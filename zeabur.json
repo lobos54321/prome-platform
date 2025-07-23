@@ -7,8 +7,8 @@
       "buildCommand": "pnpm install && pnpm build",
       "startCommand": "node server.js",
       "env": {
-        "VITE_SUPABASE_URL": "${SUPABASE_URL}",
-        "VITE_SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}"
+        "VITE_SUPABASE_URL": "https://lfjslsygnitdgdnfboiy.supabase.co",
+        "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmanNsc3lnbml0ZGdkbmZib2l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxODI5NjksImV4cCI6MjA2ODc1ODk2OX0.VpgSYmwW6mJ0iSaART16Ptb96zACJVJIdlskwBmIRsM"
       }
     }
   ]
