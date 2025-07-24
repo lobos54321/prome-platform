@@ -79,7 +79,7 @@ export class DifyTokenTracker {
     testMode = false
   ): Promise<DifyResponse> {
     try {
-      // Generate request ID for tracking
+      // Generate request ID for tracking (替换 crypto.randomUUID)
       const randomPart = Math.random().toString(36).substring(2, 9);
       const timestampPart = Date.now().toString(36);
       const requestId = randomPart + timestampPart;
@@ -92,10 +92,11 @@ export class DifyTokenTracker {
         user: userId
       };
 
-      // Send request to Dify API
+      // Send request to Dify API (修复模板字符串)
       const response = await fetch(this.config.baseUrl + '/completion-messages', {
         method: 'POST',
         headers: {
+          // 修复模板字符串
           'Authorization': 'Bearer ' + this.config.apiKey,
           'Content-Type': 'application/json'
         },
@@ -104,10 +105,11 @@ export class DifyTokenTracker {
 
       if (!response.ok) {
         const errorText = await response.text();
+        // 修复模板字符串
         throw new Error('Dify API error: ' + response.status + ' ' + errorText);
       }
 
-      const  DifyResponse = await response.json();
+      const data: DifyResponse = await response.json();
 
       // Track token usage if available
       if (data?.metadata?.usage && !testMode) {
@@ -146,7 +148,7 @@ export class DifyTokenTracker {
     testMode = false
   ): Promise<DifyResponse> {
     try {
-      // Generate request ID for tracking
+      // Generate request ID for tracking (替换 crypto.randomUUID)
       const randomPart = Math.random().toString(36).substring(2, 9);
       const timestampPart = Date.now().toString(36);
       const requestId = randomPart + timestampPart;
@@ -160,10 +162,11 @@ export class DifyTokenTracker {
         conversation_id: conversationId
       };
 
-      // Send request to Dify API
+      // Send request to Dify API (修复模板字符串)
       const response = await fetch(this.config.baseUrl + '/chat-messages', {
         method: 'POST',
         headers: {
+          // 修复模板字符串
           'Authorization': 'Bearer ' + this.config.apiKey,
           'Content-Type': 'application/json'
         },
@@ -172,6 +175,7 @@ export class DifyTokenTracker {
 
       if (!response.ok) {
         const errorText = await response.text();
+        // 修复模板字符串
         throw new Error('Dify API error: ' + response.status + ' ' + errorText);
       }
 
@@ -223,6 +227,7 @@ export class DifyTokenTracker {
         prompt_price: parseFloat(usage.prompt_price),
         completion_price: parseFloat(usage.completion_price),
         timestamp: new Date().toISOString(),
+        // 修复模板字符串
         session_id: conversationId || 'req_' + Date.now(),
         request_id: requestId,
         endpoint,
@@ -243,6 +248,7 @@ export class DifyTokenTracker {
         userId,
         amount: parseFloat(usage.total_price),
         type: 'usage',
+        // 修复模板字符串
         description: serviceId + ' - ' + usage.total_tokens + ' tokens used',
         timestamp: new Date().toISOString(),
         status: 'completed'
@@ -312,6 +318,7 @@ export class DifyTokenTracker {
       return false;
     }
     
+    // 生成 request ID (替换 crypto.randomUUID)
     const randomPart = Math.random().toString(36).substring(2, 9);
     const timestampPart = Date.now().toString(36);
     const requestId = randomPart + timestampPart;
@@ -617,9 +624,8 @@ export class DifyTokenTracker {
           ? (promptTokens * 0.00003 + completionTokens * 0.00006)
           : (promptTokens * 0.000002 + completionTokens * 0.000004);
           
-        // Generate a unique ID for the mock record
-        const randomPart = Math.random().toString(36).substring(2, 9);
-        const id = 'mock-' + randomPart + '-' + index;
+        // 修复模板字符串
+        const id = 'mock-' + index;
 
         return {
           id: id,
