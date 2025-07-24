@@ -90,7 +90,7 @@ export default function Settings() {
       
       // Update user balance
       await authService.updateBalance(amountValue);
-      setPaymentSuccess(`成功充值 ¥${amountValue.toFixed(2)}`);
+      setPaymentSuccess(`成功充值 ¥${typeof amountValue === 'number' ? amountValue.toFixed(2) : '0.00'}`);
       setAmount('100'); // Reset form
     } catch (error) {
       setPaymentError('充值处理失败，请稍后重试');
@@ -116,7 +116,9 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm text-gray-500">当前余额</p>
-                <p className="text-2xl font-bold text-green-600">¥{user.balance.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-600">
+                  ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">账户类型</p>
@@ -312,11 +314,11 @@ export default function Settings() {
                       <div className="text-sm">
                         <div className="flex justify-between mb-2">
                           <span>充值金额</span>
-                          <span>¥{parseFloat(amount).toFixed(2)}</span>
+                          <span>¥{!isNaN(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : '0.00'}</span>
                         </div>
                         <div className="flex justify-between border-t pt-2 font-medium">
                           <span>总计支付</span>
-                          <span>¥{parseFloat(amount).toFixed(2)}</span>
+                          <span>¥{!isNaN(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : '0.00'}</span>
                         </div>
                       </div>
                     </div>
