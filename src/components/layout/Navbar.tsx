@@ -1,4 +1,3 @@
-```tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -11,14 +10,16 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+// 修复：确保导入了所有用到的图标
 import { Menu, X, User, Settings, LogOut, CreditCard, Activity } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { User as UserType } from '@/types';
 
+// 使用命名导出定义组件，与 Layout.tsx 的 import { Navbar } from './Navbar'; 对应
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
-  // 增强类型安全支持：任何情况下都声明为 UserType|null
+  // 增强类型安全支持：明确声明 user 可能为 null
   const user: UserType | null = authService.getCurrentUser();
 
   const logout = () => {
@@ -26,13 +27,13 @@ export function Navbar() {
     navigate('/');
   };
 
-  // 健壮版本：任何 entry 都不会报错
+  // 健壮版本：防止 name 为 undefined/null 时调用 .split() 报错
   const getInitials = (name: string | undefined | null): string => {
     if (typeof name !== 'string') return '';
     return name
-      .split(' ')
-      .filter(Boolean)
-      .map(part => (part && part[0]) || '')
+      .split(' ') // 安全地调用 split
+      .filter(Boolean) // 过滤掉空字符串
+      .map(part => (part && part[0]) || '') // 安全地获取第一个字符
       .join('')
       .toUpperCase()
       .substring(0, 2);
@@ -66,7 +67,7 @@ export function Navbar() {
                 <Button variant="ghost" className="rounded-full h-9 w-9 p-0">
                   <Avatar>
                     <AvatarImage src={user.avatarUrl || ''} alt={user.name || ''} />
-                    {/* 将 getInitials 应用于 user.name */}
+                    {/* 安全地调用 getInitials */}
                     <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -88,8 +89,10 @@ export function Navbar() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                   <CreditCard className="mr-2 h-4 w-4" />
+                  {/* 安全地访问 balance 并格式化 */}
                   <span>余额: ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}</span>
                 </DropdownMenuItem>
+                {/* 安全地访问 role */}
                 {user.role === 'admin' && (
                   <DropdownMenuItem onClick={() => navigate('/admin')}>
                     <Settings className="mr-2 h-4 w-4" />
@@ -110,9 +113,12 @@ export function Navbar() {
             </div>
           )}
         </div>
-        <button
-          className="md:hidden p-2"
+
+        {/* Mobile Menu Button */}
+        <button 
+          className="md:hidden p-2" 
           onClick={() => setIsOpen(!isOpen)}
+          aria-label={isOpen ? "关闭菜单" : "打开菜单"} // 添加无障碍标签
         >
           {isOpen ? <X /> : <Menu />}
         </button>
@@ -163,7 +169,9 @@ export function Navbar() {
                       <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                     </Avatar>
                     <div>
+                      {/* 安全地显示用户名称 */}
                       <p className="font-medium">{user.name || '用户'}</p>
+                      {/* 安全地显示余额 */}
                       <p className="text-sm text-gray-500">余额: ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}</p>
                     </div>
                   </div>
@@ -179,6 +187,7 @@ export function Navbar() {
                       <Settings className="mr-2 h-4 w-4" />
                       设置
                     </Button>
+                    {/* 安全地检查管理员角色 */}
                     {user.role === 'admin' && (
                       <Button 
                         variant="ghost" 
@@ -233,4 +242,6 @@ export function Navbar() {
     </header>
   );
 }
-```
+
+// 文件末尾的命名导出，确保 Layout.tsx 能正确导入
+// export function Navbar() { ... } 这个声明已经在文件顶部，这里不需要重复
