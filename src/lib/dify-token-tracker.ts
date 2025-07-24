@@ -1,5 +1,3 @@
-
-```typescript
 import { supabase } from './supabase';
 import { db } from './supabase';
 
@@ -84,7 +82,7 @@ export class DifyTokenTracker {
       // Generate request ID for tracking
       const randomPart = Math.random().toString(36).substring(2, 9);
       const timestampPart = Date.now().toString(36);
-      const requestId = randomPart + timestampPart; // 使用 + 操作符拼接
+      const requestId = randomPart + timestampPart;
 
       // Prepare request payload
       const payload: DifyRequest = {
@@ -95,10 +93,10 @@ export class DifyTokenTracker {
       };
 
       // Send request to Dify API
-      const response = await fetch(`${this.config.baseUrl}/completion-messages`, {
+      const response = await fetch(this.config.baseUrl + '/completion-messages', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Authorization': 'Bearer ' + this.config.apiKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
@@ -106,10 +104,10 @@ export class DifyTokenTracker {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Dify API error: ${response.status} ${errorText}`);
+        throw new Error('Dify API error: ' + response.status + ' ' + errorText);
       }
 
-      const data: DifyResponse = await response.json();
+      const  DifyResponse = await response.json();
 
       // Track token usage if available
       if (data?.metadata?.usage && !testMode) {
@@ -151,7 +149,7 @@ export class DifyTokenTracker {
       // Generate request ID for tracking
       const randomPart = Math.random().toString(36).substring(2, 9);
       const timestampPart = Date.now().toString(36);
-      const requestId = randomPart + timestampPart; // 使用 + 操作符拼接
+      const requestId = randomPart + timestampPart;
 
       // Prepare request payload
       const payload: DifyRequest = {
@@ -163,10 +161,10 @@ export class DifyTokenTracker {
       };
 
       // Send request to Dify API
-      const response = await fetch(`${this.config.baseUrl}/chat-messages`, {
+      const response = await fetch(this.config.baseUrl + '/chat-messages', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Authorization': 'Bearer ' + this.config.apiKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
@@ -174,7 +172,7 @@ export class DifyTokenTracker {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Dify API error: ${response.status} ${errorText}`);
+        throw new Error('Dify API error: ' + response.status + ' ' + errorText);
       }
 
       const data: DifyResponse = await response.json();
@@ -225,7 +223,7 @@ export class DifyTokenTracker {
         prompt_price: parseFloat(usage.prompt_price),
         completion_price: parseFloat(usage.completion_price),
         timestamp: new Date().toISOString(),
-        session_id: conversationId || `req_${Date.now()}`,
+        session_id: conversationId || 'req_' + Date.now(),
         request_id: requestId,
         endpoint,
         model,
@@ -245,7 +243,7 @@ export class DifyTokenTracker {
         userId,
         amount: parseFloat(usage.total_price),
         type: 'usage',
-        description: `${serviceId} - ${usage.total_tokens} tokens used`,
+        description: serviceId + ' - ' + usage.total_tokens + ' tokens used',
         timestamp: new Date().toISOString(),
         status: 'completed'
       });
@@ -316,7 +314,7 @@ export class DifyTokenTracker {
     
     const randomPart = Math.random().toString(36).substring(2, 9);
     const timestampPart = Date.now().toString(36);
-    const requestId = randomPart + timestampPart; // 使用 + 操作符拼接
+    const requestId = randomPart + timestampPart;
     
     const endpoint = conversationId ? '/chat-messages' : '/completion-messages';
     await this.trackTokenUsage(
@@ -621,7 +619,7 @@ export class DifyTokenTracker {
           
         // Generate a unique ID for the mock record
         const randomPart = Math.random().toString(36).substring(2, 9);
-        const id = 'mock-' + randomPart + '-' + index; // 使用 + 操作符拼接 ID
+        const id = 'mock-' + randomPart + '-' + index;
 
         return {
           id: id,
@@ -753,4 +751,3 @@ const defaultConfig: DifyConfig = {
 };
 
 export const difyTokenTracker = new DifyTokenTracker(defaultConfig);
-```
