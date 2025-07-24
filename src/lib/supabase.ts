@@ -557,18 +557,22 @@ export class Database {
         content = payload.response.answer || '';
         title = payload.query || '未命名脚本';
       } else if (payload.messages) {
-        // Find the assistant's message
-        const assistantMessage = payload.messages.find(m => m.role === 'assistant');
-        if (assistantMessage) {
-          content = assistantMessage.content || '';
-        }
-        // Use the last user message as the title
-        const userMessages = payload.messages.filter(m => m.role === 'user');
-        if (userMessages.length > 0) {
-          const lastUserMessage = userMessages[userMessages.length - 1];
-          // 增加健壮性检查
-          if (lastUserMessage && typeof lastUserMessage.content === 'string') {
-            title = lastUserMessage.content.substring(0, 50) + (lastUserMessage.content.length > 50 ? '...' : '');
+        // 增加健壮性检查：确保 payload.messages 是数组
+        if (Array.isArray(payload.messages)) {
+          // Find the assistant's message
+          const assistantMessage = payload.messages.find(m => m.role === 'assistant');
+          if (assistantMessage) {
+            // 增加健壮性检查：确保 content 是字符串
+            content = typeof assistantMessage.content === 'string' ? assistantMessage.content : '';
+          }
+          // Use the last user message as the title
+          const userMessages = payload.messages.filter(m => m.role === 'user');
+          if (userMessages.length > 0) {
+            const lastUserMessage = userMessages[userMessages.length - 1];
+            // 增加健壮性检查：确保 lastUserMessage 和其 content 存在且是字符串
+            if (lastUserMessage && typeof lastUserMessage.content === 'string') {
+              title = lastUserMessage.content.substring(0, 50) + (lastUserMessage.content.length > 50 ? '...' : '');
+            }
           }
         }
       }
@@ -672,3 +676,5 @@ export class Database {
 }
 
 export const db = new Database();
+// 注意：这里移除了之前可能存在的 ```` ``` ```` 和多余的 `}`
+
