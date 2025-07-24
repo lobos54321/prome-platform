@@ -20,50 +20,66 @@ import { authService } from '@/lib/auth';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const user = authService.getCurrentUser();
+
+  // 严格 user 判空，防止 navigate 死循环
+  if (!user) {
+    // 不能直接 navigate()，因为会导致死循环渲染，这里用 setTimeout 保证只跳转一次
+    setTimeout(() => {
+      navigate('/login');
+    }, 0);
+    return null;
+  }
+
   const [usageRecords, setUsageRecords] = useState<TokenUsage[]>([]);
   const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
-  const user = authService.getCurrentUser();
 
+  // 加载数据时确保 catch 错误并 fallback
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
+    let cancelled = false;
     const loadData = async () => {
-      const usage = await servicesAPI.getTokenUsage(user.id);
-      const billing = await servicesAPI.getBillingRecords(user.id);
-      setUsageRecords(usage);
-      setBillingRecords(billing);
+      try {
+        const usage = await servicesAPI.getTokenUsage(user.id);
+        const billing = await servicesAPI.getBillingRecords(user.id);
+        if (!cancelled) {
+          setUsageRecords(Array.isArray(usage) ? usage : []);
+          setBillingRecords(Array.isArray(billing) ? billing : []);
+        }
+      } catch (e) {
+        setUsageRecords([]);
+        setBillingRecords([]);
+      }
     };
-
     loadData();
-  }, [user, navigate]);
+    return () => { cancelled = true; };
+  }, [user.id]);
 
-  if (!user) return null;
-
-  // Calculate stats
-  const totalSpent = billingRecords.reduce((sum, record) => sum + record.amount, 0);
+  // 计算统计数据
+  const totalSpent = billingRecords.reduce((sum, record) => typeof record.amount === 'number' ? sum + record.amount : sum, 0);
   const currentMonthUsage = usageRecords
     .filter(record => {
       const recordDate = new Date(record.timestamp);
       const now = new Date();
+      if (Number.isNaN(recordDate.getTime())) return false;
       return recordDate.getMonth() === now.getMonth() && recordDate.getFullYear() === now.getFullYear();
     })
-    .reduce((sum, record) => sum + record.tokensUsed, 0);
+    .reduce((sum, record) => typeof record.tokensUsed === 'number' ? sum + record.tokensUsed : sum, 0);
 
-  // Filter records by search term
+  // 搜索过滤
   const filteredUsage = usageRecords.filter(record => 
-    record.serviceId.toLowerCase().includes(searchTerm.toLowerCase())
+    (record.serviceId ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
   const filteredBilling = billingRecords.filter(record => 
-    record.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (record.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // 安全日期格式化
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
     return new Intl.DateTimeFormat('zh-CN', { 
       year: 'numeric', 
       month: '2-digit', 
@@ -236,10 +252,10 @@ export default function Dashboard() {
                             {record.serviceId}
                           </td>
                           <td className="px-6 py-4 text-gray-500">
-                            {record.sessionId.substring(0, 8)}...
+                            {typeof record.sessionId === 'string' ? record.sessionId.substring(0, 8) + '...' : ''}
                           </td>
                           <td className="px-6 py-4">
-                            {record.tokensUsed}
+                            {typeof record.tokensUsed === 'number' ? record.tokensUsed : ''}
                           </td>
                           <td className="px-6 py-4 text-green-600">
                             ¥{typeof record.cost === 'number' ? record.cost.toFixed(4) : '0.0000'}
@@ -288,7 +304,7 @@ export default function Dashboard() {
                       {filteredBilling.map((record, index) => (
                         <tr key={index} className="border-b">
                           <td className="px-6 py-4 font-medium">
-                            {record.id.substring(0, 8)}
+                            {typeof record.id === 'string' ? record.id.substring(0, 8) : ''}
                           </td>
                           <td className="px-6 py-4">
                             <Badge variant={record.type === 'charge' ? 'default' : 'destructive'}>
