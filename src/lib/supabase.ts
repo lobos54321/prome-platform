@@ -1,3 +1,4 @@
+```typescript
 import { createClient } from '@supabase/supabase-js';
 import { User, Service, TokenUsage, BillingRecord, PricingRule, Script, WebhookPayload } from '@/types';
 
@@ -19,7 +20,6 @@ console.log('Supabase configuration status:', isSupabaseConfigured ? 'Configured
 // Database service for ProMe application
 export class Database {
   // AUTH METHODS
-  
   async signUp(email: string, password: string, name: string): Promise<User | null> {
     try {
       // Register with Supabase Auth
@@ -34,7 +34,7 @@ export class Database {
           }
         }
       });
-
+      
       if (authError) throw authError;
       if (!authData.user) return null;
 
@@ -53,7 +53,8 @@ export class Database {
         .single();
 
       if (userError) throw userError;
-      
+      if (!userData) return null;
+
       return {
         id: userData.id,
         name: userData.name,
@@ -88,7 +89,8 @@ export class Database {
         .single();
 
       if (userError) throw userError;
-      
+      if (!userData) return null;
+
       return {
         id: userData.id,
         name: userData.name,
@@ -120,7 +122,8 @@ export class Database {
         .single();
 
       if (error) throw error;
-      
+      if (!userData) return null;
+
       return {
         id: userData.id,
         name: userData.name,
@@ -137,7 +140,6 @@ export class Database {
   }
 
   // USER METHODS
-
   async updateUserBalance(userId: string, amount: number): Promise<number> {
     try {
       // First get current balance
@@ -148,6 +150,7 @@ export class Database {
         .single();
 
       if (getUserError) throw getUserError;
+      if (!userData) throw new Error('User not found');
 
       const newBalance = userData.balance + amount;
 
@@ -160,6 +163,7 @@ export class Database {
         .single();
 
       if (updateError) throw updateError;
+      if (!updatedUser) throw new Error('Failed to update user balance');
 
       return updatedUser.balance;
     } catch (error) {
@@ -177,7 +181,8 @@ export class Database {
         .single();
 
       if (error) throw error;
-      
+      if (!data) return null;
+
       return {
         id: data.id,
         name: data.name,
@@ -194,7 +199,6 @@ export class Database {
   }
 
   // SERVICE METHODS
-
   async getServices(): Promise<Service[]> {
     try {
       const { data, error } = await supabase
@@ -202,6 +206,7 @@ export class Database {
         .select('*');
 
       if (error) throw error;
+      if (!data) return [];
 
       return data.map(service => ({
         id: service.id,
@@ -228,6 +233,7 @@ export class Database {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       return {
         id: data.id,
@@ -246,7 +252,6 @@ export class Database {
   }
 
   // TOKEN USAGE METHODS
-
   async getTokenUsage(userId: string): Promise<TokenUsage[]> {
     try {
       const { data, error } = await supabase
@@ -255,6 +260,7 @@ export class Database {
         .eq('user_id', userId);
 
       if (error) throw error;
+      if (!data) return [];
 
       return data.map(usage => ({
         id: usage.id,
@@ -287,6 +293,7 @@ export class Database {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       return {
         id: data.id,
@@ -304,7 +311,6 @@ export class Database {
   }
 
   // BILLING METHODS
-
   async getBillingRecords(userId: string): Promise<BillingRecord[]> {
     try {
       const { data, error } = await supabase
@@ -313,6 +319,7 @@ export class Database {
         .eq('user_id', userId);
 
       if (error) throw error;
+      if (!data) return [];
 
       return data.map(record => ({
         id: record.id,
@@ -345,6 +352,7 @@ export class Database {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       return {
         id: data.id,
@@ -362,7 +370,6 @@ export class Database {
   }
 
   // PRICING METHODS
-
   async getPricingRules(): Promise<PricingRule[]> {
     try {
       const { data, error } = await supabase
@@ -370,6 +377,7 @@ export class Database {
         .select('*');
 
       if (error) throw error;
+      if (!data) return [];
 
       return data.map(rule => ({
         id: rule.id,
@@ -387,7 +395,6 @@ export class Database {
   async updatePricingRule(id: string, updates: Partial<PricingRule>): Promise<PricingRule | null> {
     try {
       const updateData: Record<string, unknown> = {};
-      
       if (updates.modelName !== undefined) updateData.model_name = updates.modelName;
       if (updates.inputTokenPrice !== undefined) updateData.input_token_price = updates.inputTokenPrice;
       if (updates.outputTokenPrice !== undefined) updateData.output_token_price = updates.outputTokenPrice;
@@ -401,6 +408,7 @@ export class Database {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       return {
         id: data.id,
@@ -429,6 +437,7 @@ export class Database {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       return {
         id: data.id,
@@ -458,7 +467,6 @@ export class Database {
   }
 
   // SCRIPT METHODS
-
   async saveScript(script: Omit<Script, 'id'>): Promise<Script | null> {
     try {
       const { data, error } = await supabase
@@ -477,6 +485,7 @@ export class Database {
         .single();
 
       if (error) throw error;
+      if (!data) return null;
 
       return {
         id: data.id,
@@ -503,6 +512,7 @@ export class Database {
         .eq('user_id', userId);
 
       if (error) throw error;
+      if (!data) return [];
 
       return data.map(script => ({
         id: script.id,
@@ -522,7 +532,6 @@ export class Database {
   }
 
   // WEBHOOK METHODS
-
   async processWebhook(payload: WebhookPayload, apiKey: string): Promise<{success: boolean; message: string; scriptId?: string}> {
     try {
       // First validate the API key
@@ -541,11 +550,10 @@ export class Database {
 
       // Extract user ID from payload or default
       const userId = payload.user_id || payload.metadata?.user_id || 'anonymous';
-      
+
       // Extract content from response
       let content = '';
       let title = '';
-      
       if (payload.response) {
         content = payload.response.answer || '';
         title = payload.query || '未命名脚本';
@@ -558,7 +566,10 @@ export class Database {
         // Use the last user message as the title
         const userMessages = payload.messages.filter(m => m.role === 'user');
         if (userMessages.length > 0) {
-          title = userMessages[userMessages.length - 1].content.substring(0, 50) + '...';
+          const lastUserMessage = userMessages[userMessages.length - 1].content;
+          if (lastUserMessage) {
+            title = lastUserMessage.substring(0, 50) + (lastUserMessage.length > 50 ? '...' : '');
+          }
         }
       }
 
@@ -570,10 +581,10 @@ export class Database {
       }
 
       const isTestMode = payload.metadata?.test_mode === true;
-      
+
       // Calculate tokens (simple approximation)
       const tokensUsed = Math.ceil(content.length / 4);
-      
+
       // Get model pricing
       const { data: pricingData, error: pricingError } = await supabase
         .from('pricing_rules')
@@ -581,11 +592,11 @@ export class Database {
         .eq('model_name', payload.model || 'default')
         .eq('is_active', true)
         .single();
-        
+
       if (pricingError) {
         console.warn('Model pricing not found, using default pricing');
       }
-      
+
       const outputTokenPrice = pricingData?.output_token_price || 0.005;
       const cost = (tokensUsed * outputTokenPrice) / 1000;
 
@@ -625,7 +636,7 @@ export class Database {
           userId,
           amount: cost,
           type: 'usage',
-          description: `${script.serviceType} - ${script.title.substring(0, 30)}...`,
+          description: `${script.serviceType} - ${script.title ? script.title.substring(0, 30) : 'Untitled'}...`,
           timestamp: new Date().toISOString(),
           status: 'completed'
         });
@@ -657,3 +668,4 @@ export class Database {
 }
 
 export const db = new Database();
+```
