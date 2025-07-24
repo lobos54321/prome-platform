@@ -1,4 +1,4 @@
-好的，这是修改后的 `src/lib/webhook.ts` 文件，增加了健壮性判断：
+
 
 ```typescript
 import { WebhookPayload } from '@/types';
