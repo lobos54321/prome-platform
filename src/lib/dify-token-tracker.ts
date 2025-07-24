@@ -1,3 +1,6 @@
+好的，我已经将 `dify-token-tracker.ts` 文件中所有使用模板字符串拼接 `requestId` 的地方都改为了使用 `+` 操作符进行字符串拼接。
+
+以下是修改后的完整文件内容：
 
 ```typescript
 import { supabase } from './supabase';
@@ -84,7 +87,7 @@ export class DifyTokenTracker {
       // Generate request ID for tracking
       const randomPart = Math.random().toString(36).substring(2, 9);
       const timestampPart = Date.now().toString(36);
-      const requestId = `${randomPart}${timestampPart}`;
+      const requestId = randomPart + timestampPart; // 使用 + 操作符拼接
 
       // Prepare request payload
       const payload: DifyRequest = {
@@ -151,7 +154,7 @@ export class DifyTokenTracker {
       // Generate request ID for tracking
       const randomPart = Math.random().toString(36).substring(2, 9);
       const timestampPart = Date.now().toString(36);
-      const requestId = `${randomPart}${timestampPart}`;
+      const requestId = randomPart + timestampPart; // 使用 + 操作符拼接
 
       // Prepare request payload
       const payload: DifyRequest = {
@@ -316,7 +319,7 @@ export class DifyTokenTracker {
     
     const randomPart = Math.random().toString(36).substring(2, 9);
     const timestampPart = Date.now().toString(36);
-    const requestId = `${randomPart}${timestampPart}`;
+    const requestId = randomPart + timestampPart; // 使用 + 操作符拼接
     
     const endpoint = conversationId ? '/chat-messages' : '/completion-messages';
     await this.trackTokenUsage(
@@ -621,7 +624,7 @@ export class DifyTokenTracker {
           
         // Generate a unique ID for the mock record
         const randomPart = Math.random().toString(36).substring(2, 9);
-        const id = `mock-${randomPart}-${index}`;
+        const id = 'mock-' + randomPart + '-' + index; // 使用 + 操作符拼接 ID
 
         return {
           id: id,
