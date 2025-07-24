@@ -1,6 +1,3 @@
-
-
-```typescript
 import { createClient } from '@supabase/supabase-js';
 import { User, Service, TokenUsage, BillingRecord, PricingRule, Script, WebhookPayload } from '@/types';
 
@@ -38,7 +35,7 @@ export class Database {
       });
       
       if (authError) throw authError;
-      if (!authData.user) return null;
+      if (!authData.user) return null; // 增加健壮性检查
 
       // Create user profile in the users table
       const { data: userData, error: userError } = await supabase
@@ -653,7 +650,8 @@ export class Database {
         const user = await this.getUserById(userId);
         if (user && user.balance < 10) {
           // In a real app, send notification
-          console.log('Low balance notification for user ' + userId); // 修复模板字符串
+          // 修复模板字符串
+          console.log('Low balance notification for user ' + userId);
         }
       }
 
@@ -664,18 +662,13 @@ export class Database {
       };
     } catch (error) {
       console.error('Error processing webhook:', error);
+      // 修复模板字符串
       return {
         success: false,
-        message: 'Error processing webhook: ' + (error instanceof Error ? error.message : 'Unknown error') // 修复模板字符串
+        message: 'Error processing webhook: ' + (error instanceof Error ? error.message : 'Unknown error')
       };
     }
   }
 }
 
 export const db = new Database();
-```
-  }
-}
-
-export const db = new Database();
-```
