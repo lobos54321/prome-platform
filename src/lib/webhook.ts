@@ -1,6 +1,3 @@
-
-
-```typescript
 import { WebhookPayload } from '@/types';
 import { db } from './supabase';
 
@@ -48,9 +45,10 @@ class WebhookHandler {
       }
     } catch (error) {
       console.error('Webhook processing failed:', error);
+      // 修复模板字符串 (原第53行)
       return { 
         success: false, 
-        message: `Processing error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        message: 'Processing error: ' + (error instanceof Error ? error.message : 'Unknown error') 
       };
     }
   }
@@ -60,7 +58,8 @@ class WebhookHandler {
     try {
       // Validate that window.location exists (in browser environment)
       if (typeof window !== 'undefined' && window.location) {
-        return `${window.location.origin}${this.webhookUrl}`;
+        // 修复模板字符串
+        return window.location.origin + this.webhookUrl;
       } else {
         // Fallback for server-side or non-browser environments
         console.warn('WebhookHandler: window.location not available, returning relative URL');
@@ -153,9 +152,10 @@ class WebhookHandler {
       };
     } catch (error) {
       console.error('Error updating API key:', error);
+      // 修复模板字符串
       return { 
         success: false, 
-        message: `Update failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        message: 'Update failed: ' + (error instanceof Error ? error.message : 'Unknown error') 
       };
     }
   }
@@ -206,7 +206,8 @@ class WebhookHandler {
       }
 
       const payload: WebhookPayload = {
-        conversation_id: `conv_${Date.now()}`,
+        // 修复模板字符串
+        conversation_id: 'conv_' + Date.now(),
         user_id: user.id,
         query: title,
         response: { answer: content },
@@ -225,19 +226,14 @@ class WebhookHandler {
       };
     } catch (error) {
       console.error('Error simulating webhook:', error);
+      // 修复模板字符串
       return { 
         success: false, 
-        message: `Simulation failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        message: 'Simulation failed: ' + (error instanceof Error ? error.message : 'Unknown error') 
       };
     }
   }
 }
 
 export const webhookHandler = new WebhookHandler();
-```
 
-    await this.processWebhook(payload, this.apiKey);
-  }
-}
-
-export const webhookHandler = new WebhookHandler();
