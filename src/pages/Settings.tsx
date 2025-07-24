@@ -16,8 +16,8 @@ export default function Settings() {
 
   // Profile state
   const [profileForm, setProfileForm] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
+    name: user?.name ?? '',
+    email: user?.email ?? '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -31,6 +31,14 @@ export default function Settings() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState('');
   const [paymentError, setPaymentError] = useState('');
+
+  // 安全地获得注册时间字符串
+  const getCreatedAt = (createdAt: any) => {
+    if (!createdAt) return '未知';
+    const date = new Date(createdAt);
+    if (isNaN(date.getTime())) return '未知';
+    return date.toLocaleDateString('zh-CN');
+  };
 
   if (!user) {
     navigate('/login');
@@ -126,7 +134,7 @@ export default function Settings() {
               </div>
               <div>
                 <p className="text-sm text-gray-500">注册时间</p>
-                <p>{new Date(user.createdAt).toLocaleDateString('zh-CN')}</p>
+                <p>{getCreatedAt(user.createdAt)}</p>
               </div>
               <Button 
                 variant="outline" 
@@ -172,7 +180,7 @@ export default function Settings() {
                       <Input
                         id="name"
                         name="name"
-                        value={profileForm.name}
+                        value={profileForm.name ?? ''}
                         onChange={handleProfileChange}
                       />
                     </div>
@@ -182,7 +190,7 @@ export default function Settings() {
                         id="email"
                         name="email"
                         type="email"
-                        value={profileForm.email}
+                        value={profileForm.email ?? ''}
                         onChange={handleProfileChange}
                         disabled
                       />
@@ -314,11 +322,15 @@ export default function Settings() {
                       <div className="text-sm">
                         <div className="flex justify-between mb-2">
                           <span>充值金额</span>
-                          <span>¥{!isNaN(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : '0.00'}</span>
+                          <span>
+                            ¥{!isNaN(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : '0.00'}
+                          </span>
                         </div>
                         <div className="flex justify-between border-t pt-2 font-medium">
                           <span>总计支付</span>
-                          <span>¥{!isNaN(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : '0.00'}</span>
+                          <span>
+                            ¥{!isNaN(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : '0.00'}
+                          </span>
                         </div>
                       </div>
                     </div>
