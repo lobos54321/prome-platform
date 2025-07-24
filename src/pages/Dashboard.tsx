@@ -87,7 +87,9 @@ export default function Dashboard() {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">¥{user.balance.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-green-600">
+              ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}
+            </div>
             <p className="text-xs text-muted-foreground">
               余额过低时会影响服务使用
             </p>
@@ -117,7 +119,9 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥{totalSpent.toFixed(2)}</div>
+            <div className="text-2xl font-bold">
+              ¥{typeof totalSpent === 'number' ? totalSpent.toFixed(2) : '0.00'}
+            </div>
             <p className="text-xs text-muted-foreground">
               共产生{billingRecords.length}条账单
             </p>
@@ -238,7 +242,7 @@ export default function Dashboard() {
                             {record.tokensUsed}
                           </td>
                           <td className="px-6 py-4 text-green-600">
-                            ¥{record.cost.toFixed(4)}
+                            ¥{typeof record.cost === 'number' ? record.cost.toFixed(4) : '0.0000'}
                           </td>
                           <td className="px-6 py-4 text-gray-500">
                             {formatDate(record.timestamp)}
@@ -295,7 +299,7 @@ export default function Dashboard() {
                             {record.description}
                           </td>
                           <td className={`px-6 py-4 ${record.type === 'charge' ? 'text-green-600' : 'text-red-600'}`}>
-                            {record.type === 'charge' ? '+' : '-'}¥{record.amount.toFixed(2)}
+                            {record.type === 'charge' ? '+' : '-'}¥{typeof record.amount === 'number' ? record.amount.toFixed(2) : '0.00'}
                           </td>
                           <td className="px-6 py-4 text-gray-500">
                             {formatDate(record.timestamp)}
