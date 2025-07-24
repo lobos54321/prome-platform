@@ -1,6 +1,3 @@
-好的，我已经找到了 `dify-token-tracker.ts` 文件中使用 `Math.random().toString(36).substr(2, 9)` 的地方，并按照您的要求进行了修改，使用变量提前计算，避免在模板字符串中使用过多链式表达式。
-
-以下是修改后的完整 `dify-token-tracker.ts` 文件：
 
 ```typescript
 import { supabase } from './supabase';
