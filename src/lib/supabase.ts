@@ -1,3 +1,5 @@
+
+
 ```typescript
 import { createClient } from '@supabase/supabase-js';
 import { User, Service, TokenUsage, BillingRecord, PricingRule, Script, WebhookPayload } from '@/types';
@@ -53,7 +55,7 @@ export class Database {
         .single();
 
       if (userError) throw userError;
-      if (!userData) return null;
+      if (!userData) return null; // 增加健壮性检查
 
       return {
         id: userData.id,
@@ -89,7 +91,7 @@ export class Database {
         .single();
 
       if (userError) throw userError;
-      if (!userData) return null;
+      if (!userData) return null; // 增加健壮性检查
 
       return {
         id: userData.id,
@@ -122,7 +124,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!userData) return null;
+      if (!userData) return null; // 增加健壮性检查
 
       return {
         id: userData.id,
@@ -150,7 +152,7 @@ export class Database {
         .single();
 
       if (getUserError) throw getUserError;
-      if (!userData) throw new Error('User not found');
+      if (!userData) throw new Error('User not found'); // 增加健壮性检查
 
       const newBalance = userData.balance + amount;
 
@@ -163,7 +165,7 @@ export class Database {
         .single();
 
       if (updateError) throw updateError;
-      if (!updatedUser) throw new Error('Failed to update user balance');
+      if (!updatedUser) throw new Error('Failed to update user balance'); // 增加健壮性检查
 
       return updatedUser.balance;
     } catch (error) {
@@ -181,7 +183,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data) return null; // 增加健壮性检查
 
       return {
         id: data.id,
@@ -206,7 +208,7 @@ export class Database {
         .select('*');
 
       if (error) throw error;
-      if (!data) return [];
+      if (!data) return []; // 增加健壮性检查
 
       return data.map(service => ({
         id: service.id,
@@ -233,7 +235,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data) return null; // 增加健壮性检查
 
       return {
         id: data.id,
@@ -260,7 +262,7 @@ export class Database {
         .eq('user_id', userId);
 
       if (error) throw error;
-      if (!data) return [];
+      if (!data) return []; // 增加健壮性检查
 
       return data.map(usage => ({
         id: usage.id,
@@ -293,7 +295,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data) return null; // 增加健壮性检查
 
       return {
         id: data.id,
@@ -319,7 +321,7 @@ export class Database {
         .eq('user_id', userId);
 
       if (error) throw error;
-      if (!data) return [];
+      if (!data) return []; // 增加健壮性检查
 
       return data.map(record => ({
         id: record.id,
@@ -352,7 +354,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data) return null; // 增加健壮性检查
 
       return {
         id: data.id,
@@ -377,7 +379,7 @@ export class Database {
         .select('*');
 
       if (error) throw error;
-      if (!data) return [];
+      if (!data) return []; // 增加健壮性检查
 
       return data.map(rule => ({
         id: rule.id,
@@ -408,7 +410,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data) return null; // 增加健壮性检查
 
       return {
         id: data.id,
@@ -437,7 +439,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data) return null; // 增加健壮性检查
 
       return {
         id: data.id,
@@ -485,7 +487,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data) return null; // 增加健壮性检查
 
       return {
         id: data.id,
@@ -512,7 +514,7 @@ export class Database {
         .eq('user_id', userId);
 
       if (error) throw error;
-      if (!data) return [];
+      if (!data) return []; // 增加健壮性检查
 
       return data.map(script => ({
         id: script.id,
@@ -566,9 +568,10 @@ export class Database {
         // Use the last user message as the title
         const userMessages = payload.messages.filter(m => m.role === 'user');
         if (userMessages.length > 0) {
-          const lastUserMessage = userMessages[userMessages.length - 1].content;
-          if (lastUserMessage) {
-            title = lastUserMessage.substring(0, 50) + (lastUserMessage.length > 50 ? '...' : '');
+          const lastUserMessage = userMessages[userMessages.length - 1];
+          // 增加健壮性检查
+          if (lastUserMessage && typeof lastUserMessage.content === 'string') {
+            title = lastUserMessage.content.substring(0, 50) + (lastUserMessage.content.length > 50 ? '...' : '');
           }
         }
       }
@@ -628,7 +631,8 @@ export class Database {
           tokensUsed,
           cost,
           timestamp: new Date().toISOString(),
-          sessionId: `webhook_${payload.conversation_id || Date.now()}`
+          // 修复模板字符串
+          sessionId: 'webhook_' + (payload.conversation_id || Date.now())
         });
 
         // Add billing record
@@ -636,7 +640,8 @@ export class Database {
           userId,
           amount: cost,
           type: 'usage',
-          description: `${script.serviceType} - ${script.title ? script.title.substring(0, 30) : 'Untitled'}...`,
+          // 修复模板字符串
+          description: script.serviceType + ' - ' + (script.title ? script.title.substring(0, 30) : 'Untitled') + '...',
           timestamp: new Date().toISOString(),
           status: 'completed'
         });
@@ -648,7 +653,7 @@ export class Database {
         const user = await this.getUserById(userId);
         if (user && user.balance < 10) {
           // In a real app, send notification
-          console.log(`Low balance notification for user ${userId}`);
+          console.log('Low balance notification for user ' + userId); // 修复模板字符串
         }
       }
 
@@ -661,9 +666,14 @@ export class Database {
       console.error('Error processing webhook:', error);
       return {
         success: false,
-        message: `Error processing webhook: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: 'Error processing webhook: ' + (error instanceof Error ? error.message : 'Unknown error') // 修复模板字符串
       };
     }
+  }
+}
+
+export const db = new Database();
+```
   }
 }
 
