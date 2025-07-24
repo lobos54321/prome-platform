@@ -78,7 +78,6 @@ interface TokenUsageByModel {
   request_count: number;
 }
 
-// Dummy data for token usage over time until we can fetch real data
 const generateDailyUsageData = (days: number) => {
   const data = [];
   const today = new Date();
@@ -99,7 +98,6 @@ const generateDailyUsageData = (days: number) => {
 // Colors for charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B'];
 
-// Detailed data table component
 interface DetailedDataTableProps {
   userId: string;
   timeRange: '7d' | '30d' | 'this_month' | 'this_week';
@@ -250,14 +248,12 @@ function DetailedDataTable({ userId, timeRange }: DetailedDataTableProps) {
           </thead>
           <tbody>
             {isLoading ? (
-              // Loading state
               <tr>
                 <td colSpan={8} className="text-center py-8">
                   加载中...
                 </td>
               </tr>
             ) : records.length > 0 ? (
-              // Data rows
               records.map((record, index) => (
                 <tr key={record.id || index} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4">{format(new Date(record.timestamp), 'yyyy-MM-dd HH:mm:ss', { locale: zhCN })}</td>
@@ -270,12 +266,15 @@ function DetailedDataTable({ userId, timeRange }: DetailedDataTableProps) {
                   <td className="text-right py-3 px-4">{record.prompt_tokens || 0}</td>
                   <td className="text-right py-3 px-4">{record.completion_tokens || 0}</td>
                   <td className="text-right py-3 px-4">{record.tokens_used || 0}</td>
-                  <td className="text-right py-3 px-4">¥{record.cost?.toFixed(6) || '0.000000'}</td>
-                  <td className="text-right py-3 px-4">{record.latency ? `${record.latency.toFixed(2)}秒` : 'N/A'}</td>
+                  <td className="text-right py-3 px-4">
+                    ¥{typeof record.cost === 'number' ? record.cost.toFixed(6) : '0.000000'}
+                  </td>
+                  <td className="text-right py-3 px-4">
+                    {typeof record.latency === 'number' ? `${record.latency.toFixed(2)}秒` : 'N/A'}
+                  </td>
                 </tr>
               ))
             ) : (
-              // No data
               <tr>
                 <td colSpan={8} className="text-center py-8">
                   没有找到记录
@@ -359,39 +358,26 @@ export default function TokenDashboard() {
     
     setIsLoading(true);
     try {
-      // Check if Supabase is configured
       const isSupabaseConfigured = 
         import.meta.env.VITE_SUPABASE_URL && 
         import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       console.log('Token Dashboard: Supabase configured:', isSupabaseConfigured);
       const { startDate, endDate } = getDateRange();
-      
-      // Use dummy user ID if Supabase is not configured
       const effectiveUserId = isSupabaseConfigured ? user.id : 'demo-user';
       
-      // Load summary data
       const summaryData = await difyTokenTracker.getTokenUsageSummary(effectiveUserId, startDate, endDate);
       setSummary(summaryData);
-      
-      // Load service breakdown
       const serviceBreakdown = await difyTokenTracker.getTokenUsageByService(effectiveUserId, startDate, endDate);
       setServiceData(serviceBreakdown);
-      
-      // Load model breakdown
       const modelBreakdown = await difyTokenTracker.getTokenUsageByModel(effectiveUserId, startDate, endDate);
       setModelData(modelBreakdown);
-      
-      // Load daily usage data
       const dailyData = await difyTokenTracker.getDailyTokenUsage(effectiveUserId, startDate, endDate);
       setDailyUsageData(dailyData);
       
     } catch (error) {
       console.error('Error loading token usage data:', error);
-      // Use fallback dummy data in case of errors
       setDailyUsageData(generateDailyUsageData(timeRange === '7d' ? 7 : 30));
-      
-      // Set dummy summary data
       setSummary({
         total_prompt_tokens: 12500,
         total_completion_tokens: 8750,
@@ -401,16 +387,12 @@ export default function TokenDashboard() {
         request_count: 25,
         currency: 'USD'
       });
-      
-      // Set dummy service data
       setServiceData([
         { service_id: 'chat-service', service_name: '聊天助手', total_tokens: 8500, total_cost: 0.17, request_count: 10 },
         { service_id: 'writing-service', service_name: '内容创作', total_tokens: 6200, total_cost: 0.124, request_count: 8 },
         { service_id: 'code-service', service_name: '代码助手', total_tokens: 4300, total_cost: 0.086, request_count: 5 },
         { service_id: 'document-qa', service_name: '文档问答', total_tokens: 2250, total_cost: 0.045, request_count: 2 }
       ]);
-      
-      // Set dummy model data
       setModelData([
         { model: 'gpt-3.5-turbo', total_tokens: 9800, total_cost: 0.196, request_count: 12 },
         { model: 'gpt-4', total_tokens: 5400, total_cost: 0.162, request_count: 6 },
@@ -427,7 +409,6 @@ export default function TokenDashboard() {
       navigate('/login');
       return;
     }
-    
     loadData();
   }, [user, navigate, timeRange]);
 
@@ -444,16 +425,15 @@ export default function TokenDashboard() {
           <p className="text-sm font-semibold">{`${label}`}</p>
           <p className="text-xs text-blue-600">{`输入: ${payload[0]?.value?.toLocaleString() || 0} tokens`}</p>
           <p className="text-xs text-green-600">{`输出: ${payload[1]?.value?.toLocaleString() || 0} tokens`}</p>
-          {payload[2] && <p className="text-xs text-orange-600">{`费用: ¥${payload[2]?.value?.toFixed(4) || '0.0000'}`}</p>}
+          {payload[2] && <p className="text-xs text-orange-600">{`费用: ¥${typeof payload[2]?.value === 'number' ? payload[2].value.toFixed(4) : '0.0000'}`}</p>}
         </div>
       );
     }
-  
     return null;
   };
 
   const formatCurrency = (value: number) => {
-    return `¥${value.toFixed(4)}`;
+    return `¥${typeof value === 'number' ? value.toFixed(4) : '0.0000'}`;
   };
 
   return (
@@ -510,9 +490,11 @@ export default function TokenDashboard() {
             <BadgeDollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">¥{summary?.total_cost?.toFixed(4) || '0.0000'}</div>
+            <div className="text-2xl font-bold">¥{typeof summary?.total_cost === 'number' ? summary.total_cost.toFixed(4) : '0.0000'}</div>
             <p className="text-xs text-muted-foreground">
-              平均每次请求: ¥{summary ? (summary.total_cost / summary.request_count).toFixed(4) : '0.0000'}
+              平均每次请求: ¥{summary && typeof summary.total_cost === 'number' && typeof summary.request_count === 'number'
+                ? (summary.total_cost / summary.request_count).toFixed(4)
+                : '0.0000'}
             </p>
           </CardContent>
         </Card>
@@ -525,7 +507,9 @@ export default function TokenDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{summary?.request_count?.toLocaleString() || '0'}</div>
             <p className="text-xs text-muted-foreground">
-              平均每次: {summary?.average_tokens_per_request?.toFixed(0) || '0'} tokens
+              平均每次: {typeof summary?.average_tokens_per_request === 'number'
+                ? summary.average_tokens_per_request.toFixed(0)
+                : '0'} tokens
             </p>
           </CardContent>
         </Card>
@@ -536,7 +520,7 @@ export default function TokenDashboard() {
             <Timer className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Math.random() * 0.5 + 0.8 /* Placeholder */}秒</div>
+            <div className="text-2xl font-bold">{(Math.random() * 0.5 + 0.8).toFixed(2)}秒</div>
             <p className="text-xs text-muted-foreground">
               所有API请求的平均值
             </p>
@@ -620,7 +604,9 @@ export default function TokenDashboard() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis tickFormatter={formatCurrency} />
-                  <Tooltip formatter={(value: number): [string, string] => [`¥${value.toFixed(4)}`, '费用']} />
+                  <Tooltip formatter={(value: number): [string, string] =>
+                    [`¥${typeof value === 'number' ? value.toFixed(4) : '0.0000'}`, '费用']
+                  } />
                   <Legend />
                   <Line 
                     type="monotone" 
@@ -692,7 +678,9 @@ export default function TokenDashboard() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number): string => `¥${value.toFixed(4)}`} />
+                    <Tooltip formatter={(value: number): string =>
+                      `¥${typeof value === 'number' ? value.toFixed(4) : '0.0000'}`
+                    } />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -725,9 +713,11 @@ export default function TokenDashboard() {
                             <td className="py-3 px-4 font-medium">{service.service_name}</td>
                             <td className="text-right py-3 px-4">{service.request_count.toLocaleString()}</td>
                             <td className="text-right py-3 px-4">{service.total_tokens.toLocaleString()}</td>
-                            <td className="text-right py-3 px-4">¥{service.total_cost.toFixed(4)}</td>
+                            <td className="text-right py-3 px-4">¥{typeof service.total_cost === 'number' ? service.total_cost.toFixed(4) : '0.0000'}</td>
                             <td className="text-right py-3 px-4">
-                              ¥{(service.total_cost / service.request_count).toFixed(4)}
+                              ¥{typeof service.total_cost === 'number' && typeof service.request_count === 'number'
+                                ? (service.total_cost / service.request_count).toFixed(4)
+                                : '0.0000'}
                             </td>
                           </tr>
                         ))
@@ -800,7 +790,9 @@ export default function TokenDashboard() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number): string => `¥${value.toFixed(4)}`} />
+                    <Tooltip formatter={(value: number): string =>
+                      `¥${typeof value === 'number' ? value.toFixed(4) : '0.0000'}`
+                    } />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -833,9 +825,11 @@ export default function TokenDashboard() {
                             <td className="py-3 px-4 font-medium">{model.model}</td>
                             <td className="text-right py-3 px-4">{model.request_count.toLocaleString()}</td>
                             <td className="text-right py-3 px-4">{model.total_tokens.toLocaleString()}</td>
-                            <td className="text-right py-3 px-4">¥{model.total_cost.toFixed(4)}</td>
+                            <td className="text-right py-3 px-4">¥{typeof model.total_cost === 'number' ? model.total_cost.toFixed(4) : '0.0000'}</td>
                             <td className="text-right py-3 px-4">
-                              ¥{(model.total_cost / model.request_count).toFixed(4)}
+                              ¥{typeof model.total_cost === 'number' && typeof model.request_count === 'number'
+                                ? (model.total_cost / model.request_count).toFixed(4)
+                                : '0.0000'}
                             </td>
                           </tr>
                         ))
