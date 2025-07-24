@@ -227,17 +227,29 @@ export default function Pricing() {
                     </div>
                     <div>
                       <p className="text-gray-600">输入费用</p>
-                      <p>¥{((inputTokens / 1000) * (modelPrices.find(p => p.modelName === selectedModel)?.inputTokenPrice || 0)).toFixed(4)}</p>
+                      <p>
+                        ¥{Number(
+                          (inputTokens / 1000) *
+                          (modelPrices.find(p => p.modelName === selectedModel)?.inputTokenPrice || 0)
+                        ).toFixed(4)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-600">输出费用</p>
-                      <p>¥{((outputTokens / 1000) * (modelPrices.find(p => p.modelName === selectedModel)?.outputTokenPrice || 0)).toFixed(4)}</p>
+                      <p>
+                        ¥{Number(
+                          (outputTokens / 1000) *
+                          (modelPrices.find(p => p.modelName === selectedModel)?.outputTokenPrice || 0)
+                        ).toFixed(4)}
+                      </p>
                     </div>
                   </div>
                   <div className="border-t mt-2 pt-2">
                     <div className="flex justify-between font-medium">
                       <span>总费用</span>
-                      <span className="text-blue-600">¥{calculatedPrice.toFixed(4)}</span>
+                      <span className="text-blue-600">
+                        ¥{typeof calculatedPrice === 'number' ? calculatedPrice.toFixed(4) : '0.0000'}
+                      </span>
                     </div>
                   </div>
                 </div>
