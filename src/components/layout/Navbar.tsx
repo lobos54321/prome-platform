@@ -1,5 +1,3 @@
-
-
 ```tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -13,15 +11,14 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-// 修复：导入 Activity 图标
 import { Menu, X, User, Settings, LogOut, CreditCard, Activity } from 'lucide-react';
 import { authService } from '@/lib/auth';
-import { User as UserType } from '@/types'; // 导入 User 类型以获得更好的类型安全
+import { User as UserType } from '@/types';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
-  // 增强类型安全性：明确 user 的类型可能为 UserType 或 null
+  // 增强类型安全支持：任何情况下都声明为 UserType|null
   const user: UserType | null = authService.getCurrentUser();
 
   const logout = () => {
@@ -29,15 +26,13 @@ export function Navbar() {
     navigate('/');
   };
 
-  // 修改后的 getInitials 函数，增加了健壮性检查
-  const getInitials = (name: string | undefined | null) => {
-    // 检查 name 是否为有效字符串
-    if (typeof name !== 'string') {
-      return ''; // 如果不是字符串，返回空字符串作为 fallback
-    }
+  // 健壮版本：任何 entry 都不会报错
+  const getInitials = (name: string | undefined | null): string => {
+    if (typeof name !== 'string') return '';
     return name
-      .split(' ') // 现在可以安全地调用 .split()
-      .map(part => part[0])
+      .split(' ')
+      .filter(Boolean)
+      .map(part => (part && part[0]) || '')
       .join('')
       .toUpperCase()
       .substring(0, 2);
@@ -70,7 +65,7 @@ export function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="rounded-full h-9 w-9 p-0">
                   <Avatar>
-                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarImage src={user.avatarUrl || ''} alt={user.name || ''} />
                     {/* 将 getInitials 应用于 user.name */}
                     <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
@@ -83,7 +78,6 @@ export function Navbar() {
                   <User className="mr-2 h-4 w-4" />
                   <span>控制台</span>
                 </DropdownMenuItem>
-                {/* 修复：添加了 Activity 图标 */}
                 <DropdownMenuItem onClick={() => navigate('/token-dashboard')}>
                   <Activity className="mr-2 h-4 w-4" />
                   <span>Token 分析</span>
@@ -94,10 +88,8 @@ export function Navbar() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                   <CreditCard className="mr-2 h-4 w-4" />
-                  {/* 安全地访问 user.balance */}
-                  <span>余额: ¥{user.balance !== undefined ? user.balance.toFixed(2) : '0.00'}</span>
+                  <span>余额: ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}</span>
                 </DropdownMenuItem>
-                {/* 安全地访问 user.role */}
                 {user.role === 'admin' && (
                   <DropdownMenuItem onClick={() => navigate('/admin')}>
                     <Settings className="mr-2 h-4 w-4" />
@@ -118,10 +110,8 @@ export function Navbar() {
             </div>
           )}
         </div>
-
-        {/* Mobile Menu Button */}
-        <button 
-          className="md:hidden p-2" 
+        <button
+          className="md:hidden p-2"
           onClick={() => setIsOpen(!isOpen)}
         >
           {isOpen ? <X /> : <Menu />}
@@ -169,14 +159,12 @@ export function Navbar() {
                 <div className="pt-2 border-t">
                   <div className="flex items-center space-x-3 mb-3">
                     <Avatar>
-                      <AvatarImage src={user.avatarUrl} alt={user.name} />
-                      {/* 将 getInitials 应用于 user.name */}
+                      <AvatarImage src={user.avatarUrl || ''} alt={user.name || ''} />
                       <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                     </Avatar>
                     <div>
-                      {/* 安全地访问 user.name 和 user.balance */}
                       <p className="font-medium">{user.name || '用户'}</p>
-                      <p className="text-sm text-gray-500">余额: ¥{user.balance !== undefined ? user.balance.toFixed(2) : '0.00'}</p>
+                      <p className="text-sm text-gray-500">余额: ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}</p>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -191,7 +179,6 @@ export function Navbar() {
                       <Settings className="mr-2 h-4 w-4" />
                       设置
                     </Button>
-                    {/* 安全地访问 user.role */}
                     {user.role === 'admin' && (
                       <Button 
                         variant="ghost" 
@@ -246,5 +233,4 @@ export function Navbar() {
     </header>
   );
 }
-
 ```
