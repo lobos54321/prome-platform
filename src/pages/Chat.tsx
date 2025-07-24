@@ -308,7 +308,7 @@ export default function Chat() {
                     
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <Label>温度 ({settings.temperature.toFixed(1)})</Label>
+                        <Label>温度 ({typeof settings.temperature === 'number' ? settings.temperature.toFixed(1) : '0.0'})</Label>
                       </div>
                       <Slider
                         min={0}
@@ -352,7 +352,7 @@ export default function Chat() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">费用：</span>
                       <span className={settings.testMode ? "text-blue-600" : "text-green-600"}>
-                        {settings.testMode ? '(测试)' : ''} ¥{lastUsage.cost.toFixed(4)}
+                        {settings.testMode ? '(测试)' : ''} ¥{typeof lastUsage.cost === 'number' ? lastUsage.cost.toFixed(4) : '0.0000'}
                       </span>
                     </div>
                   </div>
