@@ -45,7 +45,7 @@ class WebhookHandler {
       }
     } catch (error) {
       console.error('Webhook processing failed:', error);
-      // 修复模板字符串 (原第53行)
+      // 修复模板字符串 (对应之前的第53行)
       return { 
         success: false, 
         message: 'Processing error: ' + (error instanceof Error ? error.message : 'Unknown error') 
@@ -58,7 +58,7 @@ class WebhookHandler {
     try {
       // Validate that window.location exists (in browser environment)
       if (typeof window !== 'undefined' && window.location) {
-        // 修复模板字符串
+        // 修复模板字符串 (对应之前的第77行)
         return window.location.origin + this.webhookUrl;
       } else {
         // Fallback for server-side or non-browser environments
@@ -152,7 +152,7 @@ class WebhookHandler {
       };
     } catch (error) {
       console.error('Error updating API key:', error);
-      // 修复模板字符串
+      // 修复模板字符串 (对应之前的第137行)
       return { 
         success: false, 
         message: 'Update failed: ' + (error instanceof Error ? error.message : 'Unknown error') 
@@ -206,7 +206,7 @@ class WebhookHandler {
       }
 
       const payload: WebhookPayload = {
-        // 修复模板字符串
+        // 修复模板字符串 (对应之前的第181行)
         conversation_id: 'conv_' + Date.now(),
         user_id: user.id,
         query: title,
@@ -226,7 +226,7 @@ class WebhookHandler {
       };
     } catch (error) {
       console.error('Error simulating webhook:', error);
-      // 修复模板字符串
+      // 修复模板字符串 (对应之前的第201行)
       return { 
         success: false, 
         message: 'Simulation failed: ' + (error instanceof Error ? error.message : 'Unknown error') 
