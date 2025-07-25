@@ -5,7 +5,6 @@ class AuthService {
   private currentUser: User | null = null;
   private isInitialized = false;
   private isValidating = false;
-  private validationPromise: Promise<void> | null = null;
 
   // Get current user synchronously (from memory)
   getCurrentUserSync(): User | null {
@@ -150,7 +149,7 @@ class AuthService {
 
   // 静默验证会话
   private async validateSessionQuietly(): Promise<void> {
-    if (this.isValidating || this.validationPromise) return;
+    if (this.isValidating) return;
     
     try {
       this.isValidating = true;
@@ -160,6 +159,10 @@ class AuthService {
         // 会话已失效，立即清除用户状态
         console.log('Session validation failed, clearing user state');
         this.clearUserState();
+        // 触发认证状态变更事件
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+          detail: { user: null } 
+        }));
       } else if (user && user.id && this.currentUser) {
         // 更新用户信息
         this.currentUser = {
@@ -184,6 +187,10 @@ class AuthService {
       console.warn('Session validation failed:', error);
       if (this.currentUser) {
         this.clearUserState();
+        // 触发认证状态变更事件
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+          detail: { user: null } 
+        }));
       }
     } finally {
       this.isValidating = false;
@@ -287,7 +294,6 @@ class AuthService {
     
     // 停止任何正在进行的验证
     this.isValidating = false;
-    this.validationPromise = null;
     
     // 清除用户状态
     this.clearUserState();
@@ -384,28 +390,6 @@ class AuthService {
 }
 
 export const authService = new AuthService();
-
-// 页面加载时初始化认证状态 - 只调用一次
-let initPromise: Promise<void> | null = null;
-
-export async function initializeAuthOnLoad(): Promise<void> {
-  if (initPromise) {
-    return initPromise;
-  }
-  
-  initPromise = (async () => {
-    try {
-      console.log('Starting auth initialization on page load...');
-      await authService.initializeAuth();
-      console.log('Auth initialization completed');
-    } catch (error) {
-      console.error('Auth initialization failed:', error);
-      authService.forceLogout();
-    }
-  })();
-  
-  return initPromise;
-}
 
 // 开发环境调试方法
 if (import.meta.env.DEV) {
