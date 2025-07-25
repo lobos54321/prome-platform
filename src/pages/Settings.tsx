@@ -87,8 +87,8 @@ export default function Settings() {
     setIsProcessing(true);
 
     const amountValue = parseFloat(amount);
-    if (isNaN(amountValue) || amountValue < 10) {
-      setPaymentError('请输入有效的充值金额（最少10元）');
+    if (isNaN(amountValue) || amountValue < 5) {
+      setPaymentError('请输入有效的充值金额（最少5元）');
       setIsProcessing(false);
       return;
     }
@@ -279,8 +279,8 @@ export default function Settings() {
                         <Input
                           id="amount"
                           type="number"
-                          min="10"
-                          step="10"
+                          min="5"
+                          step="5"
                           value={amount}
                           onChange={(e) => setAmount(e.target.value)}
                           className="rounded-l-none"
