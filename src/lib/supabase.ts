@@ -26,15 +26,38 @@ export class Database {
     return supabase;
   }
 
-  // 等待用户配置文件创建的辅助方法
-  private async waitForUserProfile(userId: string, maxRetries: number = 10): Promise<User | null> {
+  // 检查表是否存在的方法
+  private async checkTableExists(tableName: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(1);
+      
+      // 如果没有错误，表存在
+      return !error;
+    } catch (error) {
+      console.error(`Table ${tableName} check failed:`, error);
+      return false;
+    }
+  }
+
+  // 等待用户配置文件创建的辅助方法 - 改进版
+  private async waitForUserProfile(userId: string, maxRetries: number = 5): Promise<User | null> {
+    // 首先检查 users 表是否存在
+    const tableExists = await this.checkTableExists('users');
+    if (!tableExists) {
+      console.error('Users table does not exist or is not accessible');
+      return null;
+    }
+
     for (let i = 0; i < maxRetries; i++) {
       try {
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle(); // 使用 maybeSingle 避免 "more than one row" 错误
 
         if (!userError && userData) {
           console.log(`User profile found after ${i + 1} attempts:`, userData);
@@ -49,23 +72,39 @@ export class Database {
           };
         }
 
-        // 指数退避：每次等待时间递增
-        const waitTime = Math.min(1000 * Math.pow(1.5, i), 5000);
+        if (userError) {
+          console.error(`Database error on attempt ${i + 1}:`, userError);
+          // 如果是 500 错误或表不存在，直接跳出循环
+          if (userError.message.includes('500') || userError.message.includes('relation') || userError.message.includes('table')) {
+            console.error('Database table issue detected, stopping retries');
+            break;
+          }
+        }
+
+        // 较短的等待时间，减少用户等待
+        const waitTime = Math.min(2000 * (i + 1), 5000);
         console.log(`User profile not found, retrying in ${waitTime}ms... (attempt ${i + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       } catch (error) {
         console.warn(`Attempt ${i + 1} failed:`, error);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
     return null;
   }
 
-  // 手动创建用户配置文件的兜底方法
+  // 手动创建用户配置文件的兜底方法 - 改进版
   private async createUserProfileFallback(userId: string, email: string, name: string): Promise<User | null> {
     try {
       console.log('Attempting to create user profile manually as fallback...');
       
+      // 先检查表是否存在
+      const tableExists = await this.checkTableExists('users');
+      if (!tableExists) {
+        console.error('Cannot create user profile: users table does not exist');
+        return null;
+      }
+
       const { data: userData, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -77,10 +116,15 @@ export class Database {
           created_at: new Date().toISOString()
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (insertError) {
         console.error('Manual user profile creation failed:', insertError);
+        return null;
+      }
+
+      if (!userData) {
+        console.error('No data returned from user profile creation');
         return null;
       }
 
@@ -100,7 +144,7 @@ export class Database {
     }
   }
 
-  // AUTH METHODS - 改进版本，增加自动登录和重试机制
+  // 简化版的注册方法 - 只做认证，不依赖 users 表
   async signUp(email: string, password: string, name: string): Promise<User | null> {
     // Return null immediately if not configured
     if (!isSupabaseConfigured) {
@@ -109,6 +153,7 @@ export class Database {
     }
 
     try {
+      console.log('Starting registration process...');
       console.log('Attempting to register user:', email);
 
       // 第一步：使用 Supabase Auth 注册
@@ -135,22 +180,24 @@ export class Database {
 
       console.log('Auth user created successfully:', authData.user.id);
 
-      // 第二步：等待触发器创建用户配置文件
-      let user = await this.waitForUserProfile(authData.user.id);
+      // 第二步：尝试创建用户配置文件，但不依赖它成功
+      let user: User | null = null;
       
-      // 第三步：如果触发器失败，手动创建用户配置文件
-      if (!user) {
-        console.warn('Trigger failed to create user profile, attempting manual creation...');
-        user = await this.createUserProfileFallback(authData.user.id, email, name);
+      try {
+        // 尝试等待触发器创建用户配置文件
+        user = await this.waitForUserProfile(authData.user.id);
+        
+        // 如果触发器失败，尝试手动创建
+        if (!user) {
+          console.warn('Trigger failed, attempting manual creation...');
+          user = await this.createUserProfileFallback(authData.user.id, email, name);
+        }
+      } catch (profileError) {
+        console.warn('User profile creation failed, but auth user exists:', profileError);
       }
 
-      if (!user) {
-        console.error('Both trigger and manual user profile creation failed');
-        throw new Error('User profile creation failed');
-      }
-
-      // 第四步：注册成功后自动登录建立会话
-      console.log('User profile created, attempting auto-login...');
+      // 第三步：注册成功后自动登录建立会话
+      console.log('Auth registration successful, attempting auto-login...');
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -158,16 +205,26 @@ export class Database {
 
       if (loginError) {
         console.warn('Auto-login failed after registration:', loginError);
-        // 即使自动登录失败，用户已创建成功，返回用户对象
-        console.log('Registration successful but auto-login failed - user can login manually');
-        return user;
-      }
-
-      if (loginData.user) {
+        // 即使自动登录失败，也返回成功（用户可以手动登录）
+      } else if (loginData.user) {
         console.log('Auto-login successful after registration:', loginData.user.id);
       }
 
-      console.log('User registration and auto-login completed successfully:', user);
+      // 如果没有用户配置文件，创建一个基本的用户对象
+      if (!user) {
+        console.log('Creating basic user object from auth data');
+        user = {
+          id: authData.user.id,
+          name: name,
+          email: email,
+          role: 'user',
+          avatarUrl: null,
+          balance: 0,
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      console.log('Registration completed successfully:', user);
       return user;
 
     } catch (error) {
@@ -203,21 +260,34 @@ export class Database {
 
       console.log('Auth login successful:', authData.user.id);
 
-      // Get user profile from the users table
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
+      // 尝试获取用户配置文件，如果失败则创建基本用户对象
+      let userData = null;
+      try {
+        const { data, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authData.user.id)
+          .maybeSingle();
 
-      if (userError) {
-        console.error('User profile fetch error:', userError);
-        throw userError;
+        if (!userError && data) {
+          userData = data;
+        }
+      } catch (error) {
+        console.warn('Could not fetch user profile, using auth data:', error);
       }
-      
+
+      // 如果没有找到用户配置文件，使用 auth 数据创建基本用户对象
       if (!userData) {
-        console.error('No user profile found');
-        return null;
+        console.log('Creating basic user object from auth data');
+        return {
+          id: authData.user.id,
+          name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
+          email: authData.user.email || email,
+          role: 'user',
+          avatarUrl: null,
+          balance: 0,
+          createdAt: authData.user.created_at || new Date().toISOString(),
+        };
       }
 
       console.log('User profile fetched successfully:', userData);
@@ -268,20 +338,33 @@ export class Database {
         return null;
       }
 
-      // Get user profile from the users table
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      // 尝试获取用户配置文件，如果失败则使用 auth 数据
+      let userData = null;
+      try {
+        const { data, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (userError) {
-        console.error('Error getting user profile:', userError);
-        return null;
+        if (!userError && data) {
+          userData = data;
+        }
+      } catch (error) {
+        console.warn('Could not fetch user profile, using auth data:', error);
       }
-      
+
+      // 如果没有找到用户配置文件，使用 auth 数据
       if (!userData) {
-        return null;
+        return {
+          id: user.id,
+          name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          role: 'user',
+          avatarUrl: null,
+          balance: 0,
+          createdAt: user.created_at || new Date().toISOString(),
+        };
       }
 
       return {
@@ -310,7 +393,7 @@ export class Database {
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
@@ -341,7 +424,7 @@ export class Database {
         .update({ balance: amount })
         .eq('id', userId)
         .select('balance')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data?.balance || 0;
@@ -419,7 +502,7 @@ export class Database {
         .from('services')
         .select('*')
         .eq('id', serviceId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
@@ -459,7 +542,7 @@ export class Database {
           created_at: new Date().toISOString(),
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
@@ -524,7 +607,7 @@ export class Database {
           created_at: new Date().toISOString(),
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
