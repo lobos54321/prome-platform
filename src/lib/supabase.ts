@@ -26,7 +26,81 @@ export class Database {
     return supabase;
   }
 
-  // AUTH METHODS - 简化版本，依赖数据库触发器
+  // 等待用户配置文件创建的辅助方法
+  private async waitForUserProfile(userId: string, maxRetries: number = 10): Promise<User | null> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (!userError && userData) {
+          console.log(`User profile found after ${i + 1} attempts:`, userData);
+          return {
+            id: userData.id,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            avatarUrl: userData.avatar_url,
+            balance: userData.balance,
+            createdAt: userData.created_at,
+          };
+        }
+
+        // 指数退避：每次等待时间递增
+        const waitTime = Math.min(1000 * Math.pow(1.5, i), 5000);
+        console.log(`User profile not found, retrying in ${waitTime}ms... (attempt ${i + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } catch (error) {
+        console.warn(`Attempt ${i + 1} failed:`, error);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    return null;
+  }
+
+  // 手动创建用户配置文件的兜底方法
+  private async createUserProfileFallback(userId: string, email: string, name: string): Promise<User | null> {
+    try {
+      console.log('Attempting to create user profile manually as fallback...');
+      
+      const { data: userData, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          email: email,
+          name: name,
+          role: 'user',
+          balance: 0,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Manual user profile creation failed:', insertError);
+        return null;
+      }
+
+      console.log('User profile created manually:', userData);
+      return {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        avatarUrl: userData.avatar_url,
+        balance: userData.balance,
+        createdAt: userData.created_at,
+      };
+    } catch (error) {
+      console.error('Error in manual user profile creation:', error);
+      return null;
+    }
+  }
+
+  // AUTH METHODS - 改进版本，增加自动登录和重试机制
   async signUp(email: string, password: string, name: string): Promise<User | null> {
     // Return null immediately if not configured
     if (!isSupabaseConfigured) {
@@ -37,7 +111,7 @@ export class Database {
     try {
       console.log('Attempting to register user:', email);
 
-      // 只使用 Supabase Auth 的 signUp，让触发器处理用户记录创建
+      // 第一步：使用 Supabase Auth 注册
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -59,24 +133,45 @@ export class Database {
         return null;
       }
 
-      console.log('Auth user created:', authData.user.id);
+      console.log('Auth user created successfully:', authData.user.id);
 
-      // 等待触发器创建用户记录（增加等待时间确保触发器完成）
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 第二步：等待触发器创建用户配置文件
+      let user = await this.waitForUserProfile(authData.user.id);
       
-      // 获取触发器创建的用户记录
-      const user = await this.getCurrentUser();
-      
+      // 第三步：如果触发器失败，手动创建用户配置文件
       if (!user) {
-        console.error('User profile was not created by trigger');
+        console.warn('Trigger failed to create user profile, attempting manual creation...');
+        user = await this.createUserProfileFallback(authData.user.id, email, name);
+      }
+
+      if (!user) {
+        console.error('Both trigger and manual user profile creation failed');
         throw new Error('User profile creation failed');
       }
 
-      console.log('User profile created successfully by trigger:', user);
+      // 第四步：注册成功后自动登录建立会话
+      console.log('User profile created, attempting auto-login...');
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (loginError) {
+        console.warn('Auto-login failed after registration:', loginError);
+        // 即使自动登录失败，用户已创建成功，返回用户对象
+        console.log('Registration successful but auto-login failed - user can login manually');
+        return user;
+      }
+
+      if (loginData.user) {
+        console.log('Auto-login successful after registration:', loginData.user.id);
+      }
+
+      console.log('User registration and auto-login completed successfully:', user);
       return user;
 
     } catch (error) {
-      console.error('Error signing up:', error);
+      console.error('Error during registration process:', error);
       throw error;
     }
   }
