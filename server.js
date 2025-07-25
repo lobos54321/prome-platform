@@ -1,31 +1,49 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Stripe from 'stripe';
 
-// 获取 __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// 解析 JSON 请求体（如你有 API 需要接收 POST 数据）
+// 初始化 Stripe，确保 Zeabur 或本地 .env 设置了 STRIPE_SECRET_KEY
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 app.use(express.json());
 
-// 你的 Stripe 支付等 API 路由（示例，根据你的实际业务调整）
-app.post('/api/payment/stripe', (req, res) => {
-  // 这里写你的 Stripe 支付逻辑，比如获取 req.body 等
-  // 示例返回
-  res.json({ success: true, message: 'Stripe payment endpoint reached!' });
+// Stripe 充值积分接口
+app.post('/api/payment/stripe', async (req, res) => {
+  try {
+    const { amount } = req.body; // 单位：美元
+    if (!amount || amount < 5) {
+      return res.status(400).json({ error: '充值金额不能低于5美元' });
+    }
+
+    // Stripe 以分为单位，需*100
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100),
+      currency: 'usd',
+      // 你可以在 metadata 里加上用户id等信息，方便后续业务处理
+      metadata: {
+        // userId: req.user.id (如有登录系统)
+      }
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// 可以继续添加更多 API 路由
-// app.get('/api/xxx', ...)
+// 其它 API 路由可继续添加...
 
-// 静态文件服务（生产环境构建产物一般在 dist 目录）
+// 静态文件服务
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// SPA 路由处理（放在所有 API 路由和静态服务之后）
+// SPA 路由
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
