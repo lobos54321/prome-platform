@@ -1,172 +1,135 @@
--- Create users table (extends Supabase auth.users)
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create users table
 CREATE TABLE IF NOT EXISTS public.users (
-  id UUID REFERENCES auth.users PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  avatar_url TEXT,
-  role TEXT NOT NULL CHECK (role IN ('user', 'admin')) DEFAULT 'user',
-  balance DECIMAL(10,2) NOT NULL DEFAULT 0.0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL DEFAULT 'user',
+    avatar_url TEXT,
+    balance DECIMAL(10,2) DEFAULT 50.00,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create services table
 CREATE TABLE IF NOT EXISTS public.services (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  category TEXT NOT NULL,
-  features TEXT[] NOT NULL,
-  price_per_token DECIMAL(10,6) NOT NULL,
-  popular BOOLEAN NOT NULL DEFAULT FALSE,
-  dify_url TEXT NOT NULL
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    price DECIMAL(10,4) NOT NULL,
+    price_unit TEXT DEFAULT 'per token',
+    is_active BOOLEAN DEFAULT true,
+    features JSONB DEFAULT '[]',
+    model_supported JSONB DEFAULT '[]',
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create token_usage table
 CREATE TABLE IF NOT EXISTS public.token_usage (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.users(id) NOT NULL,
-  service_id TEXT NOT NULL,
-  tokens_used INTEGER NOT NULL,
-  cost DECIMAL(10,6) NOT NULL,
-  timestamp TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  session_id TEXT NOT NULL
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
+    tokens_used INTEGER NOT NULL,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    cost DECIMAL(10,4) NOT NULL,
+    model TEXT NOT NULL,
+    latency INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create billing_records table
 CREATE TABLE IF NOT EXISTS public.billing_records (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.users(id) NOT NULL,
-  amount DECIMAL(10,2) NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('charge', 'usage')),
-  description TEXT NOT NULL,
-  timestamp TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('completed', 'pending', 'failed'))
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    amount DECIMAL(10,2) NOT NULL,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Create pricing_rules table
 CREATE TABLE IF NOT EXISTS public.pricing_rules (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  model_name TEXT NOT NULL UNIQUE,
-  input_token_price DECIMAL(10,6) NOT NULL,
-  output_token_price DECIMAL(10,6) NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    model TEXT NOT NULL UNIQUE,
+    prompt_token_price DECIMAL(10,6) NOT NULL,
+    completion_token_price DECIMAL(10,6) NOT NULL,
+    currency TEXT DEFAULT 'USD',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create scripts table
-CREATE TABLE IF NOT EXISTS public.scripts (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES public.users(id) NOT NULL,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  service_type TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  test_mode BOOLEAN NOT NULL DEFAULT FALSE,
-  model TEXT NOT NULL,
-  tags TEXT[]
-);
-
--- Create API keys table for webhook authentication
+-- Create api_keys table
 CREATE TABLE IF NOT EXISTS public.api_keys (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  key TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    key TEXT NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Insert default API key for webhooks
-INSERT INTO public.api_keys (name, key) VALUES ('Default Webhook Key', 'prome_wh_key_123456')
-ON CONFLICT DO NOTHING;
+-- Insert sample services
+INSERT INTO public.services (name, description, category, price, features, model_supported) VALUES
+('智能写作助手', '基于AI的内容创作和文案生成服务', '内容创作', 0.02, '["智能文案生成", "多风格适配", "SEO优化"]', '["GPT-4", "GPT-3.5-turbo"]'),
+('代码生成助手', '智能代码生成和调试服务', '开发工具', 0.03, '["代码生成", "错误检测", "性能优化建议"]', '["GPT-4", "Claude-2"]'),
+('翻译服务', '多语言智能翻译服务', '语言处理', 0.015, '["多语言支持", "语境理解", "专业术语识别"]', '["GPT-4", "GPT-3.5-turbo"]'),
+('数据分析助手', '智能数据分析和可视化', '数据分析', 0.025, '["数据清洗", "统计分析", "图表生成"]', '["GPT-4", "Claude-2"]')
+ON CONFLICT (id) DO NOTHING;
 
--- Create Row Level Security (RLS) policies
--- Enable RLS on all tables
+-- Insert sample pricing rules
+INSERT INTO public.pricing_rules (model, prompt_token_price, completion_token_price) VALUES
+('gpt-4', 0.00003, 0.00006),
+('gpt-3.5-turbo', 0.0000015, 0.000002),
+('claude-2', 0.000008, 0.000024),
+('llama-2-70b', 0.0000007, 0.0000009)
+ON CONFLICT (model) DO NOTHING;
+
+-- Insert initial API key
+INSERT INTO public.api_keys (name, key) VALUES
+('Default Webhook Key', 'prome_wh_key_123456')
+ON CONFLICT (key) DO NOTHING;
+
+-- Set up Row Level Security (RLS)
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.token_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.billing_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pricing_rules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.scripts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
 
--- Users table policies
-CREATE POLICY "Users can view their own profile" ON public.users
-  FOR SELECT USING (auth.uid() = id);
+-- Create policies
+CREATE POLICY "Users can view own profile" ON public.users FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can view own token usage" ON public.token_usage FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own billing records" ON public.billing_records FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Admin can view all user profiles" ON public.users
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
+-- Services table should be readable by all authenticated users
+CREATE POLICY "Services are viewable by authenticated users" ON public.services FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Pricing rules are viewable by authenticated users" ON public.pricing_rules FOR SELECT TO authenticated USING (true);
 
--- Services table policies
-CREATE POLICY "Anyone can view services" ON public.services
-  FOR SELECT USING (TRUE);
+-- Grant permissions
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
-CREATE POLICY "Only admins can modify services" ON public.services
-  USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
+-- Create function to handle user registration
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.users (id, name, email, role, balance)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'name', 'User'),
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'role', 'user'),
+        50
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Token usage policies
-CREATE POLICY "Users can view their own token usage" ON public.token_usage
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Admin can view all token usage" ON public.token_usage
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
-
--- Billing records policies
-CREATE POLICY "Users can view their own billing records" ON public.billing_records
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Admin can view all billing records" ON public.billing_records
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
-
--- Pricing rules policies
-CREATE POLICY "Anyone can view pricing rules" ON public.pricing_rules
-  FOR SELECT USING (TRUE);
-
-CREATE POLICY "Only admins can modify pricing rules" ON public.pricing_rules
-  USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
-
--- Scripts policies
-CREATE POLICY "Users can view their own scripts" ON public.scripts
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Admin can view all scripts" ON public.scripts
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
-
--- API keys policies
-CREATE POLICY "Only admins can view and modify API keys" ON public.api_keys
-  USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
-  );
-
--- Create seed data for services
-INSERT INTO public.services (id, name, description, category, features, price_per_token, popular, dify_url) VALUES
-  ('broadcast-script', '口播文案创作', '专业的AI口播文案生成助手，打造流畅自然的播报内容', '口播文案', ARRAY['广告口播', '产品介绍', '新闻播报', '视频解说'], 0.0002, TRUE, 'https://example.com/embed/broadcast-script'),
-  ('voice-optimization', '播音优化助手', '针对口播稿件进行节奏、停顿和语调优化，提升播报效果', '口播文案', ARRAY['语气优化', '节奏调整', '停顿标记', '语调建议'], 0.0003, TRUE, 'https://example.com/embed/voice-optimization'),
-  ('script-translation', '口播稿翻译', '专业的口播文案多语言翻译，保留原文风格和语气', '翻译服务', ARRAY['多语言翻译', '文化本地化', '术语一致性', '语气保留'], 0.0004, FALSE, 'https://example.com/embed/script-translation'),
-  ('ad-script-generator', '广告脚本生成器', '创建引人入胜的广告口播脚本，增强产品吸引力', '广告文案', ARRAY['产品推广', '促销广告', '品牌宣传', '电台广告'], 0.0002, TRUE, 'https://example.com/embed/ad-script-generator'),
-  ('narration-expert', '旁白专家', '为视频、纪录片和教育内容创建专业旁白脚本', '视频内容', ARRAY['视频旁白', '纪录片解说', '教学内容', '故事讲述'], 0.0003, FALSE, 'https://example.com/embed/narration-expert'),
-  ('style-adapter', '风格适配器', '将已有文本调整为适合口播的风格和节奏', '内容改写', ARRAY['风格调整', '口语化处理', '语句简化', '韵律优化'], 0.0002, FALSE, 'https://example.com/embed/style-adapter')
-ON CONFLICT DO NOTHING;
-
--- Create seed data for pricing rules
-INSERT INTO public.pricing_rules (model_name, input_token_price, output_token_price, is_active) VALUES
-  ('GPT-4', 0.0003, 0.0006, TRUE),
-  ('GPT-3.5', 0.0001, 0.0002, TRUE),
-  ('Claude 3 Opus', 0.0003, 0.0015, TRUE),
-  ('Claude 3 Sonnet', 0.0002, 0.0008, TRUE),
-  ('Claude 3 Haiku', 0.00025, 0.00125, TRUE),
-  ('DeepSeek R1', 0.00015, 0.0005, TRUE),
-  ('火山方舟 V3', 0.0001, 0.0003, TRUE),
-  ('GPT-4o', 0.00025, 0.0005, TRUE),
-  ('default', 0.0001, 0.0002, TRUE)
-ON CONFLICT DO NOTHING;
+-- Create trigger for new user registration
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
