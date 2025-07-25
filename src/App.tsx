@@ -25,10 +25,13 @@ const App = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Initialize auth state
+        console.log('Starting auth initialization on page load...');
+        // 只在这里初始化认证状态，避免重复调用
         await authService.initializeAuth();
+        console.log('Auth initialization completed');
       } catch (error) {
-        console.error('Failed to initialize app:', error);
+        console.error('Auth initialization failed:', error);
+        authService.forceLogout();
       } finally {
         setIsInitialized(true);
       }
