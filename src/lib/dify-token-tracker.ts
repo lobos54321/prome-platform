@@ -343,10 +343,14 @@ export class DifyTokenTracker {
     startDate?: Date,
     endDate?: Date
   ) {
+    // Check if we're in test mode first
+    const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+    
     // Check if Supabase is properly configured through environment variables
     const isSupabaseConfigured = 
       import.meta.env.VITE_SUPABASE_URL && 
-      import.meta.env.VITE_SUPABASE_ANON_KEY;
+      import.meta.env.VITE_SUPABASE_ANON_KEY &&
+      !isTestMode;
 
     // Default values to return if not configured or error
     const defaultSummary = {
@@ -359,9 +363,9 @@ export class DifyTokenTracker {
       currency: 'USD'
     };
 
-    // If not configured, return mock data
-    if (!isSupabaseConfigured) {
-      console.log('Supabase not configured, returning mock data');
+    // If not configured or in test mode, return mock data
+    if (!isSupabaseConfigured || isTestMode) {
+      console.log('Supabase not configured or in test mode, returning mock data');
       return {
         total_prompt_tokens: 12500,
         total_completion_tokens: 8750,
@@ -413,13 +417,17 @@ export class DifyTokenTracker {
     startDate?: Date,
     endDate?: Date
   ) {
+    // Check if we're in test mode first
+    const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+    
     // Check if Supabase is properly configured
     const isSupabaseConfigured = 
       import.meta.env.VITE_SUPABASE_URL && 
-      import.meta.env.VITE_SUPABASE_ANON_KEY;
+      import.meta.env.VITE_SUPABASE_ANON_KEY &&
+      !isTestMode;
 
-    // If not configured, return mock data
-    if (!isSupabaseConfigured) {
+    // If not configured or in test mode, return mock data
+    if (!isSupabaseConfigured || isTestMode) {
       return [
         { service_id: 'chat-service', service_name: '聊天助手', total_tokens: 8500, total_cost: 0.17, request_count: 10 },
         { service_id: 'writing-service', service_name: '内容创作', total_tokens: 6200, total_cost: 0.124, request_count: 8 },
@@ -463,13 +471,17 @@ export class DifyTokenTracker {
     startDate?: Date,
     endDate?: Date
   ) {
+    // Check if we're in test mode first
+    const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+    
     // Check if Supabase is properly configured
     const isSupabaseConfigured = 
       import.meta.env.VITE_SUPABASE_URL && 
-      import.meta.env.VITE_SUPABASE_ANON_KEY;
+      import.meta.env.VITE_SUPABASE_ANON_KEY &&
+      !isTestMode;
 
-    // If not configured, return mock data
-    if (!isSupabaseConfigured) {
+    // If not configured or in test mode, return mock data
+    if (!isSupabaseConfigured || isTestMode) {
       return [
         { model: 'gpt-3.5-turbo', total_tokens: 9800, total_cost: 0.196, request_count: 12 },
         { model: 'gpt-4', total_tokens: 5400, total_cost: 0.162, request_count: 6 },
@@ -518,17 +530,21 @@ export class DifyTokenTracker {
     startDate?: Date,
     endDate?: Date
   ) {
+    // Check if we're in test mode first
+    const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+    
     // Check if Supabase is properly configured
     const isSupabaseConfigured = 
       import.meta.env.VITE_SUPABASE_URL && 
-      import.meta.env.VITE_SUPABASE_ANON_KEY;
+      import.meta.env.VITE_SUPABASE_ANON_KEY &&
+      !isTestMode;
 
     // If dates are not provided, default to last 30 days
     const end = endDate || new Date();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // If not configured, generate mock daily data
-    if (!isSupabaseConfigured) {
+    // If not configured or in test mode, generate mock daily data
+    if (!isSupabaseConfigured || isTestMode) {
       interface DailyUsageData {
         date: string;
         prompt_tokens: number;
@@ -614,17 +630,21 @@ export class DifyTokenTracker {
     limit = 20,
     offset = 0
   ) {
+    // Check if we're in test mode first
+    const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+    
     // Check if Supabase is properly configured
     const isSupabaseConfigured = 
       import.meta.env.VITE_SUPABASE_URL && 
-      import.meta.env.VITE_SUPABASE_ANON_KEY;
+      import.meta.env.VITE_SUPABASE_ANON_KEY &&
+      !isTestMode;
 
     // If dates are not provided, default to last 30 days
     const end = endDate || new Date();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // If not configured, return mock detailed records
-    if (!isSupabaseConfigured) {
+    // If not configured or in test mode, return mock detailed records
+    if (!isSupabaseConfigured || isTestMode) {
       // Generate mock records
       const models = ['gpt-3.5-turbo', 'gpt-4', 'claude-2', 'llama-2-70b'];
       const services = [

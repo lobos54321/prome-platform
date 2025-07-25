@@ -212,6 +212,23 @@ class AuthService {
     try {
       console.log('Initializing auth state...');
       
+      // Check if we're in test mode
+      const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+      if (isTestMode) {
+        console.log('Test mode enabled - using mock user');
+        this.currentUser = {
+          id: 'test-user-123',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'user',
+          avatarUrl: null,
+          balance: 100,
+          createdAt: new Date().toISOString(),
+        };
+        this.isInitialized = true;
+        return this.currentUser;
+      }
+      
       // 首先尝试从本地存储恢复用户信息
       try {
         const storedUser = localStorage.getItem('currentUser');
