@@ -1,94 +1,145 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, Sparkles, Zap, Shield, BarChart3 } from 'lucide-react';
+import { ArrowRight, CheckCircle, Zap, Shield, Clock } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { User } from '@/types';
 
 export default function Home() {
   const navigate = useNavigate();
-  const user = authService.getCurrentUser();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const features = [
-    {
-      title: '灵活计费',
-      description: '根据实际使用的API调用次数和处理数据量计费，真正做到用多少付多少',
-      icon: <Zap className="h-12 w-12 text-blue-500" />
-    },
-    {
-      title: '安全可靠',
-      description: '企业级数据加密和安全保障，完善的隐私保护机制',
-      icon: <Shield className="h-12 w-12 text-green-500" />
-    },
-    {
-      title: '丰富模型',
-      description: '支持多种主流AI大模型，满足各类应用场景需求',
-      icon: <Sparkles className="h-12 w-12 text-purple-500" />
-    },
-    {
-      title: '使用分析',
-      description: '详细的使用量统计和费用分析，帮助优化成本',
-      icon: <BarChart3 className="h-12 w-12 text-orange-500" />
-    }
-  ];
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Failed to initialize auth:', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-50 to-white py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            ProMe
+      <section className="container mx-auto px-4 py-20">
+        <div className="text-center max-w-4xl mx-auto">
+          <h1 className="text-5xl font-bold text-gray-900 mb-6">
+            ProMe AI 服务平台
           </h1>
-          <p className="text-xl md:text-2xl text-gray-700 mb-10 max-w-2xl mx-auto">
-            Feed your feed to your AI, and let it feed you
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            连接 Dify AI 应用与专业服务，提供高效、可靠的人工智能解决方案
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button 
-              size="lg"
-              onClick={() => navigate(user ? '/services' : '/register')}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600"
-            >
-              {user ? '浏览服务' : '立即注册'}
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline"
-              onClick={() => navigate('/pricing')}
-            >
-              查看价格
-            </Button>
+          
+          {/* 动态按钮区域 */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+            {user ? (
+              <>
+                <Button 
+                  size="lg" 
+                  onClick={() => navigate('/services')}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  浏览服务
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  我的仪表板
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  size="lg" 
+                  onClick={() => navigate('/register')}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  立即注册
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  onClick={() => navigate('/login')}
+                >
+                  用户登录
+                </Button>
+              </>
+            )}
           </div>
+          
+          {/* 用户状态显示 */}
+          {user && (
+            <div className="bg-white rounded-lg shadow-md p-4 max-w-md mx-auto mb-8">
+              <p className="text-gray-600">欢迎回来，{user.name}!</p>
+              <p className="text-sm text-gray-500">账户余额: ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}</p>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-16 bg-white">
+      <section className="py-20 bg-white">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">平台特色</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-shadow">
-                <CardContent className="pt-6 text-center">
-                  <div className="mb-4 flex justify-center">{feature.icon}</div>
-                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.description}</p>
-                </CardContent>
-              </Card>
-            ))}
+          <h2 className="text-3xl font-bold text-center mb-12">为什么选择 ProMe？</h2>
+          
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="text-center p-6">
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Zap className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-4">高效智能</h3>
+              <p className="text-gray-600">集成先进的AI技术，为您提供快速、准确的服务体验</p>
+            </div>
+            
+            <div className="text-center p-6">
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-4">安全可靠</h3>
+              <p className="text-gray-600">企业级安全保障，保护您的数据和隐私安全</p>
+            </div>
+            
+            <div className="text-center p-6">
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-4">24/7 可用</h3>
+              <p className="text-gray-600">全天候服务，随时满足您的业务需求</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-16 bg-gray-50">
+      {/* How it works */}
+      <section className="py-20 bg-gray-50">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-4">如何使用</h2>
-          <p className="text-gray-600 text-center max-w-2xl mx-auto mb-12">
-            三步简单操作，快速接入AI能力
-          </p>
+          <h2 className="text-3xl font-bold text-center mb-12">使用流程</h2>
           
-          <div className="flex flex-col md:flex-row gap-8 justify-center items-center md:items-stretch">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 max-w-4xl mx-auto">
             <div className="flex-1 max-w-xs text-center">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-blue-600">1</span>
@@ -109,38 +160,49 @@ export default function Home() {
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-blue-600">3</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">按量付费</h3>
-              <p className="text-gray-600">根据实际使用量自动计费，实时查看使用统计</p>
+              <h3 className="text-xl font-semibold mb-2">开始使用</h3>
+              <p className="text-gray-600">享受智能AI服务，按使用量付费</p>
             </div>
-          </div>
-          
-          <div className="mt-12 text-center">
-            <Button 
-              size="lg"
-              onClick={() => navigate('/services')}
-            >
-              开始使用
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+      <section className="py-20 bg-blue-600 text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">准备好开始了吗？</h2>
           <p className="text-xl mb-8 max-w-2xl mx-auto">
             加入我们的平台，使用先进的AI能力提升您的业务
           </p>
-          <Button 
-            size="lg" 
-            variant="secondary"
-            onClick={() => navigate(user ? '/services' : '/register')}
-          >
-            {user ? '浏览服务' : '立即注册'}
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
+          {user ? (
+            <Button 
+              size="lg" 
+              variant="secondary"
+              onClick={() => navigate('/services')}
+            >
+              浏览服务
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg" 
+                variant="secondary"
+                onClick={() => navigate('/register')}
+              >
+                立即注册
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="text-blue-600 border-white hover:bg-white"
+                onClick={() => navigate('/login')}
+              >
+                已有账号？登录
+              </Button>
+            </div>
+          )}
         </div>
       </section>
     </div>
