@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { authService } from '@/lib/auth';
 
 export default function Register() {
@@ -20,6 +20,7 @@ export default function Register() {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -31,6 +32,19 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setDebugInfo('');
+    
+    // 检查 Supabase 配置
+    const isSupabaseConfigured = 
+      import.meta.env.VITE_SUPABASE_URL && 
+      import.meta.env.VITE_SUPABASE_ANON_KEY &&
+      import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-supabase-url.supabase.co';
+
+    if (!isSupabaseConfigured) {
+      setError('系统配置错误：Supabase 未正确配置。请联系系统管理员。');
+      setDebugInfo(`配置状态: URL=${import.meta.env.VITE_SUPABASE_URL ? '已设置' : '未设置'}, KEY=${import.meta.env.VITE_SUPABASE_ANON_KEY ? '已设置' : '未设置'}`);
+      return;
+    }
     
     if (!agreedTerms) {
       setError('请同意服务条款和隐私政策');
@@ -46,13 +60,51 @@ export default function Register() {
       setError('密码长度至少为8个字符');
       return;
     }
+
+    // 检查邮箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('请输入有效的邮箱地址');
+      return;
+    }
     
     setIsLoading(true);
+    setDebugInfo('正在注册用户...');
+
     try {
-      await authService.register(formData.name, formData.email, formData.password);
-      navigate('/services');
-    } catch (err) {
-      setError('注册失败，请稍后重试或更换邮箱');
+      console.log('Starting registration process...');
+      const user = await authService.register(formData.name, formData.email, formData.password);
+      
+      if (user) {
+        setDebugInfo('注册成功！正在跳转...');
+        // 给用户一点时间看到成功消息
+        setTimeout(() => {
+          navigate('/services');
+        }, 1000);
+      } else {
+        setError('注册失败：无法创建用户账户。请检查邮箱是否已被使用。');
+        setDebugInfo('注册返回空用户对象');
+      }
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      
+      let errorMessage = '注册失败，请稍后重试';
+      
+      if (err.message?.includes('already registered')) {
+        errorMessage = '该邮箱已被注册，请使用其他邮箱或直接登录';
+      } else if (err.message?.includes('Invalid email')) {
+        errorMessage = '邮箱格式不正确，请检查后重试';
+      } else if (err.message?.includes('Password should be at least')) {
+        errorMessage = '密码长度不足，请设置至少8位密码';
+      } else if (err.message?.includes('relation "users" does not exist')) {
+        errorMessage = '系统数据库配置错误，请联系管理员';
+        setDebugInfo('数据库表未创建');
+      } else if (err.message?.includes('duplicate key')) {
+        errorMessage = '该邮箱已被注册，请使用其他邮箱';
+      }
+      
+      setError(errorMessage);
+      setDebugInfo(`错误详情: ${err.message || '未知错误'}`);
     } finally {
       setIsLoading(false);
     }
@@ -73,9 +125,25 @@ export default function Register() {
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 {error}
+                {debugInfo && (
+                  <details className="mt-2 text-xs">
+                    <summary>调试信息</summary>
+                    <pre className="mt-1 whitespace-pre-wrap">{debugInfo}</pre>
+                  </details>
+                )}
               </AlertDescription>
             </Alert>
           )}
+          
+          {debugInfo && !error && (
+            <Alert className="mb-4">
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                {debugInfo}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">姓名</Label>
@@ -86,6 +154,7 @@ export default function Register() {
                 required
                 value={formData.name}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -99,6 +168,7 @@ export default function Register() {
                 required
                 value={formData.email}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -112,6 +182,7 @@ export default function Register() {
                 required
                 value={formData.password}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -125,6 +196,7 @@ export default function Register() {
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
             <div className="flex items-center space-x-2">
@@ -132,6 +204,7 @@ export default function Register() {
                 id="terms" 
                 checked={agreedTerms}
                 onCheckedChange={(checked) => setAgreedTerms(checked as boolean)}
+                disabled={isLoading}
               />
               <label
                 htmlFor="terms"
