@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, CheckCircle, Zap, Shield, Clock } from 'lucide-react';
+import { ArrowRight, CheckCircle, Zap, Shield, Clock, Star, Users, Award } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { User } from '@/types';
 
@@ -13,17 +13,29 @@ export default function Home() {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        const currentUser = await authService.getCurrentUser();
+        // 使用同步方法获取当前用户，避免重复的异步调用
+        const currentUser = authService.getCurrentUserSync();
         setUser(currentUser);
       } catch (error) {
-        console.error('Failed to initialize auth:', error);
+        console.error('Failed to get current user:', error);
         setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
 
+    // 监听认证状态变化
+    const handleAuthChange = (event: CustomEvent) => {
+      setUser(event.detail.user);
+    };
+
+    window.addEventListener('auth-state-changed', handleAuthChange as EventListener);
+    
     initializeAuth();
+
+    return () => {
+      window.removeEventListener('auth-state-changed', handleAuthChange as EventListener);
+    };
   }, []);
 
   // Show loading state while checking auth
@@ -57,7 +69,7 @@ export default function Home() {
                 <Button 
                   size="lg" 
                   onClick={() => navigate('/services')}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
                 >
                   浏览服务
                   <ArrowRight className="ml-2 h-5 w-5" />
@@ -66,6 +78,7 @@ export default function Home() {
                   size="lg" 
                   variant="outline"
                   onClick={() => navigate('/dashboard')}
+                  className="px-8 py-3"
                 >
                   我的仪表板
                 </Button>
@@ -75,7 +88,7 @@ export default function Home() {
                 <Button 
                   size="lg" 
                   onClick={() => navigate('/register')}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
                 >
                   立即注册
                   <ArrowRight className="ml-2 h-5 w-5" />
@@ -84,6 +97,7 @@ export default function Home() {
                   size="lg" 
                   variant="outline"
                   onClick={() => navigate('/login')}
+                  className="px-8 py-3"
                 >
                   用户登录
                 </Button>
@@ -93,115 +107,122 @@ export default function Home() {
           
           {/* 用户状态显示 */}
           {user && (
-            <div className="bg-white rounded-lg shadow-md p-4 max-w-md mx-auto mb-8">
-              <p className="text-gray-600">欢迎回来，{user.name}!</p>
-              <p className="text-sm text-gray-500">账户余额: ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}</p>
+            <div className="bg-white rounded-lg shadow-md p-6 max-w-md mx-auto mb-8">
+              <div className="flex items-center justify-center mb-2">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                <p className="text-gray-700 font-medium">欢迎回来，{user.name}!</p>
+              </div>
+              <p className="text-sm text-gray-500">当前余额: ¥{user.balance?.toFixed(2) || '0.00'}</p>
+              {user.role === 'admin' && (
+                <div className="mt-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    <Award className="h-3 w-3 mr-1" />
+                    管理员
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
-      </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">为什么选择 ProMe？</h2>
+        {/* Features */}
+        <div className="grid md:grid-cols-3 gap-8 mt-16">
+          <div className="text-center p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+            <Zap className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">高效智能</h3>
+            <p className="text-gray-600">基于先进的AI技术，提供快速准确的服务响应</p>
+          </div>
           
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="text-center p-6">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Zap className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-4">高效智能</h3>
-              <p className="text-gray-600">集成先进的AI技术，为您提供快速、准确的服务体验</p>
-            </div>
-            
-            <div className="text-center p-6">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-4">安全可靠</h3>
-              <p className="text-gray-600">企业级安全保障，保护您的数据和隐私安全</p>
-            </div>
-            
-            <div className="text-center p-6">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-4">24/7 可用</h3>
-              <p className="text-gray-600">全天候服务，随时满足您的业务需求</p>
-            </div>
+          <div className="text-center p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+            <Shield className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">安全可靠</h3>
+            <p className="text-gray-600">企业级安全保障，保护您的数据和隐私</p>
+          </div>
+          
+          <div className="text-center p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+            <Clock className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">24/7服务</h3>
+            <p className="text-gray-600">全天候在线服务，随时满足您的需求</p>
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="py-20 bg-gray-50">
+      {/* Stats Section */}
+      <section className="bg-white py-16">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">使用流程</h2>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">平台数据</h2>
+            <p className="text-gray-600">值得信赖的AI服务平台</p>
+          </div>
           
-          <div className="flex flex-col md:flex-row items-center justify-center gap-8 max-w-4xl mx-auto">
-            <div className="flex-1 max-w-xs text-center">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">1</span>
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-4">
+                <Users className="h-8 w-8 text-blue-600 mr-2" />
+                <span className="text-3xl font-bold text-gray-900">10,000+</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">注册账号</h3>
-              <p className="text-gray-600">创建您的平台账号，充值初始余额</p>
+              <p className="text-gray-600">活跃用户</p>
             </div>
             
-            <div className="flex-1 max-w-xs text-center">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">2</span>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-4">
+                <Star className="h-8 w-8 text-blue-600 mr-2" />
+                <span className="text-3xl font-bold text-gray-900">4.8</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">选择服务</h3>
-              <p className="text-gray-600">从服务目录中选择您需要的AI服务</p>
+              <p className="text-gray-600">用户评分</p>
             </div>
             
-            <div className="flex-1 max-w-xs text-center">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">3</span>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-4">
+                <CheckCircle className="h-8 w-8 text-blue-600 mr-2" />
+                <span className="text-3xl font-bold text-gray-900">99.9%</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2">开始使用</h3>
-              <p className="text-gray-600">享受智能AI服务，按使用量付费</p>
+              <p className="text-gray-600">服务可用性</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-blue-600 text-white">
+      <section className="bg-blue-600 py-16">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">准备好开始了吗？</h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto">
-            加入我们的平台，使用先进的AI能力提升您的业务
+          <h2 className="text-3xl font-bold text-white mb-4">
+            准备开始使用AI服务了吗？
+          </h2>
+          <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
+            立即注册，体验智能化的专业服务，提升您的工作效率
           </p>
-          {user ? (
-            <Button 
-              size="lg" 
-              variant="secondary"
-              onClick={() => navigate('/services')}
-            >
-              浏览服务
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          ) : (
+          
+          {!user && (
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
-                size="lg" 
-                variant="secondary"
+                size="lg"
                 onClick={() => navigate('/register')}
+                className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3"
               >
-                立即注册
+                免费注册
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button 
-                size="lg" 
+                size="lg"
                 variant="outline"
-                className="text-blue-600 border-white hover:bg-white"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/pricing')}
+                className="border-white text-white hover:bg-white hover:text-blue-600 px-8 py-3"
               >
-                已有账号？登录
+                查看定价
               </Button>
             </div>
+          )}
+          
+          {user && (
+            <Button 
+              size="lg"
+              onClick={() => navigate('/services')}
+              className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3"
+            >
+              开始使用服务
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
           )}
         </div>
       </section>
