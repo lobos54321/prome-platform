@@ -8,6 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CreditCard, ArrowRight } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { loadStripe } from '@stripe/stripe-js';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -84,19 +87,31 @@ export default function Settings() {
     setIsProcessing(true);
 
     const amountValue = parseFloat(amount);
-    if (isNaN(amountValue) || amountValue <= 0) {
-      setPaymentError('请输入有效的充值金额');
+    if (isNaN(amountValue) || amountValue < 10) {
+      setPaymentError('请输入有效的充值金额（最少10元）');
       setIsProcessing(false);
       return;
     }
 
     try {
-      // TODO: 这里集成 Stripe 支付调用，实际可 replace 为后端API跳转
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setPaymentSuccess(`成功充值 ¥${amountValue.toFixed(2)}（模拟，实际应跳转到Stripe）`);
-      setAmount('100');
-    } catch (error) {
-      setPaymentError('充值处理失败，请稍后重试');
+      // 1. 请求后端创建 Stripe session
+      const res = await fetch('/api/payment/stripe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountValue, // 单位：元/美元，看你后端怎么定义
+          userId: user.id
+        })
+      });
+      const data = await res.json();
+      if (!data.sessionId) throw new Error(data.error || '无法获取支付会话');
+
+      // 2. 跳转到 Stripe
+      const stripe = await stripePromise;
+      if (!stripe) throw new Error('Stripe加载失败');
+      await stripe.redirectToCheckout({ sessionId: data.sessionId });
+    } catch (error: any) {
+      setPaymentError(error.message || '支付异常');
     } finally {
       setIsProcessing(false);
     }
