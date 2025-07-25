@@ -73,7 +73,7 @@ export default function Register() {
 
     try {
       console.log('Starting registration process...');
-      const user = await authService.register(formData.name, formData.email, formData.password);
+      const user = await authService.register(formData.email, formData.password, formData.name);
       
       if (user) {
         setDebugInfo('注册成功！正在跳转...');
