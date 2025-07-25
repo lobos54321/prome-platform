@@ -156,6 +156,12 @@ function DetailedDataTable({ userId, timeRange }: DetailedDataTableProps) {
   }, [timeRange]);
   
   const loadData = useCallback(async () => {
+    if (!userId) {
+      console.warn('DetailedDataTable: userId is required');
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       // Check if Supabase is configured
@@ -322,7 +328,27 @@ export default function TokenDashboard() {
   const [modelData, setModelData] = useState<TokenUsageByModel[]>([]);
   const [dailyUsageData, setDailyUsageData] = useState(generateDailyUsageData(7));
   const [isLoading, setIsLoading] = useState(true);
-  const user = authService.getCurrentUser();
+  const [user, setUser] = useState<any>(null);
+
+  // Initialize user state
+  useEffect(() => {
+    const initUser = async () => {
+      const currentUser = authService.getCurrentUserSync();
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        // Try to get user asynchronously
+        const asyncUser = await authService.getCurrentUser();
+        if (asyncUser) {
+          setUser(asyncUser);
+        } else {
+          navigate('/login');
+          return;
+        }
+      }
+    };
+    initUser();
+  }, [navigate]);
 
   const getDateRange = () => {
     const today = new Date();
@@ -406,11 +432,10 @@ export default function TokenDashboard() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/login');
-      return;
+      return; // Don't load data if no user
     }
     loadData();
-  }, [user, navigate, timeRange]);
+  }, [user, timeRange]);
 
   if (!user) return null;
 
