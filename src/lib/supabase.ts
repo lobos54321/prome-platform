@@ -416,7 +416,7 @@ class DatabaseService {
         service: item.service,
         tokensUsed: item.tokens_used,
         cost: item.cost,
-        createdAt: item.created_at,
+        createdAt: item.created_at || item.timestamp, // Handle both column names
       }));
     } catch (error) {
       console.error('Error getting token usage:', error);
@@ -491,7 +491,7 @@ class DatabaseService {
         amount: item.amount,
         description: item.description,
         status: item.status,
-        createdAt: item.created_at,
+        createdAt: item.created_at || item.timestamp, // Handle both column names
       }));
     } catch (error) {
       console.error('Error getting billing records:', error);
