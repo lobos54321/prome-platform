@@ -549,3 +549,4 @@ class DatabaseService {
 
 export const db = new DatabaseService();
 export { isSupabaseConfigured };
+export { supabase };
