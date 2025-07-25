@@ -11,16 +11,32 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Check if Supabase is properly configured
 const isSupabaseConfigured = 
   import.meta.env.VITE_SUPABASE_URL && 
-  import.meta.env.VITE_SUPABASE_ANON_KEY;
+  import.meta.env.VITE_SUPABASE_ANON_KEY &&
+  import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-supabase-url.supabase.co' &&
+  import.meta.env.VITE_SUPABASE_ANON_KEY !== 'placeholder-anon-key';
 
 // Console log to help debugging
 console.log('Supabase configuration status:', isSupabaseConfigured ? 'Configured' : 'Not configured');
+console.log('Supabase URL:', supabaseUrl);
 
 // Database service for ProMe application
 export class Database {
+  // Expose supabase client for other modules
+  get supabase() {
+    return supabase;
+  }
+
   // AUTH METHODS
   async signUp(email: string, password: string, name: string): Promise<User | null> {
+    // Return null immediately if not configured
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured - cannot register user');
+      return null;
+    }
+
     try {
+      console.log('Attempting to register user:', email);
+
       // Register with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -28,31 +44,61 @@ export class Database {
         options: {
           data: {
             name,
-            role: 'user',
-            balance: 50, // Welcome bonus
+            role: 'user'
           }
         }
       });
       
-      if (authError) throw authError;
-      if (!authData.user) return null; // 增加健壮性检查
+      if (authError) {
+        console.error('Auth registration error:', authError);
+        throw authError;
+      }
+      
+      if (!authData.user) {
+        console.error('No user returned from auth signup');
+        return null;
+      }
+
+      console.log('Auth user created:', authData.user.id);
+
+      // Wait a moment for the auth user to be fully created
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Create user profile in the users table
+      const userProfile = {
+        id: authData.user.id,
+        name,
+        email,
+        role: 'user',
+        balance: 50,
+        created_at: new Date().toISOString(),
+      };
+
+      console.log('Creating user profile:', userProfile);
+
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .insert({
-          id: authData.user.id,
-          name,
-          email,
-          role: 'user',
-          balance: 50,
-          created_at: new Date().toISOString(),
-        })
+        .insert(userProfile)
         .select()
         .single();
 
-      if (userError) throw userError;
-      if (!userData) return null; // 增加健壮性检查
+      if (userError) {
+        console.error('User profile creation error:', userError);
+        // If user profile creation fails, try to clean up auth user
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup auth user:', cleanupError);
+        }
+        throw userError;
+      }
+
+      if (!userData) {
+        console.error('No user data returned from profile creation');
+        return null;
+      }
+
+      console.log('User profile created successfully:', userData);
 
       return {
         id: userData.id,
@@ -65,20 +111,42 @@ export class Database {
       };
     } catch (error) {
       console.error('Error signing up:', error);
+      // Return more specific error information
+      if (error.message?.includes('duplicate key')) {
+        console.error('User already exists');
+      } else if (error.message?.includes('relation "users" does not exist')) {
+        console.error('Users table does not exist - database setup required');
+      }
       return null;
     }
   }
 
   async signIn(email: string, password: string): Promise<User | null> {
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured - cannot sign in user');
+      return null;
+    }
+
     try {
+      console.log('Attempting to sign in user:', email);
+
       // Login with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (authError) throw authError;
-      if (!authData.user) return null;
+      if (authError) {
+        console.error('Auth login error:', authError);
+        throw authError;
+      }
+      
+      if (!authData.user) {
+        console.error('No user returned from auth signin');
+        return null;
+      }
+
+      console.log('Auth login successful:', authData.user.id);
 
       // Get user profile from the users table
       const { data: userData, error: userError } = await supabase
@@ -87,8 +155,17 @@ export class Database {
         .eq('id', authData.user.id)
         .single();
 
-      if (userError) throw userError;
-      if (!userData) return null; // 增加健壮性检查
+      if (userError) {
+        console.error('User profile fetch error:', userError);
+        throw userError;
+      }
+      
+      if (!userData) {
+        console.error('No user profile found');
+        return null;
+      }
+
+      console.log('User profile fetched successfully:', userData);
 
       return {
         id: userData.id,
@@ -106,22 +183,51 @@ export class Database {
   }
 
   async signOut(): Promise<void> {
-    await supabase.auth.signOut();
+    if (!isSupabaseConfigured) {
+      console.warn('Supabase not configured - cannot sign out');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   }
 
   async getCurrentUser(): Promise<User | null> {
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) return null;
+    if (!isSupabaseConfigured) {
+      return null;
+    }
 
-      const { data: userData, error } = await supabase
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Error getting current user from auth:', error);
+        return null;
+      }
+      
+      if (!user) {
+        return null;
+      }
+
+      // Get user profile from the users table
+      const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('id', authData.user.id)
+        .eq('id', user.id)
         .single();
 
-      if (error) throw error;
-      if (!userData) return null; // 增加健壮性检查
+      if (userError) {
+        console.error('Error getting user profile:', userError);
+        return null;
+      }
+      
+      if (!userData) {
+        return null;
+      }
 
       return {
         id: userData.id,
@@ -139,39 +245,11 @@ export class Database {
   }
 
   // USER METHODS
-  async updateUserBalance(userId: string, amount: number): Promise<number> {
-    try {
-      // First get current balance
-      const { data: userData, error: getUserError } = await supabase
-        .from('users')
-        .select('balance')
-        .eq('id', userId)
-        .single();
-
-      if (getUserError) throw getUserError;
-      if (!userData) throw new Error('User not found'); // 增加健壮性检查
-
-      const newBalance = userData.balance + amount;
-
-      // Update balance
-      const { data: updatedUser, error: updateError } = await supabase
-        .from('users')
-        .update({ balance: newBalance })
-        .eq('id', userId)
-        .select('balance')
-        .single();
-
-      if (updateError) throw updateError;
-      if (!updatedUser) throw new Error('Failed to update user balance'); // 增加健壮性检查
-
-      return updatedUser.balance;
-    } catch (error) {
-      console.error('Error updating user balance:', error);
-      throw error;
-    }
-  }
-
   async getUserById(userId: string): Promise<User | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from('users')
@@ -180,7 +258,7 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null; // 增加健壮性检查
+      if (!data) return null;
 
       return {
         id: data.id,
@@ -192,31 +270,84 @@ export class Database {
         createdAt: data.created_at,
       };
     } catch (error) {
-      console.error('Error getting user by id:', error);
+      console.error('Error getting user by ID:', error);
       return null;
+    }
+  }
+
+  async updateUserBalance(userId: string, amount: number): Promise<number> {
+    if (!isSupabaseConfigured) {
+      return 0;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update({ balance: amount })
+        .eq('id', userId)
+        .select('balance')
+        .single();
+
+      if (error) throw error;
+      return data?.balance || 0;
+    } catch (error) {
+      console.error('Error updating user balance:', error);
+      return 0;
     }
   }
 
   // SERVICE METHODS
   async getServices(): Promise<Service[]> {
+    if (!isSupabaseConfigured) {
+      // Return mock data when not configured
+      return [
+        {
+          id: 'mock-service-1',
+          name: '智能写作助手',
+          description: '基于AI的内容创作和文案生成服务',
+          category: '内容创作',
+          price: 0.02,
+          priceUnit: 'per token',
+          isActive: true,
+          features: ['智能文案生成', '多风格适配', 'SEO优化'],
+          modelSupported: ['GPT-4', 'GPT-3.5-turbo'],
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 'mock-service-2',
+          name: '代码生成助手',
+          description: '智能代码生成和调试服务',
+          category: '开发工具',
+          price: 0.03,
+          priceUnit: 'per token',
+          isActive: true,
+          features: ['代码生成', '错误检测', '性能优化建议'],
+          modelSupported: ['GPT-4', 'Claude-2'],
+          createdAt: new Date().toISOString(),
+        }
+      ];
+    }
+
     try {
       const { data, error } = await supabase
         .from('services')
-        .select('*');
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (!data) return []; // 增加健壮性检查
-
-      return data.map(service => ({
+      return data?.map(service => ({
         id: service.id,
         name: service.name,
         description: service.description,
         category: service.category,
-        features: service.features,
-        pricePerToken: service.price_per_token,
-        popular: service.popular,
-        difyUrl: service.dify_url,
-      }));
+        price: service.price,
+        priceUnit: service.price_unit,
+        isActive: service.is_active,
+        features: service.features || [],
+        modelSupported: service.model_supported || [],
+        createdAt: service.created_at,
+      })) || [];
     } catch (error) {
       console.error('Error getting services:', error);
       return [];
@@ -224,6 +355,10 @@ export class Database {
   }
 
   async getServiceById(serviceId: string): Promise<Service | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
     try {
       const { data, error } = await supabase
         .from('services')
@@ -232,159 +367,113 @@ export class Database {
         .single();
 
       if (error) throw error;
-      if (!data) return null; // 增加健壮性检查
+      if (!data) return null;
 
       return {
         id: data.id,
         name: data.name,
         description: data.description,
         category: data.category,
-        features: data.features,
-        pricePerToken: data.price_per_token,
-        popular: data.popular,
-        difyUrl: data.dify_url,
+        price: data.price,
+        priceUnit: data.price_unit,
+        isActive: data.is_active,
+        features: data.features || [],
+        modelSupported: data.model_supported || [],
+        createdAt: data.created_at,
       };
     } catch (error) {
-      console.error('Error getting service by id:', error);
+      console.error('Error getting service by ID:', error);
       return null;
     }
   }
 
   // TOKEN USAGE METHODS
   async getTokenUsage(userId: string): Promise<TokenUsage[]> {
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('token_usage')
-        .select('*')
-        .eq('user_id', userId);
+        .select(`
+          *,
+          services(name)
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
-      if (!data) return []; // 增加健壮性检查
-
-      return data.map(usage => ({
+      return data?.map(usage => ({
         id: usage.id,
         userId: usage.user_id,
         serviceId: usage.service_id,
+        serviceName: usage.services?.name || 'Unknown Service',
         tokensUsed: usage.tokens_used,
         cost: usage.cost,
-        timestamp: usage.timestamp,
-        sessionId: usage.session_id,
-      }));
+        model: usage.model,
+        createdAt: usage.created_at,
+      })) || [];
     } catch (error) {
       console.error('Error getting token usage:', error);
       return [];
     }
   }
 
-  async addTokenUsage(usage: Omit<TokenUsage, 'id'>): Promise<TokenUsage | null> {
-    try {
-      const { data, error } = await supabase
-        .from('token_usage')
-        .insert({
-          user_id: usage.userId,
-          service_id: usage.serviceId,
-          tokens_used: usage.tokensUsed,
-          cost: usage.cost,
-          timestamp: usage.timestamp,
-          session_id: usage.sessionId,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (!data) return null; // 增加健壮性检查
-
-      return {
-        id: data.id,
-        userId: data.user_id,
-        serviceId: data.service_id,
-        tokensUsed: data.tokens_used,
-        cost: data.cost,
-        timestamp: data.timestamp,
-        sessionId: data.session_id,
-      };
-    } catch (error) {
-      console.error('Error adding token usage:', error);
-      return null;
-    }
-  }
-
   // BILLING METHODS
   async getBillingRecords(userId: string): Promise<BillingRecord[]> {
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('billing_records')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
-      if (!data) return []; // 增加健壮性检查
-
-      return data.map(record => ({
+      return data?.map(record => ({
         id: record.id,
         userId: record.user_id,
         amount: record.amount,
         type: record.type,
-        description: record.description,
-        timestamp: record.timestamp,
         status: record.status,
-      }));
+        description: record.description,
+        createdAt: record.created_at,
+      })) || [];
     } catch (error) {
       console.error('Error getting billing records:', error);
       return [];
     }
   }
 
-  async addBillingRecord(record: Omit<BillingRecord, 'id'>): Promise<BillingRecord | null> {
-    try {
-      const { data, error } = await supabase
-        .from('billing_records')
-        .insert({
-          user_id: record.userId,
-          amount: record.amount,
-          type: record.type,
-          description: record.description,
-          timestamp: record.timestamp,
-          status: record.status,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (!data) return null; // 增加健壮性检查
-
-      return {
-        id: data.id,
-        userId: data.user_id,
-        amount: data.amount,
-        type: data.type,
-        description: data.description,
-        timestamp: data.timestamp,
-        status: data.status,
-      };
-    } catch (error) {
-      console.error('Error adding billing record:', error);
-      return null;
-    }
-  }
-
   // PRICING METHODS
   async getPricingRules(): Promise<PricingRule[]> {
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('pricing_rules')
-        .select('*');
+        .select('*')
+        .eq('is_active', true)
+        .order('model', { ascending: true });
 
       if (error) throw error;
-      if (!data) return []; // 增加健壮性检查
-
-      return data.map(rule => ({
+      return data?.map(rule => ({
         id: rule.id,
-        modelName: rule.model_name,
-        inputTokenPrice: rule.input_token_price,
-        outputTokenPrice: rule.output_token_price,
+        model: rule.model,
+        promptTokenPrice: rule.prompt_token_price,
+        completionTokenPrice: rule.completion_token_price,
+        currency: rule.currency,
         isActive: rule.is_active,
-      }));
+        createdAt: rule.created_at,
+      })) || [];
     } catch (error) {
       console.error('Error getting pricing rules:', error);
       return [];
@@ -392,289 +481,42 @@ export class Database {
   }
 
   async updatePricingRule(id: string, updates: Partial<PricingRule>): Promise<PricingRule | null> {
-    try {
-      const updateData: Record<string, unknown> = {};
-      if (updates.modelName !== undefined) updateData.model_name = updates.modelName;
-      if (updates.inputTokenPrice !== undefined) updateData.input_token_price = updates.inputTokenPrice;
-      if (updates.outputTokenPrice !== undefined) updateData.output_token_price = updates.outputTokenPrice;
-      if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+    if (!isSupabaseConfigured) {
+      return null;
+    }
 
+    try {
       const { data, error } = await supabase
         .from('pricing_rules')
-        .update(updateData)
+        .update({
+          prompt_token_price: updates.promptTokenPrice,
+          completion_token_price: updates.completionTokenPrice,
+          currency: updates.currency,
+          is_active: updates.isActive,
+        })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      if (!data) return null; // 增加健壮性检查
+      if (!data) return null;
 
       return {
         id: data.id,
-        modelName: data.model_name,
-        inputTokenPrice: data.input_token_price,
-        outputTokenPrice: data.output_token_price,
+        model: data.model,
+        promptTokenPrice: data.prompt_token_price,
+        completionTokenPrice: data.completion_token_price,
+        currency: data.currency,
         isActive: data.is_active,
+        createdAt: data.created_at,
       };
     } catch (error) {
       console.error('Error updating pricing rule:', error);
       return null;
     }
   }
-
-  async addPricingRule(rule: Omit<PricingRule, 'id'>): Promise<PricingRule | null> {
-    try {
-      const { data, error } = await supabase
-        .from('pricing_rules')
-        .insert({
-          model_name: rule.modelName,
-          input_token_price: rule.inputTokenPrice,
-          output_token_price: rule.outputTokenPrice,
-          is_active: rule.isActive,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (!data) return null; // 增加健壮性检查
-
-      return {
-        id: data.id,
-        modelName: data.model_name,
-        inputTokenPrice: data.input_token_price,
-        outputTokenPrice: data.output_token_price,
-        isActive: data.is_active,
-      };
-    } catch (error) {
-      console.error('Error adding pricing rule:', error);
-      return null;
-    }
-  }
-
-  async deletePricingRule(id: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('pricing_rules')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error deleting pricing rule:', error);
-      throw error;
-    }
-  }
-
-  // SCRIPT METHODS
-  async saveScript(script: Omit<Script, 'id'>): Promise<Script | null> {
-    try {
-      const { data, error } = await supabase
-        .from('scripts')
-        .insert({
-          user_id: script.userId,
-          title: script.title,
-          content: script.content,
-          service_type: script.serviceType,
-          created_at: script.createdAt,
-          test_mode: script.testMode,
-          model: script.model,
-          tags: script.tags,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (!data) return null; // 增加健壮性检查
-
-      return {
-        id: data.id,
-        userId: data.user_id,
-        title: data.title,
-        content: data.content,
-        serviceType: data.service_type,
-        createdAt: data.created_at,
-        testMode: data.test_mode,
-        model: data.model,
-        tags: data.tags,
-      };
-    } catch (error) {
-      console.error('Error saving script:', error);
-      return null;
-    }
-  }
-
-  async getScriptsByUser(userId: string): Promise<Script[]> {
-    try {
-      const { data, error } = await supabase
-        .from('scripts')
-        .select('*')
-        .eq('user_id', userId);
-
-      if (error) throw error;
-      if (!data) return []; // 增加健壮性检查
-
-      return data.map(script => ({
-        id: script.id,
-        userId: script.user_id,
-        title: script.title,
-        content: script.content,
-        serviceType: script.service_type,
-        createdAt: script.created_at,
-        testMode: script.test_mode,
-        model: script.model,
-        tags: script.tags,
-      }));
-    } catch (error) {
-      console.error('Error getting scripts by user:', error);
-      return [];
-    }
-  }
-
-  // WEBHOOK METHODS
-  async processWebhook(payload: WebhookPayload, apiKey: string): Promise<{success: boolean; message: string; scriptId?: string}> {
-    try {
-      // First validate the API key
-      const { data: apiKeyData, error: apiKeyError } = await supabase
-        .from('api_keys')
-        .select('*')
-        .eq('key', apiKey)
-        .single();
-
-      if (apiKeyError || !apiKeyData) {
-        return { 
-          success: false, 
-          message: 'Invalid API key' 
-        };
-      }
-
-      // Extract user ID from payload or default
-      const userId = payload.user_id || payload.metadata?.user_id || 'anonymous';
-
-      // Extract content from response
-      let content = '';
-      let title = '';
-      if (payload.response) {
-        content = payload.response.answer || '';
-        title = payload.query || '未命名脚本';
-      } else if (payload.messages) {
-        // 增加健壮性检查：确保 payload.messages 是数组
-        if (Array.isArray(payload.messages)) {
-          // Find the assistant's message
-          const assistantMessage = payload.messages.find(m => m.role === 'assistant');
-          if (assistantMessage) {
-            // 增加健壮性检查：确保 content 是字符串
-            content = typeof assistantMessage.content === 'string' ? assistantMessage.content : '';
-          }
-          // Use the last user message as the title
-          const userMessages = payload.messages.filter(m => m.role === 'user');
-          if (userMessages.length > 0) {
-            const lastUserMessage = userMessages[userMessages.length - 1];
-            // 增加健壮性检查：确保 lastUserMessage 和其 content 存在且是字符串
-            if (lastUserMessage && typeof lastUserMessage.content === 'string') {
-              title = lastUserMessage.content.substring(0, 50) + (lastUserMessage.content.length > 50 ? '...' : '');
-            }
-          }
-        }
-      }
-
-      if (!content) {
-        return { 
-          success: false, 
-          message: 'No content found in payload' 
-        };
-      }
-
-      const isTestMode = payload.metadata?.test_mode === true;
-
-      // Calculate tokens (simple approximation)
-      const tokensUsed = Math.ceil(content.length / 4);
-
-      // Get model pricing
-      const { data: pricingData, error: pricingError } = await supabase
-        .from('pricing_rules')
-        .select('*')
-        .eq('model_name', payload.model || 'default')
-        .eq('is_active', true)
-        .single();
-
-      if (pricingError) {
-        console.warn('Model pricing not found, using default pricing');
-      }
-
-      const outputTokenPrice = pricingData?.output_token_price || 0.005;
-      const cost = (tokensUsed * outputTokenPrice) / 1000;
-
-      // Save the script
-      const script = await this.saveScript({
-        userId,
-        title,
-        content,
-        serviceType: payload.app_name || payload.metadata?.app_name || 'webhook-script',
-        createdAt: new Date().toISOString(),
-        testMode: isTestMode,
-        model: payload.model || 'unknown',
-        tags: payload.metadata?.tags || [],
-      });
-
-      if (!script) {
-        return {
-          success: false,
-          message: 'Failed to save script'
-        };
-      }
-
-      // If not in test mode, record usage and update balance
-      if (!isTestMode && userId !== 'anonymous') {
-        // Add token usage record
-        await this.addTokenUsage({
-          userId,
-          serviceId: script.serviceType,
-          tokensUsed,
-          cost,
-          timestamp: new Date().toISOString(),
-          // 修复模板字符串
-          sessionId: 'webhook_' + (payload.conversation_id || Date.now())
-        });
-
-        // Add billing record
-        await this.addBillingRecord({
-          userId,
-          amount: cost,
-          type: 'usage',
-          // 修复模板字符串
-          description: script.serviceType + ' - ' + (script.title ? script.title.substring(0, 30) : 'Untitled') + '...',
-          timestamp: new Date().toISOString(),
-          status: 'completed'
-        });
-
-        // Update user balance
-        await this.updateUserBalance(userId, -cost);
-
-        // Check if balance is low
-        const user = await this.getUserById(userId);
-        if (user && user.balance < 10) {
-          // In a real app, send notification
-          // 修复模板字符串
-          console.log('Low balance notification for user ' + userId);
-        }
-      }
-
-      return {
-        success: true,
-        message: 'Webhook processed successfully',
-        scriptId: script.id
-      };
-    } catch (error) {
-      console.error('Error processing webhook:', error);
-      // 修复模板字符串
-      return {
-        success: false,
-        message: 'Error processing webhook: ' + (error instanceof Error ? error.message : 'Unknown error')
-      };
-    }
-  }
 }
 
+// Export database instance
 export const db = new Database();
-// 注意：这里移除了之前可能存在的 ```` ``` ```` 和多余的 `}`
 
