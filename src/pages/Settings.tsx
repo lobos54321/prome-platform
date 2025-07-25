@@ -27,7 +27,6 @@ export default function Settings() {
 
   // Payment state
   const [amount, setAmount] = useState('100');
-  const [paymentMethod, setPaymentMethod] = useState('alipay');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState('');
   const [paymentError, setPaymentError] = useState('');
@@ -77,13 +76,13 @@ export default function Settings() {
     }, 1000);
   };
 
-  const handleRecharge = async (e: React.FormEvent) => {
+  // Stripe-only充值
+  const handleStripeRecharge = async (e: React.FormEvent) => {
     e.preventDefault();
     setPaymentError('');
     setPaymentSuccess('');
     setIsProcessing(true);
 
-    // Validate amount
     const amountValue = parseFloat(amount);
     if (isNaN(amountValue) || amountValue <= 0) {
       setPaymentError('请输入有效的充值金额');
@@ -92,14 +91,10 @@ export default function Settings() {
     }
 
     try {
-      // In a real app, we would call the payment API
-      // For demo, simulate API call
+      // TODO: 这里集成 Stripe 支付调用，实际可 replace 为后端API跳转
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Update user balance
-      await authService.updateBalance(amountValue);
-      setPaymentSuccess(`成功充值 ¥${typeof amountValue === 'number' ? amountValue.toFixed(2) : '0.00'}`);
-      setAmount('100'); // Reset form
+      setPaymentSuccess(`成功充值 ¥${amountValue.toFixed(2)}（模拟，实际应跳转到Stripe）`);
+      setAmount('100');
     } catch (error) {
       setPaymentError('充值处理失败，请稍后重试');
     } finally {
@@ -245,9 +240,9 @@ export default function Settings() {
               <Card>
                 <CardHeader>
                   <CardTitle>账户充值</CardTitle>
-                  <CardDescription>为您的账户充值Token使用额度</CardDescription>
+                  <CardDescription>为您的账户充值Token使用额度（仅支持 Stripe，信用卡/借记卡）</CardDescription>
                 </CardHeader>
-                <form onSubmit={handleRecharge}>
+                <form onSubmit={handleStripeRecharge}>
                   <CardContent className="space-y-4">
                     {paymentError && (
                       <Alert variant="destructive">
@@ -292,31 +287,7 @@ export default function Settings() {
                       ))}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>支付方式</Label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div
-                          className={`border rounded-lg p-4 cursor-pointer ${
-                            paymentMethod === 'alipay' ? 'border-blue-500 bg-blue-50' : ''
-                          }`}
-                          onClick={() => setPaymentMethod('alipay')}
-                        >
-                          <div className="flex items-center justify-center h-8">
-                            <span className="text-lg font-semibold text-blue-600">支付宝</span>
-                          </div>
-                        </div>
-                        <div
-                          className={`border rounded-lg p-4 cursor-pointer ${
-                            paymentMethod === 'wechat' ? 'border-blue-500 bg-blue-50' : ''
-                          }`}
-                          onClick={() => setPaymentMethod('wechat')}
-                        >
-                          <div className="flex items-center justify-center h-8">
-                            <span className="text-lg font-semibold text-green-600">微信支付</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Stripe only: 无支付方式选择 */}
 
                     <div className="bg-gray-50 p-4 rounded-md">
                       <div className="text-sm">
@@ -340,12 +311,12 @@ export default function Settings() {
                       {isProcessing ? (
                         <>
                           <div className="animate-spin mr-2">⚪</div>
-                          处理中...
+                          跳转至 Stripe...
                         </>
                       ) : (
                         <>
                           <CreditCard className="mr-2 h-4 w-4" />
-                          确认充值
+                          使用 Stripe 支付
                         </>
                       )}
                     </Button>
