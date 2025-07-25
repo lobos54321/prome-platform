@@ -1,113 +1,91 @@
-import { User } from '@/types';
 import { db } from './supabase';
+import { User } from '@/types';
 
-// Authentication service using Supabase
 class AuthService {
   private currentUser: User | null = null;
-  private isInitialized: boolean = false;
-  private isValidating: boolean = false;
-  private validationPromise: Promise<User | null> | null = null;
-  
-  // Login with email and password
-  async login(email: string, password: string): Promise<User> {
-    try {
-      // 先清除任何现有状态
-      this.forceLogout();
-      
-      const user = await db.signIn(email, password);
-      
-      if (!user) {
-        throw new Error('Login failed. Please check your credentials.');
-      }
-      
-      this.currentUser = user;
-      this.isInitialized = true;
-      
-      localStorage.setItem('currentUser', JSON.stringify({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        balance: user.balance
-      }));
-      
-      // 触发认证状态变更事件
-      window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-        detail: { user } 
-      }));
-      
-      return user;
-    } catch (error) {
-      // 登录失败时清除状态
-      this.forceLogout();
-      throw error;
-    }
+  private isInitialized = false;
+  private isValidating = false;
+  private validationPromise: Promise<void> | null = null;
+
+  // Get current user synchronously (from memory)
+  getCurrentUserSync(): User | null {
+    return this.currentUser;
   }
-  
-  // Register new user
-  async register(name: string, email: string, password: string): Promise<User> {
-    try {
-      // 先清除任何现有状态
-      this.forceLogout();
-      
-      const user = await db.signUp(email, password, name);
-      
-      if (!user) {
-        throw new Error('Registration failed. Please try again later.');
-      }
-      
-      this.currentUser = user;
-      this.isInitialized = true;
-      
-      localStorage.setItem('currentUser', JSON.stringify({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        balance: user.balance
-      }));
-      
-      // 触发认证状态变更事件
-      window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-        detail: { user } 
-      }));
-      
-      return user;
-    } catch (error) {
-      // 注册失败时清除状态
-      this.forceLogout();
-      throw error;
-    }
-  }
-  
-  // 异步获取当前用户 - 严格验证版本
+
+  // Get current user asynchronously (with validation)
   async getCurrentUser(): Promise<User | null> {
-    // 如果已经有验证进程在运行，等待其完成
-    if (this.validationPromise) {
-      return this.validationPromise;
+    // 如果还没初始化，先初始化
+    if (!this.isInitialized) {
+      return await this.initializeAuth();
     }
 
-    // 创建新的验证进程
-    this.validationPromise = this.performUserValidation();
-    
-    try {
-      const result = await this.validationPromise;
-      return result;
-    } finally {
-      this.validationPromise = null;
+    // 如果有缓存的用户，先返回，然后静默验证
+    if (this.currentUser) {
+      // 静默验证会话（不阻塞返回）
+      this.validateSessionQuietly();
+      return this.currentUser;
     }
-  }
-  
-  // 执行用户验证的核心逻辑
-  private async performUserValidation(): Promise<User | null> {
+
+    // 没有缓存用户，进行完整验证
     try {
-      this.isValidating = true;
-      
-      // 首先验证 Supabase 会话
       const user = await db.getCurrentUser();
       
       if (user && user.id) {
-        // 会话有效，更新用户信息
+        this.currentUser = user;
+        this.isInitialized = true;
+        
+        // 缓存用户信息
+        const userToStore = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          balance: user.balance
+        };
+        
+        localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        return user;
+      } else {
+        console.log('No valid Supabase session, clearing user state');
+        this.clearUserState();
+        return null;
+      }
+    } catch (error) {
+      console.error('Error getting current user from auth:', error);
+      console.log('No valid Supabase session, clearing user state');
+      this.clearUserState();
+      return null;
+    }
+  }
+
+  private clearUserState(): void {
+    this.currentUser = null;
+    this.isInitialized = true; // 标记为已初始化，避免重复检查
+    
+    try {
+      localStorage.removeItem('currentUser');
+      
+      // 清除所有以 sb- 开头的键（Supabase 相关）
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+    } catch (error) {
+      console.warn('Failed to clear user state:', error);
+    }
+  }
+
+  // Login
+  async login(email: string, password: string): Promise<User | null> {
+    try {
+      const user = await db.signIn(email, password);
+      
+      if (user && user.id) {
         this.currentUser = user;
         this.isInitialized = true;
         
@@ -121,70 +99,53 @@ class AuthService {
         
         localStorage.setItem('currentUser', JSON.stringify(userToStore));
         
-        console.log('Valid Supabase session found, user authenticated:', user.id);
+        // 触发认证状态变更事件
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+          detail: { user } 
+        }));
+        
         return user;
-      } else {
-        // 会话无效，立即清除所有用户状态
-        console.log('No valid Supabase session, clearing user state');
-        this.clearUserState();
-        return null;
-      }
-    } catch (error) {
-      console.warn('Failed to get user from Supabase:', error);
-      // 任何错误都清除用户状态
-      this.clearUserState();
-      return null;
-    } finally {
-      this.isValidating = false;
-    }
-  }
-  
-  // 清除用户状态的统一方法
-  private clearUserState(): void {
-    this.currentUser = null;
-    this.isInitialized = true;
-    localStorage.removeItem('currentUser');
-    
-    // 触发认证状态变更事件
-    window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-      detail: { user: null } 
-    }));
-  }
-  
-  // 同步版本 - 严格模式，优先使用缓存但会触发后台验证
-  getCurrentUserSync(): User | null {
-    // 如果正在验证中，返回当前缓存的用户
-    if (this.isValidating) {
-      return this.currentUser;
-    }
-    
-    // 如果还没有初始化
-    if (!this.isInitialized) {
-      // 尝试从本地存储恢复，但立即触发验证
-      const stored = localStorage.getItem('currentUser');
-      if (stored) {
-        try {
-          const storedUser = JSON.parse(stored);
-          if (storedUser && storedUser.id) {
-            this.currentUser = storedUser;
-            
-            // 立即在后台验证会话有效性
-            this.validateSessionQuietly();
-            
-            return storedUser;
-          }
-        } catch (error) {
-          console.warn('Failed to parse stored user data:', error);
-          localStorage.removeItem('currentUser');
-        }
       }
       
-      this.isInitialized = true;
       return null;
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
     }
-    
-    // 如果已初始化，返回当前用户
-    return this.currentUser;
+  }
+
+  // Register
+  async register(email: string, password: string, name: string): Promise<User | null> {
+    try {
+      const user = await db.signUp(email, password, name);
+      
+      if (user && user.id) {
+        this.currentUser = user;
+        this.isInitialized = true;
+        
+        const userToStore = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          balance: user.balance
+        };
+        
+        localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        
+        // 触发认证状态变更事件
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+          detail: { user } 
+        }));
+        
+        return user;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
   }
 
   // 静默验证会话
@@ -231,30 +192,64 @@ class AuthService {
   
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    const user = this.getCurrentUserSync();
-    return user !== null && user.id !== undefined && user.id !== null && user.id !== '';
+    return this.currentUser !== null && this.currentUser.id !== undefined && this.currentUser.id !== null && this.currentUser.id !== '';
   }
   
-  // Initialize auth state - 严格验证版本
+  // Initialize auth state - 只在应用启动时调用一次
   async initializeAuth(): Promise<User | null> {
+    // 如果已经初始化过，直接返回当前用户
+    if (this.isInitialized) {
+      return this.currentUser;
+    }
+
     try {
       console.log('Initializing auth state...');
       
-      // 首先清除可能的残留状态
-      this.isInitialized = false;
-      this.currentUser = null;
+      // 首先尝试从本地存储恢复用户信息
+      try {
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          if (parsedUser && parsedUser.id) {
+            this.currentUser = parsedUser;
+            // 标记为已初始化，但稍后会静默验证
+            this.isInitialized = true;
+            
+            // 静默验证会话（不阻塞初始化）
+            this.validateSessionQuietly();
+            
+            console.log('Auth initialization successful, user restored from cache:', parsedUser.id);
+            return this.currentUser;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to parse stored user data:', error);
+        localStorage.removeItem('currentUser');
+      }
       
-      // 不依赖本地缓存，直接进行服务器验证
-      const user = await this.getCurrentUser();
+      // 如果没有缓存用户，尝试从服务器获取
+      const user = await db.getCurrentUser();
       
       if (user && user.id) {
+        this.currentUser = user;
+        
+        const userToStore = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          balance: user.balance
+        };
+        
+        localStorage.setItem('currentUser', JSON.stringify(userToStore));
         console.log('Auth initialization successful, user found:', user.id);
-        return user;
       } else {
         console.log('Auth initialization complete, no user found');
         this.clearUserState();
-        return null;
       }
+      
+      this.isInitialized = true;
+      return this.currentUser;
     } catch (error) {
       console.error('Failed to initialize auth:', error);
       this.clearUserState();
@@ -262,7 +257,7 @@ class AuthService {
     }
   }
   
-  // Logout - 增强版本
+  // Logout - 修复路由跳转问题
   async logout(): Promise<void> {
     console.log('Starting logout process...');
     
@@ -278,10 +273,10 @@ class AuthService {
       // 即使服务器退出失败，本地状态已清除
     }
     
-    // 确保页面状态重置
+    // 确保页面状态重置 - 修复：跳转到正确的路径
     setTimeout(() => {
-      if (window.location.pathname !== '/auth/login') {
-        window.location.href = '/auth/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
     }, 100);
   }
@@ -293,23 +288,13 @@ class AuthService {
     // 停止任何正在进行的验证
     this.isValidating = false;
     this.validationPromise = null;
-    this.currentUser = null;
-    this.isInitialized = true;
     
-    // 清除所有可能的存储
+    // 清除用户状态
+    this.clearUserState();
+    
+    // 清除localStorage中的认证相关数据
     try {
       localStorage.removeItem('currentUser');
-      sessionStorage.removeItem('currentUser');
-      
-      // 清除 Supabase 认证令牌
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (supabaseUrl) {
-        const projectRef = supabaseUrl.split('//')[1]?.split('.')[0];
-        if (projectRef) {
-          localStorage.removeItem(`sb-${projectRef}-auth-token`);
-          sessionStorage.removeItem(`sb-${projectRef}-auth-token`);
-        }
-      }
       
       // 清除所有以 sb- 开头的键（Supabase 相关）
       const keysToRemove = [];
@@ -333,7 +318,7 @@ class AuthService {
   
   // Update user balance
   async updateBalance(amount: number): Promise<number> {
-    const user = await this.getCurrentUser();
+    const user = this.getCurrentUserSync();
     if (!user || !user.id) {
       throw new Error('No authenticated user found');
     }
@@ -383,7 +368,7 @@ class AuthService {
     defaultValue: T
   ): Promise<T> {
     try {
-      const user = await this.getCurrentUser();
+      const user = this.getCurrentUserSync();
       if (!user || !user.id) {
         console.warn('Service call attempted without valid user');
         this.forceLogout();
@@ -400,7 +385,7 @@ class AuthService {
 
 export const authService = new AuthService();
 
-// 页面加载时初始化认证状态
+// 页面加载时初始化认证状态 - 只调用一次
 let initPromise: Promise<void> | null = null;
 
 export async function initializeAuthOnLoad(): Promise<void> {
@@ -430,7 +415,7 @@ if (import.meta.env.DEV) {
     window.location.reload();
   };
   (window as any).checkAuth = async () => {
-    const user = await authService.getCurrentUser();
+    const user = authService.getCurrentUserSync();
     console.log('Current user:', user);
     console.log('Is authenticated:', authService.isAuthenticated());
   };
