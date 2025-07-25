@@ -4,6 +4,7 @@ import { db } from './supabase';
 // Authentication service using Supabase
 class AuthService {
   private currentUser: User | null = null;
+  private isInitialized: boolean = false;
   
   // Login with email and password
   async login(email: string, password: string): Promise<User> {
@@ -14,6 +15,8 @@ class AuthService {
     }
     
     this.currentUser = user;
+    this.isInitialized = true;
+    
     // Store minimal user info in localStorage for UI state persistence
     localStorage.setItem('currentUser', JSON.stringify({
       id: user.id,
@@ -34,8 +37,10 @@ class AuthService {
       throw new Error('Registration failed. Please try again later.');
     }
     
-    // 重要：注册后立即设置当前用户，不等待数据库查询
+    // 重要：注册后立即设置当前用户
     this.currentUser = user;
+    this.isInitialized = true;
+    
     // Store minimal user info in localStorage for UI state persistence
     localStorage.setItem('currentUser', JSON.stringify({
       id: user.id,
@@ -48,24 +53,28 @@ class AuthService {
     return user;
   }
   
-  // Get current user - 改进版本，优先使用内存中的用户
+  // 异步获取当前用户 - 从服务器验证
   async getCurrentUser(): Promise<User | null> {
-    // 如果内存中有用户且在10分钟内设置过，直接返回
-    if (this.currentUser) {
+    // 如果已经有用户且在短时间内验证过，直接返回
+    if (this.currentUser && this.isInitialized) {
       return this.currentUser;
     }
 
-    // 尝试从 localStorage 获取基本信息
+    // 尝试从 localStorage 恢复用户状态
     try {
       const stored = localStorage.getItem('currentUser');
       if (stored) {
         const storedUser = JSON.parse(stored);
-        // 如果有存储的用户信息，先使用它，然后异步更新
         this.currentUser = storedUser;
+        this.isInitialized = true;
         
-        // 异步尝试从 Supabase 获取最新信息
-        this.refreshUserAsync().catch(err => {
-          console.warn('Failed to refresh user data:', err);
+        // 异步验证服务器会话，但不阻塞返回
+        this.validateSessionAsync().catch(err => {
+          console.warn('Session validation failed:', err);
+          // 如果验证失败，清除用户状态
+          this.currentUser = null;
+          this.isInitialized = false;
+          localStorage.removeItem('currentUser');
         });
         
         return storedUser;
@@ -80,6 +89,7 @@ class AuthService {
       const user = await db.getCurrentUser();
       if (user) {
         this.currentUser = user;
+        this.isInitialized = true;
         localStorage.setItem('currentUser', JSON.stringify({
           id: user.id,
           name: user.name,
@@ -95,16 +105,17 @@ class AuthService {
     
     // 清除无效数据
     this.currentUser = null;
+    this.isInitialized = true; // 标记已初始化，避免重复查询
     localStorage.removeItem('currentUser');
     return null;
   }
 
-  // 异步刷新用户数据
-  private async refreshUserAsync(): Promise<void> {
+  // 异步验证会话有效性
+  private async validateSessionAsync(): Promise<void> {
     try {
       const user = await db.getCurrentUser();
       if (user && this.currentUser) {
-        // 更新内存中的用户数据
+        // 更新用户数据
         this.currentUser = user;
         localStorage.setItem('currentUser', JSON.stringify({
           id: user.id,
@@ -113,34 +124,41 @@ class AuthService {
           role: user.role,
           balance: user.balance
         }));
+      } else if (!user && this.currentUser) {
+        // 服务器会话已失效
+        this.currentUser = null;
+        localStorage.removeItem('currentUser');
       }
     } catch (error) {
-      // 静默失败，不影响用户体验
-      console.warn('Background user refresh failed:', error);
+      // 验证失败，清除本地状态
+      if (this.currentUser) {
+        this.currentUser = null;
+        localStorage.removeItem('currentUser');
+      }
+      throw error;
     }
   }
   
-  // Synchronous version - 优先返回内存或 localStorage 中的用户
+  // 同步版本 - 立即返回缓存的用户，不进行网络请求
   getCurrentUserSync(): User | null {
-    // 优先返回内存中的用户
-    if (this.currentUser) {
-      return this.currentUser;
-    }
-    
-    // 尝试从 localStorage 获取
-    try {
-      const stored = localStorage.getItem('currentUser');
-      if (stored) {
-        const storedUser = JSON.parse(stored);
-        this.currentUser = storedUser;
-        return storedUser;
+    // 如果还没有初始化，尝试从 localStorage 恢复
+    if (!this.isInitialized) {
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const storedUser = JSON.parse(stored);
+          this.currentUser = storedUser;
+          this.isInitialized = true;
+          return storedUser;
+        }
+      } catch (error) {
+        console.warn('Failed to parse stored user data:', error);
+        localStorage.removeItem('currentUser');
       }
-    } catch (error) {
-      console.warn('Failed to parse stored user data:', error);
-      localStorage.removeItem('currentUser');
+      this.isInitialized = true;
     }
     
-    return null;
+    return this.currentUser;
   }
   
   // Check if user is authenticated (synchronous)
@@ -151,13 +169,13 @@ class AuthService {
   // Initialize auth state on app startup
   async initializeAuth(): Promise<User | null> {
     try {
-      // 先尝试从本地获取用户信息快速显示
+      // 优先使用本地缓存的用户信息，快速初始化界面
       const localUser = this.getCurrentUserSync();
       if (localUser) {
-        // 异步验证会话有效性
+        // 异步验证会话，不阻塞界面
         setTimeout(() => {
           this.getCurrentUser().catch(err => {
-            console.warn('Session validation failed:', err);
+            console.warn('Background session validation failed:', err);
           });
         }, 100);
         return localUser;
@@ -181,12 +199,13 @@ class AuthService {
     }
     
     this.currentUser = null;
+    this.isInitialized = true; // 保持初始化状态，但清除用户
     localStorage.removeItem('currentUser');
   }
   
   // Update user balance
   async updateBalance(amount: number): Promise<number> {
-    const user = await this.getCurrentUser();
+    const user = this.getCurrentUserSync(); // 使用同步版本
     if (!user) {
       throw new Error('No user is logged in');
     }
@@ -197,7 +216,6 @@ class AuthService {
       // Update current user in memory
       if (this.currentUser) {
         this.currentUser.balance = newBalance;
-        // Update localStorage
         localStorage.setItem('currentUser', JSON.stringify({
           id: this.currentUser.id,
           name: this.currentUser.name,
