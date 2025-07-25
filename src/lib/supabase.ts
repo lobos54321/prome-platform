@@ -26,7 +26,7 @@ export class Database {
     return supabase;
   }
 
-  // AUTH METHODS
+  // AUTH METHODS - 简化版本，依赖数据库触发器
   async signUp(email: string, password: string, name: string): Promise<User | null> {
     // Return null immediately if not configured
     if (!isSupabaseConfigured) {
@@ -37,7 +37,7 @@ export class Database {
     try {
       console.log('Attempting to register user:', email);
 
-      // Register with Supabase Auth
+      // 只使用 Supabase Auth 的 signUp，让触发器处理用户记录创建
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -61,63 +61,23 @@ export class Database {
 
       console.log('Auth user created:', authData.user.id);
 
-      // Wait a moment for the auth user to be fully created
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Create user profile in the users table
-      const userProfile = {
-        id: authData.user.id,
-        name,
-        email,
-        role: 'user',
-        balance: 50,
-        created_at: new Date().toISOString(),
-      };
-
-      console.log('Creating user profile:', userProfile);
-
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .insert(userProfile)
-        .select()
-        .single();
-
-      if (userError) {
-        console.error('User profile creation error:', userError);
-        // If user profile creation fails, try to clean up auth user
-        try {
-          await supabase.auth.admin.deleteUser(authData.user.id);
-        } catch (cleanupError) {
-          console.error('Failed to cleanup auth user:', cleanupError);
-        }
-        throw userError;
+      // 等待触发器创建用户记录（增加等待时间确保触发器完成）
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 获取触发器创建的用户记录
+      const user = await this.getCurrentUser();
+      
+      if (!user) {
+        console.error('User profile was not created by trigger');
+        throw new Error('User profile creation failed');
       }
 
-      if (!userData) {
-        console.error('No user data returned from profile creation');
-        return null;
-      }
+      console.log('User profile created successfully by trigger:', user);
+      return user;
 
-      console.log('User profile created successfully:', userData);
-
-      return {
-        id: userData.id,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-        avatarUrl: userData.avatar_url,
-        balance: userData.balance,
-        createdAt: userData.created_at,
-      };
     } catch (error) {
       console.error('Error signing up:', error);
-      // Return more specific error information
-      if (error.message?.includes('duplicate key')) {
-        console.error('User already exists');
-      } else if (error.message?.includes('relation "users" does not exist')) {
-        console.error('Users table does not exist - database setup required');
-      }
-      return null;
+      throw error;
     }
   }
 
@@ -388,7 +348,42 @@ export class Database {
   }
 
   // TOKEN USAGE METHODS
-  async getTokenUsage(userId: string): Promise<TokenUsage[]> {
+  async recordTokenUsage(usage: Omit<TokenUsage, 'id' | 'createdAt'>): Promise<TokenUsage | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('token_usage')
+        .insert({
+          user_id: usage.userId,
+          service_id: usage.serviceId,
+          tokens_used: usage.tokensUsed,
+          cost: usage.cost,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        serviceId: data.service_id,
+        tokensUsed: data.tokens_used,
+        cost: data.cost,
+        createdAt: data.created_at,
+      };
+    } catch (error) {
+      console.error('Error recording token usage:', error);
+      return null;
+    }
+  }
+
+  async getUserTokenUsage(userId: string, limit: number = 50): Promise<TokenUsage[]> {
     if (!isSupabaseConfigured) {
       return [];
     }
@@ -396,33 +391,65 @@ export class Database {
     try {
       const { data, error } = await supabase
         .from('token_usage')
-        .select(`
-          *,
-          services(name)
-        `)
+        .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(limit);
 
       if (error) throw error;
       return data?.map(usage => ({
         id: usage.id,
         userId: usage.user_id,
         serviceId: usage.service_id,
-        serviceName: usage.services?.name || 'Unknown Service',
         tokensUsed: usage.tokens_used,
         cost: usage.cost,
-        model: usage.model,
         createdAt: usage.created_at,
       })) || [];
     } catch (error) {
-      console.error('Error getting token usage:', error);
+      console.error('Error getting user token usage:', error);
       return [];
     }
   }
 
   // BILLING METHODS
-  async getBillingRecords(userId: string): Promise<BillingRecord[]> {
+  async recordBilling(billing: Omit<BillingRecord, 'id' | 'createdAt'>): Promise<BillingRecord | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('billing_records')
+        .insert({
+          user_id: billing.userId,
+          amount: billing.amount,
+          type: billing.type,
+          description: billing.description,
+          status: billing.status,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        amount: data.amount,
+        type: data.type,
+        description: data.description,
+        status: data.status,
+        createdAt: data.created_at,
+      };
+    } catch (error) {
+      console.error('Error recording billing:', error);
+      return null;
+    }
+  }
+
+  async getUserBilling(userId: string, limit: number = 50): Promise<BillingRecord[]> {
     if (!isSupabaseConfigured) {
       return [];
     }
@@ -433,20 +460,20 @@ export class Database {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(limit);
 
       if (error) throw error;
-      return data?.map(record => ({
-        id: record.id,
-        userId: record.user_id,
-        amount: record.amount,
-        type: record.type,
-        status: record.status,
-        description: record.description,
-        createdAt: record.created_at,
+      return data?.map(billing => ({
+        id: billing.id,
+        userId: billing.user_id,
+        amount: billing.amount,
+        type: billing.type,
+        description: billing.description,
+        status: billing.status,
+        createdAt: billing.created_at,
       })) || [];
     } catch (error) {
-      console.error('Error getting billing records:', error);
+      console.error('Error getting user billing:', error);
       return [];
     }
   }
@@ -462,15 +489,16 @@ export class Database {
         .from('pricing_rules')
         .select('*')
         .eq('is_active', true)
-        .order('model', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data?.map(rule => ({
         id: rule.id,
-        model: rule.model,
-        promptTokenPrice: rule.prompt_token_price,
-        completionTokenPrice: rule.completion_token_price,
-        currency: rule.currency,
+        serviceId: rule.service_id,
+        tier: rule.tier,
+        minTokens: rule.min_tokens,
+        maxTokens: rule.max_tokens,
+        pricePerToken: rule.price_per_token,
         isActive: rule.is_active,
         createdAt: rule.created_at,
       })) || [];
@@ -480,43 +508,46 @@ export class Database {
     }
   }
 
-  async updatePricingRule(id: string, updates: Partial<PricingRule>): Promise<PricingRule | null> {
+  // WEBHOOK METHODS
+  async processWebhook(payload: WebhookPayload): Promise<boolean> {
     if (!isSupabaseConfigured) {
-      return null;
+      return false;
     }
 
     try {
-      const { data, error } = await supabase
-        .from('pricing_rules')
-        .update({
-          prompt_token_price: updates.promptTokenPrice,
-          completion_token_price: updates.completionTokenPrice,
-          currency: updates.currency,
-          is_active: updates.isActive,
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      // Record the webhook call
+      const { error } = await supabase
+        .from('webhook_logs')
+        .insert({
+          event_type: payload.type,
+          payload: payload,
+          processed_at: new Date().toISOString(),
+        });
 
-      if (error) throw error;
-      if (!data) return null;
+      if (error) {
+        console.error('Error logging webhook:', error);
+        return false;
+      }
 
-      return {
-        id: data.id,
-        model: data.model,
-        promptTokenPrice: data.prompt_token_price,
-        completionTokenPrice: data.completion_token_price,
-        currency: data.currency,
-        isActive: data.is_active,
-        createdAt: data.created_at,
-      };
+      // Process different webhook types
+      switch (payload.type) {
+        case 'user.created':
+          // Handle user creation webhook
+          break;
+        case 'payment.completed':
+          // Handle payment completion
+          break;
+        default:
+          console.log('Unknown webhook type:', payload.type);
+      }
+
+      return true;
     } catch (error) {
-      console.error('Error updating pricing rule:', error);
-      return null;
+      console.error('Error processing webhook:', error);
+      return false;
     }
   }
 }
 
-// Export database instance
 export const db = new Database();
 
