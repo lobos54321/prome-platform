@@ -17,6 +17,8 @@ import Pricing from './pages/Pricing';
 import Purchase from './pages/Purchase';
 import Settings from './pages/Settings';
 import AIContentGeneration from './pages/AIContentGeneration';
+import DifyTokenDemo from './pages/DifyTokenDemo';
+import AdminDemo from './pages/AdminDemo';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -72,6 +74,8 @@ const App = () => {
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/dify-demo" element={<DifyTokenDemo />} />
+              <Route path="/admin-demo" element={<AdminDemo />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

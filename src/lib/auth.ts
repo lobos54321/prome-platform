@@ -427,12 +427,12 @@ export const authService = new AuthService();
 
 // 开发环境调试方法
 if (import.meta.env.DEV) {
-  (window as any).authService = authService;
-  (window as any).forceLogout = () => {
+  (window as Record<string, unknown>).authService = authService;
+  (window as Record<string, unknown>).forceLogout = () => {
     authService.forceLogout();
     window.location.reload();
   };
-  (window as any).checkAuth = async () => {
+  (window as Record<string, unknown>).checkAuth = async () => {
     const user = authService.getCurrentUserSync();
     console.log('Current user:', user);
     console.log('Is authenticated:', authService.isAuthenticated());
