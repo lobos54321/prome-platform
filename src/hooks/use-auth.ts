@@ -7,39 +7,45 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial user state
-    const currentUser = authService.getCurrentUserSync();
-    setUser(currentUser);
-    setIsLoading(false);
+    // Initialize user state
+    const initializeAuth = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Failed to get current user in useAuth:', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-    // Listen for auth state changes
-    const handleAuthChange = (newUser: User | null) => {
-      setUser(newUser);
+    initializeAuth();
+
+    // Listen for auth state changes using the custom event
+    const handleAuthChange = (event: CustomEvent) => {
+      console.log('useAuth received auth state change:', event.detail.user?.email);
+      setUser(event.detail.user);
       setIsLoading(false);
     };
 
-    // Subscribe to auth changes if available
-    if (authService.onAuthStateChange) {
-      authService.onAuthStateChange(handleAuthChange);
-    }
+    window.addEventListener('auth-state-changed', handleAuthChange as EventListener);
 
-    // Cleanup subscription
     return () => {
-      // In a real implementation, you'd return an unsubscribe function
-      // For now, we'll just cleanup
+      window.removeEventListener('auth-state-changed', handleAuthChange as EventListener);
     };
   }, []);
 
   const login = async (email: string, password: string) => {
-    return await authService.signIn(email, password);
+    return await authService.login(email, password);
   };
 
   const logout = async () => {
-    return await authService.signOut();
+    return await authService.logout();
   };
 
   const register = async (email: string, password: string, name: string) => {
-    return await authService.signUp(email, password, name);
+    return await authService.register(email, password, name);
   };
 
   return {
