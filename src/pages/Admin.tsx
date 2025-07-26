@@ -14,11 +14,28 @@ export default function Admin() {
   const navigate = useNavigate();
   const [user, setUser] = useState(authService.getCurrentUserSync());
   const [activeTab, setActiveTab] = useState('models');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Initialize auth state and set loading
+    const initializeAuth = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Failed to get current user:', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+
     // Listen for auth state changes
     const handleAuthChange = (event: CustomEvent) => {
       setUser(event.detail.user);
+      setIsLoading(false);
     };
 
     window.addEventListener('auth-state-changed', handleAuthChange as EventListener);
@@ -28,7 +45,21 @@ export default function Admin() {
     };
   }, []);
 
-  // Redirect non-admin users
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">验证管理员权限...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect non-authenticated users
   if (!user) {
     navigate('/login');
     return null;
@@ -41,6 +72,10 @@ export default function Admin() {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             您没有访问管理后台的权限。只有管理员可以访问此页面。
+            <br />
+            <span className="text-sm text-gray-600 mt-2 block">
+              当前用户：{user.email}
+            </span>
           </AlertDescription>
         </Alert>
       </div>

@@ -22,7 +22,7 @@ import { useAuth } from '@/hooks/use-auth';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   // Always declare hooks at top level
   const [usageRecords, setUsageRecords] = useState<TokenUsage[]>([]);
@@ -30,28 +30,15 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Handle user authentication
+  // Handle user authentication - only redirect if not loading and no user
   useEffect(() => {
-    if (!user) {
+    if (!isLoading && !user) {
+      console.log('Dashboard: No user found after loading, redirecting to login');
       navigate('/login');
     }
-  }, [user, navigate]);
+  }, [user, isLoading, navigate]);
 
-  // Early return if user is not available
-  if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">加载中...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 加载数据时确保 catch 错误并 fallback
+  // 加载数据时确保 catch 错误并 fallback - 移到所有 hooks 声明之后
   useEffect(() => {
     if (!user || !user.id) return;
 
@@ -64,14 +51,49 @@ export default function Dashboard() {
           setUsageRecords(Array.isArray(usage) ? usage : []);
           setBillingRecords(Array.isArray(billing) ? billing : []);
         }
-      } catch (e) {
-        setUsageRecords([]);
-        setBillingRecords([]);
+      } catch (error) {
+        console.warn('Failed to load dashboard data:', error);
+        if (!cancelled) {
+          setUsageRecords([]);
+          setBillingRecords([]);
+        }
       }
     };
+
     loadData();
-    return () => { cancelled = true; };
-  }, [user?.id]); // Use optional chaining to avoid null reference
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">验证用户身份...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Early return if user is not available after loading
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">加载中...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 计算统计数据
   const totalSpent = billingRecords.reduce((sum, record) => typeof record.amount === 'number' ? sum + record.amount : sum, 0);

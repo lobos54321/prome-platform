@@ -22,12 +22,22 @@ export function Navbar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 获取当前用户状态
-    const currentUser = authService.getCurrentUserSync();
-    setUser(currentUser);
+    // 初始化时获取当前用户状态
+    const initializeUser = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Failed to initialize user in navbar:', error);
+        setUser(null);
+      }
+    };
+
+    initializeUser();
 
     // 监听认证状态变化
     const handleAuthChange = (event: CustomEvent) => {
+      console.log('Navbar received auth state change:', event.detail.user?.email);
       setUser(event.detail.user);
     };
 
