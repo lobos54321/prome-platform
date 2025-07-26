@@ -19,6 +19,9 @@ import Settings from './pages/Settings';
 import AIContentGeneration from './pages/AIContentGeneration';
 import DifyTokenDemo from './pages/DifyTokenDemo';
 import AdminDemo from './pages/AdminDemo';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import ForgotPassword from './pages/ForgotPassword';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -65,6 +68,9 @@ const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
               <Route path="/services" element={<Services />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/purchase" element={<Purchase />} />

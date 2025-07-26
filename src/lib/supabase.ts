@@ -258,6 +258,30 @@ class DatabaseService {
     }
   }
 
+  async resetPassword(email: string): Promise<void> {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase not configured');
+    }
+
+    try {
+      console.log('Attempting to send password reset email to:', email);
+      
+      const { error } = await supabase!.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        console.error('Password reset error:', error);
+        throw error;
+      }
+      
+      console.log('Password reset email sent successfully');
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      throw error;
+    }
+  }
+
   async getCurrentUser(): Promise<User | null> {
     if (!isSupabaseConfigured) {
       return null;

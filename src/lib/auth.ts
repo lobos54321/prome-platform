@@ -355,6 +355,17 @@ class AuthService {
       detail: { user: null } 
     }));
   }
+
+  // Reset password
+  async resetPassword(email: string): Promise<void> {
+    try {
+      await db.resetPassword(email);
+      console.log('Password reset email sent successfully');
+    } catch (error) {
+      console.error('Failed to send password reset email:', error);
+      throw error;
+    }
+  }
   
   // Update user balance
   async updateBalance(amount: number): Promise<number> {
