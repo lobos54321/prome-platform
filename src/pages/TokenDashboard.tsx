@@ -51,6 +51,7 @@ import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } fro
 import { zhCN } from 'date-fns/locale';
 import { authService } from '@/lib/auth';
 import { difyTokenTracker } from '@/lib/dify-token-tracker';
+import { User } from '@/types';
 
 // Types for the analytics data
 interface TokenUsageSummary {
@@ -328,7 +329,7 @@ export default function TokenDashboard() {
   const [modelData, setModelData] = useState<TokenUsageByModel[]>([]);
   const [dailyUsageData, setDailyUsageData] = useState(generateDailyUsageData(7));
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // Initialize user state
   useEffect(() => {

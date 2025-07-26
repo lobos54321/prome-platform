@@ -38,7 +38,7 @@ export default function ModelManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isPriceImpactDialogOpen, setIsPriceImpactDialogOpen] = useState(false);
-  const [priceImpactData, setPriceImpactData] = useState<any>(null);
+  const [priceImpactData, setPriceImpactData] = useState<Record<string, unknown> | null>(null);
   const [selectedModelForImpact, setSelectedModelForImpact] = useState<string>('');
   const [testInputPrice, setTestInputPrice] = useState<number>(0);
   const [testOutputPrice, setTestOutputPrice] = useState<number>(0);

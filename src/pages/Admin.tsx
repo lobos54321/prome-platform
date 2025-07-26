@@ -8,6 +8,7 @@ import { isAdmin } from '@/lib/admin';
 import ModelManagement from './Admin/ModelManagement';
 import WebhookConfig from './Admin/WebhookConfig';
 import PointsCalculator from './Admin/PointsCalculator';
+import TokenConsumptionMonitor from './Admin/TokenConsumptionMonitor';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -62,6 +63,7 @@ export default function Admin() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-8">
           <TabsTrigger value="models">模型管理</TabsTrigger>
+          <TabsTrigger value="consumption">消耗监控</TabsTrigger>
           <TabsTrigger value="points">积分计算器</TabsTrigger>
           <TabsTrigger value="webhook">Webhook配置</TabsTrigger>
           <TabsTrigger value="users">用户管理</TabsTrigger>
@@ -71,6 +73,10 @@ export default function Admin() {
 
         <TabsContent value="models">
           <ModelManagement />
+        </TabsContent>
+
+        <TabsContent value="consumption">
+          <TokenConsumptionMonitor />
         </TabsContent>
         
         <TabsContent value="points">

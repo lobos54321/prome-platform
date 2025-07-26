@@ -829,7 +829,7 @@ export class DifyTokenTracker {
   /**
    * Helper method to process daily data aggregation
    */
-  private processDailyData(data: any[], start: Date, end: Date, timestampColumn: string) {
+  private processDailyData(data: Record<string, unknown>[], start: Date, end: Date, timestampColumn: string) {
     interface DailyUsageData {
       date: string;
       prompt_tokens: number;
