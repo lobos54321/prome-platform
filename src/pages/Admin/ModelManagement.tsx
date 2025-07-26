@@ -1,89 +1,148 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PlusCircle, AlertCircle, Trash2 } from 'lucide-react';
-import { PricingRule } from '@/types';
-import { servicesAPI } from '@/lib/services';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { 
+  PlusCircle, 
+  AlertCircle, 
+  Trash2, 
+  TrendingUp, 
+  TrendingDown, 
+  Eye, 
+  RotateCcw,
+  Activity,
+  Clock
+} from 'lucide-react';
+import { ModelConfig, PriceChangeLog } from '@/types';
+import { adminServicesAPI } from '@/lib/admin-services';
+import { toast } from '@/hooks/use-toast';
 
 export default function ModelManagement() {
-  const [models, setModels] = useState<PricingRule[]>([]);
-  const [newModel, setNewModel] = useState<Partial<PricingRule>>({
+  const [models, setModels] = useState<ModelConfig[]>([]);
+  const [priceChangeLogs, setPriceChangeLogs] = useState<PriceChangeLog[]>([]);
+  const [exchangeRate, setExchangeRate] = useState<number>(10000);
+  const [newModel, setNewModel] = useState<Partial<ModelConfig>>({
     modelName: '',
-    inputTokenPrice: 0.0001,
-    outputTokenPrice: 0.0002,
+    inputTokenPrice: 50,
+    outputTokenPrice: 100,
     isActive: true
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isPriceImpactDialogOpen, setIsPriceImpactDialogOpen] = useState(false);
+  const [priceImpactData, setPriceImpactData] = useState<any>(null);
+  const [selectedModelForImpact, setSelectedModelForImpact] = useState<string>('');
+  const [testInputPrice, setTestInputPrice] = useState<number>(0);
+  const [testOutputPrice, setTestOutputPrice] = useState<number>(0);
 
   useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const pricingRules = await servicesAPI.getPricingRules();
-        setModels(pricingRules);
-      } catch (err) {
-        setError('加载模型数据失败');
-      }
-    };
-    
-    loadModels();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    try {
+      const [modelConfigs, logs, rate] = await Promise.all([
+        adminServicesAPI.getModelConfigs(),
+        adminServicesAPI.getPriceChangeLogs(),
+        adminServicesAPI.getExchangeRate()
+      ]);
+      
+      setModels(modelConfigs);
+      setPriceChangeLogs(logs);
+      setExchangeRate(rate);
+    } catch (err) {
+      setError('加载数据失败: ' + (err as Error).message);
+    }
+  };
 
   const handleAddModel = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     
-    if (!newModel.modelName) {
-      setError('请输入模型名称');
+    if (!newModel.modelName || !newModel.inputTokenPrice || !newModel.outputTokenPrice) {
+      setError('请填写完整的模型信息');
       return;
     }
 
-    if (models.some(m => m.modelName === newModel.modelName)) {
+    if (models.some(m => m.modelName.toLowerCase() === newModel.modelName!.toLowerCase())) {
       setError('模型名称已存在');
       return;
     }
 
     setIsLoading(true);
     try {
-      // In a real app, we would call an API to create the model
-      const addedModel = await servicesAPI.addPricingRule({
-        modelName: newModel.modelName,
-        inputTokenPrice: Number(newModel.inputTokenPrice) || 0.0001,
-        outputTokenPrice: Number(newModel.outputTokenPrice) || 0.0002,
-        isActive: newModel.isActive === undefined ? true : newModel.isActive
+      const addedModel = await adminServicesAPI.addModelConfig({
+        modelName: newModel.modelName!,
+        inputTokenPrice: newModel.inputTokenPrice!,
+        outputTokenPrice: newModel.outputTokenPrice!,
+        isActive: newModel.isActive ?? true
       });
       
       setModels([...models, addedModel]);
       setNewModel({
         modelName: '',
-        inputTokenPrice: 0.0001,
-        outputTokenPrice: 0.0002,
+        inputTokenPrice: 50,
+        outputTokenPrice: 100,
         isActive: true
       });
+      setIsAddDialogOpen(false);
       setSuccess('模型添加成功');
+      
+      // Reload logs to show the addition
+      const logs = await adminServicesAPI.getPriceChangeLogs();
+      setPriceChangeLogs(logs);
+      
+      toast({
+        title: "模型添加成功",
+        description: `${addedModel.modelName} 已添加到系统中`,
+      });
     } catch (err) {
-      setError('添加模型失败');
+      const errorMessage = (err as Error).message;
+      setError('添加模型失败: ' + errorMessage);
+      toast({
+        title: "添加失败",
+        description: errorMessage,
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleUpdateModel = async (id: string, updates: Partial<PricingRule>) => {
+  const handleUpdateModel = async (id: string, updates: Partial<ModelConfig>) => {
     setError('');
     setSuccess('');
     
     try {
-      const updatedModel = await servicesAPI.updatePricingRule(id, updates);
+      const updatedModel = await adminServicesAPI.updateModelConfig(id, updates);
       setModels(models.map(model => model.id === id ? updatedModel : model));
       setSuccess('模型更新成功');
+      
+      // Reload logs to show the update
+      const logs = await adminServicesAPI.getPriceChangeLogs();
+      setPriceChangeLogs(logs);
+      
+      toast({
+        title: "模型更新成功",
+        description: `${updatedModel.modelName} 的配置已更新`,
+      });
     } catch (err) {
-      setError('更新模型失败');
+      const errorMessage = (err as Error).message;
+      setError('更新模型失败: ' + errorMessage);
+      toast({
+        title: "更新失败",
+        description: errorMessage,
+        variant: "destructive"
+      });
     }
   };
 
@@ -91,17 +150,34 @@ export default function ModelManagement() {
     setError('');
     setSuccess('');
     
-    if (!window.confirm('确定要删除此模型吗？删除后不可恢复。')) {
+    const model = models.find(m => m.id === id);
+    if (!model) return;
+    
+    if (!window.confirm(`确定要删除模型 "${model.modelName}" 吗？删除后不可恢复。`)) {
       return;
     }
     
     try {
-      // In a real app, we would call an API to delete the model
-      await servicesAPI.deletePricingRule(id);
+      await adminServicesAPI.deleteModelConfig(id);
       setModels(models.filter(model => model.id !== id));
       setSuccess('模型删除成功');
+      
+      // Reload logs to show the deletion
+      const logs = await adminServicesAPI.getPriceChangeLogs();
+      setPriceChangeLogs(logs);
+      
+      toast({
+        title: "模型删除成功",
+        description: `${model.modelName} 已从系统中移除`,
+      });
     } catch (err) {
-      setError('删除模型失败');
+      const errorMessage = (err as Error).message;
+      setError('删除模型失败: ' + errorMessage);
+      toast({
+        title: "删除失败",
+        description: errorMessage,
+        variant: "destructive"
+      });
     }
   };
 

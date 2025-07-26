@@ -6,12 +6,18 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, DollarSign, Calculator, Save } from 'lucide-react';
-import { PointsConfig, PointsConsumptionRule } from '@/types';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Edit, Trash2, DollarSign, Calculator, Save, TrendingUp, Clock, AlertCircle } from 'lucide-react';
+import { PointsConfig, PointsConsumptionRule, ExchangeRateHistory } from '@/types';
+import { adminServicesAPI } from '@/lib/admin-services';
 import { toast } from '@/hooks/use-toast';
 
 export default function PointsCalculator() {
   const [exchangeRate, setExchangeRate] = useState<number>(10000); // 10000 points = 1 USD
+  const [newExchangeRate, setNewExchangeRate] = useState<number>(10000);
+  const [exchangeRateReason, setExchangeRateReason] = useState<string>('');
+  const [exchangeRateHistory, setExchangeRateHistory] = useState<ExchangeRateHistory[]>([]);
   const [consumptionRules, setConsumptionRules] = useState<PointsConsumptionRule[]>([]);
   const [newRule, setNewRule] = useState<Partial<PointsConsumptionRule>>({
     functionName: '',
@@ -22,20 +28,33 @@ export default function PointsCalculator() {
   const [editingRule, setEditingRule] = useState<PointsConsumptionRule | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isExchangeRateDialogOpen, setIsExchangeRateDialogOpen] = useState(false);
 
   // 计算预览数据
   const [previewTokens, setPreviewTokens] = useState<number>(1000);
   const [selectedFunction, setSelectedFunction] = useState<string>('');
+  const [previewUSD, setPreviewUSD] = useState<number>(10);
 
   useEffect(() => {
-    // 加载现有配置（模拟数据）
-    loadPointsConfig();
-    loadConsumptionRules();
+    loadData();
   }, []);
 
-  const loadPointsConfig = () => {
-    // 模拟加载积分配置
-    setExchangeRate(10000); // 默认 10000 积分 = 1 美元
+  const loadData = async () => {
+    try {
+      const [rate, history] = await Promise.all([
+        adminServicesAPI.getExchangeRate(),
+        adminServicesAPI.getExchangeRateHistory()
+      ]);
+      
+      setExchangeRate(rate);
+      setNewExchangeRate(rate);
+      setExchangeRateHistory(history);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    }
+    
+    // Load consumption rules (mock data for now)
+    loadConsumptionRules();
   };
 
   const loadConsumptionRules = () => {
@@ -75,13 +94,41 @@ export default function PointsCalculator() {
     }
   };
 
-  const handleSaveExchangeRate = () => {
-    // TODO: 保存到后端
-    console.log('Saving exchange rate:', exchangeRate);
-    toast({
-      title: "汇率设置已保存",
-      description: `新汇率：${exchangeRate} 积分 = 1 美元`,
-    });
+  const handleSaveExchangeRate = async () => {
+    if (newExchangeRate <= 0) {
+      toast({
+        title: "无效的汇率",
+        description: "汇率必须大于0",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const updatedRate = await adminServicesAPI.updateExchangeRate(
+        newExchangeRate, 
+        exchangeRateReason || undefined
+      );
+      
+      setExchangeRate(updatedRate);
+      setExchangeRateReason('');
+      setIsExchangeRateDialogOpen(false);
+      
+      // Reload history
+      const history = await adminServicesAPI.getExchangeRateHistory();
+      setExchangeRateHistory(history);
+      
+      toast({
+        title: "汇率设置已保存",
+        description: `新汇率：${updatedRate.toLocaleString()} 积分 = 1 美元`,
+      });
+    } catch (error) {
+      toast({
+        title: "保存失败",
+        description: (error as Error).message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleAddRule = () => {
@@ -154,7 +201,20 @@ export default function PointsCalculator() {
     return { points: totalPoints, usd: totalUSD };
   };
 
+  const calculatePointsFromUSD = (usdAmount: number) => {
+    return Math.floor(usdAmount * exchangeRate);
+  };
+
+  const calculateUSDFromPoints = (points: number) => {
+    return points / exchangeRate;
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('zh-CN');
+  };
+
   const preview = calculatePreview();
+  const pointsFromUSD = calculatePointsFromUSD(previewUSD);
 
   return (
     <div className="space-y-6">

@@ -16,6 +16,7 @@ export interface PointsConfig {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  createdBy: string; // Admin who created this config
 }
 
 export interface PointsConsumptionRule {
@@ -26,6 +27,41 @@ export interface PointsConsumptionRule {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Model Configuration types
+export interface ModelConfig {
+  id: string;
+  modelName: string;
+  inputTokenPrice: number; // Price per 1000 input tokens in credits
+  outputTokenPrice: number; // Price per 1000 output tokens in credits
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string; // Admin who configured this model
+}
+
+// Price Change Log types
+export interface PriceChangeLog {
+  id: string;
+  modelId: string;
+  modelName: string;
+  changeType: 'input_price' | 'output_price' | 'status' | 'exchange_rate';
+  oldValue: number | boolean;
+  newValue: number | boolean;
+  adminEmail: string;
+  reason?: string;
+  timestamp: string;
+}
+
+// Exchange Rate History
+export interface ExchangeRateHistory {
+  id: string;
+  oldRate: number;
+  newRate: number;
+  adminEmail: string;
+  reason?: string;
+  timestamp: string;
 }
 
 // Service types
@@ -69,6 +105,8 @@ export interface PricingRule {
   inputTokenPrice: number;
   outputTokenPrice: number;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Webhook types

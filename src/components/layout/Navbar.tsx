@@ -10,8 +10,9 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Menu, X, User, Settings, LogOut, CreditCard, Activity, Coins } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, CreditCard, Activity, Coins, Shield } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { isAdmin } from '@/lib/admin';
 import { User as UserType } from '@/types';
 import PointsDisplay from '@/components/ui/PointsDisplay';
 
@@ -79,6 +80,9 @@ export function Navbar() {
           {user && (
             <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">控制台</Link>
           )}
+          {user && isAdmin(user) && (
+            <Link to="/admin" className="text-blue-600 hover:text-blue-900 font-medium">管理后台</Link>
+          )}
         </nav>
 
         {/* User Menu or Auth Buttons */}
@@ -111,6 +115,15 @@ export function Navbar() {
                   <Settings className="mr-2 h-4 w-4" />
                   设置
                 </DropdownMenuItem>
+                {isAdmin(user) && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/admin')}>
+                      <Shield className="mr-2 h-4 w-4" />
+                      管理后台
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -182,6 +195,15 @@ export function Navbar() {
                 >
                   设置
                 </Link>
+                {isAdmin(user) && (
+                  <Link 
+                    to="/admin" 
+                    className="block py-2 text-blue-600 hover:text-blue-900 font-medium"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    管理后台
+                  </Link>
+                )}
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start p-2"
