@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Check, ArrowRight } from 'lucide-react';
 import { servicesAPI } from '@/lib/services';
+import { authService } from '@/lib/auth';
 import { PricingRule } from '@/types';
 
 interface PricingPlan {
@@ -97,6 +98,17 @@ export default function Pricing() {
     setCalculatedPrice(inputCost + outputCost);
   };
 
+  const handleSelectPlan = (planId: string) => {
+    const user = authService.getCurrentUserSync();
+    if (user && authService.isAuthenticated()) {
+      // 已登录用户直接进入购买流程
+      navigate(`/purchase?plan=${planId}`);
+    } else {
+      // 未登录用户引导到注册页面，并传递方案参数
+      navigate(`/register?plan=${planId}`);
+    }
+  };
+
   useEffect(() => {
     if (selectedModel) {
       calculatePrice();
@@ -153,7 +165,7 @@ export default function Pricing() {
                 <CardFooter>
                   <Button 
                     className={`w-full ${plan.highlight ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
-                    onClick={() => navigate('/register')}
+                    onClick={() => handleSelectPlan(plan.id)}
                   >
                     选择方案
                   </Button>

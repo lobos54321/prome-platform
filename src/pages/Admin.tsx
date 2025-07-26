@@ -4,10 +4,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { authService } from '@/lib/auth';
 import ModelManagement from './Admin/ModelManagement';
 import WebhookConfig from './Admin/WebhookConfig';
+import PointsCalculator from './Admin/PointsCalculator';
 
 export default function Admin() {
   const navigate = useNavigate();
-  const user = authService.getCurrentUser();
+  const user = authService.getCurrentUserSync();
   const [activeTab, setActiveTab] = useState('models');
 
   // Redirect non-admin users
@@ -26,6 +27,7 @@ export default function Admin() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-8">
           <TabsTrigger value="models">模型管理</TabsTrigger>
+          <TabsTrigger value="points">积分计算器</TabsTrigger>
           <TabsTrigger value="webhook">Webhook配置</TabsTrigger>
           <TabsTrigger value="users">用户管理</TabsTrigger>
           <TabsTrigger value="services">服务管理</TabsTrigger>
@@ -34,6 +36,10 @@ export default function Admin() {
 
         <TabsContent value="models">
           <ModelManagement />
+        </TabsContent>
+        
+        <TabsContent value="points">
+          <PointsCalculator />
         </TabsContent>
         
         <TabsContent value="webhook">

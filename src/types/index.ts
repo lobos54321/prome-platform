@@ -9,6 +9,25 @@ export interface User {
   createdAt: string;
 }
 
+// Points Configuration types
+export interface PointsConfig {
+  id: string;
+  exchangeRate: number; // points per USD (e.g., 10000 points = 1 USD)
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PointsConsumptionRule {
+  id: string;
+  functionName: string;
+  pointsPerToken: number;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Service types
 export interface Service {
   id: string;
