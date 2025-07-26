@@ -8,11 +8,17 @@ export const ADMIN_EMAIL = 'lobos54321@gmail.com';
  * Only the hardcoded admin email has admin privileges
  */
 export function isAdmin(user: User | null): boolean {
+  console.log('Admin check for user:', user?.email);
+  
   if (!user || !user.email) {
+    console.log('Admin check failed: no user or email');
     return false;
   }
   
-  return user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isUserAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  console.log(`Admin check result for ${user.email}: ${isUserAdmin}`);
+  
+  return isUserAdmin;
 }
 
 /**

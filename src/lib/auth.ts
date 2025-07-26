@@ -164,13 +164,27 @@ class AuthService {
       const user = await db.getCurrentUser();
       
       if (!user && this.currentUser) {
-        // 会话已失效，立即清除用户状态
-        console.log('Session validation failed, clearing user state');
-        this.clearUserState();
-        // 触发认证状态变更事件
-        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-          detail: { user: null } 
-        }));
+        // 增加更严格的验证条件，避免误清除状态
+        console.log('Session validation detected no server user, checking auth state...');
+        
+        // 检查是否是网络错误或临时问题，而不是真正的认证失败
+        // 如果本地有用户信息且最近更新过，给一定容错时间
+        const storedUser = localStorage.getItem('currentUser');
+        const shouldClearState = !storedUser || 
+          (this.currentUser && !this.currentUser.id) ||
+          (this.currentUser && typeof this.currentUser.id !== 'string') ||
+          (this.currentUser && this.currentUser.id.trim() === '');
+        
+        if (shouldClearState) {
+          console.log('Session validation failed, clearing user state');
+          this.clearUserState();
+          // 触发认证状态变更事件
+          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+            detail: { user: null } 
+          }));
+        } else {
+          console.log('Session validation inconclusive, retaining user state temporarily');
+        }
       } else if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '' && this.currentUser) {
         // 更新用户信息 - 确保所有必需的属性都存在
         this.currentUser = {
@@ -201,13 +215,22 @@ class AuthService {
         this.clearUserState();
       }
     } catch (error) {
-      console.warn('Session validation failed:', error);
-      if (this.currentUser) {
-        this.clearUserState();
-        // 触发认证状态变更事件
-        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-          detail: { user: null } 
-        }));
+      console.warn('Session validation encountered error:', error);
+      // 只有在明确的认证错误时才清除状态，网络错误等不清除
+      if (error instanceof Error && 
+          (error.message.includes('unauthorized') || 
+           error.message.includes('invalid') ||
+           error.message.includes('expired'))) {
+        console.log('Detected auth-related error, clearing user state');
+        if (this.currentUser) {
+          this.clearUserState();
+          // 触发认证状态变更事件
+          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+            detail: { user: null } 
+          }));
+        }
+      } else {
+        console.log('Network or other error during validation, retaining current state');
       }
     } finally {
       this.isValidating = false;

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { isAdmin } from '@/lib/admin';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -30,9 +31,24 @@ export default function Login() {
     setIsLoading(true);
     
     try {
-      await authService.login(formData.email, formData.password);
-      navigate('/services');
+      const user = await authService.login(formData.email, formData.password);
+      
+      if (user) {
+        console.log('Login successful for user:', user.email);
+        
+        // 智能重定向：管理员用户跳转到管理后台，普通用户跳转到控制台
+        if (isAdmin(user)) {
+          console.log('Redirecting admin user to admin panel');
+          navigate('/admin');
+        } else {
+          console.log('Redirecting regular user to dashboard');
+          navigate('/dashboard');
+        }
+      } else {
+        setError('登录失败，请检查邮箱和密码');
+      }
     } catch (err) {
+      console.error('Login error:', err);
       setError('邮箱或密码错误，请重试');
     } finally {
       setIsLoading(false);
