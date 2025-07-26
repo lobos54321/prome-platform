@@ -53,7 +53,7 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
     return null;
   }
 
-  const pointsValue = user.balance || 0;
+  const pointsValue = (user && typeof user.balance === 'number') ? user.balance : 0;
   const usdEquivalent = pointsValue / exchangeRate;
   const recentChange = pointsHistory.length > 0 ? pointsHistory[0].change : 0;
 

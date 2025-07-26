@@ -271,7 +271,7 @@ class DatabaseService {
         return null;
       }
       
-      if (!user) {
+      if (!user || !user.id) {
         return null;
       }
 
@@ -285,6 +285,8 @@ class DatabaseService {
 
       // 尝试获取用户配置文件，如果失败则使用 auth 数据
       let userData = null;
+      let shouldUseFallback = false;
+      
       try {
         const { data, error: userError } = await supabase!
           .from('users')
@@ -292,16 +294,25 @@ class DatabaseService {
           .eq('id', user.id)
           .maybeSingle();
 
-        if (!userError && data) {
+        if (userError) {
+          console.warn('Error fetching user profile from database:', userError);
+          // 如果是服务器错误（500等）或网络错误，使用fallback
+          shouldUseFallback = true;
+        } else if (data && data.id) {
           userData = data;
+        } else {
+          // 用户在auth中存在但在数据库中不存在
+          console.log('User exists in auth but not in database, using fallback');
+          shouldUseFallback = true;
         }
       } catch (error) {
-        console.warn('Could not fetch user profile, using auth data:', error);
+        console.warn('Database query failed, using auth data:', error);
+        shouldUseFallback = true;
       }
 
-      // 如果没有找到用户配置文件，使用 auth 数据
-      if (!userData) {
-        return {
+      // 如果需要使用fallback或者没有找到用户配置文件，使用 auth 数据
+      if (shouldUseFallback || !userData || !userData.id) {
+        const fallbackUser = {
           id: user.id,
           name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
           email: user.email || '',
@@ -310,17 +321,23 @@ class DatabaseService {
           balance: 0,
           createdAt: user.created_at || new Date().toISOString(),
         };
+        
+        console.log('Using fallback user data for user:', user.id);
+        return fallbackUser;
       }
 
-      return {
-        id: userData.id,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-        avatarUrl: userData.avatar_url,
-        balance: userData.balance,
-        createdAt: userData.created_at,
+      // 验证 userData 的完整性并返回安全的用户对象
+      const safeUserData = {
+        id: userData.id || user.id,
+        name: userData.name || user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+        email: userData.email || user.email || '',
+        role: userData.role || 'user',
+        avatarUrl: userData.avatar_url || null,
+        balance: typeof userData.balance === 'number' ? userData.balance : 0,
+        createdAt: userData.created_at || user.created_at || new Date().toISOString(),
       };
+
+      return safeUserData;
     } catch (error) {
       console.error('Error getting current user:', error);
       return null;
@@ -333,8 +350,8 @@ class DatabaseService {
       return null;
     }
 
-    if (!userId) {
-      console.warn('getUserById called with empty userId');
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.warn('getUserById called with invalid userId:', userId);
       return null;
     }
 
@@ -345,17 +362,23 @@ class DatabaseService {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) throw error;
-      if (!data) return null;
+      if (error) {
+        console.warn('Error getting user by ID:', error);
+        return null;
+      }
+      
+      if (!data || !data.id) {
+        return null;
+      }
 
       return {
         id: data.id,
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        avatarUrl: data.avatar_url,
-        balance: data.balance,
-        createdAt: data.created_at,
+        name: data.name || 'User',
+        email: data.email || '',
+        role: data.role || 'user',
+        avatarUrl: data.avatar_url || null,
+        balance: typeof data.balance === 'number' ? data.balance : 0,
+        createdAt: data.created_at || new Date().toISOString(),
       };
     } catch (error) {
       console.error('Error getting user by ID:', error);
@@ -368,8 +391,8 @@ class DatabaseService {
       return amount;
     }
 
-    if (!userId) {
-      console.warn('updateUserBalance called with empty userId');
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.warn('updateUserBalance called with invalid userId:', userId);
       return amount;
     }
 
@@ -381,9 +404,12 @@ class DatabaseService {
         .select('balance')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.warn('Error updating user balance:', error);
+        return amount;
+      }
 
-      return data.balance;
+      return typeof data.balance === 'number' ? data.balance : amount;
     } catch (error) {
       console.error('Error updating user balance:', error);
       return amount;

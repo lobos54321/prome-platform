@@ -14,7 +14,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 
 export default function Settings() {
   const navigate = useNavigate();
-  const user = authService.getCurrentUser();
+  const user = authService.getCurrentUserSync(); // Use synchronous method
   const [activeTab, setActiveTab] = useState('profile');
 
   // Profile state
@@ -85,6 +85,12 @@ export default function Settings() {
     setPaymentError('');
     setPaymentSuccess('');
     setIsProcessing(true);
+
+    if (!user || !user.id) {
+      setPaymentError('用户信息无效，请重新登录');
+      setIsProcessing(false);
+      return;
+    }
 
     const amountValue = parseFloat(amount);
     if (isNaN(amountValue) || amountValue < 5) {

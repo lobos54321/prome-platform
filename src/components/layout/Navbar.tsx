@@ -52,14 +52,14 @@ export function Navbar() {
   };
 
   const getInitials = (name: string | undefined | null): string => {
-    if (typeof name !== 'string') return '';
+    if (!name || typeof name !== 'string') return 'U';
     return name
       .split(' ')
       .filter(Boolean)
       .map(part => (part && part[0]) || '')
       .join('')
       .toUpperCase()
-      .substring(0, 2);
+      .substring(0, 2) || 'U';
   };
 
   return (
@@ -95,7 +95,7 @@ export function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="rounded-full h-9 w-9 p-0">
                   <Avatar>
-                    <AvatarImage src={user.avatarUrl || ''} alt={user.name || ''} />
+                    <AvatarImage src={user.avatarUrl || ''} alt={user.name || 'User'} />
                     <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                 </Button>

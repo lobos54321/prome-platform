@@ -84,19 +84,23 @@ class AuthService {
     try {
       const user = await db.signIn(email, password);
       
-      if (user && user.id) {
+      if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
         this.currentUser = user;
         this.isInitialized = true;
         
-        const userToStore = {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          balance: user.balance
-        };
-        
-        localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        try {
+          const userToStore = {
+            id: user.id,
+            name: user.name || 'User',
+            email: user.email || email,
+            role: user.role || 'user',
+            balance: typeof user.balance === 'number' ? user.balance : 0
+          };
+          
+          localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        } catch (storageError) {
+          console.warn('Failed to store user data in localStorage:', storageError);
+        }
         
         // 触发认证状态变更事件
         window.dispatchEvent(new CustomEvent('auth-state-changed', { 
@@ -118,19 +122,23 @@ class AuthService {
     try {
       const user = await db.signUp(email, password, name);
       
-      if (user && user.id) {
+      if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
         this.currentUser = user;
         this.isInitialized = true;
         
-        const userToStore = {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          balance: user.balance
-        };
-        
-        localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        try {
+          const userToStore = {
+            id: user.id,
+            name: user.name || name || 'User',
+            email: user.email || email,
+            role: user.role || 'user',
+            balance: typeof user.balance === 'number' ? user.balance : 0
+          };
+          
+          localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        } catch (storageError) {
+          console.warn('Failed to store user data in localStorage:', storageError);
+        }
         
         // 触发认证状态变更事件
         window.dispatchEvent(new CustomEvent('auth-state-changed', { 
@@ -163,22 +171,31 @@ class AuthService {
         window.dispatchEvent(new CustomEvent('auth-state-changed', { 
           detail: { user: null } 
         }));
-      } else if (user && user.id && this.currentUser) {
-        // 更新用户信息
+      } else if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '' && this.currentUser) {
+        // 更新用户信息 - 确保所有必需的属性都存在
         this.currentUser = {
           ...this.currentUser,
-          ...user
-        };
-        
-        const userToStore = {
+          ...user,
           id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          balance: user.balance
+          name: user.name || this.currentUser.name || 'User',
+          email: user.email || this.currentUser.email || '',
+          role: user.role || this.currentUser.role || 'user',
+          balance: typeof user.balance === 'number' ? user.balance : (this.currentUser.balance || 0)
         };
         
-        localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        try {
+          const userToStore = {
+            id: this.currentUser.id,
+            name: this.currentUser.name,
+            email: this.currentUser.email,
+            role: this.currentUser.role,
+            balance: this.currentUser.balance
+          };
+          
+          localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        } catch (storageError) {
+          console.warn('Failed to update localStorage during session validation:', storageError);
+        }
       } else if (!user && !this.currentUser) {
         // 都为空，确保状态一致
         this.clearUserState();
@@ -199,7 +216,12 @@ class AuthService {
   
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    return this.currentUser !== null && this.currentUser.id !== undefined && this.currentUser.id !== null && this.currentUser.id !== '';
+    return this.currentUser !== null && 
+           this.currentUser !== undefined && 
+           this.currentUser.id !== undefined && 
+           this.currentUser.id !== null && 
+           typeof this.currentUser.id === 'string' && 
+           this.currentUser.id.trim() !== '';
   }
   
   // Initialize auth state - 只在应用启动时调用一次
@@ -251,7 +273,7 @@ class AuthService {
         const storedUser = localStorage.getItem('currentUser');
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
-          if (parsedUser && parsedUser.id) {
+          if (parsedUser && parsedUser.id && typeof parsedUser.id === 'string' && parsedUser.id.trim() !== '') {
             this.currentUser = parsedUser;
             // 标记为已初始化，但稍后会静默验证
             this.isInitialized = true;
@@ -261,6 +283,9 @@ class AuthService {
             
             console.log('Auth initialization successful, user restored from cache:', parsedUser.id);
             return this.currentUser;
+          } else {
+            console.warn('Invalid stored user data, clearing cache');
+            localStorage.removeItem('currentUser');
           }
         }
       } catch (error) {
@@ -359,25 +384,29 @@ class AuthService {
   // Update user balance
   async updateBalance(amount: number): Promise<number> {
     const user = this.getCurrentUserSync();
-    if (!user || !user.id) {
+    if (!user || !user.id || typeof user.id !== 'string' || user.id.trim() === '') {
       throw new Error('No authenticated user found');
     }
     
     try {
       const newBalance = await db.updateUserBalance(user.id, amount);
       
-      if (this.currentUser) {
+      if (this.currentUser && this.currentUser.id === user.id) {
         this.currentUser.balance = newBalance;
         
-        const userToStore = {
-          id: this.currentUser.id,
-          name: this.currentUser.name,
-          email: this.currentUser.email,
-          role: this.currentUser.role,
-          balance: newBalance
-        };
-        
-        localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        try {
+          const userToStore = {
+            id: this.currentUser.id,
+            name: this.currentUser.name,
+            email: this.currentUser.email,
+            role: this.currentUser.role,
+            balance: newBalance
+          };
+          
+          localStorage.setItem('currentUser', JSON.stringify(userToStore));
+        } catch (storageError) {
+          console.warn('Failed to update localStorage after balance update:', storageError);
+        }
       }
       
       return newBalance;
@@ -389,8 +418,8 @@ class AuthService {
   
   // Get user by ID
   async getUserById(userId: string): Promise<User | null> {
-    if (!userId) {
-      console.warn('getUserById called with empty userId');
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.warn('getUserById called with invalid userId:', userId);
       return null;
     }
     
@@ -409,7 +438,7 @@ class AuthService {
   ): Promise<T> {
     try {
       const user = this.getCurrentUserSync();
-      if (!user || !user.id) {
+      if (!user || !user.id || typeof user.id !== 'string' || user.id.trim() === '') {
         console.warn('Service call attempted without valid user');
         this.forceLogout();
         return defaultValue;
