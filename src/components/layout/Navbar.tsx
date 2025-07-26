@@ -10,9 +10,10 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Menu, X, User, Settings, LogOut, CreditCard, Activity } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, CreditCard, Activity, Coins } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { User as UserType } from '@/types';
+import PointsDisplay from '@/components/ui/PointsDisplay';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -81,7 +82,10 @@ export function Navbar() {
         </nav>
 
         {/* User Menu or Auth Buttons */}
-        <div className="hidden md:block">
+        <div className="hidden md:flex items-center space-x-4">
+          {user && (
+            <PointsDisplay className="border-0 shadow-none bg-gray-50" showDetails={false} />
+          )}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
