@@ -215,14 +215,31 @@ class AuthService {
       // Check if we're in test mode
       const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
       if (isTestMode) {
-        console.log('Test mode enabled - using mock user');
+        console.log('Test mode enabled - using mock admin user');
         this.currentUser = {
-          id: 'test-user-123',
-          name: 'Test User',
-          email: 'test@example.com',
-          role: 'user',
+          id: 'admin-user-123',
+          name: 'Admin User',
+          email: 'lobos54321@gmail.com',
+          role: 'admin',
           avatarUrl: null,
           balance: 100,
+          createdAt: new Date().toISOString(),
+        };
+        this.isInitialized = true;
+        return this.currentUser;
+      }
+      
+      // Check if we want to test non-admin user
+      const isNonAdminTest = import.meta.env.VITE_NON_ADMIN_TEST === 'true';
+      if (isNonAdminTest) {
+        console.log('Non-admin test mode enabled - using mock regular user');
+        this.currentUser = {
+          id: 'user-123',
+          name: 'Regular User',
+          email: 'user@example.com',
+          role: 'user',
+          avatarUrl: null,
+          balance: 50,
           createdAt: new Date().toISOString(),
         };
         this.isInitialized = true;
