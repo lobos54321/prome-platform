@@ -37,9 +37,23 @@ export default function Dashboard() {
     }
   }, [user, navigate]);
 
+  // Early return if user is not available
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">加载中...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 加载数据时确保 catch 错误并 fallback
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.id) return;
 
     let cancelled = false;
     const loadData = async () => {
@@ -57,7 +71,7 @@ export default function Dashboard() {
     };
     loadData();
     return () => { cancelled = true; };
-  }, [user.id]);
+  }, [user?.id]); // Use optional chaining to avoid null reference
 
   // 计算统计数据
   const totalSpent = billingRecords.reduce((sum, record) => typeof record.amount === 'number' ? sum + record.amount : sum, 0);
@@ -107,7 +121,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ¥{typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}
+              ¥{user && typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}
             </div>
             <p className="text-xs text-muted-foreground">
               余额过低时会影响服务使用

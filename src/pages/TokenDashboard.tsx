@@ -391,7 +391,7 @@ export default function TokenDashboard() {
       
       console.log('Token Dashboard: Supabase configured:', isSupabaseConfigured);
       const { startDate, endDate } = getDateRange();
-      const effectiveUserId = isSupabaseConfigured ? user.id : 'demo-user';
+      const effectiveUserId = isSupabaseConfigured && user?.id ? user.id : 'demo-user';
       
       const summaryData = await difyTokenTracker.getTokenUsageSummary(effectiveUserId, startDate, endDate);
       setSummary(summaryData);
@@ -887,7 +887,7 @@ export default function TokenDashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              <DetailedDataTable userId={user.id} timeRange={timeRange} />
+              <DetailedDataTable userId={user?.id || 'demo-user'} timeRange={timeRange} />
             </CardContent>
           </Card>
         </TabsContent>
