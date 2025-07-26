@@ -35,7 +35,7 @@ export default function Settings() {
   const [paymentError, setPaymentError] = useState('');
 
   // 安全地获得注册时间字符串
-  const getCreatedAt = (createdAt: any) => {
+  const getCreatedAt = (createdAt: string | undefined) => {
     if (!createdAt) return '未知';
     const date = new Date(createdAt);
     if (isNaN(date.getTime())) return '未知';
@@ -110,8 +110,8 @@ export default function Settings() {
       const stripe = await stripePromise;
       if (!stripe) throw new Error('Stripe加载失败');
       await stripe.redirectToCheckout({ sessionId: data.sessionId });
-    } catch (error: any) {
-      setPaymentError(error.message || '支付异常');
+    } catch (error: unknown) {
+      setPaymentError(error instanceof Error ? error.message : '支付异常');
     } finally {
       setIsProcessing(false);
     }

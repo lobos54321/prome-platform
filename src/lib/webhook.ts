@@ -1,13 +1,14 @@
-import { WebhookPayload } from '@/types';
+import { WebhookPayload, DifyWebhookPayload } from '@/types';
 import { db } from './supabase';
+import { difyAPI } from '@/api/dify-api';
 
 // Enhanced webhook handler for processing Dify workflow callbacks
 class WebhookHandler {
   private webhookUrl = '/api/webhook/dify';
   private apiKey = 'prome_wh_key_123456'; // In production, this should be in environment variables
   
-  // Process incoming webhook from Dify
-  async processWebhook(payload: WebhookPayload, signature: string): Promise<{success: boolean; message: string; scriptId?: string}> {
+  // Process incoming webhook from Dify - enhanced for token consumption
+  async processWebhook(payload: WebhookPayload | DifyWebhookPayload, signature: string): Promise<{success: boolean; message: string; scriptId?: string}> {
     try {
       // Validate inputs
       if (!payload) {
@@ -26,7 +27,12 @@ class WebhookHandler {
         };
       }
 
-      // Use the database to process the webhook
+      // Check if this is a Dify message_end event for token consumption
+      if (this.isDifyTokenConsumptionEvent(payload)) {
+        return await this.processDifyTokenConsumption(payload as DifyWebhookPayload, signature);
+      }
+
+      // Use the database to process legacy webhook format
       const result = await db.processWebhook(payload, signature);
       
       // Validate result structure
@@ -45,12 +51,62 @@ class WebhookHandler {
       }
     } catch (error) {
       console.error('Webhook processing failed:', error);
-      // 修复模板字符串 (对应之前的第53行)
       return { 
         success: false, 
         message: 'Processing error: ' + (error instanceof Error ? error.message : 'Unknown error') 
       };
     }
+  }
+
+  // Process Dify token consumption webhook
+  private async processDifyTokenConsumption(
+    payload: DifyWebhookPayload, 
+    signature: string
+  ): Promise<{success: boolean; message: string; scriptId?: string}> {
+    try {
+      console.log('Processing Dify token consumption webhook:', payload);
+
+      // Create headers object for API processing
+      const headers = {
+        'x-api-key': signature,
+        'x-user-id': payload.data && typeof payload.data === 'object' && 'user_id' in payload.data 
+          ? payload.data.user_id as string 
+          : '',
+        'x-service-id': 'dify-service' // Default service ID for Dify
+      };
+
+      // Process using the enhanced Dify API
+      const result = await difyAPI.processWebhook(payload, headers);
+
+      return {
+        success: result.success,
+        message: result.message,
+        scriptId: result.data && typeof result.data === 'object' && 'consumptionId' in result.data 
+          ? result.data.consumptionId as string 
+          : undefined
+      };
+    } catch (error) {
+      console.error('Dify token consumption processing failed:', error);
+      return {
+        success: false,
+        message: 'Dify processing error: ' + (error instanceof Error ? error.message : 'Unknown error')
+      };
+    }
+  }
+
+  // Check if payload is a Dify message_end event
+  private isDifyTokenConsumptionEvent(payload: WebhookPayload | DifyWebhookPayload): boolean {
+    if (!payload || typeof payload !== 'object') return false;
+    
+    // Check for Dify webhook structure
+    return 'event' in payload && 
+           payload.event === 'message_end' &&
+           'data' in payload &&
+           payload.data &&
+           typeof payload.data === 'object' &&
+           'model_name' in payload.data &&
+           'input_tokens' in payload.data &&
+           'output_tokens' in payload.data;
   }
 
   // Get webhook URL

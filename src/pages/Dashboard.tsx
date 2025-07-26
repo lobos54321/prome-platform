@@ -18,26 +18,29 @@ import { TokenUsage, BillingRecord } from '@/types';
 import { servicesAPI } from '@/lib/services';
 import { authService } from '@/lib/auth';
 
+import { useAuth } from '@/hooks/use-auth';
+
 export default function Dashboard() {
   const navigate = useNavigate();
-  const user = authService.getCurrentUser();
+  const { user } = useAuth();
 
-  // 严格 user 判空，防止 navigate 死循环
-  if (!user) {
-    // 不能直接 navigate()，因为会导致死循环渲染，这里用 setTimeout 保证只跳转一次
-    setTimeout(() => {
-      navigate('/login');
-    }, 0);
-    return null;
-  }
-
+  // Always declare hooks at top level
   const [usageRecords, setUsageRecords] = useState<TokenUsage[]>([]);
   const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Handle user authentication
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
   // 加载数据时确保 catch 错误并 fallback
   useEffect(() => {
+    if (!user) return;
+
     let cancelled = false;
     const loadData = async () => {
       try {

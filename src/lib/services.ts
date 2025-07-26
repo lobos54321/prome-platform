@@ -183,7 +183,7 @@ class ServicesAPI {
   }
 
   // AI聊天服务（模拟）
-  async chat(messages: any[], settings: any): Promise<any> {
+  async chat(messages: Record<string, unknown>[], settings: Record<string, unknown>): Promise<Record<string, unknown>> {
     // 模拟AI响应
     return new Promise((resolve) => {
       setTimeout(() => {

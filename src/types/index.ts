@@ -132,6 +132,68 @@ export interface WebhookPayload {
   };
 }
 
+// Enhanced Dify webhook types for token consumption monitoring
+export interface DifyMessageEndEvent {
+  event: 'message_end';
+  conversation_id: string;
+  message_id: string;
+  user_id?: string;
+  model_name: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  timestamp: string;
+  metadata?: {
+    [key: string]: unknown;
+  };
+}
+
+export interface DifyWebhookPayload {
+  event: string;
+  data: DifyMessageEndEvent | Record<string, unknown>;
+  request_id?: string;
+}
+
+// Points consumption tracking types
+export interface PointsConsumption {
+  id: string;
+  userId: string;
+  serviceId: string;
+  modelName: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  inputCost: number;
+  outputCost: number;
+  totalCost: number;
+  pointsDeducted: number;
+  conversationId?: string;
+  messageId?: string;
+  requestId?: string;
+  timestamp: string;
+  status: 'completed' | 'failed' | 'pending';
+}
+
+// Balance check and estimation types
+export interface BalanceCheck {
+  hasEnoughBalance: boolean;
+  currentBalance: number;
+  estimatedCost: number;
+  requiredBalance: number;
+  message?: string;
+}
+
+export interface CostEstimation {
+  modelName: string;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  estimatedTotalTokens: number;
+  estimatedInputCost: number;
+  estimatedOutputCost: number;
+  estimatedTotalCost: number;
+  estimatedPoints: number;
+}
+
 // Script types
 export interface Script {
   id: string;

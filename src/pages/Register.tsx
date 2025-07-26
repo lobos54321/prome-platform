@@ -85,22 +85,24 @@ export default function Register() {
         setError('注册失败：无法创建用户账户。请检查邮箱是否已被使用。');
         setDebugInfo('注册返回空用户对象');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Registration error:', err);
       
       let errorMessage = '注册失败，请稍后重试';
       
-      if (err.message?.includes('already registered')) {
-        errorMessage = '该邮箱已被注册，请使用其他邮箱或直接登录';
-      } else if (err.message?.includes('Invalid email')) {
-        errorMessage = '邮箱格式不正确，请检查后重试';
-      } else if (err.message?.includes('Password should be at least')) {
-        errorMessage = '密码长度不足，请设置至少8位密码';
-      } else if (err.message?.includes('relation "users" does not exist')) {
-        errorMessage = '系统数据库配置错误，请联系管理员';
-        setDebugInfo('数据库表未创建');
-      } else if (err.message?.includes('duplicate key')) {
-        errorMessage = '该邮箱已被注册，请使用其他邮箱';
+      if (err instanceof Error) {
+        if (err.message?.includes('already registered')) {
+          errorMessage = '该邮箱已被注册，请使用其他邮箱或直接登录';
+        } else if (err.message?.includes('Invalid email')) {
+          errorMessage = '邮箱格式不正确，请检查后重试';
+        } else if (err.message?.includes('Password should be at least')) {
+          errorMessage = '密码长度不足，请设置至少8位密码';
+        } else if (err.message?.includes('relation "users" does not exist')) {
+          errorMessage = '系统数据库配置错误，请联系管理员';
+          setDebugInfo('数据库表未创建');
+        } else if (err.message?.includes('duplicate key')) {
+          errorMessage = '该邮箱已被注册，请使用其他邮箱';
+        }
       }
       
       setError(errorMessage);
