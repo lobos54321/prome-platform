@@ -38,7 +38,12 @@ export default function Services() {
     if (!user) {
       navigate('/login');
     } else {
-      navigate(`/chat/${service.id}`);
+      // Route AI content generation services to the dedicated page
+      if (service.id === 'live-script-generator' || service.id === 'short-video-script') {
+        navigate(`/ai-content/${service.id}`);
+      } else {
+        navigate(`/chat/${service.id}`);
+      }
     }
   };
 
