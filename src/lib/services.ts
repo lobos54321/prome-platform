@@ -73,11 +73,9 @@ class ServicesAPI {
         description: '为直播带货生成专业的口播文案，提升转化率',
         category: '直播',
         features: ['智能文案生成', '多风格选择', '实时预览'],
-        pricing: { type: 'token', basePrice: 0.01 },
-        isActive: true,
-        usage: 1250,
-        rating: 4.8,
-        avatar: '/api/placeholder/64/64'
+        pricePerToken: 0.01,
+        popular: true,
+        difyUrl: 'https://udify.app/chatbot/is3TxuUUaboPKblZ'
       },
       {
         id: 'short-video-script',
@@ -85,11 +83,29 @@ class ServicesAPI {
         description: '为短视频内容创作专业的口播脚本',
         category: '短视频',
         features: ['快速生成', '多平台适配', '时长控制'],
-        pricing: { type: 'token', basePrice: 0.008 },
-        isActive: true,
-        usage: 980,
-        rating: 4.7,
-        avatar: '/api/placeholder/64/64'
+        pricePerToken: 0.008,
+        popular: true,
+        difyUrl: 'https://udify.app/chatbot/is3TxuUUaboPKblZ'
+      },
+      {
+        id: 'content-writing',
+        name: '智能写作助手',
+        description: '基于AI的内容创作和文案生成服务',
+        category: '内容创作',
+        features: ['智能文案生成', '多风格适配', 'SEO优化'],
+        pricePerToken: 0.02,
+        popular: false,
+        difyUrl: 'https://udify.app/chatbot/is3TxuUUaboPKblZ'
+      },
+      {
+        id: 'code-assistant',
+        name: '代码生成助手',
+        description: '智能代码生成和调试服务',
+        category: '开发工具',
+        features: ['代码生成', '错误检测', '性能优化建议'],
+        pricePerToken: 0.03,
+        popular: false,
+        difyUrl: 'https://udify.app/chatbot/is3TxuUUaboPKblZ'
       }
     ];
   }

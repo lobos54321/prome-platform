@@ -408,15 +408,43 @@ class DatabaseService {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error getting token usage:', error);
+        // If the error is about missing created_at column, try with timestamp
+        if (error.code === '42703' && error.message.includes('created_at')) {
+          console.log('Fallback: trying with timestamp column');
+          const { data: fallbackData, error: fallbackError } = await supabase!
+            .from('token_usage')
+            .select('*')
+            .eq('user_id', userId)
+            .order('timestamp', { ascending: false });
+          
+          if (fallbackError) {
+            console.error('Fallback query also failed:', fallbackError);
+            return [];
+          }
+          
+          return (fallbackData || []).map(item => ({
+            id: item.id,
+            userId: item.user_id,
+            serviceId: item.service_id || item.service,
+            tokensUsed: item.tokens_used,
+            cost: item.cost,
+            timestamp: item.timestamp || item.created_at || new Date().toISOString(),
+            sessionId: item.session_id || '',
+          }));
+        }
+        return [];
+      }
 
-      return data.map(item => ({
+      return (data || []).map(item => ({
         id: item.id,
         userId: item.user_id,
-        service: item.service,
+        serviceId: item.service_id || item.service,
         tokensUsed: item.tokens_used,
         cost: item.cost,
-        createdAt: item.created_at || item.timestamp, // Handle both column names
+        timestamp: item.created_at || item.timestamp || new Date().toISOString(),
+        sessionId: item.session_id || '',
       }));
     } catch (error) {
       console.error('Error getting token usage:', error);
@@ -440,9 +468,11 @@ class DatabaseService {
         .insert([
           {
             user_id: userId,
-            service,
+            service_id: service,
             tokens_used: tokensUsed,
             cost,
+            model: 'gpt-3.5-turbo', // Default model
+            created_at: new Date().toISOString()
           }
         ])
         .select()
@@ -453,10 +483,11 @@ class DatabaseService {
       return {
         id: data.id,
         userId: data.user_id,
-        service: data.service,
+        serviceId: data.service_id,
         tokensUsed: data.tokens_used,
         cost: data.cost,
-        createdAt: data.created_at,
+        timestamp: data.created_at,
+        sessionId: '',
       };
     } catch (error) {
       console.error('Error adding token usage:', error);
@@ -482,16 +513,43 @@ class DatabaseService {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error getting billing records:', error);
+        // If the error is about missing created_at column, try with timestamp
+        if (error.code === '42703' && error.message.includes('created_at')) {
+          console.log('Fallback: trying with timestamp column for billing records');
+          const { data: fallbackData, error: fallbackError } = await supabase!
+            .from('billing_records')
+            .select('*')
+            .eq('user_id', userId)
+            .order('timestamp', { ascending: false });
+          
+          if (fallbackError) {
+            console.error('Fallback query also failed:', fallbackError);
+            return [];
+          }
+          
+          return (fallbackData || []).map(item => ({
+            id: item.id,
+            userId: item.user_id,
+            amount: item.amount,
+            type: item.type,
+            description: item.description,
+            timestamp: item.timestamp || item.created_at || new Date().toISOString(),
+            status: item.status,
+          }));
+        }
+        return [];
+      }
 
-      return data.map(item => ({
+      return (data || []).map(item => ({
         id: item.id,
         userId: item.user_id,
-        type: item.type,
         amount: item.amount,
+        type: item.type,
         description: item.description,
+        timestamp: item.created_at || item.timestamp || new Date().toISOString(),
         status: item.status,
-        createdAt: item.created_at || item.timestamp, // Handle both column names
       }));
     } catch (error) {
       console.error('Error getting billing records:', error);
@@ -524,6 +582,7 @@ class DatabaseService {
             amount,
             description,
             status: 'completed',
+            created_at: new Date().toISOString()
           }
         ])
         .select()
@@ -534,11 +593,11 @@ class DatabaseService {
       return {
         id: data.id,
         userId: data.user_id,
-        type: data.type,
         amount: data.amount,
+        type: data.type,
         description: data.description,
+        timestamp: data.created_at,
         status: data.status,
-        createdAt: data.created_at,
       };
     } catch (error) {
       console.error('Error adding billing record:', error);

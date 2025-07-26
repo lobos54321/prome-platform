@@ -15,6 +15,7 @@ import Chat from './pages/Chat';
 import Admin from './pages/Admin';
 import Pricing from './pages/Pricing';
 import Settings from './pages/Settings';
+import AIContentGeneration from './pages/AIContentGeneration';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -66,6 +67,7 @@ const App = () => {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/token-dashboard" element={<TokenDashboard />} />
               <Route path="/chat/:serviceId" element={<Chat />} />
+              <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
