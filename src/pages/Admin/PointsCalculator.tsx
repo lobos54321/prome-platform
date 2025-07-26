@@ -6,12 +6,18 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, DollarSign, Calculator, Save } from 'lucide-react';
-import { PointsConfig, PointsConsumptionRule } from '@/types';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Edit, Trash2, DollarSign, Calculator, Save, TrendingUp, Clock, AlertCircle } from 'lucide-react';
+import { PointsConfig, PointsConsumptionRule, ExchangeRateHistory } from '@/types';
+import { adminServicesAPI } from '@/lib/admin-services';
 import { toast } from '@/hooks/use-toast';
 
 export default function PointsCalculator() {
   const [exchangeRate, setExchangeRate] = useState<number>(10000); // 10000 points = 1 USD
+  const [newExchangeRate, setNewExchangeRate] = useState<number>(10000);
+  const [exchangeRateReason, setExchangeRateReason] = useState<string>('');
+  const [exchangeRateHistory, setExchangeRateHistory] = useState<ExchangeRateHistory[]>([]);
   const [consumptionRules, setConsumptionRules] = useState<PointsConsumptionRule[]>([]);
   const [newRule, setNewRule] = useState<Partial<PointsConsumptionRule>>({
     functionName: '',
@@ -22,20 +28,33 @@ export default function PointsCalculator() {
   const [editingRule, setEditingRule] = useState<PointsConsumptionRule | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isExchangeRateDialogOpen, setIsExchangeRateDialogOpen] = useState(false);
 
   // 计算预览数据
   const [previewTokens, setPreviewTokens] = useState<number>(1000);
   const [selectedFunction, setSelectedFunction] = useState<string>('');
+  const [previewUSD, setPreviewUSD] = useState<number>(10);
 
   useEffect(() => {
-    // 加载现有配置（模拟数据）
-    loadPointsConfig();
-    loadConsumptionRules();
+    loadData();
   }, []);
 
-  const loadPointsConfig = () => {
-    // 模拟加载积分配置
-    setExchangeRate(10000); // 默认 10000 积分 = 1 美元
+  const loadData = async () => {
+    try {
+      const [rate, history] = await Promise.all([
+        adminServicesAPI.getExchangeRate(),
+        adminServicesAPI.getExchangeRateHistory()
+      ]);
+      
+      setExchangeRate(rate);
+      setNewExchangeRate(rate);
+      setExchangeRateHistory(history);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    }
+    
+    // Load consumption rules (mock data for now)
+    loadConsumptionRules();
   };
 
   const loadConsumptionRules = () => {
@@ -75,13 +94,41 @@ export default function PointsCalculator() {
     }
   };
 
-  const handleSaveExchangeRate = () => {
-    // TODO: 保存到后端
-    console.log('Saving exchange rate:', exchangeRate);
-    toast({
-      title: "汇率设置已保存",
-      description: `新汇率：${exchangeRate} 积分 = 1 美元`,
-    });
+  const handleSaveExchangeRate = async () => {
+    if (newExchangeRate <= 0) {
+      toast({
+        title: "无效的汇率",
+        description: "汇率必须大于0",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const updatedRate = await adminServicesAPI.updateExchangeRate(
+        newExchangeRate, 
+        exchangeRateReason || undefined
+      );
+      
+      setExchangeRate(updatedRate);
+      setExchangeRateReason('');
+      setIsExchangeRateDialogOpen(false);
+      
+      // Reload history
+      const history = await adminServicesAPI.getExchangeRateHistory();
+      setExchangeRateHistory(history);
+      
+      toast({
+        title: "汇率设置已保存",
+        description: `新汇率：${updatedRate.toLocaleString()} 积分 = 1 美元`,
+      });
+    } catch (error) {
+      toast({
+        title: "保存失败",
+        description: (error as Error).message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleAddRule = () => {
@@ -154,7 +201,20 @@ export default function PointsCalculator() {
     return { points: totalPoints, usd: totalUSD };
   };
 
+  const calculatePointsFromUSD = (usdAmount: number) => {
+    return Math.floor(usdAmount * exchangeRate);
+  };
+
+  const calculateUSDFromPoints = (points: number) => {
+    return points / exchangeRate;
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('zh-CN');
+  };
+
   const preview = calculatePreview();
+  const pointsFromUSD = calculatePointsFromUSD(previewUSD);
 
   return (
     <div className="space-y-6">
@@ -171,24 +231,74 @@ export default function PointsCalculator() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="exchangeRate">积分数量（对应1美元）</Label>
-              <Input
-                id="exchangeRate"
-                type="number"
-                min="1"
-                value={exchangeRate}
-                onChange={(e) => setExchangeRate(parseInt(e.target.value) || 0)}
-                placeholder="例如：10000"
-              />
-              <p className="text-sm text-gray-500">
-                当前设置：{exchangeRate.toLocaleString()} 积分 = 1 美元
-              </p>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600 mb-2">当前汇率</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {exchangeRate.toLocaleString()} 积分 = 1 美元
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                1 积分 = ${calculateUSDFromPoints(1).toFixed(6)}
+              </div>
             </div>
-            <Button onClick={handleSaveExchangeRate} className="w-full">
-              <Save className="h-4 w-4 mr-2" />
-              保存汇率设置
-            </Button>
+            <Dialog open={isExchangeRateDialogOpen} onOpenChange={setIsExchangeRateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full">
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  更新汇率
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>更新积分汇率</DialogTitle>
+                  <DialogDescription>
+                    修改积分与美元的兑换比例，此操作将影响所有定价计算
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="newExchangeRate">新汇率（积分/美元）</Label>
+                    <Input
+                      id="newExchangeRate"
+                      type="number"
+                      min="1"
+                      value={newExchangeRate}
+                      onChange={(e) => setNewExchangeRate(parseInt(e.target.value) || 0)}
+                      placeholder="例如：10000"
+                    />
+                    <div className="text-sm text-gray-500">
+                      即：{newExchangeRate.toLocaleString()} 积分 = 1 美元
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="exchangeRateReason">变更原因（可选）</Label>
+                    <Textarea
+                      id="exchangeRateReason"
+                      value={exchangeRateReason}
+                      onChange={(e) => setExchangeRateReason(e.target.value)}
+                      placeholder="描述此次汇率调整的原因..."
+                      rows={3}
+                    />
+                  </div>
+                  {newExchangeRate !== exchangeRate && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        汇率从 {exchangeRate.toLocaleString()} 变更为 {newExchangeRate.toLocaleString()}，
+                        变化幅度：{(((newExchangeRate - exchangeRate) / exchangeRate) * 100).toFixed(1)}%
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsExchangeRateDialogOpen(false)}>
+                    取消
+                  </Button>
+                  <Button onClick={handleSaveExchangeRate}>
+                    确认更新
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 
@@ -204,50 +314,143 @@ export default function PointsCalculator() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="previewTokens">Token数量</Label>
-              <Input
-                id="previewTokens"
-                type="number"
-                min="0"
-                value={previewTokens}
-                onChange={(e) => setPreviewTokens(parseInt(e.target.value) || 0)}
-                placeholder="输入token数量"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="selectedFunction">选择功能</Label>
-              <select
-                id="selectedFunction"
-                value={selectedFunction}
-                onChange={(e) => setSelectedFunction(e.target.value)}
-                className="w-full p-2 border rounded-md"
-              >
-                {consumptionRules.map(rule => (
-                  <option key={rule.id} value={rule.id}>
-                    {rule.functionName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {selectedFunction && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">预估费用</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="text-gray-600">积分消耗</p>
-                    <p className="font-medium">{preview.points.toLocaleString()} 积分</p>
+            <Tabs defaultValue="token-calc" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="token-calc">Token计算</TabsTrigger>
+                <TabsTrigger value="usd-calc">美元换算</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="token-calc" className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="previewTokens">Token数量</Label>
+                  <Input
+                    id="previewTokens"
+                    type="number"
+                    min="0"
+                    value={previewTokens}
+                    onChange={(e) => setPreviewTokens(parseInt(e.target.value) || 0)}
+                    placeholder="输入token数量"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="selectedFunction">选择功能</Label>
+                  <select
+                    id="selectedFunction"
+                    value={selectedFunction}
+                    onChange={(e) => setSelectedFunction(e.target.value)}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    {consumptionRules.map(rule => (
+                      <option key={rule.id} value={rule.id}>
+                        {rule.functionName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedFunction && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-medium mb-2">预估费用</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-gray-600">积分消耗</p>
+                        <p className="font-medium">{preview.points.toLocaleString()} 积分</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">美元等值</p>
+                        <p className="font-medium">${preview.usd.toFixed(4)}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-gray-600">美元等值</p>
-                    <p className="font-medium">${preview.usd.toFixed(4)}</p>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="usd-calc" className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="previewUSD">美元金额</Label>
+                  <Input
+                    id="previewUSD"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={previewUSD}
+                    onChange={(e) => setPreviewUSD(parseFloat(e.target.value) || 0)}
+                    placeholder="输入美元金额"
+                  />
+                </div>
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">充值结果</h4>
+                  <div className="text-lg">
+                    <span className="text-gray-600">可获得：</span>
+                    <span className="font-bold text-blue-600">
+                      {pointsFromUSD.toLocaleString()} 积分
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    按当前汇率 {exchangeRate.toLocaleString()} 积分/美元 计算
                   </div>
                 </div>
-              </div>
-            )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
+
+      {/* 汇率变更历史 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            汇率变更历史
+          </CardTitle>
+          <CardDescription>
+            查看汇率调整的历史记录
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {exchangeRateHistory.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              暂无汇率变更记录
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {exchangeRateHistory.map((record) => (
+                <div key={record.id} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="text-sm">
+                          <span className="font-medium">
+                            {record.oldRate.toLocaleString()} → {record.newRate.toLocaleString()}
+                          </span>
+                          <span className="ml-2 text-gray-500">积分/美元</span>
+                        </div>
+                        <div className={`px-2 py-1 rounded-full text-xs ${
+                          record.newRate > record.oldRate 
+                            ? 'bg-red-100 text-red-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {record.newRate > record.oldRate ? '汇率上调' : '汇率下调'}
+                          {' '}
+                          {(((record.newRate - record.oldRate) / record.oldRate) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                      {record.reason && (
+                        <div className="text-sm text-gray-600 mb-2">
+                          {record.reason}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-4 text-xs text-gray-400">
+                        <span>调整人: {record.adminEmail}</span>
+                        <span>{formatDateTime(record.timestamp)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 消耗规则管理 */}
       <Card>
