@@ -15,11 +15,13 @@ class AuthService {
   async getCurrentUser(): Promise<User | null> {
     // 如果还没初始化，先初始化
     if (!this.isInitialized) {
+      console.log('AuthService: Not initialized, calling initializeAuth');
       return await this.initializeAuth();
     }
 
     // 如果有缓存的用户，先返回，然后静默验证
     if (this.currentUser) {
+      console.log('AuthService: Returning cached user:', this.currentUser.email);
       // 静默验证会话（不阻塞返回）
       this.validateSessionQuietly();
       return this.currentUser;
@@ -27,9 +29,11 @@ class AuthService {
 
     // 没有缓存用户，进行完整验证
     try {
+      console.log('AuthService: No cached user, fetching from database');
       const user = await db.getCurrentUser();
       
       if (user && user.id) {
+        console.log('AuthService: User found in database:', user.email);
         this.currentUser = user;
         this.isInitialized = true;
         
@@ -45,13 +49,13 @@ class AuthService {
         localStorage.setItem('currentUser', JSON.stringify(userToStore));
         return user;
       } else {
-        console.log('No valid Supabase session, clearing user state');
+        console.log('AuthService: No valid user found in database, clearing user state');
         this.clearUserState();
         return null;
       }
     } catch (error) {
-      console.error('Error getting current user from auth:', error);
-      console.log('No valid Supabase session, clearing user state');
+      console.error('AuthService: Error getting current user:', error);
+      console.log('AuthService: Clearing user state due to error');
       this.clearUserState();
       return null;
     }
@@ -82,9 +86,12 @@ class AuthService {
   // Login
   async login(email: string, password: string): Promise<User | null> {
     try {
+      console.log('AuthService: Starting login process for email:', email);
       const user = await db.signIn(email, password);
       
       if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
+        console.log('AuthService: Login successful for user:', user.email, 'ID:', user.id, 'Role:', user.role);
+        
         this.currentUser = user;
         this.isInitialized = true;
         
@@ -98,21 +105,24 @@ class AuthService {
           };
           
           localStorage.setItem('currentUser', JSON.stringify(userToStore));
+          console.log('AuthService: User data stored in localStorage');
         } catch (storageError) {
-          console.warn('Failed to store user data in localStorage:', storageError);
+          console.warn('AuthService: Failed to store user data in localStorage:', storageError);
         }
         
         // 触发认证状态变更事件
+        console.log('AuthService: Dispatching auth-state-changed event');
         window.dispatchEvent(new CustomEvent('auth-state-changed', { 
           detail: { user } 
         }));
         
         return user;
+      } else {
+        console.log('AuthService: Login failed - no valid user returned from database');
+        return null;
       }
-      
-      return null;
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('AuthService: Login failed with error:', error);
       throw error;
     }
   }

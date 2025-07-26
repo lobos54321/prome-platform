@@ -9,10 +9,18 @@ export const ADMIN_EMAIL = 'lobos54321@gmail.com';
  */
 export function isAdmin(user: User | null): boolean {
   if (!user || !user.email) {
+    console.log('isAdmin: No user or email provided');
     return false;
   }
   
-  return user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  // Normalize email by trimming whitespace and converting to lowercase
+  const userEmail = user.email.trim().toLowerCase();
+  const adminEmail = ADMIN_EMAIL.trim().toLowerCase();
+  
+  const result = userEmail === adminEmail;
+  console.log('isAdmin: Checking user email:', userEmail, 'against admin email:', adminEmail, 'Result:', result);
+  
+  return result;
 }
 
 /**
@@ -23,7 +31,11 @@ export function isAdminEmail(email: string | null | undefined): boolean {
     return false;
   }
   
-  return email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  // Normalize email by trimming whitespace and converting to lowercase
+  const normalizedEmail = email.trim().toLowerCase();
+  const adminEmail = ADMIN_EMAIL.trim().toLowerCase();
+  
+  return normalizedEmail === adminEmail;
 }
 
 /**
