@@ -15,6 +15,9 @@ export default function Admin() {
   const [user, setUser] = useState(authService.getCurrentUserSync());
   const [activeTab, setActiveTab] = useState('models');
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Check if Dify integration is enabled via environment variable
+  const isDifyEnabled = import.meta.env.VITE_ENABLE_DIFY_INTEGRATION === 'true';
 
   useEffect(() => {
     // Initialize auth state and set loading
@@ -98,9 +101,9 @@ export default function Admin() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-8">
           <TabsTrigger value="models">模型管理</TabsTrigger>
-          <TabsTrigger value="consumption">消耗监控</TabsTrigger>
-          <TabsTrigger value="points">积分计算器</TabsTrigger>
-          <TabsTrigger value="webhook">Webhook配置</TabsTrigger>
+          {isDifyEnabled && <TabsTrigger value="consumption">消耗监控</TabsTrigger>}
+          {isDifyEnabled && <TabsTrigger value="points">积分计算器</TabsTrigger>}
+          {isDifyEnabled && <TabsTrigger value="webhook">Webhook配置</TabsTrigger>}
           <TabsTrigger value="users">用户管理</TabsTrigger>
           <TabsTrigger value="services">服务管理</TabsTrigger>
           <TabsTrigger value="stats">平台统计</TabsTrigger>
@@ -110,17 +113,23 @@ export default function Admin() {
           <ModelManagement />
         </TabsContent>
 
-        <TabsContent value="consumption">
-          <TokenConsumptionMonitor />
-        </TabsContent>
+        {isDifyEnabled && (
+          <TabsContent value="consumption">
+            <TokenConsumptionMonitor />
+          </TabsContent>
+        )}
         
-        <TabsContent value="points">
-          <PointsCalculator />
-        </TabsContent>
+        {isDifyEnabled && (
+          <TabsContent value="points">
+            <PointsCalculator />
+          </TabsContent>
+        )}
         
-        <TabsContent value="webhook">
-          <WebhookConfig />
-        </TabsContent>
+        {isDifyEnabled && (
+          <TabsContent value="webhook">
+            <WebhookConfig />
+          </TabsContent>
+        )}
 
         <TabsContent value="users">
           <div className="text-center py-12">
