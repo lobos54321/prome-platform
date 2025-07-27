@@ -858,6 +858,42 @@ class DatabaseService {
     }
   }
 
+  async getExchangeRateHistory(): Promise<ExchangeRateHistory[]> {
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('exchange_rate_history')
+        .select(`
+          *,
+          admin:admin_id (
+            email
+          )
+        `)
+        .order('timestamp', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error getting exchange rate history:', error);
+        return [];
+      }
+
+      return (data || []).map(item => ({
+        id: item.id,
+        oldRate: item.old_rate,
+        newRate: item.new_rate,
+        adminEmail: item.admin?.email || 'Unknown',
+        reason: item.reason || '',
+        timestamp: item.timestamp,
+      }));
+    } catch (error) {
+      console.error('Error getting exchange rate history:', error);
+      return [];
+    }
+  }
+
   // ENHANCED TOKEN USAGE METHODS
   async addTokenUsageWithModel(
     userId: string,

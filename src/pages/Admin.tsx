@@ -6,6 +6,7 @@ import { Shield, AlertTriangle } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import ModelManagement from './Admin/ModelManagement';
+import ExchangeRateSettings from './Admin/ExchangeRateSettings';
 import WebhookConfig from './Admin/WebhookConfig';
 import PointsCalculator from './Admin/PointsCalculator';
 import TokenConsumptionMonitor from './Admin/TokenConsumptionMonitor';
@@ -101,6 +102,7 @@ export default function Admin() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-8">
           <TabsTrigger value="models">模型管理</TabsTrigger>
+          {isDifyEnabled && <TabsTrigger value="exchange">汇率设置</TabsTrigger>}
           {isDifyEnabled && <TabsTrigger value="consumption">消耗监控</TabsTrigger>}
           {isDifyEnabled && <TabsTrigger value="points">积分计算器</TabsTrigger>}
           {isDifyEnabled && <TabsTrigger value="webhook">Webhook配置</TabsTrigger>}
@@ -112,6 +114,12 @@ export default function Admin() {
         <TabsContent value="models">
           <ModelManagement />
         </TabsContent>
+
+        {isDifyEnabled && (
+          <TabsContent value="exchange">
+            <ExchangeRateSettings />
+          </TabsContent>
+        )}
 
         {isDifyEnabled && (
           <TabsContent value="consumption">
