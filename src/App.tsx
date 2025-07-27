@@ -17,6 +17,7 @@ import Pricing from './pages/Pricing';
 import Purchase from './pages/Purchase';
 import Settings from './pages/Settings';
 import AIContentGeneration from './pages/AIContentGeneration';
+import DifyTestPage from './pages/DifyTestPage';
 
 import NotFound from './pages/NotFound';
 
@@ -72,6 +73,7 @@ const App = () => {
               <Route path="/chat/:serviceId" element={<Chat />} />
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/dify-test" element={<DifyTestPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

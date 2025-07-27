@@ -17,6 +17,9 @@ export class DifyIframeMonitor {
   private currentExchangeRate = 10000; // Default: 10000 points = 1 USD
   private onTokenConsumption?: (event: TokenConsumptionEvent) => void;
   private onBalanceUpdate?: (newBalance: number) => void;
+  private processedEvents = new Set<string>(); // Prevent duplicate processing
+  private lastEventTime = 0;
+  private minEventInterval = 1000; // Minimum 1 second between events
 
   constructor() {
     this.initialize();
@@ -95,10 +98,18 @@ export class DifyIframeMonitor {
       'https://dify.ai',
       'https://cloud.dify.ai',
       'https://app.dify.ai',
+      window.location.origin, // Allow same-origin for testing
       // Add more as needed
     ];
 
-    return validOrigins.some(validOrigin => origin.includes(validOrigin));
+    // For testing: also allow localhost and development origins
+    if (import.meta.env.DEV) {
+      validOrigins.push('http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173');
+    }
+
+    return validOrigins.some(validOrigin => 
+      origin === validOrigin || origin.includes(validOrigin)
+    );
   }
 
   private async processTokenConsumption(event: DifyMessageEndEvent, userId: string) {
@@ -113,6 +124,27 @@ export class DifyIframeMonitor {
         conversation_id: conversationId,
         message_id: messageId
       } = event;
+
+      // Create unique event ID to prevent duplicate processing
+      const eventId = `${conversationId}-${messageId}-${totalTokens}`;
+      if (this.processedEvents.has(eventId)) {
+        console.log('Event already processed, skipping:', eventId);
+        return;
+      }
+
+      // Rate limiting - prevent rapid successive events
+      const now = Date.now();
+      if (now - this.lastEventTime < this.minEventInterval) {
+        console.log('Rate limiting: event too soon after previous one');
+        return;
+      }
+      this.lastEventTime = now;
+
+      // Validate token counts
+      if (totalTokens <= 0 || inputTokens < 0 || outputTokens < 0) {
+        console.warn('Invalid token counts:', { inputTokens, outputTokens, totalTokens });
+        return;
+      }
 
       // Find model configuration
       const modelConfig = this.modelConfigs.find(
@@ -131,6 +163,16 @@ export class DifyIframeMonitor {
 
       // Convert to points
       const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
+
+      // Safety check: prevent excessive deduction
+      if (pointsToDeduct > 100000) { // Adjust threshold as needed
+        console.error('Token cost too high, potential error:', {
+          modelName,
+          totalTokens,
+          pointsToDeduct
+        });
+        return;
+      }
 
       console.log(`Token consumption calculation:`, {
         modelName,
@@ -151,6 +193,16 @@ export class DifyIframeMonitor {
       );
 
       if (result.success) {
+        // Mark event as processed
+        this.processedEvents.add(eventId);
+        
+        // Clean up old processed events (keep last 100)
+        if (this.processedEvents.size > 100) {
+          const eventsArray = Array.from(this.processedEvents);
+          this.processedEvents.clear();
+          eventsArray.slice(-50).forEach(id => this.processedEvents.add(id));
+        }
+
         // Record token usage
         await db.addTokenUsageWithModel(
           userId,
