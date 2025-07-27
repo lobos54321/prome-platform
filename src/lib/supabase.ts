@@ -859,6 +859,18 @@ class DatabaseService {
   }
 
   // ENHANCED TOKEN USAGE METHODS
+  // Overloaded method for new token pricing engine
+  async addTokenUsageWithModel(
+    userId: string,
+    modelName: string,
+    inputTokens: number,
+    outputTokens: number,
+    totalCostCredits: number,
+    conversationId?: string,
+    messageId?: string
+  ): Promise<TokenUsage | null>;
+
+  // Original method signature for backward compatibility
   async addTokenUsageWithModel(
     userId: string,
     modelName: string,
@@ -870,12 +882,45 @@ class DatabaseService {
     totalCost: number,
     conversationId?: string,
     messageId?: string
+  ): Promise<TokenUsage | null>;
+
+  async addTokenUsageWithModel(
+    userId: string,
+    modelName: string,
+    inputTokens: number,
+    outputTokens: number,
+    param5: number,
+    param6?: string | number,
+    param7?: string | number,
+    param8?: number,
+    param9?: string,
+    param10?: string
   ): Promise<TokenUsage | null> {
     if (!isSupabaseConfigured) {
       return null;
     }
 
     try {
+      let totalTokens: number;
+      let totalCost: number;
+      let conversationId: string | undefined;
+      let messageId: string | undefined;
+
+      // Determine which overload is being called
+      if (typeof param6 === 'string' || param6 === undefined) {
+        // New signature: (userId, modelName, inputTokens, outputTokens, totalCostCredits, conversationId?, messageId?)
+        totalTokens = inputTokens + outputTokens;
+        totalCost = param5; // totalCostCredits
+        conversationId = param6 as string;
+        messageId = param7 as string;
+      } else {
+        // Old signature: (userId, modelName, inputTokens, outputTokens, totalTokens, inputCost, outputCost, totalCost, conversationId?, messageId?)
+        totalTokens = param5;
+        totalCost = param8 as number;
+        conversationId = param9;
+        messageId = param10;
+      }
+
       const { data, error } = await supabase!
         .from('token_usage')
         .insert([
@@ -886,8 +931,6 @@ class DatabaseService {
             input_tokens: inputTokens,
             output_tokens: outputTokens,
             tokens_used: totalTokens,
-            input_cost: inputCost,
-            output_cost: outputCost,
             cost: totalCost,
             conversation_id: conversationId,
             message_id: messageId,
@@ -911,6 +954,45 @@ class DatabaseService {
     } catch (error) {
       console.error('Error adding token usage with model:', error);
       return null;
+    }
+  }
+
+  async getExchangeRateHistory(): Promise<ExchangeRateHistory[]> {
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('exchange_rate_history')
+        .select(`
+          id,
+          old_rate,
+          new_rate,
+          reason,
+          timestamp,
+          users!admin_id (
+            email
+          )
+        `)
+        .order('timestamp', { ascending: false });
+
+      if (error) {
+        console.error('Error getting exchange rate history:', error);
+        return [];
+      }
+
+      return (data || []).map(item => ({
+        id: item.id,
+        oldRate: item.old_rate,
+        newRate: item.new_rate,
+        adminEmail: item.users?.email || 'Unknown',
+        reason: item.reason,
+        timestamp: item.timestamp,
+      }));
+    } catch (error) {
+      console.error('Error getting exchange rate history:', error);
+      return [];
     }
   }
 
