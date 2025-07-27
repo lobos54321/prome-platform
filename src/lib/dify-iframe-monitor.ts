@@ -1,5 +1,6 @@
 import { DifyMessageEndEvent, ModelConfig } from '@/types';
 import { db } from '@/lib/supabase';
+import { tokenPricingEngine } from '@/lib/token-pricing-engine';
 
 export interface TokenConsumptionEvent {
   modelName: string;
@@ -13,8 +14,6 @@ export interface TokenConsumptionEvent {
 
 export class DifyIframeMonitor {
   private isListening = false;
-  private modelConfigs: ModelConfig[] = [];
-  private currentExchangeRate = 10000; // Default: 10000 points = 1 USD
   private onTokenConsumption?: (event: TokenConsumptionEvent) => void;
   private onBalanceUpdate?: (newBalance: number) => void;
   private processedEvents = new Set<string>(); // Prevent duplicate processing
@@ -26,27 +25,8 @@ export class DifyIframeMonitor {
   }
 
   private async initialize() {
-    // Load model configurations and exchange rate
-    await this.loadModelConfigs();
-    await this.loadExchangeRate();
-  }
-
-  private async loadModelConfigs() {
-    try {
-      this.modelConfigs = await db.getModelConfigs();
-      console.log('Loaded model configs:', this.modelConfigs.length);
-    } catch (error) {
-      console.error('Failed to load model configs:', error);
-    }
-  }
-
-  private async loadExchangeRate() {
-    try {
-      this.currentExchangeRate = await db.getCurrentExchangeRate();
-      console.log('Current exchange rate:', this.currentExchangeRate);
-    } catch (error) {
-      console.error('Failed to load exchange rate:', error);
-    }
+    // Initialize the token pricing engine
+    await tokenPricingEngine.loadConfigurations();
   }
 
   public startListening(userId: string) {
@@ -146,49 +126,47 @@ export class DifyIframeMonitor {
         return;
       }
 
-      // Find model configuration
-      const modelConfig = this.modelConfigs.find(
-        config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
-      );
-
-      if (!modelConfig) {
-        console.warn(`No active model config found for: ${modelName}`);
-        return;
-      }
-
-      // Calculate costs
-      const inputCost = (inputTokens / 1000) * modelConfig.inputTokenPrice;
-      const outputCost = (outputTokens / 1000) * modelConfig.outputTokenPrice;
-      const totalCost = inputCost + outputCost;
-
-      // Convert to points
-      const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
-
-      // Safety check: prevent excessive deduction
-      if (pointsToDeduct > 100000) { // Adjust threshold as needed
-        console.error('Token cost too high, potential error:', {
-          modelName,
-          totalTokens,
-          pointsToDeduct
-        });
-        return;
-      }
-
-      console.log(`Token consumption calculation:`, {
+      // Calculate costs using the pricing engine
+      const costCalculation = await tokenPricingEngine.calculateTokenCost(
         modelName,
         inputTokens,
-        outputTokens,
-        totalTokens,
-        inputCost,
-        outputCost,
-        totalCost,
-        pointsToDeduct
-      });
+        outputTokens
+      );
+
+      if (!costCalculation) {
+        console.warn(`No pricing available for model: ${modelName}`);
+        return;
+      }
+
+      // Safety check for reasonable costs
+      const costValidation = tokenPricingEngine.validateReasonableCost(costCalculation);
+      if (!costValidation.isReasonable) {
+        console.error('Cost validation failed:', costValidation.reason);
+        return;
+      }
+
+      console.log(`Token consumption calculation:`, costCalculation);
+
+      // Validate user has sufficient balance
+      const balanceValidation = await tokenPricingEngine.validateBalance(
+        userId,
+        costCalculation.totalCostCredits
+      );
+
+      if (!balanceValidation.hasEnoughBalance) {
+        console.warn('Insufficient balance for token consumption:', {
+          required: costCalculation.totalCostCredits,
+          available: balanceValidation.currentBalance,
+          shortfall: balanceValidation.shortfall
+        });
+        // You might want to show a notification to the user here
+        return;
+      }
 
       // Deduct balance
       const result = await db.deductUserBalance(
         userId,
-        pointsToDeduct,
+        costCalculation.totalCostCredits,
         `Token usage: ${modelName} (${totalTokens} tokens)`
       );
 
@@ -210,9 +188,9 @@ export class DifyIframeMonitor {
           inputTokens,
           outputTokens,
           totalTokens,
-          inputCost,
-          outputCost,
-          totalCost,
+          costCalculation.inputCostUSD,
+          costCalculation.outputCostUSD,
+          costCalculation.totalCostUSD,
           conversationId,
           messageId
         );
@@ -248,13 +226,50 @@ export class DifyIframeMonitor {
     this.onBalanceUpdate = callback;
   }
 
+  /**
+   * Refresh configurations from database
+   */
   public async refreshConfigs() {
-    await this.loadModelConfigs();
-    await this.loadExchangeRate();
+    await tokenPricingEngine.loadConfigurations();
   }
 
+  /**
+   * Check if monitor is currently listening
+   */
   public isCurrentlyListening(): boolean {
     return this.isListening;
+  }
+
+  /**
+   * Get current exchange rate from pricing engine
+   */
+  public getCurrentExchangeRate(): number {
+    return tokenPricingEngine.getCurrentExchangeRate();
+  }
+
+  /**
+   * Get available models with pricing
+   */
+  public getAvailableModels(): ModelConfig[] {
+    return tokenPricingEngine.getAvailableModels();
+  }
+
+  /**
+   * Estimate cost for a potential request
+   */
+  public async estimateTokenCost(
+    modelName: string,
+    inputTokens: number,
+    outputTokens: number
+  ) {
+    return await tokenPricingEngine.calculateTokenCost(modelName, inputTokens, outputTokens);
+  }
+
+  /**
+   * Validate if user has enough balance for estimated cost
+   */
+  public async validateUserBalance(userId: string, estimatedCredits: number) {
+    return await tokenPricingEngine.validateBalance(userId, estimatedCredits);
   }
 }
 

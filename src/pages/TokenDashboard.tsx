@@ -181,9 +181,15 @@ export default function TokenDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Token 仪表板</h1>
-        <p className="text-gray-600">查看您的Token使用情况和积分统计</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">积分仪表板</h1>
+          <p className="text-gray-600">查看您的积分余额和使用统计</p>
+        </div>
+        <Button onClick={() => navigate('/pricing')} className="bg-blue-600 hover:bg-blue-700">
+          <Wallet className="mr-2 h-4 w-4" />
+          充值积分
+        </Button>
       </div>
 
       {/* Balance and Status */}
@@ -194,8 +200,8 @@ export default function TokenDashboard() {
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{user?.balance || 0}</div>
-            <p className="text-xs text-muted-foreground">积分</p>
+            <div className="text-2xl font-bold">{user?.balance?.toLocaleString() || 0}</div>
+            <p className="text-xs text-muted-foreground">积分余额</p>
           </CardContent>
         </Card>
 
