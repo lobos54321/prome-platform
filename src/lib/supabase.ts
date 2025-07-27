@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { User, BillingRecord, TokenUsage } from '@/types';
+import { User, BillingRecord, TokenUsage, ModelConfig, ExchangeRateHistory, PriceChangeLog } from '@/types';
 
 // Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -628,6 +628,334 @@ class DatabaseService {
     } catch (error) {
       console.error('Error adding billing record:', error);
       return null;
+    }
+  }
+
+  // MODEL CONFIGURATION METHODS
+  async getModelConfigs(): Promise<ModelConfig[]> {
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('model_configs')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error getting model configs:', error);
+        return [];
+      }
+
+      return (data || []).map(item => ({
+        id: item.id,
+        modelName: item.model_name,
+        inputTokenPrice: item.input_token_price,
+        outputTokenPrice: item.output_token_price,
+        isActive: item.is_active,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        createdBy: item.created_by,
+      }));
+    } catch (error) {
+      console.error('Error getting model configs:', error);
+      return [];
+    }
+  }
+
+  async addModelConfig(
+    modelName: string,
+    inputTokenPrice: number,
+    outputTokenPrice: number,
+    adminId: string
+  ): Promise<ModelConfig | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('model_configs')
+        .insert([
+          {
+            model_name: modelName,
+            input_token_price: inputTokenPrice,
+            output_token_price: outputTokenPrice,
+            is_active: true,
+            created_by: adminId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        modelName: data.model_name,
+        inputTokenPrice: data.input_token_price,
+        outputTokenPrice: data.output_token_price,
+        isActive: data.is_active,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        createdBy: data.created_by,
+      };
+    } catch (error) {
+      console.error('Error adding model config:', error);
+      return null;
+    }
+  }
+
+  async updateModelConfig(
+    id: string,
+    updates: Partial<Pick<ModelConfig, 'inputTokenPrice' | 'outputTokenPrice' | 'isActive'>>,
+    adminId: string
+  ): Promise<ModelConfig | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const updateData: Record<string, unknown> = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (updates.inputTokenPrice !== undefined) {
+        updateData.input_token_price = updates.inputTokenPrice;
+      }
+      if (updates.outputTokenPrice !== undefined) {
+        updateData.output_token_price = updates.outputTokenPrice;
+      }
+      if (updates.isActive !== undefined) {
+        updateData.is_active = updates.isActive;
+      }
+
+      const { data, error } = await supabase!
+        .from('model_configs')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        modelName: data.model_name,
+        inputTokenPrice: data.input_token_price,
+        outputTokenPrice: data.output_token_price,
+        isActive: data.is_active,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        createdBy: data.created_by,
+      };
+    } catch (error) {
+      console.error('Error updating model config:', error);
+      return null;
+    }
+  }
+
+  // EXCHANGE RATE METHODS
+  async getCurrentExchangeRate(): Promise<number> {
+    if (!isSupabaseConfigured) {
+      return 10000; // Default: 10000 points = 1 USD
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('exchange_rates')
+        .select('rate')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Error getting exchange rate:', error);
+        return 10000; // Default fallback
+      }
+
+      return data?.rate || 10000;
+    } catch (error) {
+      console.error('Error getting exchange rate:', error);
+      return 10000;
+    }
+  }
+
+  async updateExchangeRate(
+    newRate: number,
+    adminId: string,
+    reason?: string
+  ): Promise<number> {
+    if (!isSupabaseConfigured) {
+      return newRate;
+    }
+
+    try {
+      // First, get the current rate for history
+      const currentRate = await this.getCurrentExchangeRate();
+
+      // Deactivate all existing rates
+      await supabase!
+        .from('exchange_rates')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('is_active', true);
+
+      // Insert new rate
+      const { error: insertError } = await supabase!
+        .from('exchange_rates')
+        .insert([
+          {
+            rate: newRate,
+            is_active: true,
+            created_by: adminId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ]);
+
+      if (insertError) throw insertError;
+
+      // Log the change
+      await this.logExchangeRateChange(currentRate, newRate, adminId, reason);
+
+      return newRate;
+    } catch (error) {
+      console.error('Error updating exchange rate:', error);
+      return currentRate || newRate;
+    }
+  }
+
+  async logExchangeRateChange(
+    oldRate: number,
+    newRate: number,
+    adminId: string,
+    reason?: string
+  ): Promise<void> {
+    if (!isSupabaseConfigured) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase!
+        .from('exchange_rate_history')
+        .insert([
+          {
+            old_rate: oldRate,
+            new_rate: newRate,
+            admin_id: adminId,
+            reason: reason || '',
+            timestamp: new Date().toISOString()
+          }
+        ]);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error logging exchange rate change:', error);
+    }
+  }
+
+  // ENHANCED TOKEN USAGE METHODS
+  async addTokenUsageWithModel(
+    userId: string,
+    modelName: string,
+    inputTokens: number,
+    outputTokens: number,
+    totalTokens: number,
+    inputCost: number,
+    outputCost: number,
+    totalCost: number,
+    conversationId?: string,
+    messageId?: string
+  ): Promise<TokenUsage | null> {
+    if (!isSupabaseConfigured) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('token_usage')
+        .insert([
+          {
+            user_id: userId,
+            service_id: 'dify',
+            model: modelName,
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            tokens_used: totalTokens,
+            input_cost: inputCost,
+            output_cost: outputCost,
+            cost: totalCost,
+            conversation_id: conversationId,
+            message_id: messageId,
+            created_at: new Date().toISOString()
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        userId: data.user_id,
+        serviceId: data.service_id,
+        tokensUsed: data.tokens_used,
+        cost: data.cost,
+        timestamp: data.created_at,
+        sessionId: '',
+      };
+    } catch (error) {
+      console.error('Error adding token usage with model:', error);
+      return null;
+    }
+  }
+
+  // BALANCE MANAGEMENT WITH DEDUCTION
+  async deductUserBalance(
+    userId: string,
+    amount: number,
+    description: string
+  ): Promise<{ success: boolean; newBalance: number; message: string }> {
+    if (!isSupabaseConfigured) {
+      return { success: false, newBalance: 0, message: 'Database not configured' };
+    }
+
+    try {
+      // Get current balance
+      const user = await this.getUserById(userId);
+      if (!user) {
+        return { success: false, newBalance: 0, message: 'User not found' };
+      }
+
+      const currentBalance = user.balance;
+      if (currentBalance < amount) {
+        return { 
+          success: false, 
+          newBalance: currentBalance, 
+          message: 'Insufficient balance' 
+        };
+      }
+
+      const newBalance = currentBalance - amount;
+
+      // Update balance
+      const updatedBalance = await this.updateUserBalance(userId, newBalance);
+
+      // Add billing record
+      await this.addBillingRecord(userId, 'charge', amount, description);
+
+      return { 
+        success: true, 
+        newBalance: updatedBalance, 
+        message: 'Balance deducted successfully' 
+      };
+    } catch (error) {
+      console.error('Error deducting user balance:', error);
+      return { success: false, newBalance: 0, message: 'Failed to deduct balance' };
     }
   }
 }

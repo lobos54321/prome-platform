@@ -3,15 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { BarChart2, InfoIcon, Activity } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { BarChart2, InfoIcon, Activity, Wallet, TrendingUp, Clock, Loader2 } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { isDifyEnabled } from '@/api/dify-api';
-import { User } from '@/types';
+import { db } from '@/lib/supabase';
+import { difyIframeMonitor } from '@/lib/dify-iframe-monitor';
+import { User, TokenUsage, BillingRecord } from '@/types';
+import { toast } from 'sonner';
 
 export default function TokenDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage[]>([]);
+  const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   useEffect(() => {
     const initUser = async () => {
@@ -21,6 +29,12 @@ export default function TokenDashboard() {
         
         if (!currentUser) {
           navigate('/login');
+          return;
+        }
+
+        if (isDifyEnabled()) {
+          await loadUserData(currentUser.id);
+          setupIframeMonitoring(currentUser.id);
         }
       } catch (error) {
         console.error('Failed to get current user:', error);
@@ -31,7 +45,82 @@ export default function TokenDashboard() {
     };
 
     initUser();
+
+    return () => {
+      difyIframeMonitor.stopListening();
+    };
   }, [navigate]);
+
+  const loadUserData = async (userId: string) => {
+    try {
+      setIsDataLoading(true);
+      const [usage, billing] = await Promise.all([
+        db.getTokenUsage(userId),
+        db.getBillingRecords(userId)
+      ]);
+      
+      setTokenUsage(usage);
+      setBillingRecords(billing);
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+      toast.error('加载数据失败');
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
+  const setupIframeMonitoring = (userId: string) => {
+    difyIframeMonitor.setOnTokenConsumption((event) => {
+      console.log('Token consumption event:', event);
+      toast.success(`Token已消费: ${event.totalTokens} tokens (${event.modelName})`);
+      loadUserData(userId); // Reload data
+    });
+
+    difyIframeMonitor.setOnBalanceUpdate((newBalance) => {
+      if (user) {
+        setUser({ ...user, balance: newBalance });
+      }
+    });
+
+    difyIframeMonitor.startListening(userId);
+  };
+
+  const calculateStats = () => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const monthlyUsage = tokenUsage.filter(usage => 
+      new Date(usage.timestamp) >= startOfMonth
+    );
+    
+    const dailyUsage = tokenUsage.filter(usage => 
+      new Date(usage.timestamp) >= startOfDay
+    );
+
+    const totalTokens = tokenUsage.reduce((sum, usage) => sum + usage.tokensUsed, 0);
+    const monthlyTokens = monthlyUsage.reduce((sum, usage) => sum + usage.tokensUsed, 0);
+    const dailyTokens = dailyUsage.reduce((sum, usage) => sum + usage.tokensUsed, 0);
+    
+    const totalCost = tokenUsage.reduce((sum, usage) => sum + usage.cost, 0);
+    const monthlyCost = monthlyUsage.reduce((sum, usage) => sum + usage.cost, 0);
+    const dailyCost = dailyUsage.reduce((sum, usage) => sum + usage.cost, 0);
+
+    const avgTokensPerCall = tokenUsage.length > 0 ? Math.round(totalTokens / tokenUsage.length) : 0;
+
+    return {
+      totalTokens,
+      monthlyTokens,
+      dailyTokens,
+      totalCost,
+      monthlyCost,
+      dailyCost,
+      avgTokensPerCall,
+      usageCount: tokenUsage.length
+    };
+  };
+
+  const stats = calculateStats();
 
   if (isLoading) {
     return (
@@ -94,28 +183,44 @@ export default function TokenDashboard() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Token 仪表板</h1>
-        <p className="text-gray-600">查看您的Token使用情况和统计数据</p>
+        <p className="text-gray-600">查看您的Token使用情况和积分统计</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+      {/* Balance and Status */}
+      <div className="grid gap-6 md:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">总Token使用</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">当前余额</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
-            <p className="text-xs text-muted-foreground">需要Dify集成</p>
+            <div className="text-2xl font-bold">{user?.balance || 0}</div>
+            <p className="text-xs text-muted-foreground">积分</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">本月费用</CardTitle>
+            <CardTitle className="text-sm font-medium">今日消费</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {isDataLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.dailyTokens.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">Token</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">本月消费</CardTitle>
             <BarChart2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">
+              {isDataLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : Math.round(stats.monthlyCost)}
+            </div>
             <p className="text-xs text-muted-foreground">积分</p>
           </CardContent>
         </Card>
@@ -123,31 +228,122 @@ export default function TokenDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">平均每次调用</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">
+              {isDataLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.avgTokensPerCall}
+            </div>
             <p className="text-xs text-muted-foreground">Token</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Usage Summary */}
+      <div className="grid gap-6 md:grid-cols-2 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>使用统计</CardTitle>
+            <CardDescription>
+              Token消费概览
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>总调用次数</span>
+                <span className="font-medium">{stats.usageCount}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>总Token消费</span>
+                <span className="font-medium">{stats.totalTokens.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>总积分消费</span>
+                <span className="font-medium">{Math.round(stats.totalCost)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>监控状态</CardTitle>
+            <CardDescription>
+              实时监控状态
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Dify集成</span>
+              <Badge variant="default">已启用</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm">实时监控</span>
+              <Badge variant={difyIframeMonitor.isCurrentlyListening() ? "default" : "secondary"}>
+                {difyIframeMonitor.isCurrentlyListening() ? '运行中' : '已停止'}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm">余额状态</span>
+              <Badge variant={(user?.balance || 0) > 1000 ? "default" : "destructive"}>
+                {(user?.balance || 0) > 1000 ? '充足' : '不足'}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Usage */}
       <Card>
         <CardHeader>
-          <CardTitle>Token使用记录</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            最近使用记录
+          </CardTitle>
           <CardDescription>
-            详细的Token消耗历史记录
+            最新的Token消费记录
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Alert>
-            <InfoIcon className="h-4 w-4" />
-            <AlertDescription>
-              Token使用记录需要启用Dify集成才能显示。目前显示的是基本界面。
-            </AlertDescription>
-          </Alert>
+          {isDataLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : tokenUsage.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>暂无使用记录</p>
+              <p className="text-sm">开始使用Dify服务后将显示记录</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {tokenUsage.slice(0, 10).map((usage) => (
+                <div key={usage.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <div className="font-medium">{usage.serviceId}</div>
+                    <div className="text-sm text-gray-500">
+                      {new Date(usage.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium">{usage.tokensUsed} tokens</div>
+                    <div className="text-sm text-gray-500">{Math.round(usage.cost)} 积分</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <div className="mt-6 flex gap-4">
+        <Button onClick={() => navigate('/dashboard')}>
+          返回主仪表板
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/pricing')}>
+          充值积分
+        </Button>
+      </div>
     </div>
   );
 }
