@@ -206,3 +206,23 @@ export interface Script {
   model: string;
   tags: string[];
 }
+
+// Recharge Package types
+export interface RechargePackage {
+  id: string;
+  name: string;
+  usdAmount: number;
+  creditsAmount: number;
+  isPopular?: boolean;
+  discount?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+// Custom Recharge types
+export interface CustomRecharge {
+  usdAmount: number;
+  creditsAmount: number;
+}
