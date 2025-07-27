@@ -18,11 +18,8 @@ export default function ModelManagement() {
   const [newModelName, setNewModelName] = useState('');
   const [newInputPrice, setNewInputPrice] = useState(0.05);
   const [newOutputPrice, setNewOutputPrice] = useState(0.1);
-  const [exchangeRate, setExchangeRate] = useState(10000);
-  const [newExchangeRate, setNewExchangeRate] = useState(10000);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [isUpdatingRate, setIsUpdatingRate] = useState(false);
 
   useEffect(() => {
     if (isDifyEnabled()) {
@@ -33,14 +30,8 @@ export default function ModelManagement() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [modelConfigs, currentRate] = await Promise.all([
-        db.getModelConfigs(),
-        db.getCurrentExchangeRate()
-      ]);
-      
+      const modelConfigs = await db.getModelConfigs();
       setModels(modelConfigs);
-      setExchangeRate(currentRate);
-      setNewExchangeRate(currentRate);
     } catch (error) {
       console.error('Failed to load data:', error);
       toast.error('加载数据失败');
@@ -116,36 +107,6 @@ export default function ModelManagement() {
     }
   };
 
-  const updateExchangeRate = async () => {
-    if (newExchangeRate <= 0) {
-      toast.error('汇率必须大于0');
-      return;
-    }
-
-    try {
-      setIsUpdatingRate(true);
-      const user = await authService.getCurrentUser();
-      if (!user) {
-        toast.error('用户认证失败');
-        return;
-      }
-
-      const updatedRate = await db.updateExchangeRate(
-        newExchangeRate,
-        user.id,
-        '管理员手动更新汇率'
-      );
-
-      setExchangeRate(updatedRate);
-      toast.success('汇率更新成功');
-    } catch (error) {
-      console.error('Error updating exchange rate:', error);
-      toast.error('更新汇率失败');
-    } finally {
-      setIsUpdatingRate(false);
-    }
-  };
-
   if (!isDifyEnabled()) {
     return (
       <div>
@@ -206,46 +167,6 @@ export default function ModelManagement() {
       </div>
 
       <div className="grid gap-6">
-        {/* Exchange Rate Configuration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              汇率配置
-            </CardTitle>
-            <CardDescription>
-              设置1美元等于多少积分 (当前: 1 USD = {exchangeRate} 积分)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <Label htmlFor="exchangeRate">新汇率 (积分/美元)</Label>
-                <Input
-                  id="exchangeRate"
-                  type="number"
-                  min="1"
-                  step="100"
-                  value={newExchangeRate}
-                  onChange={(e) => setNewExchangeRate(Number(e.target.value))}
-                  placeholder="10000"
-                />
-              </div>
-              <Button 
-                onClick={updateExchangeRate} 
-                disabled={isUpdatingRate || newExchangeRate === exchangeRate}
-              >
-                {isUpdatingRate && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <Save className="mr-2 h-4 w-4" />
-                更新汇率
-              </Button>
-            </div>
-            <p className="text-sm text-gray-500">
-              汇率变更将影响所有后续的Token消费计算
-            </p>
-          </CardContent>
-        </Card>
-
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -322,9 +243,6 @@ export default function ModelManagement() {
                           <div className="font-medium">{model.modelName}</div>
                           <div className="text-sm text-gray-500">
                             输入: ${model.inputTokenPrice}/1K • 输出: ${model.outputTokenPrice}/1K
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            约 {Math.round(model.inputTokenPrice * exchangeRate)} / {Math.round(model.outputTokenPrice * exchangeRate)} 积分/1K tokens
                           </div>
                         </div>
                       </div>
