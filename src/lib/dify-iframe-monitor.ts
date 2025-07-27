@@ -1,5 +1,5 @@
-import { DifyMessageEndEvent, ModelConfig } from '@/types';
-import { db } from '@/lib/supabase';
+import { DifyMessageEndEvent } from '@/types';
+import { tokenPricingEngine, TokenConsumptionCalculation } from '@/lib/token-pricing-engine';
 
 export interface TokenConsumptionEvent {
   modelName: string;
@@ -9,12 +9,11 @@ export interface TokenConsumptionEvent {
   conversationId?: string;
   messageId?: string;
   timestamp: string;
+  calculation?: TokenConsumptionCalculation;
 }
 
 export class DifyIframeMonitor {
   private isListening = false;
-  private modelConfigs: ModelConfig[] = [];
-  private currentExchangeRate = 10000; // Default: 10000 points = 1 USD
   private onTokenConsumption?: (event: TokenConsumptionEvent) => void;
   private onBalanceUpdate?: (newBalance: number) => void;
   private processedEvents = new Set<string>(); // Prevent duplicate processing
@@ -22,31 +21,7 @@ export class DifyIframeMonitor {
   private minEventInterval = 1000; // Minimum 1 second between events
 
   constructor() {
-    this.initialize();
-  }
-
-  private async initialize() {
-    // Load model configurations and exchange rate
-    await this.loadModelConfigs();
-    await this.loadExchangeRate();
-  }
-
-  private async loadModelConfigs() {
-    try {
-      this.modelConfigs = await db.getModelConfigs();
-      console.log('Loaded model configs:', this.modelConfigs.length);
-    } catch (error) {
-      console.error('Failed to load model configs:', error);
-    }
-  }
-
-  private async loadExchangeRate() {
-    try {
-      this.currentExchangeRate = await db.getCurrentExchangeRate();
-      console.log('Current exchange rate:', this.currentExchangeRate);
-    } catch (error) {
-      console.error('Failed to load exchange rate:', error);
-    }
+    // No initialization needed - TokenPricingEngine handles configuration loading
   }
 
   public startListening(userId: string) {
@@ -146,50 +121,14 @@ export class DifyIframeMonitor {
         return;
       }
 
-      // Find model configuration
-      const modelConfig = this.modelConfigs.find(
-        config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
-      );
-
-      if (!modelConfig) {
-        console.warn(`No active model config found for: ${modelName}`);
-        return;
-      }
-
-      // Calculate costs
-      const inputCost = (inputTokens / 1000) * modelConfig.inputTokenPrice;
-      const outputCost = (outputTokens / 1000) * modelConfig.outputTokenPrice;
-      const totalCost = inputCost + outputCost;
-
-      // Convert to points
-      const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
-
-      // Safety check: prevent excessive deduction
-      if (pointsToDeduct > 100000) { // Adjust threshold as needed
-        console.error('Token cost too high, potential error:', {
-          modelName,
-          totalTokens,
-          pointsToDeduct
-        });
-        return;
-      }
-
-      console.log(`Token consumption calculation:`, {
+      // Process consumption using the pricing engine
+      const result = await tokenPricingEngine.processTokenConsumption(
+        userId,
         modelName,
         inputTokens,
         outputTokens,
-        totalTokens,
-        inputCost,
-        outputCost,
-        totalCost,
-        pointsToDeduct
-      });
-
-      // Deduct balance
-      const result = await db.deductUserBalance(
-        userId,
-        pointsToDeduct,
-        `Token usage: ${modelName} (${totalTokens} tokens)`
+        conversationId,
+        messageId
       );
 
       if (result.success) {
@@ -203,20 +142,6 @@ export class DifyIframeMonitor {
           eventsArray.slice(-50).forEach(id => this.processedEvents.add(id));
         }
 
-        // Record token usage
-        await db.addTokenUsageWithModel(
-          userId,
-          modelName,
-          inputTokens,
-          outputTokens,
-          totalTokens,
-          inputCost,
-          outputCost,
-          totalCost,
-          conversationId,
-          messageId
-        );
-
         // Notify callbacks
         this.onTokenConsumption?.({
           modelName,
@@ -225,14 +150,15 @@ export class DifyIframeMonitor {
           totalTokens,
           conversationId,
           messageId,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          calculation: result.calculation
         });
 
         this.onBalanceUpdate?.(result.newBalance);
 
-        console.log(`Successfully processed token consumption. New balance: ${result.newBalance}`);
+        console.log(`Successfully processed token consumption. ${result.message}. New balance: ${result.newBalance}`);
       } else {
-        console.error(`Failed to deduct balance: ${result.message}`);
+        console.error(`Failed to process token consumption: ${result.message}`);
         // You might want to show a notification to the user here
       }
     } catch (error) {
@@ -249,8 +175,7 @@ export class DifyIframeMonitor {
   }
 
   public async refreshConfigs() {
-    await this.loadModelConfigs();
-    await this.loadExchangeRate();
+    await tokenPricingEngine.refreshConfigurations();
   }
 
   public isCurrentlyListening(): boolean {

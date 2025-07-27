@@ -186,7 +186,49 @@ export default function TokenDashboard() {
         <p className="text-gray-600">查看您的Token使用情况和积分统计</p>
       </div>
 
-      {/* Balance and Status */}
+      {/* Enhanced Balance Display */}
+      <div className="mb-8">
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">账户余额</h3>
+                <div className="flex items-baseline space-x-2">
+                  <span className="text-3xl font-bold text-blue-600">
+                    {user?.balance?.toLocaleString() || 0}
+                  </span>
+                  <span className="text-sm text-gray-500">积分</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                  余额充足，可继续使用AI服务
+                </p>
+              </div>
+              <div className="text-right">
+                <Button 
+                  onClick={() => navigate('/pricing')}
+                  className="mb-2"
+                >
+                  <Wallet className="h-4 w-4 mr-2" />
+                  充值积分
+                </Button>
+                <div className="text-xs text-gray-500">
+                  支持信用卡和借记卡
+                </div>
+              </div>
+            </div>
+            
+            {user?.balance && user.balance < 1000 && (
+              <Alert className="mt-4 border-orange-200 bg-orange-50">
+                <AlertDescription className="text-orange-800">
+                  积分余额较低，建议及时充值以免影响服务使用
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Usage Statistics */}
       <div className="grid gap-6 md:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
