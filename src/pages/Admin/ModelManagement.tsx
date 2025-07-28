@@ -58,6 +58,19 @@ export default function ModelManagement() {
       return;
     }
 
+    // Validate based on service type
+    if ((newServiceType === 'ai_model' || newServiceType === 'custom') && 
+        (newInputPrice <= 0 || newOutputPrice <= 0)) {
+      toast.error('AI模型和自定义服务需要输入有效的Token价格');
+      return;
+    }
+
+    if ((newServiceType === 'workflow' || newServiceType === 'digital_human') && 
+        (!newWorkflowCost || newWorkflowCost <= 0)) {
+      toast.error('工作流和数字人服务需要输入有效的固定费用');
+      return;
+    }
+
     try {
       setIsAdding(true);
       const user = await authService.getCurrentUser();
