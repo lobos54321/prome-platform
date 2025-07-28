@@ -6,7 +6,7 @@
 import { User, ModelConfig, TokenUsage, BillingRecord } from '@/types';
 
 // Mock data storage
-let mockUsers: User[] = [
+const mockUsers: User[] = [
   {
     id: 'mock-user-1',
     name: 'Test Admin',
@@ -17,7 +17,7 @@ let mockUsers: User[] = [
   }
 ];
 
-let mockModelConfigs: ModelConfig[] = [
+const mockModelConfigs: ModelConfig[] = [
   {
     id: 'mock-gpt4',
     modelName: 'gpt-4',
@@ -46,7 +46,7 @@ let mockModelConfigs: ModelConfig[] = [
 
 let mockTokenUsage: TokenUsage[] = [];
 let mockBillingRecords: BillingRecord[] = [];
-let mockExchangeRate = 10000;
+const mockExchangeRate = 10000;
 
 export class MockDatabaseService {
   
