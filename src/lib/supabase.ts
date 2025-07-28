@@ -653,7 +653,10 @@ class DatabaseService {
         modelName: item.model_name,
         inputTokenPrice: item.input_token_price,
         outputTokenPrice: item.output_token_price,
+        serviceType: item.service_type || 'ai_model',
+        workflowCost: item.workflow_cost,
         isActive: item.is_active,
+        autoCreated: item.auto_created || false,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
         createdBy: item.created_by,
@@ -668,26 +671,63 @@ class DatabaseService {
     modelName: string,
     inputTokenPrice: number,
     outputTokenPrice: number,
-    adminId: string
+    adminId: string,
+    serviceType: 'ai_model' | 'digital_human' | 'workflow' | 'custom' = 'ai_model',
+    workflowCost?: number,
+    autoCreated: boolean = false
   ): Promise<ModelConfig | null> {
     if (!isSupabaseConfigured) {
       return null;
     }
 
     try {
+      // Check if model already exists first
+      const { data: existingModel, error: checkError } = await supabase!
+        .from('model_configs')
+        .select('*')
+        .eq('model_name', modelName)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.warn('Error checking existing model:', checkError);
+      }
+
+      if (existingModel) {
+        console.log(`Model ${modelName} already exists, returning existing config`);
+        return {
+          id: existingModel.id,
+          modelName: existingModel.model_name,
+          inputTokenPrice: existingModel.input_token_price,
+          outputTokenPrice: existingModel.output_token_price,
+          serviceType: existingModel.service_type || 'ai_model',
+          workflowCost: existingModel.workflow_cost,
+          isActive: existingModel.is_active,
+          autoCreated: existingModel.auto_created || false,
+          createdAt: existingModel.created_at,
+          updatedAt: existingModel.updated_at,
+          createdBy: existingModel.created_by,
+        };
+      }
+
+      const insertData: any = {
+        model_name: modelName,
+        input_token_price: inputTokenPrice,
+        output_token_price: outputTokenPrice,
+        service_type: serviceType,
+        is_active: true,
+        auto_created: autoCreated,
+        created_by: adminId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      if (workflowCost !== undefined) {
+        insertData.workflow_cost = workflowCost;
+      }
+
       const { data, error } = await supabase!
         .from('model_configs')
-        .insert([
-          {
-            model_name: modelName,
-            input_token_price: inputTokenPrice,
-            output_token_price: outputTokenPrice,
-            is_active: true,
-            created_by: adminId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ])
+        .insert([insertData])
         .select()
         .single();
 
@@ -698,7 +738,10 @@ class DatabaseService {
         modelName: data.model_name,
         inputTokenPrice: data.input_token_price,
         outputTokenPrice: data.output_token_price,
+        serviceType: data.service_type || 'ai_model',
+        workflowCost: data.workflow_cost,
         isActive: data.is_active,
+        autoCreated: data.auto_created || false,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         createdBy: data.created_by,
@@ -711,7 +754,7 @@ class DatabaseService {
 
   async updateModelConfig(
     id: string,
-    updates: Partial<Pick<ModelConfig, 'inputTokenPrice' | 'outputTokenPrice' | 'isActive'>>,
+    updates: Partial<Pick<ModelConfig, 'inputTokenPrice' | 'outputTokenPrice' | 'isActive' | 'serviceType' | 'workflowCost'>>,
     adminId: string
   ): Promise<ModelConfig | null> {
     if (!isSupabaseConfigured) {
@@ -732,6 +775,12 @@ class DatabaseService {
       if (updates.isActive !== undefined) {
         updateData.is_active = updates.isActive;
       }
+      if (updates.serviceType !== undefined) {
+        updateData.service_type = updates.serviceType;
+      }
+      if (updates.workflowCost !== undefined) {
+        updateData.workflow_cost = updates.workflowCost;
+      }
 
       const { data, error } = await supabase!
         .from('model_configs')
@@ -747,7 +796,10 @@ class DatabaseService {
         modelName: data.model_name,
         inputTokenPrice: data.input_token_price,
         outputTokenPrice: data.output_token_price,
+        serviceType: data.service_type || 'ai_model',
+        workflowCost: data.workflow_cost,
         isActive: data.is_active,
+        autoCreated: data.auto_created || false,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         createdBy: data.created_by,
@@ -956,6 +1008,52 @@ class DatabaseService {
     } catch (error) {
       console.error('Error deducting user balance:', error);
       return { success: false, newBalance: 0, message: 'Failed to deduct balance' };
+    }
+  }
+
+  // ADMIN ACCOUNT MANAGEMENT
+  async addCreditsToAdmin(
+    adminEmail: string,
+    creditsToAdd: number,
+    description: string = 'Admin credit addition'
+  ): Promise<{ success: boolean; newBalance: number; message: string }> {
+    if (!isSupabaseConfigured) {
+      return { success: false, newBalance: 0, message: 'Database not configured' };
+    }
+
+    try {
+      // Find user by email
+      const { data: userData, error: userError } = await supabase!
+        .from('users')
+        .select('*')
+        .eq('email', adminEmail)
+        .maybeSingle();
+
+      if (userError || !userData) {
+        return { 
+          success: false, 
+          newBalance: 0, 
+          message: `User with email ${adminEmail} not found` 
+        };
+      }
+
+      const currentBalance = userData.balance || 0;
+      const newBalance = currentBalance + creditsToAdd;
+
+      // Update balance
+      const updatedBalance = await this.updateUserBalance(userData.id, newBalance);
+
+      // Add billing record
+      await this.addBillingRecord(userData.id, 'charge', creditsToAdd, description);
+
+      return { 
+        success: true, 
+        newBalance: updatedBalance, 
+        message: `Successfully added ${creditsToAdd} credits to ${adminEmail}` 
+      };
+    } catch (error) {
+      console.error('Error adding credits to admin:', error);
+      return { success: false, newBalance: 0, message: 'Failed to add credits' };
     }
   }
 }

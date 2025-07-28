@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, InfoIcon, Loader2, Save, DollarSign } from 'lucide-react';
+import { PlusCircle, InfoIcon, Loader2, Save, DollarSign, Bot, User, Workflow, Sparkles } from 'lucide-react';
 import { isDifyEnabled } from '@/api/dify-api';
 import { authService } from '@/lib/auth';
 import { db } from '@/lib/supabase';
@@ -18,6 +19,8 @@ export default function ModelManagement() {
   const [newModelName, setNewModelName] = useState('');
   const [newInputPrice, setNewInputPrice] = useState(0.05);
   const [newOutputPrice, setNewOutputPrice] = useState(0.1);
+  const [newServiceType, setNewServiceType] = useState<'ai_model' | 'digital_human' | 'workflow' | 'custom'>('ai_model');
+  const [newWorkflowCost, setNewWorkflowCost] = useState<number | undefined>(undefined);
   const [exchangeRate, setExchangeRate] = useState(10000);
   const [newExchangeRate, setNewExchangeRate] = useState(10000);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +70,10 @@ export default function ModelManagement() {
         newModelName.trim(),
         newInputPrice,
         newOutputPrice,
-        user.id
+        user.id,
+        newServiceType,
+        newWorkflowCost,
+        false // Not auto-created since it's manually added by admin
       );
 
       if (newModel) {
@@ -75,6 +81,8 @@ export default function ModelManagement() {
         setNewModelName('');
         setNewInputPrice(0.05);
         setNewOutputPrice(0.1);
+        setNewServiceType('ai_model');
+        setNewWorkflowCost(undefined);
         toast.success('模型添加成功');
       } else {
         toast.error('添加模型失败');
@@ -143,6 +151,51 @@ export default function ModelManagement() {
       toast.error('更新汇率失败');
     } finally {
       setIsUpdatingRate(false);
+    }
+  };
+
+  const getServiceTypeIcon = (serviceType: string) => {
+    switch (serviceType) {
+      case 'ai_model':
+        return <Bot className="h-4 w-4" />;
+      case 'digital_human':
+        return <User className="h-4 w-4" />;
+      case 'workflow':
+        return <Workflow className="h-4 w-4" />;
+      case 'custom':
+        return <Sparkles className="h-4 w-4" />;
+      default:
+        return <Bot className="h-4 w-4" />;
+    }
+  };
+
+  const getServiceTypeLabel = (serviceType: string) => {
+    switch (serviceType) {
+      case 'ai_model':
+        return 'AI模型';
+      case 'digital_human':
+        return '数字人';
+      case 'workflow':
+        return '工作流';
+      case 'custom':
+        return '自定义服务';
+      default:
+        return 'AI模型';
+    }
+  };
+
+  const getServiceTypeBadgeColor = (serviceType: string) => {
+    switch (serviceType) {
+      case 'ai_model':
+        return 'bg-blue-100 text-blue-800';
+      case 'digital_human':
+        return 'bg-purple-100 text-purple-800';
+      case 'workflow':
+        return 'bg-green-100 text-green-800';
+      case 'custom':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-blue-100 text-blue-800';
     }
   };
 
@@ -259,43 +312,98 @@ export default function ModelManagement() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="modelName">模型名称</Label>
+                <Label htmlFor="modelName">模型/服务名称</Label>
                 <Input
                   id="modelName"
                   value={newModelName}
                   onChange={(e) => setNewModelName(e.target.value)}
-                  placeholder="例如: GPT-4"
+                  placeholder="例如: GPT-4, 数字人服务, 自定义工作流"
                 />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="inputPrice">输入价格 (USD/1000 tokens)</Label>
-                  <Input
-                    id="inputPrice"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={newInputPrice}
-                    onChange={(e) => setNewInputPrice(Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="outputPrice">输出价格 (USD/1000 tokens)</Label>
-                  <Input
-                    id="outputPrice"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={newOutputPrice}
-                    onChange={(e) => setNewOutputPrice(Number(e.target.value))}
-                  />
-                </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="serviceType">服务类型</Label>
+                <Select value={newServiceType} onValueChange={(value: 'ai_model' | 'digital_human' | 'workflow' | 'custom') => setNewServiceType(value)}>
+                  <SelectTrigger id="serviceType">
+                    <SelectValue placeholder="选择服务类型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ai_model">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4" />
+                        AI模型 (按Token计费)
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="digital_human">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        数字人服务
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="workflow">
+                      <div className="flex items-center gap-2">
+                        <Workflow className="h-4 w-4" />
+                        工作流 (固定费用)
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="custom">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        自定义服务
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              
+              {(newServiceType === 'ai_model' || newServiceType === 'custom') && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="inputPrice">输入价格 (USD/1000 tokens)</Label>
+                    <Input
+                      id="inputPrice"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={newInputPrice}
+                      onChange={(e) => setNewInputPrice(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="outputPrice">输出价格 (USD/1000 tokens)</Label>
+                    <Input
+                      id="outputPrice"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={newOutputPrice}
+                      onChange={(e) => setNewOutputPrice(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(newServiceType === 'workflow' || newServiceType === 'digital_human') && (
+                <div className="space-y-2">
+                  <Label htmlFor="workflowCost">固定费用 (USD/次执行)</Label>
+                  <Input
+                    id="workflowCost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newWorkflowCost || ''}
+                    onChange={(e) => setNewWorkflowCost(e.target.value ? Number(e.target.value) : undefined)}
+                    placeholder="例如: 0.10"
+                  />
+                  <p className="text-xs text-gray-500">
+                    {newServiceType === 'workflow' ? '每次工作流执行的固定费用' : '每次数字人服务调用的费用'}
+                  </p>
+                </div>
+              )}
               
               <Button onClick={addModel} className="w-full" disabled={isAdding}>
                 {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                添加模型
+                添加{getServiceTypeLabel(newServiceType)}
               </Button>
             </CardContent>
           </Card>
@@ -318,13 +426,38 @@ export default function ModelManagement() {
                   models.map((model) => (
                     <div key={model.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div>
-                          <div className="font-medium">{model.modelName}</div>
-                          <div className="text-sm text-gray-500">
-                            输入: ${model.inputTokenPrice}/1K • 输出: ${model.outputTokenPrice}/1K
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            约 {Math.round(model.inputTokenPrice * exchangeRate)} / {Math.round(model.outputTokenPrice * exchangeRate)} 积分/1K tokens
+                        <div className="flex items-center gap-2">
+                          {getServiceTypeIcon(model.serviceType)}
+                          <div>
+                            <div className="font-medium flex items-center gap-2">
+                              {model.modelName}
+                              {model.autoCreated && (
+                                <Badge variant="outline" className="text-xs">
+                                  自动识别
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Badge className={`text-xs ${getServiceTypeBadgeColor(model.serviceType)}`}>
+                                {getServiceTypeLabel(model.serviceType)}
+                              </Badge>
+                            </div>
+                            {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
+                              <div className="text-sm text-gray-500">
+                                输入: ${model.inputTokenPrice}/1K • 输出: ${model.outputTokenPrice}/1K
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-500">
+                                固定费用: ${model.workflowCost || 0}/次
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-400">
+                              {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
+                                `约 ${Math.round(model.inputTokenPrice * exchangeRate)} / ${Math.round(model.outputTokenPrice * exchangeRate)} 积分/1K tokens`
+                              ) : (
+                                `约 ${Math.round((model.workflowCost || 0) * exchangeRate)} 积分/次`
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

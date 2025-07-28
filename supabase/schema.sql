@@ -6,7 +6,10 @@ CREATE TABLE IF NOT EXISTS model_configs (
   model_name TEXT NOT NULL UNIQUE,
   input_token_price DECIMAL(10, 6) NOT NULL, -- USD per 1000 tokens
   output_token_price DECIMAL(10, 6) NOT NULL, -- USD per 1000 tokens
+  service_type TEXT DEFAULT 'ai_model' CHECK (service_type IN ('ai_model', 'digital_human', 'workflow', 'custom')),
+  workflow_cost DECIMAL(10, 6) DEFAULT NULL, -- Fixed cost per workflow execution (for non-token services)
   is_active BOOLEAN DEFAULT true,
+  auto_created BOOLEAN DEFAULT false, -- Indicates if this was auto-created by the system
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -41,6 +44,24 @@ ADD COLUMN IF NOT EXISTS input_cost DECIMAL(10, 6) DEFAULT 0,
 ADD COLUMN IF NOT EXISTS output_cost DECIMAL(10, 6) DEFAULT 0,
 ADD COLUMN IF NOT EXISTS conversation_id TEXT,
 ADD COLUMN IF NOT EXISTS message_id TEXT;
+
+-- Add new columns to model_configs table if they don't exist
+ALTER TABLE model_configs
+ADD COLUMN IF NOT EXISTS service_type TEXT DEFAULT 'ai_model',
+ADD COLUMN IF NOT EXISTS workflow_cost DECIMAL(10, 6) DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS auto_created BOOLEAN DEFAULT false;
+
+-- Add constraint for service_type if it doesn't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.constraint_column_usage 
+        WHERE table_name = 'model_configs' AND constraint_name = 'model_configs_service_type_check'
+    ) THEN
+        ALTER TABLE model_configs ADD CONSTRAINT model_configs_service_type_check 
+        CHECK (service_type IN ('ai_model', 'digital_human', 'workflow', 'custom'));
+    END IF;
+END $$;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_model_configs_active ON model_configs(is_active);

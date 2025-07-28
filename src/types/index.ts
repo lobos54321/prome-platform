@@ -33,9 +33,12 @@ export interface PointsConsumptionRule {
 export interface ModelConfig {
   id: string;
   modelName: string;
-  inputTokenPrice: number; // Price per 1000 input tokens in credits
-  outputTokenPrice: number; // Price per 1000 output tokens in credits
+  inputTokenPrice: number; // Price per 1000 input tokens in USD
+  outputTokenPrice: number; // Price per 1000 output tokens in USD
+  serviceType: 'ai_model' | 'digital_human' | 'workflow' | 'custom'; // Type of service
+  workflowCost?: number; // Fixed cost per workflow execution (for non-token services)
   isActive: boolean;
+  autoCreated: boolean; // Indicates if this was auto-created by the system
   createdAt: string;
   updatedAt: string;
   createdBy: string; // Admin who configured this model
@@ -109,30 +112,7 @@ export interface PricingRule {
   updatedAt: string;
 }
 
-// Webhook types
-export interface WebhookPayload {
-  conversation_id?: string;
-  user_id?: string;
-  query?: string;
-  response?: {
-    answer?: string;
-  };
-  model?: string;
-  messages?: Array<{
-    role: string;
-    content: string;
-  }>;
-  app_name?: string;
-  metadata?: {
-    test_mode?: boolean;
-    app_name?: string;
-    user_id?: string;
-    tags?: string[];
-    [key: string]: unknown;
-  };
-}
-
-// Enhanced Dify webhook types for token consumption monitoring
+// Enhanced Dify iframe types for token consumption monitoring
 export interface DifyMessageEndEvent {
   event: 'message_end';
   conversation_id: string;
@@ -146,12 +126,6 @@ export interface DifyMessageEndEvent {
   metadata?: {
     [key: string]: unknown;
   };
-}
-
-export interface DifyWebhookPayload {
-  event: string;
-  data: DifyMessageEndEvent | Record<string, unknown>;
-  request_id?: string;
 }
 
 // Points consumption tracking types

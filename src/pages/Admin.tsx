@@ -6,8 +6,6 @@ import { Shield, AlertTriangle } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import ModelManagement from './Admin/ModelManagement';
-import WebhookConfig from './Admin/WebhookConfig';
-import PointsCalculator from './Admin/PointsCalculator';
 import TokenConsumptionMonitor from './Admin/TokenConsumptionMonitor';
 import RechargePackageManagement from './Admin/RechargePackageManagement';
 
@@ -104,8 +102,6 @@ export default function Admin() {
           <TabsTrigger value="models">模型管理</TabsTrigger>
           <TabsTrigger value="recharge">充值方案</TabsTrigger>
           {isDifyEnabled && <TabsTrigger value="consumption">消耗监控</TabsTrigger>}
-          {isDifyEnabled && <TabsTrigger value="points">积分计算器</TabsTrigger>}
-          {isDifyEnabled && <TabsTrigger value="webhook">Webhook配置</TabsTrigger>}
           <TabsTrigger value="users">用户管理</TabsTrigger>
           <TabsTrigger value="services">服务管理</TabsTrigger>
           <TabsTrigger value="stats">平台统计</TabsTrigger>
@@ -122,18 +118,6 @@ export default function Admin() {
         {isDifyEnabled && (
           <TabsContent value="consumption">
             <TokenConsumptionMonitor />
-          </TabsContent>
-        )}
-        
-        {isDifyEnabled && (
-          <TabsContent value="points">
-            <PointsCalculator />
-          </TabsContent>
-        )}
-        
-        {isDifyEnabled && (
-          <TabsContent value="webhook">
-            <WebhookConfig />
           </TabsContent>
         )}
 
