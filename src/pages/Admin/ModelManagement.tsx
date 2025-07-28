@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, InfoIcon, Loader2, Save, DollarSign, Bot, User, Workflow, Sparkles } from 'lucide-react';
+import { PlusCircle, InfoIcon, Loader2, Save, DollarSign, Bot, User, Workflow, Sparkles, Calculator, Activity } from 'lucide-react';
 import { isDifyEnabled } from '@/api/dify-api';
 import { authService } from '@/lib/auth';
 import { db } from '@/lib/supabase';
@@ -26,6 +26,9 @@ export default function ModelManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [isUpdatingRate, setIsUpdatingRate] = useState(false);
+  // Token consumption calculator states
+  const [calculatorTokens, setCalculatorTokens] = useState(1000);
+  const [calculatorModel, setCalculatorModel] = useState<string>('');
 
   useEffect(() => {
     if (isDifyEnabled()) {
@@ -44,6 +47,15 @@ export default function ModelManagement() {
       setModels(modelConfigs);
       setExchangeRate(currentRate);
       setNewExchangeRate(currentRate);
+      
+      // Initialize calculator with first AI model
+      const firstAiModel = modelConfigs.find(m => 
+        (m.serviceType === 'ai_model' || m.serviceType === 'custom') && m.isActive
+      ) || modelConfigs.find(m => m.serviceType === 'ai_model' || m.serviceType === 'custom');
+      
+      if (firstAiModel && !calculatorModel) {
+        setCalculatorModel(firstAiModel.id);
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
       toast.error('加载数据失败');
@@ -55,6 +67,19 @@ export default function ModelManagement() {
   const addModel = async () => {
     if (!newModelName.trim()) {
       toast.error('请输入模型名称');
+      return;
+    }
+
+    // Validate based on service type
+    if ((newServiceType === 'ai_model' || newServiceType === 'custom') && 
+        (newInputPrice <= 0 || newOutputPrice <= 0)) {
+      toast.error('AI模型和自定义服务需要输入有效的Token价格');
+      return;
+    }
+
+    if ((newServiceType === 'workflow' || newServiceType === 'digital_human') && 
+        (!newWorkflowCost || newWorkflowCost <= 0)) {
+      toast.error('工作流和数字人服务需要输入有效的固定费用');
       return;
     }
 
@@ -199,6 +224,28 @@ export default function ModelManagement() {
     }
   };
 
+  // Token consumption calculation functions
+  const calculateTokenCost = (inputTokens: number, outputTokens: number, model: ModelConfig) => {
+    const inputCost = (inputTokens / 1000) * model.inputTokenPrice;
+    const outputCost = (outputTokens / 1000) * model.outputTokenPrice;
+    const totalCost = inputCost + outputCost;
+    const creditsDeducted = Math.round(totalCost * exchangeRate);
+    
+    return {
+      inputCost,
+      outputCost,
+      totalCost,
+      creditsDeducted
+    };
+  };
+
+  const getCalculatorModel = () => {
+    return models.find(m => m.id === calculatorModel) || models.find(m => m.isActive) || models[0];
+  };
+
+  const calculatorResult = calculatorModel && getCalculatorModel() ? 
+    calculateTokenCost(calculatorTokens * 0.7, calculatorTokens * 0.3, getCalculatorModel()!) : null;
+
   if (!isDifyEnabled()) {
     return (
       <div>
@@ -296,6 +343,122 @@ export default function ModelManagement() {
             <p className="text-sm text-gray-500">
               汇率变更将影响所有后续的Token消费计算
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Token Consumption to Credits Conversion */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Token消费积分转换设置
+            </CardTitle>
+            <CardDescription>
+              Token消费自动扣除积分的完整转换逻辑和计算器
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Conversion Logic Explanation */}
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2 flex items-center gap-2">
+                <InfoIcon className="h-4 w-4" />
+                自动积分扣除逻辑
+              </h4>
+              <div className="text-sm text-gray-700 space-y-2">
+                <p>• <strong>Token消费监听</strong>: 系统实时监听Dify iframe中的token消费事件</p>
+                <p>• <strong>成本计算</strong>: 根据模型配置计算USD成本 = (输入tokens/1000 × 输入价格) + (输出tokens/1000 × 输出价格)</p>
+                <p>• <strong>积分转换</strong>: 积分扣除 = USD成本 × 汇率({exchangeRate} 积分/USD)</p>
+                <p>• <strong>余额扣除</strong>: 自动从用户账户扣除对应积分，余额不足时停止服务</p>
+                <p>• <strong>记录追踪</strong>: 所有消费记录保存到数据库，支持审计和查询</p>
+              </div>
+            </div>
+
+            {/* Token Cost Calculator */}
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium mb-4 flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                Token消费积分计算器
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="calcTokens">Token数量</Label>
+                    <Input
+                      id="calcTokens"
+                      type="number"
+                      min="1"
+                      step="100"
+                      value={calculatorTokens}
+                      onChange={(e) => setCalculatorTokens(Number(e.target.value))}
+                      placeholder="1000"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">假设输入70%, 输出30%</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="calcModel">选择模型</Label>
+                    <Select value={calculatorModel} onValueChange={setCalculatorModel}>
+                      <SelectTrigger id="calcModel">
+                        <SelectValue placeholder="选择模型进行计算" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {models.filter(m => m.serviceType === 'ai_model' || m.serviceType === 'custom').map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.modelName} (${model.inputTokenPrice}/${model.outputTokenPrice}/1K)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {calculatorResult && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h5 className="font-medium mb-2">计算结果</h5>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>输入Tokens ({Math.round(calculatorTokens * 0.7)}):</span>
+                        <span>${calculatorResult.inputCost.toFixed(4)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>输出Tokens ({Math.round(calculatorTokens * 0.3)}):</span>
+                        <span>${calculatorResult.outputCost.toFixed(4)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2 font-medium">
+                        <span>总成本:</span>
+                        <span>${calculatorResult.totalCost.toFixed(4)}</span>
+                      </div>
+                      <div className="flex justify-between text-blue-600 font-medium">
+                        <span>扣除积分:</span>
+                        <span>{calculatorResult.creditsDeducted} 积分</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Current Rate Summary */}
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-2">当前转换率总览</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">汇率</p>
+                  <p className="font-medium">{exchangeRate} 积分/USD</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">1K Token (输入)</p>
+                  <p className="font-medium">~{Math.round(0.001 * exchangeRate)} 积分</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">1K Token (输出)</p>
+                  <p className="font-medium">~{Math.round(0.002 * exchangeRate)} 积分</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">活跃模型</p>
+                  <p className="font-medium">{models.filter(m => m.isActive).length} 个</p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -453,9 +616,24 @@ export default function ModelManagement() {
                             )}
                             <div className="text-xs text-gray-400">
                               {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
-                                `约 ${Math.round(model.inputTokenPrice * exchangeRate)} / ${Math.round(model.outputTokenPrice * exchangeRate)} 积分/1K tokens`
+                                <>
+                                  <span>积分转换: </span>
+                                  <span className="text-blue-600">
+                                    {Math.round(model.inputTokenPrice * exchangeRate)} / {Math.round(model.outputTokenPrice * exchangeRate)} 积分/1K tokens
+                                  </span>
+                                  <br />
+                                  <span>平均1K tokens ≈ </span>
+                                  <span className="font-medium text-green-600">
+                                    {Math.round(((model.inputTokenPrice + model.outputTokenPrice) / 2) * exchangeRate)} 积分
+                                  </span>
+                                </>
                               ) : (
-                                `约 ${Math.round((model.workflowCost || 0) * exchangeRate)} 积分/次`
+                                <>
+                                  <span>积分转换: </span>
+                                  <span className="text-blue-600">
+                                    {Math.round((model.workflowCost || 0) * exchangeRate)} 积分/次
+                                  </span>
+                                </>
                               )}
                             </div>
                           </div>
