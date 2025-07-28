@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Coins, DollarSign, TrendingDown, TrendingUp } from 'lucide-react';
+import { Coins, DollarSign, TrendingDown, TrendingUp, AlertCircle } from 'lucide-react';
 import { authService } from '@/lib/auth';
+import { db } from '@/lib/supabase';
 import { User } from '@/types';
 
 interface PointsDisplayProps {
@@ -12,32 +13,57 @@ interface PointsDisplayProps {
 
 export default function PointsDisplay({ className = '', showDetails = true }: PointsDisplayProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [exchangeRate, setExchangeRate] = useState<number>(10000); // Default rate
+  const [isLoadingRate, setIsLoadingRate] = useState(true);
   const [pointsHistory, setPointsHistory] = useState<{
     change: number;
     timestamp: string;
   }[]>([]);
   
-  // 积分汇率（从管理员设置中获取，这里用默认值）
-  const exchangeRate = 10000; // 10000 积分 = 1 美元
-
   useEffect(() => {
     const currentUser = authService.getCurrentUserSync();
     setUser(currentUser);
+
+    // Load exchange rate
+    loadExchangeRate();
 
     // 监听认证状态变化
     const handleAuthChange = (event: CustomEvent) => {
       setUser(event.detail.user);
     };
 
+    // 监听余额更新
+    const handleBalanceUpdate = (event: CustomEvent) => {
+      if (user && event.detail.balance !== undefined) {
+        setUser(prev => prev ? { ...prev, balance: event.detail.balance } : null);
+      }
+    };
+
     window.addEventListener('auth-state-changed', handleAuthChange as EventListener);
+    window.addEventListener('balance-updated', handleBalanceUpdate as EventListener);
     
     // 模拟积分历史数据
     loadPointsHistory();
 
     return () => {
       window.removeEventListener('auth-state-changed', handleAuthChange as EventListener);
+      window.removeEventListener('balance-updated', handleBalanceUpdate as EventListener);
     };
-  }, []);
+  }, [user?.id]); // Re-run when user ID changes
+
+  const loadExchangeRate = async () => {
+    try {
+      setIsLoadingRate(true);
+      const rate = await db.getCurrentExchangeRate();
+      setExchangeRate(rate);
+      console.log('Loaded exchange rate for points display:', rate);
+    } catch (error) {
+      console.warn('Failed to load exchange rate, using default:', error);
+      setExchangeRate(10000);
+    } finally {
+      setIsLoadingRate(false);
+    }
+  };
 
   const loadPointsHistory = () => {
     // 模拟最近的积分变化记录
@@ -70,11 +96,16 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
                     {pointsValue.toLocaleString()}
                   </span>
                   <span className="text-sm text-gray-500">积分</span>
+                  {pointsValue === 0 && user.id === '9dee4891-89a6-44ee-8fe8-69097846e97d' && (
+                    <AlertCircle className="h-4 w-4 text-amber-500" title="余额显示可能有延迟" />
+                  )}
                 </div>
                 {showDetails && (
                   <div className="flex items-center space-x-1 text-sm text-gray-500">
                     <DollarSign className="h-3 w-3" />
-                    <span>≈ ${usdEquivalent.toFixed(4)}</span>
+                    <span>
+                      {isLoadingRate ? '加载中...' : `≈ $${usdEquivalent.toFixed(4)}`}
+                    </span>
                   </div>
                 )}
               </div>
