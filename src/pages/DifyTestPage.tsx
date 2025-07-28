@@ -10,7 +10,8 @@ import {
   MessageSquare, 
   DollarSign, 
   CheckCircle, 
-  XCircle 
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 import { difyIframeMonitor, TokenConsumptionEvent } from '@/lib/dify-iframe-monitor';
 import { authService } from '@/lib/auth';
@@ -23,6 +24,7 @@ export default function DifyTestPage() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [recentEvents, setRecentEvents] = useState<TokenConsumptionEvent[]>([]);
   const [balance, setBalance] = useState(0);
+  const [globalMonitorStatus, setGlobalMonitorStatus] = useState(false);
 
   useEffect(() => {
     const initUser = async () => {
@@ -34,6 +36,36 @@ export default function DifyTestPage() {
     };
 
     initUser();
+
+    // Check initial global monitoring status
+    setGlobalMonitorStatus(difyIframeMonitor.isCurrentlyListening());
+
+    // Listen for global monitoring changes
+    const handleBalanceUpdate = (event: CustomEvent) => {
+      const { balance } = event.detail;
+      setBalance(balance);
+      toast.info(`全局监控: 余额更新为 ${balance} 积分`);
+    };
+
+    const handleTokenConsumed = (event: CustomEvent) => {
+      const { event: tokenEvent } = event.detail;
+      setRecentEvents(prev => [tokenEvent, ...prev.slice(0, 4)]);
+      toast.success(`全局监控: 检测到Token消费`);
+    };
+
+    window.addEventListener('balance-updated', handleBalanceUpdate as EventListener);
+    window.addEventListener('token-consumed', handleTokenConsumed as EventListener);
+
+    // Check monitoring status periodically
+    const interval = setInterval(() => {
+      setGlobalMonitorStatus(difyIframeMonitor.isCurrentlyListening());
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('balance-updated', handleBalanceUpdate as EventListener);
+      window.removeEventListener('token-consumed', handleTokenConsumed as EventListener);
+      clearInterval(interval);
+    };
   }, []);
 
   const startMonitoring = () => {
@@ -86,6 +118,11 @@ export default function DifyTestPage() {
     toast.info('发送了模拟Token消费事件');
   };
 
+  const refreshStatus = () => {
+    setGlobalMonitorStatus(difyIframeMonitor.isCurrentlyListening());
+    toast.info('状态已刷新');
+  };
+
   if (!isDifyEnabled()) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -115,22 +152,39 @@ export default function DifyTestPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 mb-8">
-        {/* Monitoring Control */}
+        {/* Global Monitor Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5" />
-              监控控制
+              全局监控状态
+              <Button 
+                onClick={refreshStatus}
+                variant="ghost" 
+                size="sm"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </CardTitle>
             <CardDescription>
-              启动或停止iframe事件监控
+              应用级别的Dify监控状态（自动启动）
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span>监控状态</span>
-              <Badge variant={isMonitoring ? "default" : "secondary"}>
-                {isMonitoring ? '运行中' : '已停止'}
+              <span>全局监控状态</span>
+              <Badge variant={globalMonitorStatus ? "default" : "secondary"}>
+                {globalMonitorStatus ? (
+                  <>
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    自动运行中
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3 w-3 mr-1" />
+                    未运行
+                  </>
+                )}
               </Badge>
             </div>
             
@@ -139,10 +193,41 @@ export default function DifyTestPage() {
               <span className="font-medium">{balance} 积分</span>
             </div>
 
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                {globalMonitorStatus 
+                  ? '全局监控已自动启动，会监控所有Dify iframe事件'
+                  : '全局监控未运行，需要登录用户才能自动启动'
+                }
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+
+        {/* Local Monitoring Control */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              本地监控控制
+            </CardTitle>
+            <CardDescription>
+              页面级别的监控控制（测试用）
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span>本地监控状态</span>
+              <Badge variant={isMonitoring ? "default" : "secondary"}>
+                {isMonitoring ? '运行中' : '已停止'}
+              </Badge>
+            </div>
+
             <div className="flex gap-2">
               <Button 
                 onClick={startMonitoring} 
-                disabled={isMonitoring || !user}
+                disabled={isMonitoring || !user || globalMonitorStatus}
                 size="sm"
               >
                 <Play className="mr-2 h-4 w-4" />
@@ -158,6 +243,15 @@ export default function DifyTestPage() {
                 停止监控
               </Button>
             </div>
+
+            {globalMonitorStatus && (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  全局监控已运行，无需启动本地监控
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
 
@@ -182,7 +276,7 @@ export default function DifyTestPage() {
 
             <Button 
               onClick={simulateTokenEvent}
-              disabled={!isMonitoring}
+              disabled={!globalMonitorStatus && !isMonitoring}
               className="w-full"
             >
               <DollarSign className="mr-2 h-4 w-4" />
@@ -244,11 +338,13 @@ export default function DifyTestPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li>登录后，全局监控会自动启动（无需手动操作）</li>
+            <li>查看页面顶部导航栏的"Token监控"状态指示器</li>
             <li>确保已在管理面板中配置了模型定价</li>
-            <li>点击"开始监控"启动iframe事件监听</li>
             <li>使用"模拟Token消费事件"测试系统响应</li>
             <li>观察余额变化和事件记录</li>
             <li>在实际环境中，系统会自动监听Dify iframe的message_end事件</li>
+            <li>如果全局监控未启动，可以手动使用本地监控进行测试</li>
           </ol>
         </CardContent>
       </Card>

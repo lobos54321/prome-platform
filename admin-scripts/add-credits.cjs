@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Admin script to add credits to a specific user account
- * Usage: node add-credits.js <email> <credits> [description]
+ * Admin script to add credits to a specific user account (CommonJS version)
+ * Usage: node add-credits-cjs.js <email> <credits> [description]
  */
 
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config();
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
@@ -110,8 +109,8 @@ async function main() {
   const args = process.argv.slice(2);
   
   if (args.length < 2) {
-    console.log('📝 Usage: node add-credits.js <email> <credits> [description]');
-    console.log('📝 Example: node add-credits.js lobos54321@gmail.com 10000 "Initial admin credits"');
+    console.log('📝 Usage: node add-credits-cjs.js <email> <credits> [description]');
+    console.log('📝 Example: node add-credits-cjs.js lobos54321@gmail.com 10000 "Initial admin credits"');
     process.exit(1);
   }
 
