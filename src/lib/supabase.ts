@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { User, BillingRecord, TokenUsage, ModelConfig, ExchangeRateHistory, PriceChangeLog } from '@/types';
+import { mockDb } from './mock-database';
 
 // Supabase configuration
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -8,10 +9,14 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 console.log('Supabase configuration status:', supabaseUrl && supabaseKey ? 'Configured' : 'Not configured');
 console.log('Supabase URL:', supabaseUrl);
 
-const isSupabaseConfigured = !!(supabaseUrl && supabaseKey);
+const isSupabaseConfigured = !!(supabaseUrl && supabaseKey && 
+  supabaseUrl !== 'https://test.supabase.co' && 
+  supabaseKey !== 'test_key_for_development');
 
 // Create Supabase client only if configured
 const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseKey) : null;
+
+console.log('Database mode:', isSupabaseConfigured ? 'Supabase' : 'Mock');
 
 // Database service class
 class DatabaseService {
@@ -347,7 +352,7 @@ class DatabaseService {
   // USER METHODS
   async getUserById(userId: string): Promise<User | null> {
     if (!isSupabaseConfigured) {
-      return null;
+      return await mockDb.getUserById(userId);
     }
 
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
@@ -388,7 +393,7 @@ class DatabaseService {
 
   async updateUserBalance(userId: string, amount: number): Promise<number> {
     if (!isSupabaseConfigured) {
-      return amount;
+      return await mockDb.updateUserBalance(userId, amount);
     }
 
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
@@ -590,7 +595,7 @@ class DatabaseService {
     description: string
   ): Promise<BillingRecord | null> {
     if (!isSupabaseConfigured) {
-      return null;
+      return await mockDb.addBillingRecord(userId, type === 'charge' ? 'charge' : 'usage', amount, description);
     }
 
     if (!userId) {
@@ -634,7 +639,7 @@ class DatabaseService {
   // MODEL CONFIGURATION METHODS
   async getModelConfigs(): Promise<ModelConfig[]> {
     if (!isSupabaseConfigured) {
-      return [];
+      return await mockDb.getModelConfigs();
     }
 
     try {
@@ -677,7 +682,9 @@ class DatabaseService {
     autoCreated: boolean = false
   ): Promise<ModelConfig | null> {
     if (!isSupabaseConfigured) {
-      return null;
+      return await mockDb.addModelConfig(
+        modelName, inputTokenPrice, outputTokenPrice, adminId, serviceType, workflowCost, autoCreated
+      );
     }
 
     try {
@@ -813,7 +820,7 @@ class DatabaseService {
   // EXCHANGE RATE METHODS
   async getCurrentExchangeRate(): Promise<number> {
     if (!isSupabaseConfigured) {
-      return 10000; // Default: 10000 points = 1 USD
+      return await mockDb.getCurrentExchangeRate();
     }
 
     try {
@@ -924,7 +931,10 @@ class DatabaseService {
     messageId?: string
   ): Promise<TokenUsage | null> {
     if (!isSupabaseConfigured) {
-      return null;
+      return await mockDb.addTokenUsageWithModel(
+        userId, modelName, inputTokens, outputTokens, totalTokens,
+        inputCost, outputCost, totalCost, conversationId, messageId
+      );
     }
 
     try {
@@ -973,7 +983,7 @@ class DatabaseService {
     description: string
   ): Promise<{ success: boolean; newBalance: number; message: string }> {
     if (!isSupabaseConfigured) {
-      return { success: false, newBalance: 0, message: 'Database not configured' };
+      return await mockDb.deductUserBalance(userId, amount, description);
     }
 
     try {
@@ -1018,7 +1028,7 @@ class DatabaseService {
     description: string = 'Admin credit addition'
   ): Promise<{ success: boolean; newBalance: number; message: string }> {
     if (!isSupabaseConfigured) {
-      return { success: false, newBalance: 0, message: 'Database not configured' };
+      return await mockDb.addCreditsToAdmin(adminEmail, creditsToAdd, description);
     }
 
     try {
