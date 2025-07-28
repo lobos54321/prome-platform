@@ -9,6 +9,7 @@ import ModelManagement from './Admin/ModelManagement';
 import WebhookConfig from './Admin/WebhookConfig';
 import PointsCalculator from './Admin/PointsCalculator';
 import TokenConsumptionMonitor from './Admin/TokenConsumptionMonitor';
+import RechargePackageManagement from './Admin/RechargePackageManagement';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -101,6 +102,7 @@ export default function Admin() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-8">
           <TabsTrigger value="models">模型管理</TabsTrigger>
+          <TabsTrigger value="recharge">充值方案</TabsTrigger>
           {isDifyEnabled && <TabsTrigger value="consumption">消耗监控</TabsTrigger>}
           {isDifyEnabled && <TabsTrigger value="points">积分计算器</TabsTrigger>}
           {isDifyEnabled && <TabsTrigger value="webhook">Webhook配置</TabsTrigger>}
@@ -111,6 +113,10 @@ export default function Admin() {
 
         <TabsContent value="models">
           <ModelManagement />
+        </TabsContent>
+
+        <TabsContent value="recharge">
+          <RechargePackageManagement />
         </TabsContent>
 
         {isDifyEnabled && (

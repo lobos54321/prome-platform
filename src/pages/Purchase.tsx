@@ -1,131 +1,221 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { authService } from '@/lib/auth';
-import { Check } from 'lucide-react';
-
-interface PricingPlan {
-  id: string;
-  name: string;
-  price: number;
-  description: string;
-  features: string[];
-  tokenAmount: number;
-}
+import { adminServicesAPI } from '@/lib/admin-services';
+import { Check, CreditCard, ArrowLeft } from 'lucide-react';
+import { RechargePackage, CustomRecharge } from '@/types';
 
 export default function Purchase() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const planId = searchParams.get('plan');
+  const packageId = searchParams.get('package');
+  const isCustom = searchParams.get('custom') === 'true';
+  const customAmount = searchParams.get('amount');
 
-  const plans: PricingPlan[] = [
-    {
-      id: 'basic',
-      name: '基础版',
-      price: 99,
-      description: '适合个人用户和小型团队',
-      features: [
-        '100,000 Tokens',
-        '所有基础口播文案服务',
-        '标准模型访问权限',
-        '邮件支持'
-      ],
-      tokenAmount: 100000
-    },
-    {
-      id: 'pro',
-      name: '专业版',
-      price: 299,
-      description: '适合中型内容创作团队',
-      features: [
-        '500,000 Tokens',
-        '所有高级口播文案服务',
-        '优先模型访问权限',
-        '优先技术支持'
-      ],
-      tokenAmount: 500000
-    },
-    {
-      id: 'enterprise',
-      name: '企业版',
-      price: 899,
-      description: '适合大型企业和媒体公司',
-      features: [
-        '2,000,000 Tokens',
-        '所有专业口播文案服务',
-        'API访问权限',
-        '专属客户经理'
-      ],
-      tokenAmount: 2000000
-    }
-  ];
+  const [selectedPackage, setSelectedPackage] = useState<RechargePackage | null>(null);
+  const [customRecharge, setCustomRecharge] = useState<CustomRecharge | null>(null);
+  const [exchangeRate, setExchangeRate] = useState<number>(10000);
+  const [customAmountInput, setCustomAmountInput] = useState<string>(customAmount || '');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const selectedPlan = plans.find(p => p.id === planId);
+  const minimumUSD = 5;
 
   useEffect(() => {
-    const user = authService.getCurrentUserSync();
-    if (!user || !authService.isAuthenticated()) {
-      // 未登录用户重定向到登录页面
-      navigate(`/login?redirect=/purchase&plan=${planId}`);
-    }
-  }, [navigate, planId]);
+    const initializePurchase = async () => {
+      const user = authService.getCurrentUserSync();
+      if (!user || !authService.isAuthenticated()) {
+        // Redirect unauthenticated users to login page
+        const redirectParams = new URLSearchParams();
+        if (packageId) redirectParams.set('package', packageId);
+        if (isCustom) {
+          redirectParams.set('custom', 'true');
+          if (customAmount) redirectParams.set('amount', customAmount);
+        }
+        navigate(`/login?redirect=/purchase&${redirectParams.toString()}`);
+        return;
+      }
 
-  if (!selectedPlan) {
+      try {
+        // Load exchange rate
+        const rate = await adminServicesAPI.getExchangeRate();
+        setExchangeRate(rate);
+
+        if (packageId && !isCustom) {
+          // Load selected package
+          const packages = await adminServicesAPI.getRechargePackages();
+          const pkg = packages.find(p => p.id === packageId);
+          if (!pkg) {
+            navigate('/pricing');
+            return;
+          }
+          setSelectedPackage(pkg);
+        } else if (isCustom && customAmount) {
+          // Setup custom recharge
+          const amount = parseFloat(customAmount);
+          if (amount >= minimumUSD) {
+            setCustomRecharge({
+              usdAmount: amount,
+              creditsAmount: Math.floor(amount * (rate / 10)) // rate is per $10
+            });
+          } else {
+            navigate('/pricing');
+            return;
+          }
+        } else {
+          navigate('/pricing');
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to initialize purchase:', error);
+        navigate('/pricing');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializePurchase();
+  }, [navigate, packageId, isCustom, customAmount]);
+
+  const updateCustomRecharge = (amount: string) => {
+    setCustomAmountInput(amount);
+    const amountNum = parseFloat(amount);
+    if (!isNaN(amountNum) && amountNum >= minimumUSD) {
+      setCustomRecharge({
+        usdAmount: amountNum,
+        creditsAmount: Math.floor(amountNum * (exchangeRate / 10))
+      });
+    } else {
+      setCustomRecharge(null);
+    }
+  };
+
+  const handlePurchase = () => {
+    // TODO: Implement actual payment flow
+    const purchaseData = selectedPackage || customRecharge;
+    console.log('Processing credit purchase:', purchaseData);
+    // Here you can integrate Stripe or other payment services
+    alert('积分充值功能正在开发中，请联系客服完成充值。');
+  };
+
+  if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">方案未找到</h1>
-          <Button onClick={() => navigate('/pricing')}>返回价格页面</Button>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">正在加载购买信息...</p>
+          </div>
         </div>
       </div>
     );
   }
 
-  const handlePurchase = () => {
-    // TODO: 实现实际的支付流程
-    console.log('Processing purchase for plan:', selectedPlan.id);
-    // 这里可以集成Stripe或其他支付服务
-    alert('购买功能正在开发中，请联系客服完成购买。');
-  };
+  if (!selectedPackage && !customRecharge) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">充值方案未找到</h1>
+          <Button onClick={() => navigate('/pricing')}>返回充值页面</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const purchaseInfo = selectedPackage || customRecharge;
+  const isPackagePurchase = !!selectedPackage;
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-4">确认购买</h1>
-          <p className="text-gray-600">请确认您选择的方案详情</p>
+          <h1 className="text-3xl font-bold mb-4">确认充值</h1>
+          <p className="text-gray-600">请确认您的积分充值详情</p>
         </div>
 
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="flex justify-between items-center">
-              {selectedPlan.name}
-              <span className="text-2xl font-bold">¥{selectedPlan.price}/月</span>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-blue-500" />
+                {isPackagePurchase ? selectedPackage!.name : '自定义充值'}
+              </span>
+              <span className="text-2xl font-bold text-green-600">
+                ${purchaseInfo!.usdAmount}
+              </span>
             </CardTitle>
-            <CardDescription>{selectedPlan.description}</CardDescription>
+            <CardDescription>
+              {isPackagePurchase ? selectedPackage!.name : '自定义金额充值'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-2">包含功能：</h4>
-                <ul className="space-y-2">
-                  {selectedPlan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start">
-                      <Check className="h-5 w-5 text-green-500 mr-2 shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+            <div className="space-y-6">
+              {/* Credits Info */}
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-blue-700 font-medium">您将获得积分：</span>
+                  <span className="text-2xl font-bold text-blue-800">
+                    {purchaseInfo!.creditsAmount.toLocaleString()} 积分
+                  </span>
+                </div>
+                <div className="text-sm text-blue-600 mt-1">
+                  汇率：1 USD = {(exchangeRate / 10).toLocaleString()} 积分
+                </div>
               </div>
+
+              {/* Custom amount input for custom recharge */}
+              {!isPackagePurchase && (
+                <div className="space-y-2">
+                  <Label htmlFor="finalAmount">确认充值金额 (USD)</Label>
+                  <Input
+                    id="finalAmount"
+                    type="number"
+                    min={minimumUSD}
+                    step="0.01"
+                    value={customAmountInput}
+                    onChange={(e) => updateCustomRecharge(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500">
+                    最低充值金额为 ${minimumUSD}
+                  </p>
+                </div>
+              )}
+
+              {/* Features for package */}
+              {isPackagePurchase && (
+                <div>
+                  <h4 className="font-medium mb-3">充值优势：</h4>
+                  <ul className="space-y-2">
+                    <li className="flex items-start">
+                      <Check className="h-5 w-5 text-green-500 mr-2 shrink-0" />
+                      <span>积分永不过期，可长期使用</span>
+                    </li>
+                    <li className="flex items-start">
+                      <Check className="h-5 w-5 text-green-500 mr-2 shrink-0" />
+                      <span>按需使用，透明计费</span>
+                    </li>
+                    <li className="flex items-start">
+                      <Check className="h-5 w-5 text-green-500 mr-2 shrink-0" />
+                      <span>支持所有AI服务功能</span>
+                    </li>
+                    <li className="flex items-start">
+                      <Check className="h-5 w-5 text-green-500 mr-2 shrink-0" />
+                      <span>实时余额查看</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
               
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center text-lg font-medium">
-                  <span>总计：</span>
-                  <span className="text-blue-600">¥{selectedPlan.price}</span>
+                  <span>支付总额：</span>
+                  <span className="text-green-600">${purchaseInfo!.usdAmount}</span>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
-                  包含 {selectedPlan.tokenAmount.toLocaleString()} Tokens
+                  获得 {purchaseInfo!.creditsAmount.toLocaleString()} 积分
                 </p>
               </div>
             </div>
@@ -133,11 +223,20 @@ export default function Purchase() {
         </Card>
 
         <div className="flex gap-4">
-          <Button variant="outline" onClick={() => navigate('/pricing')} className="flex-1">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/pricing')} 
+            className="flex-1"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
             返回选择
           </Button>
-          <Button onClick={handlePurchase} className="flex-1 bg-blue-500 hover:bg-blue-600">
-            确认购买
+          <Button 
+            onClick={handlePurchase} 
+            className="flex-1 bg-green-500 hover:bg-green-600"
+            disabled={!isPackagePurchase && (!customRecharge || customRecharge.usdAmount < minimumUSD)}
+          >
+            确认充值 ${purchaseInfo!.usdAmount}
           </Button>
         </div>
       </div>

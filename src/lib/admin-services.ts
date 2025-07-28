@@ -1,4 +1,4 @@
-import { ModelConfig, PriceChangeLog, ExchangeRateHistory, PointsConfig } from '@/types';
+import { ModelConfig, PriceChangeLog, ExchangeRateHistory, PointsConfig, RechargePackage } from '@/types';
 import { isAdmin, requireAdmin } from './admin';
 import { authService } from './auth';
 
@@ -8,6 +8,7 @@ class AdminServicesAPI {
   private priceChangeLogs: PriceChangeLog[] = [];
   private exchangeRateHistory: ExchangeRateHistory[] = [];
   private currentExchangeRate: number = 10000; // Default: 10000 points = 1 USD
+  private rechargePackages: RechargePackage[] = [];
 
   constructor() {
     this.initializeDefaultData();
@@ -41,6 +42,54 @@ class AdminServicesAPI {
         modelName: 'Claude-3-Opus',
         inputTokenPrice: 30, // 30 credits per 1000 input tokens
         outputTokenPrice: 60, // 60 credits per 1000 output tokens
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: 'lobos54321@gmail.com'
+      }
+    ];
+
+    // Initialize default recharge packages
+    this.rechargePackages = [
+      {
+        id: '1',
+        name: '基础套餐',
+        usdAmount: 10,
+        creditsAmount: 10000,
+        isPopular: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: 'lobos54321@gmail.com'
+      },
+      {
+        id: '2',
+        name: '推荐套餐',
+        usdAmount: 25,
+        creditsAmount: 25000,
+        isPopular: true,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: 'lobos54321@gmail.com'
+      },
+      {
+        id: '3',
+        name: '高级套餐',
+        usdAmount: 50,
+        creditsAmount: 50000,
+        isPopular: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: 'lobos54321@gmail.com'
+      },
+      {
+        id: '4',
+        name: '专业套餐',
+        usdAmount: 100,
+        creditsAmount: 100000,
+        isPopular: false,
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -383,6 +432,71 @@ class AdminServicesAPI {
       percentageChange,
       sampleScenarios
     };
+  }
+
+  // Recharge Package Management
+  async getRechargePackages(): Promise<RechargePackage[]> {
+    // Public method - no admin check needed for viewing packages
+    return this.rechargePackages.filter(pkg => pkg.isActive);
+  }
+
+  async getAllRechargePackages(): Promise<RechargePackage[]> {
+    const user = authService.getCurrentUserSync();
+    requireAdmin(user);
+    return [...this.rechargePackages];
+  }
+
+  async getRechargePackage(id: string): Promise<RechargePackage | null> {
+    const user = authService.getCurrentUserSync();
+    requireAdmin(user);
+    return this.rechargePackages.find(pkg => pkg.id === id) || null;
+  }
+
+  async addRechargePackage(pkg: Omit<RechargePackage, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): Promise<RechargePackage> {
+    const user = authService.getCurrentUserSync();
+    requireAdmin(user);
+
+    const newPackage: RechargePackage = {
+      ...pkg,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: user!.email
+    };
+
+    this.rechargePackages.push(newPackage);
+    return newPackage;
+  }
+
+  async updateRechargePackage(id: string, updates: Partial<RechargePackage>): Promise<RechargePackage> {
+    const user = authService.getCurrentUserSync();
+    requireAdmin(user);
+
+    const pkgIndex = this.rechargePackages.findIndex(pkg => pkg.id === id);
+    if (pkgIndex === -1) {
+      throw new Error('Recharge package not found');
+    }
+
+    const updatedPackage = {
+      ...this.rechargePackages[pkgIndex],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.rechargePackages[pkgIndex] = updatedPackage;
+    return updatedPackage;
+  }
+
+  async deleteRechargePackage(id: string): Promise<void> {
+    const user = authService.getCurrentUserSync();
+    requireAdmin(user);
+
+    const pkgIndex = this.rechargePackages.findIndex(pkg => pkg.id === id);
+    if (pkgIndex === -1) {
+      throw new Error('Recharge package not found');
+    }
+
+    this.rechargePackages.splice(pkgIndex, 1);
   }
 }
 
