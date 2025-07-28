@@ -15,6 +15,7 @@ import { authService } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import { User as UserType } from '@/types';
 import PointsDisplay from '@/components/ui/PointsDisplay';
+import { DifyMonitorStatus } from '@/components/DifyMonitorStatus';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -98,7 +99,10 @@ export function Navbar() {
         {/* User Menu or Auth Buttons */}
         <div className="hidden md:flex items-center space-x-4">
           {user && (
-            <PointsDisplay className="border-0 shadow-none bg-gray-50" showDetails={false} />
+            <>
+              <PointsDisplay className="border-0 shadow-none bg-gray-50" showDetails={false} />
+              <DifyMonitorStatus />
+            </>
           )}
           {user ? (
             <DropdownMenu>
