@@ -36,6 +36,24 @@ async function addCreditsToUser(email, credits, description = 'Admin credit addi
   try {
     console.log(`🔍 Looking for user with email: ${email}`);
     
+    // Test database connection first
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('users')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Database connection test failed:', testError);
+        console.error('Please check your Supabase configuration in .env file');
+        return false;
+      }
+      console.log('✅ Database connection test successful');
+    } catch (connError) {
+      console.error('❌ Database connection failed:', connError);
+      return false;
+    }
+    
     // Find user by email
     const { data: userData, error: userError } = await supabase
       .from('users')
@@ -45,18 +63,36 @@ async function addCreditsToUser(email, credits, description = 'Admin credit addi
 
     if (userError) {
       console.error('❌ Database error:', userError);
+      console.error('Error details:', JSON.stringify(userError, null, 2));
       return false;
     }
 
     if (!userData) {
       console.error(`❌ User with email ${email} not found`);
+      console.log('💡 Available users (first 5):');
+      
+      try {
+        const { data: allUsers, error: listError } = await supabase
+          .from('users')
+          .select('email, name, balance')
+          .limit(5);
+        
+        if (!listError && allUsers) {
+          allUsers.forEach(user => {
+            console.log(`   - ${user.email} (${user.name}) - Balance: ${user.balance}`);
+          });
+        }
+      } catch (listErr) {
+        console.log('Could not list users:', listErr);
+      }
+      
       return false;
     }
 
     console.log(`✅ Found user: ${userData.name} (ID: ${userData.id})`);
     console.log(`💰 Current balance: ${userData.balance || 0} credits`);
 
-    const currentBalance = userData.balance || 0;
+    const currentBalance = parseFloat(userData.balance) || 0;
     const newBalance = currentBalance + credits;
 
     // Update balance
@@ -69,6 +105,7 @@ async function addCreditsToUser(email, credits, description = 'Admin credit addi
 
     if (updateError) {
       console.error('❌ Failed to update balance:', updateError);
+      console.error('Update error details:', JSON.stringify(updateError, null, 2));
       return false;
     }
 
@@ -90,6 +127,7 @@ async function addCreditsToUser(email, credits, description = 'Admin credit addi
 
     if (billingError) {
       console.warn('⚠️ Failed to create billing record:', billingError);
+      console.warn('Billing error details:', JSON.stringify(billingError, null, 2));
       console.log('💡 Balance was updated successfully, but billing record failed');
     } else {
       console.log('✅ Billing record created successfully');
@@ -101,6 +139,7 @@ async function addCreditsToUser(email, credits, description = 'Admin credit addi
     return true;
   } catch (error) {
     console.error('❌ Unexpected error:', error);
+    console.error('Full error details:', JSON.stringify(error, null, 2));
     return false;
   }
 }
