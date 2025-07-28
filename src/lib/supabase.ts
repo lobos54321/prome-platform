@@ -709,7 +709,7 @@ class DatabaseService {
         };
       }
 
-      const insertData: any = {
+      const insertData: Record<string, unknown> = {
         model_name: modelName,
         input_token_price: inputTokenPrice,
         output_token_price: outputTokenPrice,
