@@ -21,6 +21,7 @@ import Purchase from './pages/Purchase';
 import Settings from './pages/Settings';
 import AIContentGeneration from './pages/AIContentGeneration';
 import DifyTestPage from './pages/DifyTestPage';
+import TokenMonitorTest from './pages/TokenMonitorTest';
 
 import NotFound from './pages/NotFound';
 
@@ -175,6 +176,7 @@ const App = () => {
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/dify-test" element={<DifyTestPage />} />
+              <Route path="/token-monitor-test" element={<TokenMonitorTest />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

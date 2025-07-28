@@ -8,6 +8,7 @@ import { isAdmin } from '@/lib/admin';
 import ModelManagement from './Admin/ModelManagement';
 import TokenConsumptionMonitor from './Admin/TokenConsumptionMonitor';
 import RechargePackageManagement from './Admin/RechargePackageManagement';
+import AdminDebugTools from './Admin/AdminDebugTools';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -105,6 +106,7 @@ export default function Admin() {
           <TabsTrigger value="users">用户管理</TabsTrigger>
           <TabsTrigger value="services">服务管理</TabsTrigger>
           <TabsTrigger value="stats">平台统计</TabsTrigger>
+          <TabsTrigger value="debug">调试工具</TabsTrigger>
         </TabsList>
 
         <TabsContent value="models">
@@ -137,6 +139,10 @@ export default function Admin() {
           <div className="text-center py-12">
             <p className="text-xl text-gray-500">平台统计功能正在开发中</p>
           </div>
+        </TabsContent>
+
+        <TabsContent value="debug">
+          <AdminDebugTools />
         </TabsContent>
       </Tabs>
     </div>
