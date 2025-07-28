@@ -17,6 +17,7 @@ export class DifyIframeMonitor {
   private currentExchangeRate = 10000; // Default: 10000 points = 1 USD
   private onTokenConsumption?: (event: TokenConsumptionEvent) => void;
   private onBalanceUpdate?: (newBalance: number) => void;
+  private onNewModelDetected?: (model: ModelConfig) => void;
   private processedEvents = new Set<string>(); // Prevent duplicate processing
   private lastEventTime = 0;
   private minEventInterval = 1000; // Minimum 1 second between events
@@ -146,14 +147,25 @@ export class DifyIframeMonitor {
         return;
       }
 
-      // Find model configuration
-      const modelConfig = this.modelConfigs.find(
+      // Find model configuration or auto-create if not found
+      let modelConfig = this.modelConfigs.find(
         config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
       );
 
       if (!modelConfig) {
-        console.warn(`No active model config found for: ${modelName}`);
-        return;
+        console.log(`Model config not found for: ${modelName}, attempting to auto-create...`);
+        
+        // Try to auto-create the model with default pricing
+        const autoCreatedModel = await this.autoCreateModelConfig(modelName);
+        if (autoCreatedModel) {
+          console.log(`Successfully auto-created model config for: ${modelName}`);
+          modelConfig = autoCreatedModel;
+          // Add to local cache
+          this.modelConfigs.push(autoCreatedModel);
+        } else {
+          console.warn(`Failed to auto-create model config for: ${modelName}, skipping processing`);
+          return;
+        }
       }
 
       // Calculate costs
@@ -255,6 +267,101 @@ export class DifyIframeMonitor {
 
   public isCurrentlyListening(): boolean {
     return this.isListening;
+  }
+
+  /**
+   * Auto-create a model configuration with default pricing when a new model is detected
+   */
+  private async autoCreateModelConfig(modelName: string): Promise<ModelConfig | null> {
+    try {
+      console.log(`Auto-creating model config for: ${modelName}`);
+      
+      // Determine default pricing based on common model patterns
+      const defaultPricing = this.getDefaultModelPricing(modelName);
+      
+      // Use system user ID for auto-created models
+      const systemUserId = 'system'; // We'll create a system user for auto-generated configs
+      
+      const newModel = await db.addModelConfig(
+        modelName,
+        defaultPricing.inputTokenPrice,
+        defaultPricing.outputTokenPrice,
+        systemUserId,
+        'ai_model', // Default service type for auto-detected models
+        undefined, // No workflow cost for AI models
+        true // Mark as auto-created
+      );
+
+      if (newModel) {
+        console.log(`Successfully auto-created model config:`, newModel);
+        
+        // Notify about the new model creation (could trigger admin notification)
+        this.onNewModelDetected?.(newModel);
+        
+        return newModel;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Failed to auto-create model config for ${modelName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get default pricing for different model types
+   */
+  private getDefaultModelPricing(modelName: string): { inputTokenPrice: number; outputTokenPrice: number } {
+    const name = modelName.toLowerCase();
+    
+    // GPT models
+    if (name.includes('gpt-4o') || name.includes('gpt-4-turbo')) {
+      return { inputTokenPrice: 0.01, outputTokenPrice: 0.03 }; // GPT-4 Turbo pricing
+    }
+    if (name.includes('gpt-4')) {
+      return { inputTokenPrice: 0.03, outputTokenPrice: 0.06 }; // GPT-4 pricing
+    }
+    if (name.includes('gpt-3.5')) {
+      return { inputTokenPrice: 0.001, outputTokenPrice: 0.002 }; // GPT-3.5 pricing
+    }
+    
+    // Claude models
+    if (name.includes('claude-3-opus')) {
+      return { inputTokenPrice: 0.015, outputTokenPrice: 0.075 }; // Claude 3 Opus
+    }
+    if (name.includes('claude-3-sonnet')) {
+      return { inputTokenPrice: 0.003, outputTokenPrice: 0.015 }; // Claude 3 Sonnet
+    }
+    if (name.includes('claude-3-haiku')) {
+      return { inputTokenPrice: 0.00025, outputTokenPrice: 0.00125 }; // Claude 3 Haiku
+    }
+    if (name.includes('claude')) {
+      return { inputTokenPrice: 0.003, outputTokenPrice: 0.015 }; // Default Claude pricing
+    }
+    
+    // Gemini models
+    if (name.includes('gemini-pro')) {
+      return { inputTokenPrice: 0.0005, outputTokenPrice: 0.0015 }; // Gemini Pro
+    }
+    if (name.includes('gemini')) {
+      return { inputTokenPrice: 0.0005, outputTokenPrice: 0.0015 }; // Default Gemini pricing
+    }
+    
+    // Local or custom models - conservative pricing
+    if (name.includes('llama') || name.includes('mistral') || name.includes('qwen')) {
+      return { inputTokenPrice: 0.0002, outputTokenPrice: 0.0006 }; // Local model pricing
+    }
+    
+    // Default for unknown models - moderate pricing
+    console.log(`Using default pricing for unknown model: ${modelName}`);
+    return { inputTokenPrice: 0.002, outputTokenPrice: 0.006 }; // Conservative default
+  }
+
+  /**
+   * Set callback for when new models are detected
+   */
+  public setOnNewModelDetected(callback: (model: ModelConfig) => void) {
+    this.onNewModelDetected = callback;
   }
 }
 
