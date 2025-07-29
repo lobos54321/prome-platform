@@ -217,6 +217,7 @@ async function testTokenConsumption(modelName, inputTokens, outputTokens, descri
           cost: totalCost,
           conversation_id: conversationId,
           message_id: messageId,
+          session_id: conversationId || `test_session_${Date.now()}`,
           created_at: new Date().toISOString()
         }
       ]);
