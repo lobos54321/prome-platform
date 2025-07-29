@@ -1,4 +1,4 @@
-import { DifyMessageEndEvent, ModelConfig } from '@/types';
+import { DifyMessageEndEvent, DifyWorkflowFinishedEvent, ModelConfig } from '@/types';
 import { db } from '@/lib/supabase';
 
 export interface TokenConsumptionEvent {
@@ -134,13 +134,20 @@ export class DifyIframeMonitor {
       console.log('[DifyIframeMonitor] ✅ Origin validation passed for:', event.origin);
       const data = event.data;
       
-      // Check if this is a Dify message_end event
+      // Check if this is a Dify message_end event (legacy format)
       if (data?.event === 'message_end' && data?.data) {
         console.log('[DifyIframeMonitor] 🚀 Processing message_end event from:', event.origin);
         console.log('[DifyIframeMonitor] Token data:', data.data);
         await this.processTokenConsumption(data.data as DifyMessageEndEvent, userId);
-      } else {
-        console.log('[DifyIframeMonitor] ⏭️ Message ignored - not a message_end event. Event type:', data?.event);
+      } 
+      // Check if this is a Dify workflow_finished event (new format)
+      else if (data?.event === 'workflow_finished' && data?.data?.metadata?.usage) {
+        console.log('[DifyIframeMonitor] 🚀 Processing workflow_finished event from:', event.origin);
+        console.log('[DifyIframeMonitor] Workflow data:', data);
+        await this.processWorkflowTokenConsumption(data as DifyWorkflowFinishedEvent, userId);
+      } 
+      else {
+        console.log('[DifyIframeMonitor] ⏭️ Message ignored - not a supported event. Event type:', data?.event);
       }
       console.log('[DifyIframeMonitor] ===============================================');
     } catch (error) {
@@ -391,6 +398,157 @@ export class DifyIframeMonitor {
     }
   }
 
+  private async processWorkflowTokenConsumption(event: DifyWorkflowFinishedEvent, userId: string) {
+    try {
+      console.log('[DifyIframeMonitor] Processing workflow token consumption:', event);
+
+      const { 
+        conversation_id: conversationId,
+        message_id: messageId,
+        data: {
+          metadata: {
+            usage: {
+              prompt_tokens: inputTokens,
+              completion_tokens: outputTokens,
+              total_tokens: totalTokens,
+              prompt_price: promptPriceStr,
+              completion_price: completionPriceStr,
+              total_price: totalPriceStr,
+              currency
+            }
+          }
+        }
+      } = event;
+
+      // Create unique event ID to prevent duplicate processing
+      const eventId = `${conversationId}-${messageId}-${totalTokens}-${Date.now()}`;
+      if (this.processedEvents.has(eventId)) {
+        console.log('[DifyIframeMonitor] Event already processed, skipping:', eventId);
+        return;
+      }
+
+      // Rate limiting - prevent rapid successive events
+      const now = Date.now();
+      if (now - this.lastEventTime < this.minEventInterval) {
+        console.log('[DifyIframeMonitor] Rate limiting: event too soon after previous one');
+        return;
+      }
+      this.lastEventTime = now;
+
+      // Validate token counts
+      if (totalTokens <= 0 || inputTokens < 0 || outputTokens < 0) {
+        console.warn('[DifyIframeMonitor] Invalid token counts:', { inputTokens, outputTokens, totalTokens });
+        return;
+      }
+
+      // Parse the provided pricing from Dify
+      const inputCost = parseFloat(promptPriceStr) || 0;
+      const outputCost = parseFloat(completionPriceStr) || 0;
+      const totalCost = parseFloat(totalPriceStr) || (inputCost + outputCost);
+
+      console.log(`[DifyIframeMonitor] Using Dify-provided pricing:`, {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        currency
+      });
+
+      // Validate costs
+      if (totalCost <= 0) {
+        console.warn('[DifyIframeMonitor] Invalid cost calculation:', { inputCost, outputCost, totalCost });
+        return;
+      }
+
+      // Convert to points using exchange rate
+      const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
+
+      // Safety check: prevent excessive deduction
+      if (pointsToDeduct > 100000) { // Adjust threshold as needed
+        console.error('[DifyIframeMonitor] Token cost too high, potential error:', {
+          totalTokens,
+          totalCost,
+          pointsToDeduct
+        });
+        return;
+      }
+
+      console.log(`[DifyIframeMonitor] Workflow token consumption calculation:`, {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        pointsToDeduct,
+        exchangeRate: this.currentExchangeRate
+      });
+
+      // Try to deduct balance
+      try {
+        const result = await db.deductUserBalance(
+          userId,
+          pointsToDeduct,
+          `Workflow token usage: ${totalTokens} tokens ($${totalCost.toFixed(6)})`
+        );
+
+        if (result.success) {
+          // Mark event as processed
+          this.processedEvents.add(eventId);
+          
+          // Clean up old processed events (keep last 100)
+          if (this.processedEvents.size > 100) {
+            const eventsArray = Array.from(this.processedEvents);
+            this.processedEvents.clear();
+            eventsArray.slice(-50).forEach(id => this.processedEvents.add(id));
+          }
+
+          // Record token usage - use 'dify-workflow' as model name since we don't have specific model info
+          try {
+            await db.addTokenUsageWithModel(
+              userId,
+              'dify-workflow', // Generic model name for workflow usage
+              inputTokens,
+              outputTokens,
+              totalTokens,
+              inputCost,
+              outputCost,
+              totalCost,
+              conversationId,
+              messageId
+            );
+            console.log('[DifyIframeMonitor] Workflow token usage recorded successfully');
+          } catch (usageError) {
+            console.error('[DifyIframeMonitor] Failed to record workflow token usage:', usageError);
+          }
+
+          // Notify callbacks
+          this.onTokenConsumption?.({
+            modelName: 'dify-workflow',
+            inputTokens,
+            outputTokens,
+            totalTokens,
+            conversationId,
+            messageId,
+            timestamp: new Date().toISOString()
+          });
+
+          this.onBalanceUpdate?.(result.newBalance);
+
+          console.log(`[DifyIframeMonitor] Successfully processed workflow token consumption. New balance: ${result.newBalance}`);
+        } else {
+          console.error(`[DifyIframeMonitor] Failed to deduct balance: ${result.message}`);
+        }
+      } catch (balanceError) {
+        console.error('[DifyIframeMonitor] Error during balance deduction:', balanceError);
+      }
+    } catch (error) {
+      console.error('[DifyIframeMonitor] Error processing workflow token consumption:', error);
+    }
+  }
+
   public setOnTokenConsumption(callback: (event: TokenConsumptionEvent) => void) {
     this.onTokenConsumption = callback;
   }
@@ -534,6 +692,44 @@ export class DifyIframeMonitor {
   }
 
   /**
+   * Simulate a workflow_finished token consumption event for testing
+   */
+  public async simulateWorkflowTokenConsumption(
+    userId: string,
+    inputTokens: number = 2913,
+    outputTokens: number = 701,
+    inputPrice: number = 0.005826,
+    outputPrice: number = 0.005608
+  ): Promise<void> {
+    console.log('[DifyIframeMonitor] Simulating workflow token consumption event');
+    
+    const totalTokens = inputTokens + outputTokens;
+    const totalPrice = inputPrice + outputPrice;
+
+    const mockEvent: DifyWorkflowFinishedEvent = {
+      event: 'workflow_finished',
+      conversation_id: `test_workflow_conv_${Date.now()}`,
+      message_id: `test_workflow_msg_${Date.now()}`,
+      data: {
+        total_tokens: totalTokens,
+        metadata: {
+          usage: {
+            prompt_tokens: inputTokens,
+            completion_tokens: outputTokens,
+            total_tokens: totalTokens,
+            prompt_price: inputPrice.toString(),
+            completion_price: outputPrice.toString(),
+            total_price: totalPrice.toString(),
+            currency: 'USD'
+          }
+        }
+      }
+    };
+
+    await this.processWorkflowTokenConsumption(mockEvent, userId);
+  }
+
+  /**
    * Test method to validate if a given origin would be accepted
    * Useful for debugging domain issues
    */
@@ -548,27 +744,31 @@ export class DifyIframeMonitor {
    * Test method to simulate receiving a message from a specific origin
    * Useful for debugging real udify.app integration
    */
-  public simulateMessageFromOrigin(origin: string, userId: string, messageData?: { event: string; data?: DifyMessageEndEvent }): void {
+  public simulateMessageFromOrigin(
+    origin: string, 
+    userId: string, 
+    messageData?: { event: string; data?: DifyMessageEndEvent | DifyWorkflowFinishedEvent }
+  ): void {
     console.log(`[DifyIframeMonitor] Simulating message from origin: ${origin}`);
     
     const mockEvent = {
       origin: origin,
       data: messageData || {
-        event: 'message_end',
+        event: 'workflow_finished',
+        conversation_id: `test_workflow_conv_${Date.now()}`,
+        message_id: `test_workflow_msg_${Date.now()}`,
         data: {
-          event: 'message_end',
-          conversation_id: `test_conv_${Date.now()}`,
-          message_id: `test_msg_${Date.now()}`,
-          user_id: userId,
-          model_name: 'gpt-4',
-          input_tokens: 1000,
-          output_tokens: 500,
-          total_tokens: 1500,
-          timestamp: new Date().toISOString(),
+          total_tokens: 3614,
           metadata: {
-            test: true,
-            simulated: true,
-            fromOrigin: origin
+            usage: {
+              prompt_tokens: 2913,
+              completion_tokens: 701,
+              total_tokens: 3614,
+              prompt_price: "0.005826",
+              completion_price: "0.005608",
+              total_price: "0.011434",
+              currency: "USD"
+            }
           }
         }
       }
