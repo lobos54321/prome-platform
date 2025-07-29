@@ -318,77 +318,11 @@ class AuthService {
         this.isInitialized = true;
         return this.currentUser;
       }
-      
-      // 首先尝试从本地存储恢复用户信息
-      try {
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          if (parsedUser && parsedUser.id && typeof parsedUser.id === 'string' && parsedUser.id.trim() !== '') {
-            this.currentUser = parsedUser;
-            // 标记为已初始化，但稍后会静默验证
-            this.isInitialized = true;
-            
-            // Check for potential cache issues
-            const isPotentialCacheIssue = parsedUser.balance === 0 && parsedUser.id === '9dee4891-89a6-44ee-8fe8-69097846e97d';
-            
-            if (isPotentialCacheIssue) {
-              console.log('Detected potential cache issue for problematic user, forcing database refresh...');
-              // Force immediate refresh for this specific case
-              setTimeout(async () => {
-                try {
-                  await this.refreshBalance();
-                } catch (error) {
-                  console.warn('Failed to refresh balance during initialization:', error);
-                }
-              }, 100);
-            } else {
-              // 静默验证会话（不阻塞初始化）
-              this.validateSessionQuietly();
-            }
-            
-            console.log('Auth initialization successful, user restored from cache:', parsedUser.id);
-            return this.currentUser;
-          } else {
-            console.warn('Invalid stored user data, clearing cache');
-            localStorage.removeItem('currentUser');
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to parse stored user data:', error);
-        localStorage.removeItem('currentUser');
-      }
-      
-      // 如果没有缓存用户，尝试从服务器获取
-      // Wrap database call in try-catch to prevent AuthSessionMissingError from bubbling up
-      let user = null;
-      try {
-        user = await db.getCurrentUser();
-      } catch (dbError) {
-        console.warn('Database connection failed during auth initialization:', dbError);
-        // Don't throw error - just continue with no user
-        if (dbError instanceof Error && dbError.message.includes('Auth session missing')) {
-          console.log('No auth session found - this is normal for new users');
-        }
-      }
-      
-      if (user && user.id) {
-        this.currentUser = user;
-        
-        const userToStore = {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          balance: user.balance
-        };
-        
-        localStorage.setItem('currentUser', JSON.stringify(userToStore));
-        console.log('Auth initialization successful, user found:', user.id);
-      } else {
-        console.log('Auth initialization complete, no user found');
-        this.clearUserState();
-      }
+
+      // Production mode: attempt real authentication with enhanced session recovery
+      await this.attemptSessionRecovery();
+      // Production mode: attempt real authentication with enhanced session recovery
+      await this.attemptSessionRecovery();
       
       this.isInitialized = true;
       return this.currentUser;
@@ -398,6 +332,143 @@ class AuthService {
       this.clearUserState();
       return null;
     }
+  }
+
+  // Enhanced session recovery for production use
+  private async attemptSessionRecovery(): Promise<void> {
+    console.log('Attempting session recovery in production mode...');
+    
+    try {
+      // First, try to restore from localStorage with validation
+      const localUser = this.tryRestoreFromLocalStorage();
+      if (localUser) {
+        this.currentUser = localUser;
+        console.log('User restored from localStorage:', localUser.id);
+        
+        // Validate session in background without blocking UI
+        this.validateAndRefreshSession();
+        return;
+      }
+
+      // If no local user, attempt fresh authentication from server
+      const serverUser = await this.tryServerSessionRecovery();
+      if (serverUser) {
+        this.currentUser = serverUser;
+        this.storeUserLocally(serverUser);
+        console.log('User session recovered from server:', serverUser.id);
+        return;
+      }
+
+      // No valid session found
+      console.log('No valid session found during recovery');
+      this.clearUserState();
+      
+    } catch (error) {
+      console.warn('Session recovery failed:', error);
+      this.clearUserState();
+    }
+  }
+
+  private tryRestoreFromLocalStorage(): User | null {
+    try {
+      const storedUser = localStorage.getItem('currentUser');
+      if (!storedUser) return null;
+
+      const parsedUser = JSON.parse(storedUser);
+      if (!this.isValidUserObject(parsedUser)) {
+        console.warn('Invalid stored user data, clearing cache');
+        localStorage.removeItem('currentUser');
+        return null;
+      }
+
+      return parsedUser;
+    } catch (error) {
+      console.warn('Failed to parse stored user data:', error);
+      localStorage.removeItem('currentUser');
+      return null;
+    }
+  }
+
+  private async tryServerSessionRecovery(): Promise<User | null> {
+    try {
+      console.log('Attempting server session recovery...');
+      const user = await db.getCurrentUser();
+      
+      if (user && this.isValidUserObject(user)) {
+        return user;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Server session recovery failed:', error);
+      return null;
+    }
+  }
+
+  private isValidUserObject(user: unknown): user is User {
+    return user && 
+           typeof user === 'object' &&
+           typeof user.id === 'string' && 
+           user.id.trim() !== '' &&
+           typeof user.email === 'string' &&
+           typeof user.name === 'string' &&
+           typeof user.role === 'string';
+  }
+
+  private storeUserLocally(user: User): void {
+    try {
+      const userToStore = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        balance: user.balance
+      };
+      localStorage.setItem('currentUser', JSON.stringify(userToStore));
+    } catch (error) {
+      console.warn('Failed to store user locally:', error);
+    }
+  }
+
+  private async validateAndRefreshSession(): Promise<void> {
+    // Run validation in background without affecting UI
+    setTimeout(async () => {
+      try {
+        const freshUser = await db.getCurrentUser();
+        if (freshUser && this.currentUser && freshUser.id === this.currentUser.id) {
+          // Update user data if needed
+          if (freshUser.balance !== this.currentUser.balance) {
+            this.currentUser.balance = freshUser.balance;
+            this.storeUserLocally(this.currentUser);
+            
+            // Trigger balance update event
+            window.dispatchEvent(new CustomEvent('balance-updated', { 
+              detail: { balance: freshUser.balance } 
+            }));
+          }
+        } else if (!freshUser && this.currentUser) {
+          // Session expired
+          console.log('Session expired during background validation');
+          this.clearUserState();
+          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+            detail: { user: null } 
+          }));
+        }
+      } catch (error) {
+        console.warn('Background session validation failed:', error);
+        // Don't clear user state on network errors
+      }
+    }, 2000); // Wait 2 seconds before validating
+  }
+  
+  // Check if user is authenticated
+  isAuthenticated(): boolean {
+    return this.currentUser !== null && 
+           this.currentUser !== undefined && 
+           this.currentUser.id !== undefined && 
+           this.currentUser.id !== null && 
+           typeof this.currentUser.id === 'string' && 
+           this.currentUser.id.trim() !== '';
   }
   
   // Logout - 修复路由跳转问题
