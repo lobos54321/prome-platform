@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Coins, DollarSign, TrendingDown, TrendingUp, AlertCircle } from 'lucide-react';
+import { Coins, DollarSign, TrendingDown, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { db } from '@/lib/supabase';
 import { User } from '@/types';
@@ -15,6 +16,7 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
   const [user, setUser] = useState<User | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number>(10000); // Default rate
   const [isLoadingRate, setIsLoadingRate] = useState(true);
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
   const [pointsHistory, setPointsHistory] = useState<{
     change: number;
     timestamp: string;
@@ -26,6 +28,23 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
 
     // Load exchange rate
     loadExchangeRate();
+
+    // Force refresh balance from database if user exists and balance is 0
+    // This handles the cache invalidation issue
+    if (currentUser && currentUser.id && currentUser.balance === 0) {
+      console.log('User balance is 0, checking if refresh is needed...');
+      
+      // For the specific problematic user, always refresh
+      if (currentUser.id === '9dee4891-89a6-44ee-8fe8-69097846e97d') {
+        console.log('Problematic user detected, forcing balance refresh...');
+        refreshBalanceFromDatabase();
+      } else {
+        // For other users, refresh after a short delay to avoid blocking UI
+        setTimeout(() => {
+          refreshBalanceFromDatabase();
+        }, 1000);
+      }
+    }
 
     // 监听认证状态变化
     const handleAuthChange = (event: CustomEvent) => {
@@ -50,6 +69,25 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
       window.removeEventListener('balance-updated', handleBalanceUpdate as EventListener);
     };
   }, [user?.id]); // Re-run when user ID changes
+
+  const refreshBalanceFromDatabase = async () => {
+    if (isRefreshingBalance) return;
+    
+    try {
+      setIsRefreshingBalance(true);
+      console.log('Refreshing balance from database...');
+      
+      const newBalance = await authService.refreshBalance();
+      console.log('Balance refresh completed, new balance:', newBalance);
+      
+      // The balance update event will be triggered by authService.refreshBalance()
+      // which will update the user state through the event listener
+    } catch (error) {
+      console.error('Failed to refresh balance from database:', error);
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  };
 
   const loadExchangeRate = async () => {
     try {
@@ -83,6 +121,9 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
   const usdEquivalent = pointsValue / exchangeRate;
   const recentChange = pointsHistory.length > 0 ? pointsHistory[0].change : 0;
 
+  // Check if this might be a stale cache issue
+  const isPotentialCacheIssue = pointsValue === 0 && user.id === '9dee4891-89a6-44ee-8fe8-69097846e97d';
+
   return (
     <Card className={className}>
       <CardContent className="p-4">
@@ -96,8 +137,20 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
                     {pointsValue.toLocaleString()}
                   </span>
                   <span className="text-sm text-gray-500">积分</span>
-                  {pointsValue === 0 && user.id === '9dee4891-89a6-44ee-8fe8-69097846e97d' && (
-                    <AlertCircle className="h-4 w-4 text-amber-500" title="余额显示可能有延迟" />
+                  {isPotentialCacheIssue && (
+                    <AlertCircle className="h-4 w-4 text-amber-500" title="余额可能需要刷新" />
+                  )}
+                  {showDetails && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={refreshBalanceFromDatabase}
+                      disabled={isRefreshingBalance}
+                      title="刷新余额"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isRefreshingBalance ? 'animate-spin' : ''}`} />
+                    </Button>
                   )}
                 </div>
                 {showDetails && (
@@ -143,6 +196,17 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        
+        {isPotentialCacheIssue && showDetails && (
+          <div className="mt-3 pt-3 border-t">
+            <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              <div className="flex items-center space-x-1">
+                <AlertCircle className="h-3 w-3" />
+                <span>余额可能需要刷新，点击刷新按钮获取最新数据</span>
+              </div>
             </div>
           </div>
         )}

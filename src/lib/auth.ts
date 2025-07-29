@@ -329,8 +329,23 @@ class AuthService {
             // 标记为已初始化，但稍后会静默验证
             this.isInitialized = true;
             
-            // 静默验证会话（不阻塞初始化）
-            this.validateSessionQuietly();
+            // Check for potential cache issues
+            const isPotentialCacheIssue = parsedUser.balance === 0 && parsedUser.id === '9dee4891-89a6-44ee-8fe8-69097846e97d';
+            
+            if (isPotentialCacheIssue) {
+              console.log('Detected potential cache issue for problematic user, forcing database refresh...');
+              // Force immediate refresh for this specific case
+              setTimeout(async () => {
+                try {
+                  await this.refreshBalance();
+                } catch (error) {
+                  console.warn('Failed to refresh balance during initialization:', error);
+                }
+              }, 100);
+            } else {
+              // 静默验证会话（不阻塞初始化）
+              this.validateSessionQuietly();
+            }
             
             console.log('Auth initialization successful, user restored from cache:', parsedUser.id);
             return this.currentUser;
@@ -469,12 +484,68 @@ class AuthService {
         } catch (storageError) {
           console.warn('Failed to update localStorage after balance update:', storageError);
         }
+        
+        // Trigger balance update event
+        window.dispatchEvent(new CustomEvent('balance-updated', { 
+          detail: { balance: newBalance } 
+        }));
       }
       
       return newBalance;
     } catch (error) {
       console.warn('Failed to update balance:', error);
       throw error;
+    }
+  }
+
+  // Force refresh user balance from database
+  async refreshBalance(): Promise<number> {
+    const user = this.getCurrentUserSync();
+    if (!user || !user.id || typeof user.id !== 'string' || user.id.trim() === '') {
+      throw new Error('No authenticated user found');
+    }
+    
+    try {
+      console.log('Refreshing balance from database for user:', user.id);
+      
+      // Get fresh user data from database
+      const freshUser = await db.getUserById(user.id);
+      if (!freshUser) {
+        console.warn('User not found in database during balance refresh');
+        return this.currentUser?.balance || 0;
+      }
+      
+      const newBalance = typeof freshUser.balance === 'number' ? freshUser.balance : 0;
+      
+      // Update current user balance
+      if (this.currentUser && this.currentUser.id === user.id) {
+        this.currentUser.balance = newBalance;
+        
+        try {
+          const userToStore = {
+            id: this.currentUser.id,
+            name: this.currentUser.name,
+            email: this.currentUser.email,
+            role: this.currentUser.role,
+            balance: newBalance
+          };
+          
+          localStorage.setItem('currentUser', JSON.stringify(userToStore));
+          console.log('Balance refreshed successfully:', newBalance);
+        } catch (storageError) {
+          console.warn('Failed to update localStorage after balance refresh:', storageError);
+        }
+        
+        // Trigger balance update event
+        window.dispatchEvent(new CustomEvent('balance-updated', { 
+          detail: { balance: newBalance } 
+        }));
+      }
+      
+      return newBalance;
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
+      return this.currentUser?.balance || 0;
     }
   }
   
