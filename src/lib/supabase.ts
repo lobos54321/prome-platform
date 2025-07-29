@@ -1177,6 +1177,131 @@ class DatabaseService {
       return { success: false, newBalance: 0, message: 'Failed to add credits' };
     }
   }
+
+  // TOKEN CONSUMPTION MONITORING METHODS
+  async getTokenConsumptionStats(): Promise<{
+    totalConsumptions: number;
+    totalCreditsDeducted: number;
+  }> {
+    if (!isSupabaseConfigured) {
+      console.log('Supabase not configured, using mock data');
+      return await mockDb.getTokenConsumptionStats();
+    }
+
+    try {
+      // Get total number of token usage records
+      const { count: totalCount, error: countError } = await supabase!
+        .from('token_usage')
+        .select('*', { count: 'exact', head: true });
+
+      if (countError) {
+        console.warn('Error getting token usage count:', countError);
+        emitDatabaseError('获取Token使用统计', countError);
+        return { totalConsumptions: 0, totalCreditsDeducted: 0 };
+      }
+
+      // Get sum of all costs and convert to credits
+      const { data: costData, error: costError } = await supabase!
+        .from('token_usage')
+        .select('cost');
+
+      if (costError) {
+        console.warn('Error getting token usage costs:', costError);
+        emitDatabaseError('获取Token费用统计', costError);
+        return { totalConsumptions: totalCount || 0, totalCreditsDeducted: 0 };
+      }
+
+      // Get current exchange rate to convert USD to credits
+      const exchangeRate = await this.getCurrentExchangeRate();
+      
+      // Calculate total credits deducted
+      const totalUsdCost = (costData || []).reduce((sum, record) => sum + (record.cost || 0), 0);
+      const totalCreditsDeducted = Math.round(totalUsdCost * exchangeRate);
+
+      console.log(`Token consumption stats: ${totalCount} consumptions, ${totalCreditsDeducted} credits deducted`);
+      
+      return { 
+        totalConsumptions: totalCount || 0, 
+        totalCreditsDeducted 
+      };
+    } catch (error) {
+      console.error('Error getting token consumption stats:', error);
+      emitDatabaseError('获取Token消耗统计', error);
+      return { totalConsumptions: 0, totalCreditsDeducted: 0 };
+    }
+  }
+
+  async getDetailedTokenConsumptionRecords(): Promise<Array<{
+    id: string;
+    timestamp: string;
+    userEmail: string;
+    service: string;
+    tokens: number;
+    costUsd: number;
+    credits: number;
+    model?: string;
+  }>> {
+    if (!isSupabaseConfigured) {
+      console.log('Supabase not configured, using mock data');
+      return await mockDb.getDetailedTokenConsumptionRecords();
+    }
+
+    try {
+      // Query token usage with user information
+      const { data, error } = await supabase!
+        .from('token_usage')
+        .select(`
+          id,
+          created_at,
+          tokens_used,
+          cost,
+          model,
+          service_id,
+          user_id,
+          users!inner(email)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100); // Limit to recent 100 records
+
+      if (error) {
+        console.warn('Error getting detailed token consumption records:', error);
+        emitDatabaseError('获取详细Token消耗记录', error);
+        return [];
+      }
+
+      // Get current exchange rate to convert USD to credits
+      const exchangeRate = await this.getCurrentExchangeRate();
+
+      // Transform the data
+      const records = (data || []).map(record => ({
+        id: record.id,
+        timestamp: record.created_at || new Date().toISOString(),
+        userEmail: record.users?.email || 'Unknown',
+        service: this.formatServiceName(record.service_id, record.model),
+        tokens: record.tokens_used || 0,
+        costUsd: record.cost || 0,
+        credits: Math.round((record.cost || 0) * exchangeRate),
+        model: record.model || undefined,
+      }));
+
+      console.log(`Retrieved ${records.length} detailed token consumption records`);
+      return records;
+    } catch (error) {
+      console.error('Error getting detailed token consumption records:', error);
+      emitDatabaseError('获取详细Token消耗记录', error);
+      return [];
+    }
+  }
+
+  private formatServiceName(serviceId: string, model?: string): string {
+    if (model && serviceId) {
+      return `${serviceId}-${model}`;
+    }
+    if (serviceId === 'dify') {
+      return 'dify-workflow';
+    }
+    return serviceId || 'unknown-service';
+  }
 }
 
 export const db = new DatabaseService();
