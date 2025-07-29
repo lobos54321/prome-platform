@@ -32,6 +32,13 @@ VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+For payment functionality (optional):
+```
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+```
+
 ## 3. Deploying to Zeabur
 
 ### 3.1 Prepare for Deployment
@@ -45,8 +52,11 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 2. Create a new project
 3. Connect your Git repository
 4. Set environment variables:
-   - `SUPABASE_URL`: Your Supabase URL
-   - `SUPABASE_ANON_KEY`: Your Supabase Anonymous Key
+   - `VITE_SUPABASE_URL`: Your Supabase URL
+   - `VITE_SUPABASE_ANON_KEY`: Your Supabase Anonymous Key
+   - `STRIPE_SECRET_KEY`: Your Stripe Secret Key (for payment processing)
+   - `STRIPE_WEBHOOK_SECRET`: Your Stripe Webhook Secret (for payment completion)
+   - `VITE_STRIPE_PUBLISHABLE_KEY`: Your Stripe Publishable Key (for frontend)
 5. Deploy the application
 
 ### 3.3 Configure Custom Domain (Optional)
