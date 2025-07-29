@@ -584,6 +584,9 @@ class DatabaseService {
     }
 
     try {
+      // Generate session_id for backward compatibility
+      const sessionId = `legacy_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const { data, error } = await supabase!
         .from('token_usage')
         .insert([
@@ -593,6 +596,7 @@ class DatabaseService {
             tokens_used: tokensUsed,
             cost,
             model: 'gpt-3.5-turbo', // Default model
+            session_id: sessionId,
             created_at: new Date().toISOString()
           }
         ])
@@ -608,7 +612,7 @@ class DatabaseService {
         tokensUsed: data.tokens_used,
         cost: data.cost,
         timestamp: data.created_at,
-        sessionId: '',
+        sessionId: data.session_id || sessionId,
       };
     } catch (error) {
       console.error('Error adding token usage:', error);
@@ -1041,6 +1045,9 @@ class DatabaseService {
     }
 
     try {
+      // Generate session_id with fallback to conversationId or generate a unique one
+      const sessionId = conversationId || `dify_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const { data, error } = await supabase!
         .from('token_usage')
         .insert([
@@ -1056,6 +1063,7 @@ class DatabaseService {
             cost: totalCost,
             conversation_id: conversationId,
             message_id: messageId,
+            session_id: sessionId,
             created_at: new Date().toISOString()
           }
         ])
@@ -1071,7 +1079,7 @@ class DatabaseService {
         tokensUsed: data.tokens_used,
         cost: data.cost,
         timestamp: data.created_at,
-        sessionId: '',
+        sessionId: data.session_id || sessionId,
       };
     } catch (error) {
       console.error('Error adding token usage with model:', error);

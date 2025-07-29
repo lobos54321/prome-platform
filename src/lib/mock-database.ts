@@ -135,6 +135,9 @@ export class MockDatabaseService {
     messageId?: string
   ): Promise<TokenUsage | null> {
     
+    // Generate session_id with fallback to conversationId or generate a unique one
+    const sessionId = conversationId || `mock_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     const usage: TokenUsage = {
       id: `mock-usage-${Date.now()}`,
       userId,
@@ -142,7 +145,7 @@ export class MockDatabaseService {
       tokensUsed: totalTokens,
       cost: totalCost,
       timestamp: new Date().toISOString(),
-      sessionId: conversationId || ''
+      sessionId
     };
 
     mockTokenUsage.push(usage);
