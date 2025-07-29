@@ -33,19 +33,19 @@ app.use(express.json());
 // 创建 Stripe 充值订单
 app.post('/api/payment/stripe', async (req, res) => {
   try {
-    // 检查 Stripe 是否已配置
-    if (!stripe) {
-      return res.status(500).json({ error: 'Stripe 未配置，请设置 STRIPE_SECRET_KEY 环境变量' });
-    }
-
     const { amount, userId } = req.body;
     
-    // 验证参数
+    // 验证参数 (优先验证参数，然后检查配置)
     if (!amount || amount < 5) {
       return res.status(400).json({ error: '最少充值5美元' });
     }
     if (!userId) {
       return res.status(400).json({ error: '缺少 userId' });
+    }
+
+    // 检查 Stripe 是否已配置
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe 未配置，请设置 STRIPE_SECRET_KEY 环境变量' });
     }
 
     // 创建 Stripe Checkout Session
