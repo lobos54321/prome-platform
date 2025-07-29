@@ -118,6 +118,36 @@ export default function DifyTestPage() {
     toast.info('发送了模拟Token消费事件');
   };
 
+  const simulateWorkflowEvent = () => {
+    // Simulate a workflow_finished event with exact data from problem statement
+    const mockWorkflowEvent = {
+      origin: 'https://udify.app',
+      data: {
+        event: 'workflow_finished',
+        conversation_id: 'd2e4796c-f759-4644-9a6c-8865ef129be2',
+        message_id: '13b6fad6-077c-4c41-a0c9-623993a5ae00',
+        data: {
+          total_tokens: 3614,
+          metadata: {
+            usage: {
+              prompt_tokens: 2913,
+              completion_tokens: 701,
+              total_tokens: 3614,
+              prompt_price: '0.005826',
+              completion_price: '0.005608',
+              total_price: '0.011434',
+              currency: 'USD'
+            }
+          }
+        }
+      }
+    };
+
+    // Dispatch a custom message event
+    window.postMessage(mockWorkflowEvent.data, window.location.origin);
+    toast.info('发送了模拟Workflow完成事件 (114积分)');
+  };
+
   const refreshStatus = () => {
     setGlobalMonitorStatus(difyIframeMonitor.isCurrentlyListening());
     toast.info('状态已刷新');
@@ -280,11 +310,25 @@ export default function DifyTestPage() {
               className="w-full"
             >
               <DollarSign className="mr-2 h-4 w-4" />
-              模拟Token消费事件
+              模拟Token消费事件 (旧格式)
             </Button>
 
             <p className="text-sm text-gray-500">
               模拟事件: GPT-3.5-Turbo, 150输入+200输出=350总Token
+            </p>
+
+            <Button 
+              onClick={simulateWorkflowEvent}
+              disabled={!globalMonitorStatus && !isMonitoring}
+              className="w-full"
+              variant="outline"
+            >
+              <Activity className="mr-2 h-4 w-4" />
+              模拟Workflow完成事件 (新格式)
+            </Button>
+
+            <p className="text-sm text-gray-500">
+              模拟事件: 2913提示+701完成=3614总Token, $0.011434 (114积分)
             </p>
           </CardContent>
         </Card>

@@ -128,6 +128,27 @@ export interface DifyMessageEndEvent {
   };
 }
 
+// New Dify workflow_finished event type for actual token monitoring
+export interface DifyWorkflowFinishedEvent {
+  event: 'workflow_finished';
+  conversation_id: string;
+  message_id: string;
+  data: {
+    total_tokens: number;
+    metadata: {
+      usage: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+        prompt_price: string; // USD price as string
+        completion_price: string; // USD price as string 
+        total_price: string; // USD price as string
+        currency: string; // e.g., "USD"
+      };
+    };
+  };
+}
+
 // Points consumption tracking types
 export interface PointsConsumption {
   id: string;
