@@ -1,4 +1,4 @@
-import { DifyMessageEndEvent, DifyWorkflowFinishedEvent, ModelConfig } from '@/types';
+import { DifyMessageEndEvent, DifyWorkflowFinishedEvent, DifyRealUsageEvent, ModelConfig } from '@/types';
 import { db } from '@/lib/supabase';
 
 export interface TokenConsumptionEvent {
@@ -125,6 +125,12 @@ export class DifyIframeMonitor {
       console.log('[DifyIframeMonitor] Event type:', event.data?.event);
       console.log('[DifyIframeMonitor] User ID:', userId);
       
+      // Enhanced logging for udify.app messages
+      if (event.origin.includes('udify.app')) {
+        console.log('[DifyIframeMonitor] 🎯 UDIFY.APP MESSAGE DETECTED:');
+        console.log('[DifyIframeMonitor] Full event data:', JSON.stringify(event.data, null, 2));
+      }
+      
       // Validate message origin for security
       if (!this.isValidOrigin(event.origin)) {
         console.log('[DifyIframeMonitor] ❌ Message rejected - invalid origin:', event.origin);
@@ -134,12 +140,24 @@ export class DifyIframeMonitor {
       console.log('[DifyIframeMonitor] ✅ Origin validation passed for:', event.origin);
       const data = event.data;
       
+      // Check for real Dify usage format (top-level usage field)
+      if (data?.usage && data.usage.total_tokens > 0) {
+        console.log('[DifyIframeMonitor] 🚀 Processing real Dify usage event from:', event.origin);
+        console.log('[DifyIframeMonitor] Real usage data:', data.usage);
+        await this.processRealDifyUsage(data as DifyRealUsageEvent, userId);
+      }
       // Check if this is a Dify message_end event (legacy format)
-      if (data?.event === 'message_end' && data?.data) {
+      else if (data?.event === 'message_end' && data?.data) {
         console.log('[DifyIframeMonitor] 🚀 Processing message_end event from:', event.origin);
         console.log('[DifyIframeMonitor] Token data:', data.data);
         await this.processTokenConsumption(data.data as DifyMessageEndEvent, userId);
-      } 
+      }
+      // Check if this is a message_end event with usage field
+      else if (data?.event === 'message_end' && data?.usage) {
+        console.log('[DifyIframeMonitor] 🚀 Processing message_end with usage from:', event.origin);
+        console.log('[DifyIframeMonitor] Usage data:', data.usage);
+        await this.processMessageEndWithUsage(data as DifyMessageEndEvent, userId);
+      }
       // Check if this is a Dify workflow_finished event (new format)
       else if (data?.event === 'workflow_finished' && data?.data?.metadata?.usage) {
         console.log('[DifyIframeMonitor] 🚀 Processing workflow_finished event from:', event.origin);
@@ -148,6 +166,14 @@ export class DifyIframeMonitor {
       } 
       else {
         console.log('[DifyIframeMonitor] ⏭️ Message ignored - not a supported event. Event type:', data?.event);
+        // Log detailed info for udify.app messages to help debug
+        if (event.origin.includes('udify.app')) {
+          console.log('[DifyIframeMonitor] 🔍 UDIFY.APP message analysis:');
+          console.log('[DifyIframeMonitor] - Has event field:', !!data?.event);
+          console.log('[DifyIframeMonitor] - Has usage field:', !!data?.usage);
+          console.log('[DifyIframeMonitor] - Has data field:', !!data?.data);
+          console.log('[DifyIframeMonitor] - Top-level keys:', Object.keys(data || {}));
+        }
       }
       console.log('[DifyIframeMonitor] ===============================================');
     } catch (error) {
@@ -232,6 +258,388 @@ export class DifyIframeMonitor {
     }
 
     return validOrigins;
+  }
+
+  private async processRealDifyUsage(event: DifyRealUsageEvent, userId: string) {
+    try {
+      console.log('[DifyIframeMonitor] Processing real Dify usage event:', event);
+
+      const { 
+        usage: {
+          prompt_tokens: inputTokens,
+          completion_tokens: outputTokens,
+          total_tokens: totalTokens,
+          prompt_price: inputPriceStr,
+          completion_price: outputPriceStr,
+          total_price: totalPriceStr,
+          currency
+        },
+        conversation_id: conversationId,
+        message_id: messageId
+      } = event;
+
+      // Create unique event ID to prevent duplicate processing
+      const eventId = `${conversationId || 'unknown'}-${messageId || 'unknown'}-${totalTokens}-${Date.now()}`;
+      if (this.processedEvents.has(eventId)) {
+        console.log('[DifyIframeMonitor] Event already processed, skipping:', eventId);
+        return;
+      }
+
+      // Rate limiting - prevent rapid successive events
+      const now = Date.now();
+      if (now - this.lastEventTime < this.minEventInterval) {
+        console.log('[DifyIframeMonitor] Rate limiting: event too soon after previous one');
+        return;
+      }
+      this.lastEventTime = now;
+
+      // Validate token counts
+      if (totalTokens <= 0 || inputTokens < 0 || outputTokens < 0) {
+        console.warn('[DifyIframeMonitor] Invalid token counts:', { inputTokens, outputTokens, totalTokens });
+        return;
+      }
+
+      // Parse the provided pricing from Dify
+      const inputCost = parseFloat(inputPriceStr) || 0;
+      const outputCost = parseFloat(outputPriceStr) || 0;
+      const totalCost = parseFloat(totalPriceStr) || (inputCost + outputCost);
+
+      console.log(`[DifyIframeMonitor] Using real Dify pricing:`, {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        currency
+      });
+
+      // Validate costs
+      if (totalCost <= 0) {
+        console.warn('[DifyIframeMonitor] Invalid cost calculation:', { inputCost, outputCost, totalCost });
+        return;
+      }
+
+      // Use 'dify-real' model name for real Dify events
+      const modelName = 'dify-real';
+      let modelConfig = this.modelConfigs.find(
+        config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
+      );
+
+      if (!modelConfig) {
+        console.log(`[DifyIframeMonitor] Model config not found for: ${modelName}, attempting to auto-create...`);
+        
+        // Try to auto-create the model configuration
+        const autoCreatedModel = await this.autoCreateModelConfig(modelName);
+        if (autoCreatedModel) {
+          console.log(`[DifyIframeMonitor] Successfully auto-created model config for: ${modelName}`);
+          modelConfig = autoCreatedModel;
+          // Add to local cache
+          this.modelConfigs.push(autoCreatedModel);
+        } else {
+          console.warn(`[DifyIframeMonitor] Failed to auto-create model config for: ${modelName}, creating fallback config`);
+          // Create a fallback config for real Dify events
+          modelConfig = {
+            id: `fallback-${modelName}`,
+            modelName: modelName,
+            inputTokenPrice: 0.002, // Default pricing - actual costs come from Dify
+            outputTokenPrice: 0.006,
+            serviceType: 'ai_model' as const,
+            isActive: true,
+            autoCreated: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            createdBy: 'system'
+          };
+        }
+      }
+
+      // Convert to points using exchange rate
+      const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
+
+      // Safety check: prevent excessive deduction
+      if (pointsToDeduct > 100000) { // Adjust threshold as needed
+        console.error('[DifyIframeMonitor] Token cost too high, potential error:', {
+          modelName,
+          totalTokens,
+          totalCost,
+          pointsToDeduct
+        });
+        return;
+      }
+
+      console.log(`[DifyIframeMonitor] Real Dify token consumption calculation:`, {
+        modelName,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        pointsToDeduct,
+        exchangeRate: this.currentExchangeRate
+      });
+
+      // Try to deduct balance
+      try {
+        const result = await db.deductUserBalance(
+          userId,
+          pointsToDeduct,
+          `Real Dify usage: ${modelName} (${totalTokens} tokens, $${totalCost.toFixed(6)})`
+        );
+
+        if (result.success) {
+          // Mark event as processed
+          this.processedEvents.add(eventId);
+          
+          // Clean up old processed events (keep last 100)
+          if (this.processedEvents.size > 100) {
+            const eventsArray = Array.from(this.processedEvents);
+            this.processedEvents.clear();
+            eventsArray.slice(-50).forEach(id => this.processedEvents.add(id));
+          }
+
+          // Record token usage - use actual Dify-provided costs
+          try {
+            await db.addTokenUsageWithModel(
+              userId,
+              modelName,
+              inputTokens,
+              outputTokens,
+              totalTokens,
+              inputCost,
+              outputCost,
+              totalCost,
+              conversationId,
+              messageId
+            );
+            console.log('[DifyIframeMonitor] Real Dify token usage recorded successfully');
+          } catch (usageError) {
+            console.error('[DifyIframeMonitor] Failed to record real Dify token usage:', usageError);
+          }
+
+          // Notify callbacks
+          this.onTokenConsumption?.({
+            modelName,
+            inputTokens,
+            outputTokens,
+            totalTokens,
+            conversationId,
+            messageId,
+            timestamp: new Date().toISOString()
+          });
+
+          this.onBalanceUpdate?.(result.newBalance);
+
+          console.log(`[DifyIframeMonitor] Successfully processed real Dify token consumption. New balance: ${result.newBalance}`);
+        } else {
+          console.error(`[DifyIframeMonitor] Failed to deduct balance: ${result.message}`);
+        }
+      } catch (balanceError) {
+        console.error('[DifyIframeMonitor] Error during balance deduction:', balanceError);
+      }
+    } catch (error) {
+      console.error('[DifyIframeMonitor] Error processing real Dify usage:', error);
+    }
+  }
+
+  private async processMessageEndWithUsage(event: DifyMessageEndEvent, userId: string) {
+    try {
+      console.log('[DifyIframeMonitor] Processing message_end event with usage field:', event);
+
+      if (!event.usage) {
+        console.warn('[DifyIframeMonitor] No usage field in message_end event');
+        return;
+      }
+
+      const { 
+        usage: {
+          prompt_tokens: inputTokens,
+          completion_tokens: outputTokens,
+          total_tokens: totalTokens,
+          prompt_price: inputPriceStr,
+          completion_price: outputPriceStr,
+          total_price: totalPriceStr,
+          currency
+        },
+        conversation_id: conversationId,
+        message_id: messageId,
+        model_name: providedModelName
+      } = event;
+
+      // Use provided model name or fallback
+      const modelName = providedModelName || 'dify-message-end';
+
+      // Create unique event ID to prevent duplicate processing
+      const eventId = `${conversationId}-${messageId}-${totalTokens}-${Date.now()}`;
+      if (this.processedEvents.has(eventId)) {
+        console.log('[DifyIframeMonitor] Event already processed, skipping:', eventId);
+        return;
+      }
+
+      // Rate limiting - prevent rapid successive events
+      const now = Date.now();
+      if (now - this.lastEventTime < this.minEventInterval) {
+        console.log('[DifyIframeMonitor] Rate limiting: event too soon after previous one');
+        return;
+      }
+      this.lastEventTime = now;
+
+      // Validate token counts
+      if (totalTokens <= 0 || inputTokens < 0 || outputTokens < 0) {
+        console.warn('[DifyIframeMonitor] Invalid token counts:', { inputTokens, outputTokens, totalTokens });
+        return;
+      }
+
+      // Parse the provided pricing from Dify or calculate if not provided
+      let inputCost = 0;
+      let outputCost = 0;
+      let totalCost = 0;
+
+      if (inputPriceStr && outputPriceStr) {
+        inputCost = parseFloat(inputPriceStr) || 0;
+        outputCost = parseFloat(outputPriceStr) || 0;
+        totalCost = parseFloat(totalPriceStr || '') || (inputCost + outputCost);
+      } else {
+        // Fallback to model-based calculation
+        console.log('[DifyIframeMonitor] No pricing in usage field, falling back to model-based calculation');
+        return await this.processTokenConsumption(event, userId);
+      }
+
+      console.log(`[DifyIframeMonitor] Using message_end usage pricing:`, {
+        modelName,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        currency
+      });
+
+      // Validate costs
+      if (totalCost <= 0) {
+        console.warn('[DifyIframeMonitor] Invalid cost calculation:', { inputCost, outputCost, totalCost });
+        return;
+      }
+
+      // Find or create model configuration
+      let modelConfig = this.modelConfigs.find(
+        config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
+      );
+
+      if (!modelConfig) {
+        console.log(`[DifyIframeMonitor] Model config not found for: ${modelName}, attempting to auto-create...`);
+        
+        const autoCreatedModel = await this.autoCreateModelConfig(modelName);
+        if (autoCreatedModel) {
+          console.log(`[DifyIframeMonitor] Successfully auto-created model config for: ${modelName}`);
+          modelConfig = autoCreatedModel;
+          this.modelConfigs.push(autoCreatedModel);
+        } else {
+          console.warn(`[DifyIframeMonitor] Failed to auto-create model config for: ${modelName}, creating fallback config`);
+          modelConfig = {
+            id: `fallback-${modelName}`,
+            modelName: modelName,
+            inputTokenPrice: 0.002,
+            outputTokenPrice: 0.006,
+            serviceType: 'ai_model' as const,
+            isActive: true,
+            autoCreated: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            createdBy: 'system'
+          };
+        }
+      }
+
+      // Convert to points using exchange rate
+      const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
+
+      // Safety check: prevent excessive deduction
+      if (pointsToDeduct > 100000) {
+        console.error('[DifyIframeMonitor] Token cost too high, potential error:', {
+          modelName,
+          totalTokens,
+          totalCost,
+          pointsToDeduct
+        });
+        return;
+      }
+
+      console.log(`[DifyIframeMonitor] Message_end with usage calculation:`, {
+        modelName,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        pointsToDeduct,
+        exchangeRate: this.currentExchangeRate
+      });
+
+      // Try to deduct balance
+      try {
+        const result = await db.deductUserBalance(
+          userId,
+          pointsToDeduct,
+          `Message end usage: ${modelName} (${totalTokens} tokens, $${totalCost.toFixed(6)})`
+        );
+
+        if (result.success) {
+          // Mark event as processed
+          this.processedEvents.add(eventId);
+          
+          // Clean up old processed events
+          if (this.processedEvents.size > 100) {
+            const eventsArray = Array.from(this.processedEvents);
+            this.processedEvents.clear();
+            eventsArray.slice(-50).forEach(id => this.processedEvents.add(id));
+          }
+
+          // Record token usage
+          try {
+            await db.addTokenUsageWithModel(
+              userId,
+              modelName,
+              inputTokens,
+              outputTokens,
+              totalTokens,
+              inputCost,
+              outputCost,
+              totalCost,
+              conversationId,
+              messageId
+            );
+            console.log('[DifyIframeMonitor] Message_end token usage recorded successfully');
+          } catch (usageError) {
+            console.error('[DifyIframeMonitor] Failed to record message_end token usage:', usageError);
+          }
+
+          // Notify callbacks
+          this.onTokenConsumption?.({
+            modelName,
+            inputTokens,
+            outputTokens,
+            totalTokens,
+            conversationId,
+            messageId,
+            timestamp: new Date().toISOString()
+          });
+
+          this.onBalanceUpdate?.(result.newBalance);
+
+          console.log(`[DifyIframeMonitor] Successfully processed message_end usage. New balance: ${result.newBalance}`);
+        } else {
+          console.error(`[DifyIframeMonitor] Failed to deduct balance: ${result.message}`);
+        }
+      } catch (balanceError) {
+        console.error('[DifyIframeMonitor] Error during balance deduction:', balanceError);
+      }
+    } catch (error) {
+      console.error('[DifyIframeMonitor] Error processing message_end with usage:', error);
+    }
   }
 
   private async processTokenConsumption(event: DifyMessageEndEvent, userId: string) {
@@ -736,8 +1144,43 @@ export class DifyIframeMonitor {
   }
 
   /**
-   * Simulate a workflow_finished token consumption event for testing
+   * Simulate a real Dify usage event for testing (based on actual udify.app format)
    */
+  public async simulateRealDifyUsage(
+    userId: string,
+    inputTokens: number = 2913,
+    outputTokens: number = 686,
+    inputPrice: number = 0.005826,
+    outputPrice: number = 0.005488
+  ): Promise<void> {
+    console.log('[DifyIframeMonitor] Simulating real Dify usage event');
+    
+    const totalTokens = inputTokens + outputTokens;
+    const totalPrice = inputPrice + outputPrice;
+
+    const mockEvent: DifyRealUsageEvent = {
+      conversation_id: `test_real_conv_${Date.now()}`,
+      message_id: `test_real_msg_${Date.now()}`,
+      usage: {
+        prompt_tokens: inputTokens,
+        prompt_unit_price: "2",
+        prompt_price_unit: "0.000001",
+        prompt_price: inputPrice.toString(),
+        completion_tokens: outputTokens,
+        completion_unit_price: "8",
+        completion_price_unit: "0.000001",
+        completion_price: outputPrice.toString(),
+        total_tokens: totalTokens,
+        total_price: totalPrice.toString(),
+        currency: "USD",
+        latency: 2.6395470835268497
+      },
+      finish_reason: "stop",
+      files: []
+    };
+
+    await this.processRealDifyUsage(mockEvent, userId);
+  }
   public async simulateWorkflowTokenConsumption(
     userId: string,
     inputTokens: number = 2913,

@@ -157,6 +157,17 @@ const App = () => {
     }
   };
 
+  // Expose services globally for debugging
+  useEffect(() => {
+    // Make services available globally for console debugging
+    (window as any).difyIframeMonitor = difyIframeMonitor;
+    (window as any).authService = authService;
+    
+    console.log('[App] Services exposed globally for debugging:');
+    console.log('  - window.difyIframeMonitor');
+    console.log('  - window.authService');
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
