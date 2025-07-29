@@ -119,34 +119,84 @@ export class DifyIframeMonitor {
 
   private async handleMessage(event: MessageEvent, userId: string) {
     try {
+      console.log('[DifyIframeMonitor] ===============================================');
       console.log('[DifyIframeMonitor] Received message from:', event.origin);
       console.log('[DifyIframeMonitor] Message data:', event.data);
+      console.log('[DifyIframeMonitor] Event type:', event.data?.event);
+      console.log('[DifyIframeMonitor] User ID:', userId);
       
       // Validate message origin for security
       if (!this.isValidOrigin(event.origin)) {
-        console.log('[DifyIframeMonitor] Message rejected - invalid origin:', event.origin);
+        console.log('[DifyIframeMonitor] ❌ Message rejected - invalid origin:', event.origin);
         return;
       }
 
+      console.log('[DifyIframeMonitor] ✅ Origin validation passed for:', event.origin);
       const data = event.data;
       
       // Check if this is a Dify message_end event
       if (data?.event === 'message_end' && data?.data) {
-        console.log('[DifyIframeMonitor] Processing message_end event');
+        console.log('[DifyIframeMonitor] 🚀 Processing message_end event from:', event.origin);
+        console.log('[DifyIframeMonitor] Token data:', data.data);
         await this.processTokenConsumption(data.data as DifyMessageEndEvent, userId);
       } else {
-        console.log('[DifyIframeMonitor] Message ignored - not a message_end event:', data?.event);
+        console.log('[DifyIframeMonitor] ⏭️ Message ignored - not a message_end event. Event type:', data?.event);
       }
+      console.log('[DifyIframeMonitor] ===============================================');
     } catch (error) {
-      console.error('[DifyIframeMonitor] Error handling iframe message:', error);
+      console.error('[DifyIframeMonitor] ❌ Error handling iframe message:', error);
+      console.error('[DifyIframeMonitor] Origin:', event.origin);
+      console.error('[DifyIframeMonitor] Data:', event.data);
     }
   }
 
   private isValidOrigin(origin: string): boolean {
     const validOrigins = this.getValidOrigins();
-    return validOrigins.some(validOrigin => 
-      origin === validOrigin || origin.includes(validOrigin)
-    );
+    
+    // First check exact matches
+    if (validOrigins.includes(origin)) {
+      console.log('[DifyIframeMonitor] Origin validation - exact match:', origin);
+      return true;
+    }
+    
+    try {
+      const url = new URL(origin);
+      
+      // Check for subdomain matches for udify.app (must be exact subdomain, not just containing)
+      if (url.protocol === 'https:' && url.hostname.endsWith('.udify.app')) {
+        console.log('[DifyIframeMonitor] Origin validation - udify.app subdomain match:', origin);
+        return true;
+      }
+      
+      // Check for specific path matches for known domains (like udify.app with paths)
+      for (const validOrigin of validOrigins) {
+        try {
+          const validUrl = new URL(validOrigin);
+          if (url.hostname === validUrl.hostname && url.protocol === validUrl.protocol) {
+            console.log('[DifyIframeMonitor] Origin validation - domain match:', origin, 'with base:', validOrigin);
+            return true;
+          }
+        } catch (e) {
+          // Handle cases where validOrigin might not be a full URL
+          if (origin.startsWith(validOrigin + '/') || origin === validOrigin) {
+            console.log('[DifyIframeMonitor] Origin validation - path match:', origin, 'with base:', validOrigin);
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      // If URL parsing fails, fall back to string matching for basic cases
+      for (const validOrigin of validOrigins) {
+        if (origin.startsWith(validOrigin + '/') || origin === validOrigin) {
+          console.log('[DifyIframeMonitor] Origin validation - fallback path match:', origin, 'with base:', validOrigin);
+          return true;
+        }
+      }
+    }
+    
+    console.log('[DifyIframeMonitor] Origin validation - REJECTED:', origin);
+    console.log('[DifyIframeMonitor] Valid origins:', validOrigins);
+    return false;
   }
 
   private getValidOrigins(): string[] {
@@ -155,6 +205,9 @@ export class DifyIframeMonitor {
       'https://dify.ai',
       'https://cloud.dify.ai',
       'https://app.dify.ai',
+      // Add udify.app domains for real token monitoring
+      'https://udify.app',
+      'https://chatbot.udify.app',
       window.location.origin, // Allow same-origin for testing
       // Add more as needed
     ];
@@ -478,6 +531,50 @@ export class DifyIframeMonitor {
     };
 
     await this.processTokenConsumption(mockEvent, userId);
+  }
+
+  /**
+   * Test method to validate if a given origin would be accepted
+   * Useful for debugging domain issues
+   */
+  public testOriginValidation(origin: string): boolean {
+    console.log(`[DifyIframeMonitor] Testing origin validation for: ${origin}`);
+    const result = this.isValidOrigin(origin);
+    console.log(`[DifyIframeMonitor] Origin ${origin} is ${result ? 'VALID' : 'INVALID'}`);
+    return result;
+  }
+
+  /**
+   * Test method to simulate receiving a message from a specific origin
+   * Useful for debugging real udify.app integration
+   */
+  public simulateMessageFromOrigin(origin: string, userId: string, messageData?: { event: string; data?: DifyMessageEndEvent }): void {
+    console.log(`[DifyIframeMonitor] Simulating message from origin: ${origin}`);
+    
+    const mockEvent = {
+      origin: origin,
+      data: messageData || {
+        event: 'message_end',
+        data: {
+          event: 'message_end',
+          conversation_id: `test_conv_${Date.now()}`,
+          message_id: `test_msg_${Date.now()}`,
+          user_id: userId,
+          model_name: 'gpt-4',
+          input_tokens: 1000,
+          output_tokens: 500,
+          total_tokens: 1500,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            test: true,
+            simulated: true,
+            fromOrigin: origin
+          }
+        }
+      }
+    } as MessageEvent;
+
+    this.handleMessage(mockEvent, userId);
   }
 
   /**
