@@ -48,6 +48,44 @@ let mockTokenUsage: TokenUsage[] = [];
 let mockBillingRecords: BillingRecord[] = [];
 const mockExchangeRate = 10000;
 
+// Initialize with some sample token usage data for testing
+const initializeSampleData = () => {
+  const sampleTokenUsage: TokenUsage[] = [
+    {
+      id: 'sample-1',
+      userId: 'mock-user-1',
+      serviceId: 'dify',
+      tokensUsed: 3599,
+      cost: 0.0113,
+      timestamp: '2025-01-29T13:43:22.000Z',
+      sessionId: 'session-1'
+    },
+    {
+      id: 'sample-2', 
+      userId: 'mock-user-1',
+      serviceId: 'dify',
+      tokensUsed: 2156,
+      cost: 0.0068,
+      timestamp: '2025-01-29T13:40:15.000Z',
+      sessionId: 'session-2'
+    },
+    {
+      id: 'sample-3',
+      userId: 'mock-user-1', 
+      serviceId: 'dify',
+      tokensUsed: 1895,
+      cost: 0.0052,
+      timestamp: '2025-01-29T13:35:10.000Z',
+      sessionId: 'session-3'
+    }
+  ];
+  
+  mockTokenUsage.push(...sampleTokenUsage);
+};
+
+// Initialize sample data
+initializeSampleData();
+
 export class MockDatabaseService {
   
   // Model configuration methods
@@ -259,6 +297,55 @@ export class MockDatabaseService {
     mockBillingRecords.push(billing);
     console.log('[MockDB] Added billing record:', type, amount);
     return billing;
+  }
+
+  // Token consumption monitoring methods
+  async getTokenConsumptionStats(): Promise<{
+    totalConsumptions: number;
+    totalCreditsDeducted: number;
+  }> {
+    const totalConsumptions = mockTokenUsage.length;
+    
+    // Calculate total credits deducted by converting USD cost to credits
+    const totalUsdCost = mockTokenUsage.reduce((sum, record) => sum + (record.cost || 0), 0);
+    const totalCreditsDeducted = Math.round(totalUsdCost * mockExchangeRate);
+    
+    console.log('[MockDB] Token consumption stats:', totalConsumptions, 'consumptions,', totalCreditsDeducted, 'credits deducted');
+    
+    return { 
+      totalConsumptions, 
+      totalCreditsDeducted 
+    };
+  }
+
+  async getDetailedTokenConsumptionRecords(): Promise<Array<{
+    id: string;
+    timestamp: string;
+    userEmail: string;
+    service: string;
+    tokens: number;
+    costUsd: number;
+    credits: number;
+    model?: string;
+  }>> {
+    // Transform mock token usage data to the required format
+    const records = mockTokenUsage.map(record => {
+      const user = mockUsers.find(u => u.id === record.userId);
+      return {
+        id: record.id,
+        timestamp: record.timestamp,
+        userEmail: user?.email || 'unknown@example.com',
+        service: 'dify-workflow',
+        tokens: record.tokensUsed,
+        costUsd: record.cost || 0,
+        credits: Math.round((record.cost || 0) * mockExchangeRate),
+        model: 'gpt-3.5-turbo', // Default model for mock data
+      };
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 100); // Limit to recent 100 records
+
+    console.log('[MockDB] Retrieved', records.length, 'detailed token consumption records');
+    return records;
   }
 
   // Debug methods
