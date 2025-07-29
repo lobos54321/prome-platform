@@ -462,12 +462,47 @@ export class DifyIframeMonitor {
         return;
       }
 
+      // Ensure 'dify-workflow' model configuration exists
+      const modelName = 'dify-workflow';
+      let modelConfig = this.modelConfigs.find(
+        config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
+      );
+
+      if (!modelConfig) {
+        console.log(`[DifyIframeMonitor] Model config not found for: ${modelName}, attempting to auto-create...`);
+        
+        // Try to auto-create the dify-workflow model configuration
+        const autoCreatedModel = await this.autoCreateModelConfig(modelName);
+        if (autoCreatedModel) {
+          console.log(`[DifyIframeMonitor] Successfully auto-created model config for: ${modelName}`);
+          modelConfig = autoCreatedModel;
+          // Add to local cache
+          this.modelConfigs.push(autoCreatedModel);
+        } else {
+          console.warn(`[DifyIframeMonitor] Failed to auto-create model config for: ${modelName}, creating fallback config`);
+          // Create a fallback config specifically for dify-workflow
+          modelConfig = {
+            id: `fallback-${modelName}`,
+            modelName: modelName,
+            inputTokenPrice: 0.002, // Default pricing for workflow models
+            outputTokenPrice: 0.006,
+            serviceType: 'workflow' as const,
+            isActive: true,
+            autoCreated: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            createdBy: 'system'
+          };
+        }
+      }
+
       // Convert to points using exchange rate
       const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
 
       // Safety check: prevent excessive deduction
       if (pointsToDeduct > 100000) { // Adjust threshold as needed
         console.error('[DifyIframeMonitor] Token cost too high, potential error:', {
+          modelName,
           totalTokens,
           totalCost,
           pointsToDeduct
@@ -476,6 +511,7 @@ export class DifyIframeMonitor {
       }
 
       console.log(`[DifyIframeMonitor] Workflow token consumption calculation:`, {
+        modelName,
         inputTokens,
         outputTokens,
         totalTokens,
@@ -491,7 +527,7 @@ export class DifyIframeMonitor {
         const result = await db.deductUserBalance(
           userId,
           pointsToDeduct,
-          `Workflow token usage: ${totalTokens} tokens ($${totalCost.toFixed(6)})`
+          `Workflow token usage: ${modelName} (${totalTokens} tokens, $${totalCost.toFixed(6)})`
         );
 
         if (result.success) {
@@ -505,11 +541,11 @@ export class DifyIframeMonitor {
             eventsArray.slice(-50).forEach(id => this.processedEvents.add(id));
           }
 
-          // Record token usage - use 'dify-workflow' as model name since we don't have specific model info
+          // Record token usage - use dify-workflow model name with actual Dify-provided costs
           try {
             await db.addTokenUsageWithModel(
               userId,
-              'dify-workflow', // Generic model name for workflow usage
+              modelName,
               inputTokens,
               outputTokens,
               totalTokens,
@@ -526,7 +562,7 @@ export class DifyIframeMonitor {
 
           // Notify callbacks
           this.onTokenConsumption?.({
-            modelName: 'dify-workflow',
+            modelName,
             inputTokens,
             outputTokens,
             totalTokens,
@@ -576,6 +612,9 @@ export class DifyIframeMonitor {
       // Determine default pricing based on common model patterns
       const defaultPricing = this.getDefaultModelPricing(modelName);
       
+      // Determine service type based on model name
+      const serviceType = modelName.toLowerCase() === 'dify-workflow' ? 'workflow' : 'ai_model';
+      
       // Use system user ID for auto-created models
       const systemUserId = 'system'; // We'll create a system user for auto-generated configs
       
@@ -584,8 +623,8 @@ export class DifyIframeMonitor {
         defaultPricing.inputTokenPrice,
         defaultPricing.outputTokenPrice,
         systemUserId,
-        'ai_model', // Default service type for auto-detected models
-        undefined, // No workflow cost for AI models
+        serviceType,
+        undefined, // No fixed workflow cost - costs come from Dify pricing
         true // Mark as auto-created
       );
 
@@ -610,6 +649,11 @@ export class DifyIframeMonitor {
    */
   private getDefaultModelPricing(modelName: string): { inputTokenPrice: number; outputTokenPrice: number } {
     const name = modelName.toLowerCase();
+    
+    // Dify workflow models - use moderate pricing since actual costs come from Dify
+    if (name === 'dify-workflow') {
+      return { inputTokenPrice: 0.002, outputTokenPrice: 0.006 }; // Moderate default for workflow models
+    }
     
     // GPT models
     if (name.includes('gpt-4o') || name.includes('gpt-4-turbo')) {
