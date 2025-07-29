@@ -8,6 +8,8 @@ import { Layout } from './components/layout/Layout';
 import { authService } from './lib/auth';
 import { difyIframeMonitor } from './lib/dify-iframe-monitor';
 import { isDifyEnabled } from './api/dify-api';
+import { environmentValidator } from './lib/environment-validator';
+import { databaseTester } from './lib/database-tester';
 import { User } from './types';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -23,6 +25,7 @@ import Settings from './pages/Settings';
 import AIContentGeneration from './pages/AIContentGeneration';
 import DifyTestPage from './pages/DifyTestPage';
 import TokenMonitorTest from './pages/TokenMonitorTest';
+import SystemDiagnostics from './pages/SystemDiagnostics';
 
 import NotFound from './pages/NotFound';
 
@@ -36,7 +39,22 @@ const App = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('Starting auth initialization on page load...');
+        console.log('Starting application initialization...');
+        
+        // Validate environment configuration
+        environmentValidator.logValidationResults();
+        
+        // Test database connection if not in test mode
+        const isTestMode = import.meta.env.VITE_TEST_MODE === 'true' ||
+                           import.meta.env.VITE_NON_ADMIN_TEST === 'true' ||
+                           import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
+        
+        if (!isTestMode) {
+          console.log('Testing database connection...');
+          await databaseTester.testBasicConnection();
+        }
+        
+        console.log('Starting auth initialization...');
         // 只在这里初始化认证状态，避免重复调用
         await authService.initializeAuth();
         console.log('Auth initialization completed');
@@ -51,7 +69,7 @@ const App = () => {
           initializeDifyMonitoring(user);
         }
       } catch (error) {
-        console.error('Auth initialization failed:', error);
+        console.error('Application initialization failed:', error);
         authService.forceLogout();
       } finally {
         setIsInitialized(true);
@@ -179,6 +197,7 @@ const App = () => {
               <Route path="/admin" element={<Admin />} />
               <Route path="/dify-test" element={<DifyTestPage />} />
               <Route path="/token-monitor-test" element={<TokenMonitorTest />} />
+              <Route path="/system-diagnostics" element={<SystemDiagnostics />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
