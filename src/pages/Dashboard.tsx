@@ -12,7 +12,8 @@ import {
   Plus, 
   DollarSign,
   ArrowRight,
-  Search
+  Search,
+  RefreshCw
 } from 'lucide-react';
 import { TokenUsage, BillingRecord } from '@/types';
 import { servicesAPI } from '@/lib/services';
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
   // Handle user authentication - only redirect if not loading and no user
   useEffect(() => {
@@ -128,6 +130,21 @@ export default function Dashboard() {
     }).format(date);
   };
 
+  const refreshBalance = async () => {
+    if (!user || !user.id || isRefreshingBalance) return;
+    
+    try {
+      setIsRefreshingBalance(true);
+      console.log('Manual balance refresh requested...');
+      await authService.refreshBalance();
+      console.log('Manual balance refresh completed');
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -139,7 +156,19 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">账户余额</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={refreshBalance}
+                disabled={isRefreshingBalance}
+                title="刷新余额"
+              >
+                <RefreshCw className={`h-3 w-3 ${isRefreshingBalance ? 'animate-spin' : ''}`} />
+              </Button>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
