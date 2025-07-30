@@ -24,6 +24,7 @@ import Purchase from './pages/Purchase';
 import Settings from './pages/Settings';
 import AIContentGeneration from './pages/AIContentGeneration';
 import DifyTestPage from './pages/DifyTestPage';
+import DifyChat from './pages/DifyChat';
 import TokenMonitorTest from './pages/TokenMonitorTest';
 import SystemDiagnostics from './pages/SystemDiagnostics';
 import SessionIdTest from './pages/SessionIdTest';
@@ -160,8 +161,8 @@ const App = () => {
   // Expose services globally for debugging
   useEffect(() => {
     // Make services available globally for console debugging
-    (window as any).difyIframeMonitor = difyIframeMonitor;
-    (window as any).authService = authService;
+    (window as Record<string, unknown>).difyIframeMonitor = difyIframeMonitor;
+    (window as Record<string, unknown>).authService = authService;
     
     console.log('[App] Services exposed globally for debugging:');
     console.log('  - window.difyIframeMonitor');
@@ -205,6 +206,7 @@ const App = () => {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/token-dashboard" element={<TokenDashboard />} />
               <Route path="/chat/:serviceId" element={<Chat />} />
+              <Route path="/chat/dify" element={<DifyChat />} />
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/dify-test" element={<DifyTestPage />} />

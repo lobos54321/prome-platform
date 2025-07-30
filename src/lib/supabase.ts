@@ -1087,6 +1087,56 @@ class DatabaseService {
     }
   }
 
+  async getTokenUsageByModel(modelName: string): Promise<Array<{
+    id: string;
+    userId: string;
+    modelName: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    inputCost: number;
+    outputCost: number;
+    totalCost: number;
+    conversationId?: string;
+    messageId?: string;
+    timestamp: string;
+  }>> {
+    if (!isSupabaseConfigured) {
+      return await mockDb.getTokenUsageByModel(modelName);
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .from('token_usage')
+        .select('*')
+        .eq('model', modelName)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error getting token usage by model:', error);
+        return [];
+      }
+
+      return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        modelName: item.model,
+        inputTokens: item.input_tokens || 0,
+        outputTokens: item.output_tokens || 0,
+        totalTokens: item.tokens_used,
+        inputCost: item.input_cost || 0,
+        outputCost: item.output_cost || 0,
+        totalCost: item.cost,
+        conversationId: item.conversation_id,
+        messageId: item.message_id,
+        timestamp: item.created_at,
+      }));
+    } catch (error) {
+      console.error('Error getting token usage by model:', error);
+      return [];
+    }
+  }
+
   // BALANCE MANAGEMENT WITH DEDUCTION
   async deductUserBalance(
     userId: string,
