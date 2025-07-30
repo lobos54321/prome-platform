@@ -160,8 +160,8 @@ const App = () => {
   // Expose services globally for debugging
   useEffect(() => {
     // Make services available globally for console debugging
-    (window as any).difyIframeMonitor = difyIframeMonitor;
-    (window as any).authService = authService;
+    (window as Record<string, unknown>).difyIframeMonitor = difyIframeMonitor;
+    (window as Record<string, unknown>).authService = authService;
     
     console.log('[App] Services exposed globally for debugging:');
     console.log('  - window.difyIframeMonitor');
