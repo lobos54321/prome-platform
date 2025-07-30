@@ -5,6 +5,8 @@
  * accurate token monitoring and billing.
  */
 
+import { generateUUID } from '@/lib/utils';
+
 export interface DifyMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -115,7 +117,13 @@ export class DifyAPIClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Dify API error: ${response.status} ${response.statusText} - ${errorText}`);
+      
+      // Special handling for conversation ID format errors
+      if (response.status === 400 && errorText.includes('not a valid uuid')) {
+        throw new Error('Conversation ID format error. Please start a new conversation.');
+      }
+      
+      throw new Error(`Dify API error: ${response.status} - ${errorText}`);
     }
 
     return await response.json();
@@ -149,7 +157,13 @@ export class DifyAPIClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Dify API error: ${response.status} ${response.statusText} - ${errorText}`);
+      
+      // Special handling for conversation ID format errors
+      if (response.status === 400 && errorText.includes('not a valid uuid')) {
+        throw new Error('Conversation ID format error. Please start a new conversation.');
+      }
+      
+      throw new Error(`Dify API error: ${response.status} - ${errorText}`);
     }
 
     const reader = response.body?.getReader();
@@ -308,8 +322,8 @@ export class DifyAPIClient {
   async startNewConversation(): Promise<string> {
     // Dify doesn't have explicit "start conversation" endpoint
     // Conversations are created automatically when sending first message
-    // Return a unique identifier for tracking
-    return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Return a proper UUID v4 identifier for tracking
+    return generateUUID();
   }
 
   /**

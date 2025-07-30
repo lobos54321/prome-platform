@@ -9,6 +9,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { DifyAPIClient, DifyMessage, DifyResponse, DifyStreamResponse, createDifyAPIClient } from '@/lib/dify-api-client';
 import { useTokenMonitoring } from './useTokenMonitoring';
 import { authService } from '@/lib/auth';
+import { generateUUID, isValidUUID } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export interface ChatMessage {
@@ -76,10 +77,18 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
   const { processTokenUsage } = useTokenMonitoring();
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Initialize Dify client
+  // Initialize Dify client and clean up invalid conversation IDs
   useEffect(() => {
     try {
       clientRef.current = createDifyAPIClient();
+      
+      // Clean up any existing invalid conversation IDs from storage
+      const storedConversationId = localStorage.getItem('dify_conversation_id') || sessionStorage.getItem('dify_conversation_id');
+      if (storedConversationId && !isValidUUID(storedConversationId)) {
+        localStorage.removeItem('dify_conversation_id');
+        sessionStorage.removeItem('dify_conversation_id');
+        console.log('Cleaned up invalid conversation ID from storage:', storedConversationId);
+      }
     } catch (error) {
       console.error('Failed to initialize Dify client:', error);
       setState(prev => ({ 
@@ -101,12 +110,28 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
   }, []);
 
   const startNewConversation = useCallback(() => {
+    // Clear any invalid conversation IDs from storage
+    const oldConversationId = localStorage.getItem('dify_conversation_id');
+    if (oldConversationId && !isValidUUID(oldConversationId)) {
+      localStorage.removeItem('dify_conversation_id');
+      sessionStorage.removeItem('dify_conversation_id');
+    }
+    
+    const newConversationId = generateUUID();
+    
     setState(prev => ({
       ...prev,
-      conversationId: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      conversationId: newConversationId,
       messages: [],
       error: null
     }));
+
+    // Store the new UUID for potential reuse
+    localStorage.setItem('dify_conversation_id', newConversationId);
+    
+    toast.success('已开始新对话', {
+      description: '对话ID已生成，可以开始聊天了'
+    });
   }, []);
 
   const addMessage = useCallback((message: ChatMessage) => {
@@ -278,20 +303,35 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       console.error('Error sending message:', error);
       
-      updateMessage(assistantMessageId, {
-        content: '',
-        isStreaming: false,
-        error: errorMessage
-      });
+      // Handle conversation ID format errors
+      if (errorMessage.includes('Conversation ID format error')) {
+        console.log('Conversation ID format error detected, starting new conversation');
+        startNewConversation();
+        toast.warning('对话ID格式错误，已自动开始新对话', {
+          description: '请重新发送您的消息'
+        });
+        
+        updateMessage(assistantMessageId, {
+          content: '',
+          isStreaming: false,
+          error: '对话ID格式错误，已开始新对话，请重新发送消息'
+        });
+      } else {
+        updateMessage(assistantMessageId, {
+          content: '',
+          isStreaming: false,
+          error: errorMessage
+        });
+
+        toast.error('发送消息失败', {
+          description: errorMessage
+        });
+      }
 
       setState(prev => ({
         ...prev,
         error: errorMessage
       }));
-
-      toast.error('发送消息失败', {
-        description: errorMessage
-      });
     } finally {
       setState(prev => ({
         ...prev,
