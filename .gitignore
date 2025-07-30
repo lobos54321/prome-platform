@@ -59,6 +59,11 @@ jspm_packages/
 tmp/
 temp/
 
+# Test files
+test-*.js
+test-*.ts
+*.test.tmp
+
 # Package manager files
 package-lock.json
 yarn.lock
