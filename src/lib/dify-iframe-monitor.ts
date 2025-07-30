@@ -18,6 +18,7 @@ export class DifyIframeMonitor {
   private onTokenConsumption?: (event: TokenConsumptionEvent) => void;
   private onBalanceUpdate?: (newBalance: number) => void;
   private onNewModelDetected?: (model: ModelConfig) => void;
+  private onConfigurationFailed?: (reason: string) => void;
   private processedEvents = new Set<string>(); // Prevent duplicate processing
   private lastEventTime = 0;
   private minEventInterval = 1000; // Minimum 1 second between events
@@ -269,10 +270,36 @@ export class DifyIframeMonitor {
       setTimeout(() => {
         console.log('[DifyIframeMonitor] ⏰ 30 seconds elapsed - checking if usage tracking is working...');
         console.log('[DifyIframeMonitor] If no usage events have been received, consider implementing backup tracking methods');
+        // Could trigger fallback tracking here if needed
+        this.checkUsageTrackingStatus();
       }, 30000);
 
     } catch (error) {
       console.error('[DifyIframeMonitor] ❌ Error configuring Dify usage tracking:', error);
+    }
+  }
+
+  /**
+   * Check if usage tracking is working and suggest alternatives if not
+   */
+  private checkUsageTrackingStatus(): void {
+    const now = Date.now();
+    const timeSinceLastEvent = now - this.lastEventTime;
+    
+    if (timeSinceLastEvent > 30000 && this.processedEvents.size === 0) {
+      console.warn('[DifyIframeMonitor] ⚠️ No usage events received in 30 seconds after configuration');
+      console.warn('[DifyIframeMonitor] Dify may not support usage tracking via postMessage');
+      console.warn('[DifyIframeMonitor] Consider these alternatives:');
+      console.warn('[DifyIframeMonitor] 1. Manual usage tracking');
+      console.warn('[DifyIframeMonitor] 2. Iframe activity monitoring');
+      console.warn('[DifyIframeMonitor] 3. Direct API integration with Dify');
+      
+      // Could emit an event here for the UI to show alternative options
+      if (this.onConfigurationFailed) {
+        this.onConfigurationFailed('No usage events received after configuration attempts');
+      }
+    } else if (this.processedEvents.size > 0) {
+      console.log('[DifyIframeMonitor] ✅ Usage tracking appears to be working - events processed:', this.processedEvents.size);
     }
   }
 
@@ -1207,6 +1234,13 @@ export class DifyIframeMonitor {
   }
 
   /**
+   * Set callback for when configuration attempts fail
+   */
+  public setOnConfigurationFailed(callback: (reason: string) => void) {
+    this.onConfigurationFailed = callback;
+  }
+
+  /**
    * Simulate a token consumption event for testing
    */
   public async simulateTokenConsumption(
@@ -1307,6 +1341,86 @@ export class DifyIframeMonitor {
     };
 
     await this.processWorkflowTokenConsumption(mockEvent, userId);
+  }
+
+  /**
+   * Manual token usage recording - fallback method when Dify doesn't provide usage data
+   */
+  public async recordManualTokenUsage(
+    userId: string,
+    modelName: string,
+    inputTokens: number,
+    outputTokens: number,
+    description: string = 'Manual token usage entry'
+  ): Promise<{ success: boolean; message: string; newBalance?: number }> {
+    try {
+      console.log('[DifyIframeMonitor] 📝 Recording manual token usage:', {
+        userId, modelName, inputTokens, outputTokens, description
+      });
+
+      const totalTokens = inputTokens + outputTokens;
+
+      // Find or create model config
+      let modelConfig = this.modelConfigs.find(
+        config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
+      );
+
+      if (!modelConfig) {
+        const autoCreatedModel = await this.autoCreateModelConfig(modelName);
+        if (autoCreatedModel) {
+          modelConfig = autoCreatedModel;
+          this.modelConfigs.push(autoCreatedModel);
+        } else {
+          return { success: false, message: `Model configuration not found for: ${modelName}` };
+        }
+      }
+
+      // Calculate costs
+      const inputCost = (inputTokens / 1000) * modelConfig.inputTokenPrice;
+      const outputCost = (outputTokens / 1000) * modelConfig.outputTokenPrice;
+      const totalCost = inputCost + outputCost;
+      const pointsToDeduct = Math.round(totalCost * this.currentExchangeRate);
+
+      // Deduct balance
+      const result = await db.deductUserBalance(userId, pointsToDeduct, description);
+
+      if (result.success) {
+        // Record usage
+        await db.addTokenUsageWithModel(
+          userId,
+          modelName,
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          inputCost,
+          outputCost,
+          totalCost,
+          `manual_${Date.now()}`,
+          `manual_${Date.now()}`
+        );
+
+        // Notify callbacks
+        this.onTokenConsumption?.({
+          modelName,
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          conversationId: `manual_${Date.now()}`,
+          messageId: `manual_${Date.now()}`,
+          timestamp: new Date().toISOString()
+        });
+
+        this.onBalanceUpdate?.(result.newBalance);
+
+        console.log('[DifyIframeMonitor] ✅ Manual token usage recorded successfully');
+        return { success: true, message: 'Token usage recorded successfully', newBalance: result.newBalance };
+      } else {
+        return { success: false, message: result.message };
+      }
+    } catch (error) {
+      console.error('[DifyIframeMonitor] ❌ Error recording manual token usage:', error);
+      return { success: false, message: 'Error recording token usage' };
+    }
   }
 
   /**
