@@ -1,4 +1,4 @@
-import { DifyMessageEndEvent, DifyWorkflowFinishedEvent, DifyRealUsageEvent, ModelConfig } from '@/types';
+import { DifyMessageEndEvent, DifyWorkflowFinishedEvent, DifyRealUsageEvent, DifyReadyEvent, DifyGenericEvent, ModelConfig } from '@/types';
 import { db } from '@/lib/supabase';
 
 export interface TokenConsumptionEvent {
@@ -140,39 +140,47 @@ export class DifyIframeMonitor {
       console.log('[DifyIframeMonitor] ✅ Origin validation passed for:', event.origin);
       const data = event.data;
       
+      // Check for Dify ready message - respond with configuration requests
+      if (data?.type === 'dify-chatbot-iframe-ready') {
+        console.log('[DifyIframeMonitor] 🎯 DIFY READY MESSAGE DETECTED from:', event.origin);
+        console.log('[DifyIframeMonitor] Attempting to configure Dify usage tracking...');
+        await this.configureDifyUsageTracking(event.source, event.origin);
+      }
       // Check for real Dify usage format (top-level usage field)
-      if (data?.usage && data.usage.total_tokens > 0) {
+      else if (data?.usage && data.usage.total_tokens > 0) {
         console.log('[DifyIframeMonitor] 🚀 Processing real Dify usage event from:', event.origin);
         console.log('[DifyIframeMonitor] Real usage data:', data.usage);
         await this.processRealDifyUsage(data as DifyRealUsageEvent, userId);
       }
-      // Check if this is a Dify message_end event (legacy format)
-      else if (data?.event === 'message_end' && data?.data) {
+      // Check if this is a Dify message_end event (legacy format) - support both 'event' and 'type' fields
+      else if ((data?.event === 'message_end' || data?.type === 'message_end') && data?.data) {
         console.log('[DifyIframeMonitor] 🚀 Processing message_end event from:', event.origin);
         console.log('[DifyIframeMonitor] Token data:', data.data);
         await this.processTokenConsumption(data.data as DifyMessageEndEvent, userId);
       }
-      // Check if this is a message_end event with usage field
-      else if (data?.event === 'message_end' && data?.usage) {
+      // Check if this is a message_end event with usage field - support both 'event' and 'type' fields
+      else if ((data?.event === 'message_end' || data?.type === 'message_end') && data?.usage) {
         console.log('[DifyIframeMonitor] 🚀 Processing message_end with usage from:', event.origin);
         console.log('[DifyIframeMonitor] Usage data:', data.usage);
         await this.processMessageEndWithUsage(data as DifyMessageEndEvent, userId);
       }
-      // Check if this is a Dify workflow_finished event (new format)
-      else if (data?.event === 'workflow_finished' && data?.data?.metadata?.usage) {
+      // Check if this is a Dify workflow_finished event (new format) - support both 'event' and 'type' fields
+      else if ((data?.event === 'workflow_finished' || data?.type === 'workflow_finished') && data?.data?.metadata?.usage) {
         console.log('[DifyIframeMonitor] 🚀 Processing workflow_finished event from:', event.origin);
         console.log('[DifyIframeMonitor] Workflow data:', data);
         await this.processWorkflowTokenConsumption(data as DifyWorkflowFinishedEvent, userId);
       } 
       else {
-        console.log('[DifyIframeMonitor] ⏭️ Message ignored - not a supported event. Event type:', data?.event);
-        // Log detailed info for udify.app messages to help debug
+        console.log('[DifyIframeMonitor] ⏭️ Message ignored - not a supported event. Event type:', data?.event || data?.type);
+        // Enhanced logging for udify.app messages to help debug
         if (event.origin.includes('udify.app')) {
           console.log('[DifyIframeMonitor] 🔍 UDIFY.APP message analysis:');
           console.log('[DifyIframeMonitor] - Has event field:', !!data?.event);
+          console.log('[DifyIframeMonitor] - Has type field:', !!data?.type);
           console.log('[DifyIframeMonitor] - Has usage field:', !!data?.usage);
           console.log('[DifyIframeMonitor] - Has data field:', !!data?.data);
           console.log('[DifyIframeMonitor] - Top-level keys:', Object.keys(data || {}));
+          console.log('[DifyIframeMonitor] - Full message content:', JSON.stringify(data, null, 2));
         }
       }
       console.log('[DifyIframeMonitor] ===============================================');
@@ -180,6 +188,91 @@ export class DifyIframeMonitor {
       console.error('[DifyIframeMonitor] ❌ Error handling iframe message:', error);
       console.error('[DifyIframeMonitor] Origin:', event.origin);
       console.error('[DifyIframeMonitor] Data:', event.data);
+    }
+  }
+
+  /**
+   * Attempt to configure Dify iframe to enable usage tracking
+   * Called when we receive a dify-chatbot-iframe-ready message
+   */
+  private async configureDifyUsageTracking(source: MessageEventSource | null, origin: string): Promise<void> {
+    if (!source) {
+      console.warn('[DifyIframeMonitor] No message source available for configuration');
+      return;
+    }
+
+    console.log('[DifyIframeMonitor] 🔧 Configuring Dify usage tracking for origin:', origin);
+    
+    try {
+      // Try multiple configuration approaches to enable usage tracking
+      const configMessages = [
+        // Approach 1: Request usage tracking enable
+        {
+          type: 'enable-usage-tracking',
+          events: ['message_end', 'usage_update', 'token_consumption'],
+          config: { enablePostMessage: true, trackUsage: true }
+        },
+        // Approach 2: Subscribe to events
+        {
+          action: 'subscribe',
+          events: ['message_end', 'workflow_finished', 'usage'],
+          postMessage: true
+        },
+        // Approach 3: Configure chatbot
+        {
+          action: 'configure',
+          config: { 
+            enablePostMessage: true, 
+            trackUsage: true,
+            reportTokens: true,
+            eventSubscription: ['message_end', 'usage_update']
+          }
+        },
+        // Approach 4: Request specific event types
+        {
+          type: 'request-events',
+          requestedEvents: ['message_end', 'usage', 'token_usage'],
+          callback: true
+        },
+        // Approach 5: Enable monitoring
+        {
+          action: 'enable-monitoring',
+          monitor: {
+            tokens: true,
+            usage: true,
+            costs: true
+          }
+        }
+      ];
+
+      // Send each configuration message with a delay
+      for (let i = 0; i < configMessages.length; i++) {
+        const config = configMessages[i];
+        console.log(`[DifyIframeMonitor] 📤 Sending config ${i + 1}/${configMessages.length}:`, config);
+        
+        try {
+          source.postMessage(config, origin);
+          
+          // Wait between messages to avoid overwhelming the iframe
+          if (i < configMessages.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (postError) {
+          console.warn(`[DifyIframeMonitor] Failed to send config ${i + 1}:`, postError);
+        }
+      }
+
+      console.log('[DifyIframeMonitor] ✅ Finished sending configuration requests to Dify');
+      console.log('[DifyIframeMonitor] 🕐 Waiting for usage events... If none arrive in 30 seconds, Dify may not support usage tracking');
+      
+      // Set a timer to check if we receive usage events
+      setTimeout(() => {
+        console.log('[DifyIframeMonitor] ⏰ 30 seconds elapsed - checking if usage tracking is working...');
+        console.log('[DifyIframeMonitor] If no usage events have been received, consider implementing backup tracking methods');
+      }, 30000);
+
+    } catch (error) {
+      console.error('[DifyIframeMonitor] ❌ Error configuring Dify usage tracking:', error);
     }
   }
 
@@ -1214,6 +1307,27 @@ export class DifyIframeMonitor {
     };
 
     await this.processWorkflowTokenConsumption(mockEvent, userId);
+  }
+
+  /**
+   * Simulate a Dify ready message for testing
+   */
+  public async simulateDifyReady(userId: string, origin: string = 'https://udify.app'): Promise<void> {
+    console.log('[DifyIframeMonitor] Simulating Dify ready message from:', origin);
+    
+    const mockEvent = {
+      origin: origin,
+      data: {
+        type: 'dify-chatbot-iframe-ready'
+      },
+      source: {
+        postMessage: (message: unknown, targetOrigin: string) => {
+          console.log('[DifyIframeMonitor] Mock iframe received configuration:', message, 'for origin:', targetOrigin);
+        }
+      }
+    } as MessageEvent;
+
+    await this.handleMessage(mockEvent, userId);
   }
 
   /**
