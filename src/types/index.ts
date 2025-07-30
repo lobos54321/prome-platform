@@ -189,6 +189,18 @@ export interface DifyRealUsageEvent {
   files?: unknown[];
 }
 
+// Dify iframe ready message - sent when iframe initializes
+export interface DifyReadyEvent {
+  type: 'dify-chatbot-iframe-ready';
+}
+
+// Generic Dify event interface to support both 'event' and 'type' fields
+export interface DifyGenericEvent {
+  event?: string; // Legacy field
+  type?: string;  // New field used by Dify
+  [key: string]: unknown;
+}
+
 // Points consumption tracking types
 export interface PointsConsumption {
   id: string;
