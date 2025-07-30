@@ -41,6 +41,14 @@ export default function AdminDebugTools() {
     outputTokens: '800'
   });
 
+  // Real Dify usage simulation form
+  const [realDifyForm, setRealDifyForm] = useState({
+    inputTokens: '2913',
+    outputTokens: '686',
+    inputPrice: '0.005826',
+    outputPrice: '0.005488'
+  });
+
   const currentUser = authService.getCurrentUserSync();
 
   const addCredits = async () => {
@@ -68,6 +76,51 @@ export default function AdminDebugTools() {
     } catch (error) {
       console.error('Error adding credits:', error);
       setResult(`❌ Error adding credits: ${error}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const simulateRealDifyUsage = async () => {
+    if (!currentUser) {
+      setResult('❌ You must be logged in to simulate real Dify usage');
+      return;
+    }
+
+    setIsLoading(true);
+    setResult('Simulating real Dify usage...');
+    
+    try {
+      const inputTokens = parseInt(realDifyForm.inputTokens);
+      const outputTokens = parseInt(realDifyForm.outputTokens);
+      const inputPrice = parseFloat(realDifyForm.inputPrice);
+      const outputPrice = parseFloat(realDifyForm.outputPrice);
+      
+      if (isNaN(inputTokens) || isNaN(outputTokens) || inputTokens <= 0 || outputTokens <= 0) {
+        setResult('❌ Invalid token counts. Please enter positive numbers.');
+        return;
+      }
+
+      if (isNaN(inputPrice) || isNaN(outputPrice) || inputPrice <= 0 || outputPrice <= 0) {
+        setResult('❌ Invalid prices. Please enter positive numbers.');
+        return;
+      }
+
+      await difyIframeMonitor.simulateRealDifyUsage(
+        currentUser.id,
+        inputTokens,
+        outputTokens,
+        inputPrice,
+        outputPrice
+      );
+
+      const totalTokens = inputTokens + outputTokens;
+      const totalPrice = inputPrice + outputPrice;
+
+      setResult(`✅ Simulated real Dify usage:\nInput: ${inputTokens} tokens ($${inputPrice})\nOutput: ${outputTokens} tokens ($${outputPrice})\nTotal: ${totalTokens} tokens ($${totalPrice.toFixed(6)})`);
+    } catch (error) {
+      console.error('Error simulating real Dify usage:', error);
+      setResult(`❌ Error simulating real Dify usage: ${error}`);
     } finally {
       setIsLoading(false);
     }
@@ -126,6 +179,47 @@ export default function AdminDebugTools() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const testOriginValidation = (origin: string) => {
+    const isValid = difyIframeMonitor.testOriginValidation(origin);
+    setResult(`🔍 Origin validation test for: ${origin}\nResult: ${isValid ? '✅ VALID' : '❌ INVALID'}\nCheck console for detailed logs.`);
+  };
+
+  const simulateUdifyMessage = () => {
+    if (!currentUser) {
+      setResult('❌ You must be logged in to simulate udify message');
+      return;
+    }
+
+    setResult('📨 Simulating udify.app message...\nCheck console for detailed processing logs.');
+    
+    // Simulate a real udify.app message
+    difyIframeMonitor.simulateMessageFromOrigin(
+      'https://chatbot.udify.app',
+      currentUser.id,
+      {
+        event: '', // Real udify messages might not have this
+        data: {
+          usage: {
+            prompt_tokens: 2913,
+            prompt_unit_price: "2",
+            prompt_price_unit: "0.000001",
+            prompt_price: "0.005826",
+            completion_tokens: 686,
+            completion_unit_price: "8", 
+            completion_price_unit: "0.000001",
+            completion_price: "0.005488",
+            total_tokens: 3599,
+            total_price: "0.011314",
+            currency: "USD",
+            latency: 2.6395470835268497
+          },
+          finish_reason: "stop",
+          files: []
+        }
+      }
+    );
   };
 
   const refreshMonitorStatus = () => {
@@ -207,10 +301,10 @@ node admin-scripts/test-token-monitoring.js
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlayCircle className="h-5 w-5" />
-              Token消耗模拟
+              Token消耗模拟 (传统格式)
             </CardTitle>
             <CardDescription>
-              模拟AI模型的token消耗事件
+              模拟传统AI模型的token消耗事件
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -245,8 +339,109 @@ node admin-scripts/test-token-monitoring.js
             </div>
             <Button onClick={simulateTokenUsage} disabled={isLoading} className="w-full">
               <PlayCircle className="h-4 w-4 mr-2" />
-              模拟消耗
+              模拟传统消耗
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Real Dify Usage Simulation */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TestTube className="h-5 w-5" />
+              真实Dify格式模拟
+            </CardTitle>
+            <CardDescription>
+              模拟真实udify.app的token消耗事件 (基于实际格式)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="realInputTokens">输入Token数</Label>
+              <Input
+                id="realInputTokens"
+                value={realDifyForm.inputTokens}
+                onChange={(e) => setRealDifyForm(prev => ({ ...prev, inputTokens: e.target.value }))}
+                placeholder="2913"
+                type="number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="realOutputTokens">输出Token数</Label>
+              <Input
+                id="realOutputTokens"
+                value={realDifyForm.outputTokens}
+                onChange={(e) => setRealDifyForm(prev => ({ ...prev, outputTokens: e.target.value }))}
+                placeholder="686"
+                type="number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="realInputPrice">输入价格 (USD)</Label>
+              <Input
+                id="realInputPrice"
+                value={realDifyForm.inputPrice}
+                onChange={(e) => setRealDifyForm(prev => ({ ...prev, inputPrice: e.target.value }))}
+                placeholder="0.005826"
+                type="number"
+                step="0.000001"
+              />
+            </div>
+            <div>
+              <Label htmlFor="realOutputPrice">输出价格 (USD)</Label>
+              <Input
+                id="realOutputPrice"
+                value={realDifyForm.outputPrice}
+                onChange={(e) => setRealDifyForm(prev => ({ ...prev, outputPrice: e.target.value }))}
+                placeholder="0.005488"
+                type="number"
+                step="0.000001"
+              />
+            </div>
+            <Button onClick={simulateRealDifyUsage} disabled={isLoading} className="w-full">
+              <TestTube className="h-4 w-4 mr-2" />
+              模拟真实Dify
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        {/* Message Origin Testing */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5" />
+              消息来源测试
+            </CardTitle>
+            <CardDescription>
+              测试不同来源的消息处理和调试udify.app集成
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Button 
+                onClick={() => testOriginValidation('https://udify.app')} 
+                variant="outline" 
+                disabled={isLoading}
+              >
+                测试 udify.app
+              </Button>
+              <Button 
+                onClick={() => testOriginValidation('https://chatbot.udify.app')} 
+                variant="outline" 
+                disabled={isLoading}
+              >
+                测试 chatbot.udify.app
+              </Button>
+              <Button 
+                onClick={() => simulateUdifyMessage()} 
+                variant="outline" 
+                disabled={isLoading}
+              >
+                模拟udify消息
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

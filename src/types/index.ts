@@ -126,6 +126,23 @@ export interface DifyMessageEndEvent {
   metadata?: {
     [key: string]: unknown;
   };
+  // Support for real Dify usage format
+  usage?: {
+    prompt_tokens: number;
+    prompt_unit_price?: string;
+    prompt_price_unit?: string;
+    prompt_price?: string;
+    completion_tokens: number;
+    completion_unit_price?: string;
+    completion_price_unit?: string;
+    completion_price?: string;
+    total_tokens: number;
+    total_price?: string;
+    currency?: string;
+    latency?: number;
+  };
+  finish_reason?: string;
+  files?: unknown[];
 }
 
 // New Dify workflow_finished event type for actual token monitoring
@@ -147,6 +164,29 @@ export interface DifyWorkflowFinishedEvent {
       };
     };
   };
+}
+
+// Real Dify event format based on user testing at udify.app
+export interface DifyRealUsageEvent {
+  event?: string; // May be missing in real events
+  conversation_id?: string;
+  message_id?: string;
+  usage: {
+    prompt_tokens: number;
+    prompt_unit_price?: string;
+    prompt_price_unit?: string;
+    prompt_price: string;
+    completion_tokens: number;
+    completion_unit_price?: string;
+    completion_price_unit?: string;
+    completion_price: string;
+    total_tokens: number;
+    total_price: string;
+    currency: string;
+    latency?: number;
+  };
+  finish_reason?: string;
+  files?: unknown[];
 }
 
 // Points consumption tracking types
