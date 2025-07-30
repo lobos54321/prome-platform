@@ -191,6 +191,44 @@ export class MockDatabaseService {
     return usage;
   }
 
+  async getTokenUsageByModel(modelName: string): Promise<Array<{
+    id: string;
+    userId: string;
+    modelName: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    inputCost: number;
+    outputCost: number;
+    totalCost: number;
+    conversationId?: string;
+    messageId?: string;
+    timestamp: string;
+  }>> {
+    // For mock data, we'll simulate some usage based on the model name
+    console.log('[MockDB] Getting token usage by model:', modelName);
+    
+    // Return filtered mock data (for now, we'll return a few sample entries)
+    const mockUsageData = mockTokenUsage
+      .filter(usage => usage.serviceId === 'dify') // Filter Dify-related usage
+      .map(usage => ({
+        id: usage.id,
+        userId: usage.userId,
+        modelName: modelName,
+        inputTokens: Math.floor(usage.tokensUsed * 0.7), // Simulate input tokens (~70%)
+        outputTokens: Math.floor(usage.tokensUsed * 0.3), // Simulate output tokens (~30%)
+        totalTokens: usage.tokensUsed,
+        inputCost: usage.cost * 0.4, // Simulate input cost
+        outputCost: usage.cost * 0.6, // Simulate output cost  
+        totalCost: usage.cost,
+        conversationId: `conv_${usage.id}`,
+        messageId: `msg_${usage.id}`,
+        timestamp: usage.timestamp,
+      }));
+    
+    return mockUsageData;
+  }
+
   // Balance management
   async deductUserBalance(
     userId: string,
