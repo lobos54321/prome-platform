@@ -154,7 +154,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-  // 构建完整的输入参数 - 关键修复点
+  // 构建完整的输入参数 - 关键修复点：简化配置，避免冲突
   const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
     const currentTime = new Date();
     
@@ -163,7 +163,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     const totalMessageCount = state.messages.length;
     const hasConversationHistory = userMessageCount > 0;
     
-    // 基础输入参数
+    // 简化的基础输入参数 - 移除冲突配置
     const baseInputs = {
       // 系统参数
       "user_id": user || 'default-user',
@@ -180,71 +180,50 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       "question": message,
       "current_message": message,
       
-      // 会话控制参数
+      // 会话控制参数 - 简化版本
       "language": "zh-CN",
       "locale": "zh-CN",
       "chat_mode": "workflow",
-      "workflow_mode": hasConversationHistory ? "incremental_execution" : "full_execution", // 关键修复
-      "enable_workflow": true,
-      "execute_all_nodes": !hasConversationHistory, // 只在首次执行所有节点
       
-      // 流程控制参数 - 关键修复点
-      "continue_workflow": !hasConversationHistory, // 只在首次消息时继续完整工作流
-      "skip_first_node": hasConversationHistory, // 有历史记录时跳过首节点
-      "force_execution": false, // 不强制执行，让工作流自然判断
-      "prevent_loops": true, // 防止循环
-      "max_iterations": hasConversationHistory ? 1 : 3, // 限制迭代次数
-      "step_mode": hasConversationHistory ? "single" : "auto", // 单步或自动模式
-      
-      // 条件判断参数 - 更准确的状态判断
-      "has_context": hasConversationHistory,
+      // 核心工作流控制参数 - 关键修复
+      "conversation_id": state.conversationId,
       "message_count": userMessageCount,
-      "total_message_count": totalMessageCount,
       "is_first_message": userMessageCount === 0,
-      "is_followup_message": userMessageCount > 0,
-      "conversation_started": !!state.conversationId,
-      "has_conversation_history": hasConversationHistory,
+      "has_history": hasConversationHistory,
       
-      // 工作流状态控制 - 新增关键参数
-      "workflow_step": userMessageCount === 0 ? "initialize" : "process",
-      "workflow_phase": userMessageCount === 0 ? "start" : "continue", 
-      "should_exit_loop": hasConversationHistory,
-      "bypass_conditions": hasConversationHistory, // 有历史时绕过初始条件
-      "execution_mode": userMessageCount === 0 ? "full" : "targeted", // 执行模式
-      "node_selection": hasConversationHistory ? "conditional" : "all", // 节点选择策略
-      
-      // 循环控制参数
-      "auto_exit_conditions": true,
-      "max_workflow_steps": hasConversationHistory ? 2 : 5,
-      "step_timeout": 30,
+      // 执行控制 - 防止循环的核心参数
+      "execution_mode": hasConversationHistory ? "targeted" : "full",
+      "max_iterations": 1, // 强制限制为1次迭代，防止循环
+      "force_exit": hasConversationHistory, // 有历史记录时强制退出循环节点
+      "skip_initialization": hasConversationHistory, // 跳过初始化节点
       "prevent_infinite_loops": true,
+      "workflow_step_limit": hasConversationHistory ? 1 : 3, // 限制工作流步数
       
-      // 用户首选项（可以根据实际需求调整）
-      "user_preference": "detailed",
-      "response_style": "helpful",
-      "output_format": "markdown",
+      // 节点选择策略
+      "node_execution": hasConversationHistory ? "selective" : "all",
+      "bypass_initial_conditions": hasConversationHistory,
       
       // 上下文信息
-      "previous_messages": state.messages.slice(-3).map(msg => ({
+      "previous_messages": state.messages.slice(-2).map(msg => ({
         role: msg.role,
-        content: msg.content.substring(0, 200) // 限制长度
+        content: msg.content.substring(0, 100) // 进一步限制长度
       })),
       
+      // 合并其他输入参数
       ...inputs, // 来自 useDifyChat 选项的输入
       ...workflowInputs, // 工作流专用输入
       ...customInputs, // 自定义输入（优先级最高）
     };
 
-    console.log('🔧 Complete inputs for Dify workflow:', {
+    console.log('🔧 Simplified workflow inputs:', {
       userMessageCount,
-      totalMessageCount,
       hasConversationHistory,
-      workflowMode: baseInputs.workflow_mode,
-      workflowStep: baseInputs.workflow_step,
-      shouldExitLoop: baseInputs.should_exit_loop,
-      bypassConditions: baseInputs.bypass_conditions,
-      executeAllNodes: baseInputs.execute_all_nodes,
-      continueWorkflow: baseInputs.continue_workflow
+      executionMode: baseInputs.execution_mode,
+      maxIterations: baseInputs.max_iterations,
+      forceExit: baseInputs.force_exit,
+      skipInitialization: baseInputs.skip_initialization,
+      nodeExecution: baseInputs.node_execution,
+      workflowStepLimit: baseInputs.workflow_step_limit
     });
     
     return baseInputs;
@@ -370,7 +349,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
           },
           state.conversationId || undefined,
           userId,
-          completeInputs // 使用完整的输入参数
+          completeInputs // 使用简化的输入参数
         );
 
         // Process token usage if available
@@ -391,7 +370,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
           content,
           state.conversationId || undefined,
           userId,
-          completeInputs // 使用完整的输入参数
+          completeInputs // 使用简化的输入参数
         );
 
         updateMessage(assistantMessageId, {
