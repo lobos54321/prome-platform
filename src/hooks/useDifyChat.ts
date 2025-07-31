@@ -196,24 +196,26 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       "has_conversation_history": hasConversationHistory,
       "conversation_id": state.conversationId,
       
-      // 工作流执行模式 - 关键修复
+      // 工作流执行模式 - 关键修复：允许正常进展但防止循环
       "workflow_mode": hasConversationHistory ? "continue" : "start", // 明确模式
-      "node_filter": hasConversationHistory ? "response_only" : "full_flow", // 节点过滤
+      "node_filter": hasConversationHistory ? "continue_flow" : "full_flow", // 允许继续流程
       "skip_intro": hasConversationHistory, // 跳过介绍性节点
-      "direct_response": hasConversationHistory, // 直接响应模式
+      "direct_response": false, // 允许完整工作流执行，不强制直接响应
       "bypass_initialization": hasConversationHistory, // 绕过初始化
       
-      // 防止循环的关键参数
-      "max_node_executions": 1, // 每个节点最多执行1次
-      "force_single_pass": true, // 强制单次执行
-      "exit_after_response": true, // 生成响应后立即退出
+      // 防止循环的关键参数 - 优化以允许正常进展
+      "max_node_executions": 3, // 每个节点最多执行3次（允许少量重试）
+      "force_single_pass": false, // 允许多步骤执行
+      "exit_after_response": false, // 允许工作流完整执行
       "prevent_infinite_loops": true,
-      "workflow_step_limit": 1, // 严格限制步数
+      "workflow_step_limit": 10, // 合理的步数限制（允许第一节点到第二节点）
+      "max_execution_time": 60000, // 60秒超时限制
       
-      // 执行控制
-      "execution_mode": hasConversationHistory ? "targeted" : "full",
-      "enable_all_nodes": !hasConversationHistory, // 只在首次启用所有节点
-      "force_exit": hasConversationHistory, // 有历史记录时强制退出
+      // 执行控制 - 优化进展控制
+      "execution_mode": "progressive", // 渐进式执行模式
+      "enable_all_nodes": true, // 启用所有节点（包括第二节点）
+      "allow_node_progression": true, // 明确允许节点间进展
+      "force_exit": false, // 不强制退出，允许完整流程
       
       // 上下文信息（简化）
       "has_context": hasConversationHistory,
@@ -233,16 +235,17 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       ...customInputs, // 自定义输入（优先级最高）
     };
 
-    console.log('🎯 Precise workflow control:', {
+    console.log('🎯 Optimized workflow control for progression:', {
       conversationTurn: baseInputs.conversation_turn,
       workflowMode: baseInputs.workflow_mode,
       nodeFilter: baseInputs.node_filter,
-      skipIntro: baseInputs.skip_intro,
       directResponse: baseInputs.direct_response,
       maxNodeExecutions: baseInputs.max_node_executions,
       forceSinglePass: baseInputs.force_single_pass,
-      exitAfterResponse: baseInputs.exit_after_response,
-      bypassInitialization: baseInputs.bypass_initialization
+      workflowStepLimit: baseInputs.workflow_step_limit,
+      enableAllNodes: baseInputs.enable_all_nodes,
+      allowNodeProgression: baseInputs.allow_node_progression,
+      executionMode: baseInputs.execution_mode
     });
     
     // Record parameters for diagnostics
@@ -401,6 +404,14 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
               console.log('🔄 Node started:', chunk);
               const nodeId = chunk.node_id || 'unknown_node';
               nodeStartTimesRef.current.set(nodeId, Date.now());
+              
+              // Special handling for workflow progression
+              if (chunk.node_name && chunk.node_name.includes('第二') || 
+                  chunk.node_id && chunk.node_id.includes('second') ||
+                  chunk.node_title && chunk.node_title.includes('second')) {
+                console.log('🎉 Successfully progressed to second node!');
+              }
+              
               // Record node started event for diagnostics
               recordEvent(state.conversationId, {
                 event: 'node_started',
@@ -414,6 +425,13 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
               const startTime = nodeStartTimesRef.current.get(nodeId);
               const executionTime = startTime ? Date.now() - startTime : undefined;
               nodeStartTimesRef.current.delete(nodeId);
+              
+              // Log workflow progression
+              if (chunk.node_name && chunk.node_name.includes('第一') || 
+                  chunk.node_id && chunk.node_id.includes('first')) {
+                console.log('✅ First node completed, workflow should progress to second node');
+              }
+              
               // Record node finished event for diagnostics
               recordEvent(state.conversationId, {
                 event: 'node_finished',

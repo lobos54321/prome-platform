@@ -16,9 +16,9 @@ const DEFAULT_SETTINGS: DiagnosticSettings = {
   maxHistorySize: 1000,
   enableAutoDetection: true,
   detectionThresholds: {
-    maxNodeExecutions: 3,
-    maxSessionDuration: 5 * 60 * 1000, // 5 minutes
-    maxEventInterval: 30 * 1000, // 30 seconds
+    maxNodeExecutions: 5, // Increased to allow normal workflow progression
+    maxSessionDuration: 10 * 60 * 1000, // 10 minutes (increased from 5)
+    maxEventInterval: 60 * 1000, // 60 seconds (increased from 30)
   },
   enableParameterTracking: true,
   enableEventLogging: true,
