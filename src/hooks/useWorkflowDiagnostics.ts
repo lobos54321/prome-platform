@@ -149,6 +149,49 @@ export function useWorkflowDiagnostics() {
       return issues;
     }
 
+    // Check for CORS errors
+    if (event.event === 'error' && event.data) {
+      const errorMessage = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+      if (errorMessage.includes('CORS') || errorMessage.includes('Access-Control-Allow-Origin')) {
+        issues.push({
+          id: generateUUID(),
+          type: 'cors_error',
+          severity: 'critical',
+          message: 'CORS policy error detected - direct API calls are being blocked by browser',
+          details: {
+            sessionId,
+            errorMessage,
+            nodeId: event.nodeId,
+            suggestion: 'Remove direct client-side API calls and use server-side proxy instead'
+          },
+          timestamp: new Date().toISOString(),
+          nodeId: event.nodeId,
+          resolved: false,
+          autoDetected: true,
+        });
+      }
+      
+      // Check for method not allowed errors
+      if (errorMessage.includes('405') || errorMessage.includes('Method Not Allowed')) {
+        issues.push({
+          id: generateUUID(),
+          type: 'method_not_allowed',
+          severity: 'high',
+          message: 'HTTP method not allowed - API endpoint does not support the requested method',
+          details: {
+            sessionId,
+            errorMessage,
+            nodeId: event.nodeId,
+            suggestion: 'Check API documentation for supported HTTP methods'
+          },
+          timestamp: new Date().toISOString(),
+          nodeId: event.nodeId,
+          resolved: false,
+          autoDetected: true,
+        });
+      }
+    }
+
     // Check for infinite loops
     if (event.nodeId) {
       const nodeExecutions = session.nodeExecutions.get(event.nodeId);
@@ -411,20 +454,35 @@ export function useWorkflowDiagnostics() {
     const recommendations: string[] = [];
     
     // Generate recommendations based on issues
+    if (issues.some(i => i.type === 'cors_error')) {
+      recommendations.push('修复 CORS 错误：移除直接的客户端 API 调用');
+      recommendations.push('使用服务器端代理来避免跨域问题');
+      recommendations.push('检查 API 调用是否符合同源策略');
+    }
+    
+    if (issues.some(i => i.type === 'method_not_allowed')) {
+      recommendations.push('检查 API 端点支持的 HTTP 方法');
+      recommendations.push('避免使用不支持的 HTTP 方法（如对 conversations 端点使用 GET）');
+      recommendations.push('使用正确的 API 端点和方法组合');
+    }
+    
     if (issues.some(i => i.type === 'infinite_loop')) {
       recommendations.push('检查工作流节点配置，确保没有无限循环的逻辑路径');
       recommendations.push('添加退出条件或最大执行次数限制');
+      recommendations.push('改进错误处理机制，避免因验证失败导致的循环');
     }
     
     if (issues.some(i => i.type === 'stuck_node')) {
       recommendations.push('检查节点的执行逻辑，可能存在阻塞或超时问题');
       recommendations.push('添加节点执行超时机制');
+      recommendations.push('改进错误恢复策略，确保工作流能够正常进行');
     }
     
     if (parameterAnalysis.length > 1) {
       const significantChanges = parameterAnalysis.flatMap(p => p.changes.filter(c => c.type !== 'unchanged'));
       if (significantChanges.length > 0) {
         recommendations.push('检查参数传递逻辑，确保状态正确传递');
+        recommendations.push('优化工作流参数控制，避免不必要的循环');
       }
     }
 

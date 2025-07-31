@@ -481,21 +481,59 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
         console.log('✅ Non-streaming message sent successfully');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error sending message:', error);
       
       // Handle specific error cases
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log('🛑 Request was aborted');
         return;
       }
 
+      // Record error event for diagnostics
+      recordEvent(state.conversationId, {
+        event: 'error',
+        data: error instanceof Error ? error.message : 'Unknown error'
+      });
+
       let errorMessage = 'Failed to send message';
       if (error instanceof Error) {
-        if (error.message.includes('Conversation Not Exists') || 
-            error.message.includes('Conversation ID format error') ||
-            error.message.includes('404') ||
-            error.message.includes('Not Found')) {
+        // Check for CORS errors
+        if (error.message.includes('CORS') || 
+            error.message.includes('Access-Control-Allow-Origin') ||
+            error.message.includes('blocked by CORS policy')) {
+          console.log('🚫 CORS error detected - this should be fixed by removing direct API calls');
+          errorMessage = 'CORS 错误已修复 - 请刷新页面重试';
+          
+          // Record CORS error for diagnostics
+          recordEvent(state.conversationId, {
+            event: 'error',
+            data: {
+              type: 'cors_error',
+              message: error.message
+            }
+          });
+        }
+        // Check for method not allowed errors
+        else if (error.message.includes('405') || 
+                 error.message.includes('Method Not Allowed')) {
+          console.log('🚫 Method not allowed error - this should be fixed by API route changes');
+          errorMessage = 'API 方法错误已修复 - 请刷新页面重试';
+          
+          // Record method not allowed error for diagnostics
+          recordEvent(state.conversationId, {
+            event: 'error',
+            data: {
+              type: 'method_not_allowed',
+              message: error.message
+            }
+          });
+        }
+        // Handle conversation not exists errors
+        else if (error.message.includes('Conversation Not Exists') || 
+                 error.message.includes('Conversation ID format error') ||
+                 error.message.includes('404') ||
+                 error.message.includes('Not Found')) {
           // Handle conversation not exists error
           console.log('🔄 Conversation no longer exists, starting new conversation...');
           

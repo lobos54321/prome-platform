@@ -25,9 +25,9 @@ export interface DifyError {
 export interface DifyMessage {
   id: string;
   conversation_id: string;
-  inputs: Record<string, any>;
+  inputs: Record<string, unknown>;
   query: string;
   answer: string;
-  message_files: any[];
+  message_files: unknown[];
   created_at: number;
 }

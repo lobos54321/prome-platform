@@ -92,21 +92,17 @@ export class DifyAPIClient {
 
   /**
    * 验证会话ID是否在Dify端仍然有效
+   * 
+   * NOTE: Direct conversation validation disabled to avoid CORS errors.
+   * The Dify API conversations endpoint doesn't support GET method and
+   * causes CORS issues when called from browser. Instead, we rely on
+   * error handling during message sending to detect invalid conversations.
    */
   async validateConversationId(conversationId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.config.apiUrl}/conversations/${conversationId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return response.ok;
-    } catch (error) {
-      console.warn('Failed to validate conversation ID:', error);
-      return false;
-    }
+    // Always return true to skip validation and rely on error handling
+    // during actual message sending to detect invalid conversation IDs
+    console.log('🔄 Skipping direct conversation validation to avoid CORS issues');
+    return true;
   }
 
   /**
@@ -118,16 +114,9 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
-    // 如果有conversationId，先验证是否有效
-    let validConversationId = conversationId;
-    if (conversationId) {
-      const isValid = await this.validateConversationId(conversationId);
-      if (!isValid) {
-        // 如果无效，设置为undefined，让Dify创建新会话
-        validConversationId = undefined;
-        console.log('Conversation ID is invalid, creating new conversation');
-      }
-    }
+    // Skip conversation validation to avoid CORS issues
+    // Let Dify handle invalid conversation IDs through error responses
+    const validConversationId = conversationId;
 
     const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
       method: 'POST',
@@ -174,16 +163,9 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<void> {
-    // 如果有conversationId，先验证是否有效
-    let validConversationId = conversationId;
-    if (conversationId) {
-      const isValid = await this.validateConversationId(conversationId);
-      if (!isValid) {
-        // 如果无效，设置为undefined，让Dify创建新会话
-        validConversationId = undefined;
-        console.log('Conversation ID is invalid, creating new conversation for streaming');
-      }
-    }
+    // Skip conversation validation to avoid CORS issues
+    // Let Dify handle invalid conversation IDs through error responses
+    const validConversationId = conversationId;
 
     const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
       method: 'POST',
