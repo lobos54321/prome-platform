@@ -91,6 +91,25 @@ export class DifyAPIClient {
   }
 
   /**
+   * 验证会话ID是否在Dify端仍然有效
+   */
+  async validateConversationId(conversationId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.config.apiUrl}/conversations/${conversationId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.ok;
+    } catch (error) {
+      console.warn('Failed to validate conversation ID:', error);
+      return false;
+    }
+  }
+
+  /**
    * Send a message to Dify and get response
    */
   async sendMessage(
@@ -99,6 +118,17 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
+    // 如果有conversationId，先验证是否有效
+    let validConversationId = conversationId;
+    if (conversationId) {
+      const isValid = await this.validateConversationId(conversationId);
+      if (!isValid) {
+        // 如果无效，设置为undefined，让Dify创建新会话
+        validConversationId = undefined;
+        console.log('Conversation ID is invalid, creating new conversation');
+      }
+    }
+
     const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
       method: 'POST',
       headers: {
@@ -109,7 +139,7 @@ export class DifyAPIClient {
         inputs: inputs || {},
         query: message,
         response_mode: 'blocking',
-        conversation_id: conversationId || undefined,
+        conversation_id: validConversationId || undefined,
         user: user || 'default-user',
         files: []
       }),
@@ -121,6 +151,11 @@ export class DifyAPIClient {
       // Special handling for conversation ID format errors
       if (response.status === 400 && errorText.includes('not a valid uuid')) {
         throw new Error('Conversation ID format error. Please start a new conversation.');
+      }
+      
+      // Handle conversation not found errors
+      if (response.status === 404 && errorText.includes('Conversation')) {
+        throw new Error('Conversation Not Exists. Starting new conversation.');
       }
       
       throw new Error(`Dify API error: ${response.status} - ${errorText}`);
@@ -139,6 +174,17 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<void> {
+    // 如果有conversationId，先验证是否有效
+    let validConversationId = conversationId;
+    if (conversationId) {
+      const isValid = await this.validateConversationId(conversationId);
+      if (!isValid) {
+        // 如果无效，设置为undefined，让Dify创建新会话
+        validConversationId = undefined;
+        console.log('Conversation ID is invalid, creating new conversation for streaming');
+      }
+    }
+
     const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
       method: 'POST',
       headers: {
@@ -149,7 +195,7 @@ export class DifyAPIClient {
         inputs: inputs || {},
         query: message,
         response_mode: 'streaming',
-        conversation_id: conversationId || undefined,
+        conversation_id: validConversationId || undefined,
         user: user || 'default-user',
         files: []
       }),
@@ -158,9 +204,9 @@ export class DifyAPIClient {
     if (!response.ok) {
       const errorText = await response.text();
       
-      // Special handling for conversation ID format errors
-      if (response.status === 400 && errorText.includes('not a valid uuid')) {
-        throw new Error('Conversation ID format error. Please start a new conversation.');
+      // Handle conversation errors for streaming
+      if (response.status === 404 && errorText.includes('Conversation')) {
+        throw new Error('Conversation Not Exists. Starting new conversation.');
       }
       
       throw new Error(`Dify API error: ${response.status} - ${errorText}`);
@@ -168,28 +214,32 @@ export class DifyAPIClient {
 
     const reader = response.body?.getReader();
     if (!reader) {
-      throw new Error('Failed to get response reader');
+      throw new Error('No response body reader available');
     }
 
     const decoder = new TextDecoder();
-    let buffer = '';
-
+    
     try {
       while (true) {
         const { done, value } = await reader.read();
+        
         if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              return;
+            }
+            
             try {
-              const data = JSON.parse(line.slice(6));
-              onChunk(data);
-            } catch (error) {
-              console.warn('Failed to parse streaming response:', line, error);
+              const parsed: DifyStreamResponse = JSON.parse(data);
+              onChunk(parsed);
+            } catch (e) {
+              console.warn('Failed to parse stream chunk:', data);
             }
           }
         }
@@ -208,12 +258,11 @@ export class DifyAPIClient {
     limit?: number
   ): Promise<DifyConversationHistoryResponse> {
     const params = new URLSearchParams({
-      conversation_id: conversationId,
       user: user || 'default-user',
       limit: (limit || 20).toString()
     });
 
-    const response = await fetch(`${this.config.apiUrl}/messages?${params}`, {
+    const response = await fetch(`${this.config.apiUrl}/messages?conversation_id=${conversationId}&${params}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${this.config.apiKey}`,
@@ -230,7 +279,7 @@ export class DifyAPIClient {
   }
 
   /**
-   * Get conversations list
+   * Get list of conversations
    */
   async getConversations(
     user?: string,
@@ -341,7 +390,6 @@ export class DifyAPIClient {
     text_to_speech: {
       enabled: boolean;
       voice: string;
-      language: string;
     };
     retriever_resource: {
       enabled: boolean;
@@ -350,32 +398,11 @@ export class DifyAPIClient {
       enabled: boolean;
     };
     user_input_form: Array<{
-      paragraph?: {
-        label: string;
-        variable: string;
-        required: boolean;
-        default: string;
-      };
-      select?: {
-        label: string;
-        variable: string;
-        required: boolean;
-        default: string;
-        options: string[];
-      };
-      text_input?: {
+      text_input: {
         label: string;
         variable: string;
         required: boolean;
         max_length: number;
-        default: string;
-      };
-      external_data_tool?: {
-        label: string;
-        variable: string;
-        required: boolean;
-        type: string;
-        config: Record<string, unknown>;
       };
     }>;
     file_upload: {
@@ -412,25 +439,31 @@ export class DifyAPIClient {
 }
 
 /**
- * Create a configured Dify API client using environment variables
+ * Create a configured Dify API client
  */
 export function createDifyAPIClient(): DifyAPIClient {
+  const config: DifyAPIClientConfig = {
+    apiUrl: import.meta.env.VITE_DIFY_API_URL || '',
+    appId: import.meta.env.VITE_DIFY_APP_ID || '',
+    apiKey: import.meta.env.VITE_DIFY_API_KEY || '',
+  };
+
+  // Validate configuration
+  if (!config.apiUrl || !config.appId || !config.apiKey) {
+    throw new Error('Dify API configuration is incomplete. Please check environment variables.');
+  }
+
+  return new DifyAPIClient(config);
+}
+
+/**
+ * Check if Dify integration is enabled and properly configured
+ */
+export function isDifyEnabled(): boolean {
+  const enabled = import.meta.env.VITE_ENABLE_DIFY_INTEGRATION === 'true';
   const apiUrl = import.meta.env.VITE_DIFY_API_URL;
   const appId = import.meta.env.VITE_DIFY_APP_ID;
   const apiKey = import.meta.env.VITE_DIFY_API_KEY;
 
-  if (!apiUrl || !appId || !apiKey) {
-    throw new Error('Dify API configuration missing. Please set VITE_DIFY_API_URL, VITE_DIFY_APP_ID, and VITE_DIFY_API_KEY environment variables.');
-  }
-
-  return new DifyAPIClient({
-    apiUrl,
-    appId,
-    apiKey
-  });
+  return enabled && !!apiUrl && !!appId && !!apiKey;
 }
-
-/**
- * Default client instance
- */
-export const difyAPIClient = createDifyAPIClient();
