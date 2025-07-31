@@ -76,10 +76,10 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       if (storedConversationId && !isValidUUID(storedConversationId)) {
         localStorage.removeItem('dify_conversation_id');
         sessionStorage.removeItem('dify_conversation_id');
-        console.log('Cleaned up invalid conversation ID from storage:', storedConversationId);
+        console.log('🧹 Cleaned up invalid conversation ID from storage:', storedConversationId);
       }
     } catch (error) {
-      console.error('Failed to initialize Dify client:', error);
+      console.error('❌ Failed to initialize Dify client:', error);
       setState(prev => ({ ...prev, error: 'Failed to initialize chat client' }));
     }
   }, []);
@@ -135,24 +135,33 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       setState(prev => ({
         ...prev,
         conversationId: newConversationId,
+        messages: [], // 清空消息历史
         error: null,
       }));
       
-      // Store the new conversation ID
+      // Store the new conversation ID and clear old data
       localStorage.setItem('dify_conversation_id', newConversationId);
-      console.log('Started new conversation:', newConversationId);
+      localStorage.removeItem('dify_messages'); // 清空旧消息
+      localStorage.removeItem('dify_workflow_state'); // 清空工作流状态
+      
+      console.log('🆕 Started new conversation:', newConversationId);
       
       return newConversationId;
     } catch (error) {
-      console.error('Failed to start new conversation:', error);
+      console.error('❌ Failed to start new conversation:', error);
       setError('Failed to start new conversation');
       return null;
     }
   }, [setError]);
 
-  // 构建完整的输入参数
+  // 构建完整的输入参数 - 关键修复点
   const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
     const currentTime = new Date();
+    
+    // 计算用户消息数量（排除系统消息和助手消息）
+    const userMessageCount = state.messages.filter(msg => msg.role === 'user').length;
+    const totalMessageCount = state.messages.length;
+    const hasConversationHistory = userMessageCount > 0;
     
     // 基础输入参数
     const baseInputs = {
@@ -169,39 +178,77 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       "query": message,
       "user_input": message,
       "question": message,
+      "current_message": message,
       
       // 会话控制参数
       "language": "zh-CN",
       "locale": "zh-CN",
       "chat_mode": "workflow",
-      "workflow_mode": "full_execution",
+      "workflow_mode": hasConversationHistory ? "incremental_execution" : "full_execution", // 关键修复
       "enable_workflow": true,
-      "execute_all_nodes": true,
+      "execute_all_nodes": !hasConversationHistory, // 只在首次执行所有节点
       
-      // 流程控制参数
-      "continue_workflow": true,
-      "skip_first_node": false,
-      "force_execution": true,
+      // 流程控制参数 - 关键修复点
+      "continue_workflow": !hasConversationHistory, // 只在首次消息时继续完整工作流
+      "skip_first_node": hasConversationHistory, // 有历史记录时跳过首节点
+      "force_execution": false, // 不强制执行，让工作流自然判断
+      "prevent_loops": true, // 防止循环
+      "max_iterations": hasConversationHistory ? 1 : 3, // 限制迭代次数
+      "step_mode": hasConversationHistory ? "single" : "auto", // 单步或自动模式
       
-      // 条件判断可能需要的参数
-      "has_context": state.messages.length > 0,
-      "message_count": state.messages.length,
-      "is_first_message": state.messages.length === 0,
+      // 条件判断参数 - 更准确的状态判断
+      "has_context": hasConversationHistory,
+      "message_count": userMessageCount,
+      "total_message_count": totalMessageCount,
+      "is_first_message": userMessageCount === 0,
+      "is_followup_message": userMessageCount > 0,
       "conversation_started": !!state.conversationId,
+      "has_conversation_history": hasConversationHistory,
+      
+      // 工作流状态控制 - 新增关键参数
+      "workflow_step": userMessageCount === 0 ? "initialize" : "process",
+      "workflow_phase": userMessageCount === 0 ? "start" : "continue", 
+      "should_exit_loop": hasConversationHistory,
+      "bypass_conditions": hasConversationHistory, // 有历史时绕过初始条件
+      "execution_mode": userMessageCount === 0 ? "full" : "targeted", // 执行模式
+      "node_selection": hasConversationHistory ? "conditional" : "all", // 节点选择策略
+      
+      // 循环控制参数
+      "auto_exit_conditions": true,
+      "max_workflow_steps": hasConversationHistory ? 2 : 5,
+      "step_timeout": 30,
+      "prevent_infinite_loops": true,
       
       // 用户首选项（可以根据实际需求调整）
       "user_preference": "detailed",
       "response_style": "helpful",
       "output_format": "markdown",
       
+      // 上下文信息
+      "previous_messages": state.messages.slice(-3).map(msg => ({
+        role: msg.role,
+        content: msg.content.substring(0, 200) // 限制长度
+      })),
+      
       ...inputs, // 来自 useDifyChat 选项的输入
       ...workflowInputs, // 工作流专用输入
       ...customInputs, // 自定义输入（优先级最高）
     };
 
-    console.log('🔧 Complete inputs for Dify workflow:', baseInputs);
+    console.log('🔧 Complete inputs for Dify workflow:', {
+      userMessageCount,
+      totalMessageCount,
+      hasConversationHistory,
+      workflowMode: baseInputs.workflow_mode,
+      workflowStep: baseInputs.workflow_step,
+      shouldExitLoop: baseInputs.should_exit_loop,
+      bypassConditions: baseInputs.bypass_conditions,
+      executeAllNodes: baseInputs.execute_all_nodes,
+      continueWorkflow: baseInputs.continue_workflow
+    });
+    
     return baseInputs;
-  }, [user, state.conversationId, state.messages.length, inputs, workflowInputs]);
+  }, [user, state.conversationId, state.messages, inputs, workflowInputs]);
 
   const sendMessage = useCallback(async (content: string, customInputs?: Record<string, unknown>) => {
     if (!clientRef.current) {
@@ -256,6 +303,9 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }));
 
     try {
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
+
       if (enableStreaming) {
         // Streaming response
         let fullContent = '';
@@ -307,7 +357,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
                 localStorage.setItem('dify_conversation_id', finalConversationId);
               }
             } else if (chunk.event === 'error') {
-              throw new Error('Dify API error in stream');
+              throw new Error(chunk.data || 'Dify API error in stream');
             } else if (chunk.event === 'workflow_started') {
               console.log('🚀 Workflow started:', chunk);
             } else if (chunk.event === 'workflow_finished') {
@@ -332,6 +382,8 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
             'dify-native'
           );
         }
+
+        console.log('✅ Streaming completed successfully');
 
       } else {
         // Blocking response
@@ -369,18 +421,41 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
             'dify-native'
           );
         }
+
+        console.log('✅ Non-streaming message sent successfully');
       }
 
-    } catch (error) {
-      console.error('Error sending message:', error);
+    } catch (error: any) {
+      console.error('❌ Error sending message:', error);
       
+      // Handle specific error cases
+      if (error.name === 'AbortError') {
+        console.log('🛑 Request was aborted');
+        return;
+      }
+
       let errorMessage = 'Failed to send message';
       if (error instanceof Error) {
-        if (error.message.includes('Conversation Not Exists') || error.message.includes('Conversation ID format error')) {
+        if (error.message.includes('Conversation Not Exists') || 
+            error.message.includes('Conversation ID format error') ||
+            error.message.includes('404') ||
+            error.message.includes('Not Found')) {
           // Handle conversation not exists error
-          console.log('Conversation no longer exists, starting new conversation...');
+          console.log('🔄 Conversation no longer exists, starting new conversation...');
+          
+          // Clear conversation state
+          setState(prev => ({
+            ...prev,
+            conversationId: null,
+          }));
+          
+          // Clear stored conversation IDs and workflow state
+          localStorage.removeItem('dify_conversation_id');
+          sessionStorage.removeItem('dify_conversation_id');
+          localStorage.removeItem('dify_workflow_state');
+          
           await startNewConversation();
-          errorMessage = 'Conversation expired. Please try again.';
+          errorMessage = '对话已过期，已自动为你新建会话，请重试刚才的问题';
         } else {
           errorMessage = error.message;
         }
@@ -450,7 +525,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
             ...prev,
             conversationId: storedConversationId,
           }));
-          console.log('Loaded conversation ID from storage:', storedConversationId);
+          console.log('📂 Loaded conversation ID from storage:', storedConversationId);
         }
 
         // Try to load messages from storage
@@ -463,15 +538,15 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
                 ...prev,
                 messages: messages,
               }));
-              console.log('Loaded messages from storage:', messages.length);
+              console.log('📂 Loaded messages from storage:', messages.length);
             }
           } catch (error) {
-            console.warn('Failed to parse stored messages:', error);
+            console.warn('⚠️ Failed to parse stored messages:', error);
             localStorage.removeItem('dify_messages');
           }
         }
       } catch (error) {
-        console.warn('Failed to load stored conversation:', error);
+        console.warn('⚠️ Failed to load stored conversation:', error);
       }
     };
 
@@ -484,7 +559,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       try {
         localStorage.setItem('dify_messages', JSON.stringify(state.messages));
       } catch (error) {
-        console.warn('Failed to save messages to storage:', error);
+        console.warn('⚠️ Failed to save messages to storage:', error);
       }
     }
   }, [state.messages]);
@@ -503,7 +578,9 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     setState(INITIAL_STATE);
     localStorage.removeItem('dify_conversation_id');
     localStorage.removeItem('dify_messages');
-    console.log('Cleared conversation data');
+    localStorage.removeItem('dify_workflow_state'); // 清除工作流状态
+    sessionStorage.removeItem('dify_conversation_id');
+    console.log('🧹 Cleared conversation data and workflow state');
   }, []);
 
   // Export conversation data
