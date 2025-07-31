@@ -1,34 +1,29 @@
-/**
- * Dify Chat Interface
- * 
- * Main chat interface component that combines all chat functionality
- * with real-time token monitoring and billing integration.
- */
-
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { 
-  MessageSquare, 
-  Plus, 
-  Settings, 
-  Coins,
-  Activity,
-  AlertTriangle,
-  Bot,
-  Zap
+  Bot, 
+  User, 
+  Send, 
+  Loader2, 
+  RotateCcw, 
+  Trash2, 
+  MessageSquare,
+  Zap,
+  AlertCircle,
+  Copy,
+  Check,
+  Settings,
+  RefreshCw
 } from 'lucide-react';
-import { ChatHistory } from './ChatHistory';
-import { ChatInput } from './ChatInput';
-import { useDifyChat } from '@/hooks/useDifyChat';
+import { useDifyChat, ChatMessage } from '@/hooks/useDifyChat';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
 import { authService } from '@/lib/auth';
-import { User } from '@/types';
+import { User as UserType } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -45,11 +40,37 @@ export const DifyChatInterface = ({
   enableStreaming = true,
   autoStartConversation = true
 }: DifyChatInterfaceProps) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserType | null>(null);
   const [showTokenDetails, setShowTokenDetails] = useState(false);
   const [streamingEnabled, setStreamingEnabled] = useState(enableStreaming);
+  const [inputMessage, setInputMessage] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Chat functionality
+  // 定义工作流专用输入参数
+  const workflowInputs = {
+    // 工作流控制参数
+    "workflow_type": "chat_assistant",
+    "execution_mode": "complete",
+    "enable_all_nodes": true,
+    "bypass_conditions": false,
+    
+    // 条件判断参数
+    "user_intent": "question", // 可以根据消息内容动态调整
+    "context_available": true,
+    "require_detailed_response": true,
+    
+    // 自定义工作流变量（根据你的具体工作流调整）
+    "processing_level": "full",
+    "response_type": "comprehensive",
+    "enable_followup": true,
+    
+    // 如果你的工作流有特定的条件变量，在这里添加
+    "condition_check": true,
+    "workflow_branch": "main",
+    "execute_conditional_nodes": true,
+  };
+
+  // Chat functionality with workflow inputs
   const {
     state: chatState,
     sendMessage,
@@ -62,6 +83,7 @@ export const DifyChatInterface = ({
     autoStartConversation,
     enableStreaming: streamingEnabled,
     user: user?.id,
+    workflowInputs, // 传递工作流专用输入
   });
 
   // Token monitoring
@@ -75,68 +97,145 @@ export const DifyChatInterface = ({
         setUser(currentUser);
       } catch (error) {
         console.error('Failed to load user:', error);
-        setError('用户认证失败');
+        setError('Failed to load user data');
       }
     };
 
     loadUser();
   }, [setError]);
 
-  // Check for API configuration
-  const isDifyConfigured = !!(
-    import.meta.env.VITE_DIFY_API_URL &&
-    import.meta.env.VITE_DIFY_APP_ID &&
-    import.meta.env.VITE_DIFY_API_KEY
-  );
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatState.messages]);
 
-  if (!isDifyConfigured) {
-    return (
-      <Card className={cn("h-full", className)}>
-        <CardContent className="flex items-center justify-center h-full">
-          <Alert className="max-w-md">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              Dify API 未配置。请设置相关环境变量：
-              <ul className="mt-2 text-sm list-disc list-inside">
-                <li>VITE_DIFY_API_URL</li>
-                <li>VITE_DIFY_APP_ID</li>
-                <li>VITE_DIFY_API_KEY</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || chatState.isLoading) return;
 
-  if (!user) {
-    return (
-      <Card className={cn("h-full", className)}>
-        <CardContent className="flex items-center justify-center h-full">
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              请先登录以使用聊天功能
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
+    const message = inputMessage.trim();
+    setInputMessage('');
 
-  const handleSendMessage = async (message: string) => {
-    // Check balance before sending
-    if (user.balance <= 0) {
-      toast.error('余额不足，请先充值');
-      return;
-    }
+    // 根据消息内容动态添加输入参数
+    const dynamicInputs = {
+      "message_length": message.length,
+      "message_type": message.includes('?') || message.includes('？') ? 'question' : 'statement',
+      "is_greeting": /^(你好|hi|hello|嗨)/i.test(message),
+      "requires_analysis": message.length > 50,
+      "user_emotion": "neutral", // 可以根据消息内容分析情绪
+      "priority": "normal",
+      "current_datetime": new Date().toISOString(),
+    };
 
     try {
-      await sendMessage(message);
+      await sendMessage(message, dynamicInputs);
     } catch (error) {
-      console.error('Failed to send message:', error);
-      toast.error('发送消息失败');
+      console.error('Error sending message:', error);
+      toast.error('发送消息失败，请重试');
     }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('已复制到剪贴板');
+    } catch (error) {
+      toast.error('复制失败');
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const MessageItem = ({ message }: { message: ChatMessage }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+      await copyToClipboard(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+      <div className={cn(
+        "flex gap-3 p-4 rounded-lg",
+        message.role === 'user' 
+          ? "bg-blue-50 ml-8" 
+          : "bg-gray-50 mr-8"
+      )}>
+        <div className={cn(
+          "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
+          message.role === 'user' 
+            ? "bg-blue-600 text-white" 
+            : "bg-gray-600 text-white"
+        )}>
+          {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium">
+              {message.role === 'user' ? '你' : 'AI助手'}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                {formatTimestamp(message.timestamp)}
+              </span>
+              {message.content && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="h-6 w-6 p-0"
+                >
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {message.error ? (
+            <Alert className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{message.error}</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="prose prose-sm max-w-none">
+              <div className="whitespace-pre-wrap">{message.content}</div>
+              {message.isStreaming && (
+                <div className="flex items-center gap-2 mt-2 text-blue-600">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span className="text-xs">正在生成回复...</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showMetadata && message.metadata && (
+            <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-gray-600">
+              {message.metadata.messageId && (
+                <div>Message ID: {message.metadata.messageId}</div>
+              )}
+              {message.metadata.usage && (
+                <div>
+                  Tokens: {message.metadata.usage.prompt_tokens}+{message.metadata.usage.completion_tokens}={message.metadata.usage.total_tokens}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -167,149 +266,152 @@ export const DifyChatInterface = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={startNewConversation}
-                disabled={chatState.isLoading}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                新对话
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
                 onClick={() => setShowTokenDetails(!showTokenDetails)}
               >
                 <Settings className="h-4 w-4" />
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStreamingEnabled(!streamingEnabled)}
+              >
+                {streamingEnabled ? 'Streaming: On' : 'Streaming: Off'}
+              </Button>
             </div>
           </div>
 
-          {/* Settings Panel */}
-          {showTokenDetails && (
-            <>
-              <Separator className="my-4" />
-              <div className="grid gap-4 md:grid-cols-2">
-                {/* User Balance */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Coins className="h-4 w-4 text-yellow-500" />
-                    账户余额
-                  </h4>
-                  <div className="text-2xl font-bold text-green-600">
-                    {user.balance.toLocaleString()} 积分
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    汇率: 10,000积分 = $1 USD
-                  </p>
+          {showTokenDetails && tokenState.lastUsage && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span>输入Tokens:</span>
+                  <span>{tokenState.lastUsage.prompt_tokens}</span>
                 </div>
-
-                {/* Token Usage Stats */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-blue-500" />
-                    本次会话统计
-                  </h4>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span>总Token:</span>
-                      <Badge variant="outline">{tokenState.totalTokensUsed}</Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>总费用:</span>
-                      <Badge variant="outline">${tokenState.totalCost.toFixed(6)}</Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>积分消费:</span>
-                      <Badge variant="outline">{tokenState.totalPointsDeducted}</Badge>
-                    </div>
-                  </div>
+                <div className="flex justify-between">
+                  <span>输出Tokens:</span>
+                  <span>{tokenState.lastUsage.completion_tokens}</span>
                 </div>
-
-                {/* Settings */}
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium">设置</h4>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="streaming"
-                      checked={streamingEnabled}
-                      onCheckedChange={setStreamingEnabled}
-                    />
-                    <Label htmlFor="streaming" className="text-sm">
-                      流式响应
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="metadata"
-                      checked={showMetadata}
-                      onCheckedChange={setShowTokenDetails}
-                    />
-                    <Label htmlFor="metadata" className="text-sm">
-                      显示Token详情
-                    </Label>
-                  </div>
+                <div className="flex justify-between font-semibold">
+                  <span>总计Tokens:</span>
+                  <span>{tokenState.lastUsage.total_tokens}</span>
                 </div>
-
-                {/* Recent Usage */}
-                {tokenState.usageHistory.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">最近使用</h4>
-                    <div className="space-y-1 max-h-24 overflow-y-auto">
-                      {tokenState.usageHistory.slice(0, 3).map((usage, index) => (
-                        <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                          <div className="flex justify-between">
-                            <span>{usage.modelName}</span>
-                            <span>{usage.totalTokens} tokens</span>
-                          </div>
-                          <div className="text-gray-500">
-                            {usage.pointsDeducted} 积分 • {new Date(usage.timestamp).toLocaleTimeString()}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-            </>
+            </div>
           )}
         </CardHeader>
       </Card>
 
       {/* Error Display */}
-      {(chatState.error || tokenState.error) && (
+      {chatState.error && (
         <Alert className="mb-4">
-          <AlertTriangle className="h-4 w-4" />
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            {chatState.error || tokenState.error}
+            {chatState.error}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setError(null)}
+              className="ml-2"
+            >
+              关闭
+            </Button>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Chat History */}
-      <div className="flex-1 min-h-0">
-        <ChatHistory
-          messages={chatState.messages}
-          onRetryMessage={retryLastMessage}
-          onClearMessages={clearMessages}
-          onRegenerateLastMessage={regenerateLastMessage}
-          isLoading={chatState.isLoading}
-          isStreaming={chatState.isStreaming}
-          showMetadata={showMetadata}
-          conversationId={chatState.conversationId}
-          className="h-full"
-        />
-      </div>
+      {/* Messages */}
+      <Card className="flex-1 flex flex-col">
+        <CardContent className="flex-1 flex flex-col p-0">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {chatState.messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <MessageSquare className="h-12 w-12 mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-2">开始对话</p>
+                <p className="text-sm text-center max-w-md">
+                  发送消息开始与AI助手对话。支持复杂工作流和条件判断。
+                </p>
+              </div>
+            ) : (
+              <>
+                {chatState.messages.map((message) => (
+                  <MessageItem key={message.id} message={message} />
+                ))}
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
 
-      {/* Chat Input */}
-      <div className="flex-shrink-0 mt-4">
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          disabled={chatState.isLoading || user.balance <= 0}
-          isLoading={chatState.isLoading}
-          error={user.balance <= 0 ? '余额不足，请先充值' : null}
-          placeholder="输入您的问题... (每次对话会实时扣费)"
-        />
-      </div>
+          <Separator />
+
+          {/* Input Area */}
+          <div className="p-4">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Textarea
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="输入消息... (Shift+Enter 换行，Enter 发送)"
+                  className="min-h-[60px] resize-none"
+                  disabled={chatState.isLoading}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={chatState.isLoading || !inputMessage.trim()}
+                  className="h-[60px] px-4"
+                >
+                  {chatState.isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={regenerateLastMessage}
+                  disabled={chatState.isLoading || chatState.messages.length === 0}
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  重新生成
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearMessages}
+                  disabled={chatState.isLoading || chatState.messages.length === 0}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  清空对话
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={startNewConversation}
+                  disabled={chatState.isLoading}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  新对话
+                </Button>
+              </div>
+
+              <div className="text-xs text-gray-500">
+                {user && (
+                  <span>余额: {user.balance.toLocaleString()} 积分</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
