@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { 
   Bot, 
   User, 
@@ -18,7 +20,8 @@ import {
   Copy,
   Check,
   Settings,
-  RefreshCw
+  RefreshCw,
+  Activity
 } from 'lucide-react';
 import { useDifyChat, ChatMessage } from '@/hooks/useDifyChat';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
@@ -44,31 +47,50 @@ export const DifyChatInterface = ({
   const [showTokenDetails, setShowTokenDetails] = useState(false);
   const [streamingEnabled, setStreamingEnabled] = useState(enableStreaming);
   const [inputMessage, setInputMessage] = useState('');
+  const [workflowReset, setWorkflowReset] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 定义工作流专用输入参数
-  const workflowInputs = {
-    // 工作流控制参数
-    "workflow_type": "chat_assistant",
-    "execution_mode": "complete",
-    "enable_all_nodes": true,
-    "bypass_conditions": false,
-    
-    // 条件判断参数
-    "user_intent": "question", // 可以根据消息内容动态调整
-    "context_available": true,
-    "require_detailed_response": true,
-    
-    // 自定义工作流变量（根据你的具体工作流调整）
-    "processing_level": "full",
-    "response_type": "comprehensive",
-    "enable_followup": true,
-    
-    // 如果你的工作流有特定的条件变量，在这里添加
-    "condition_check": true,
-    "workflow_branch": "main",
-    "execute_conditional_nodes": true,
-  };
+  // 动态工作流专用输入参数 - 根据状态变化
+  const workflowInputs = useMemo(() => {
+    const baseWorkflowInputs = {
+      // 工作流控制参数
+      "workflow_type": "chat_assistant",
+      "execution_mode": "controlled", // 改为受控模式
+      "enable_all_nodes": false, // 改为 false
+      "bypass_conditions": false,
+      
+      // 条件判断参数
+      "user_intent": inputMessage ? "question" : "init",
+      "context_available": true,
+      "require_detailed_response": true,
+      
+      // 自定义工作流变量（根据你的具体工作流调整）
+      "processing_level": "optimized", // 改为优化模式
+      "response_type": "contextual", // 改为上下文相关
+      "enable_followup": true,
+      
+      // 工作流条件控制 - 关键修复
+      "condition_check": true,
+      "workflow_branch": "main",
+      "execute_conditional_nodes": false, // 改为 false，避免执行所有条件节点
+      
+      // 循环控制参数
+      "prevent_infinite_loops": true,
+      "max_workflow_steps": 3,
+      "step_timeout": 30,
+      "auto_exit_conditions": true,
+      
+      // 重置标志
+      "workflow_reset": workflowReset,
+    };
+
+    // 如果是重置状态，清除重置标志
+    if (workflowReset) {
+      setTimeout(() => setWorkflowReset(false), 100);
+    }
+
+    return baseWorkflowInputs;
+  }, [inputMessage, workflowReset]);
 
   // Chat functionality with workflow inputs
   const {
@@ -76,15 +98,35 @@ export const DifyChatInterface = ({
     sendMessage,
     clearMessages,
     regenerateLastMessage,
-    startNewConversation,
+    startNewConversation: originalStartNewConversation,
     setError,
     retryLastMessage,
   } = useDifyChat({
     autoStartConversation,
     enableStreaming: streamingEnabled,
     user: user?.id,
-    workflowInputs, // 传递工作流专用输入
+    workflowInputs, // 传递动态工作流输入
   });
+
+  // Enhanced start new conversation with workflow reset
+  const startNewConversation = useCallback(() => {
+    // 设置工作流重置标志
+    setWorkflowReset(true);
+    
+    // 清除输入消息
+    setInputMessage('');
+    
+    // 清除相关的本地存储
+    localStorage.removeItem('dify_conversation_id');
+    sessionStorage.removeItem('dify_conversation_id');
+    localStorage.removeItem('dify_workflow_state');
+    localStorage.removeItem('dify_messages');
+    
+    // 调用原始的新对话函数
+    originalStartNewConversation();
+    
+    console.log('🔄 Started new conversation with workflow reset');
+  }, [originalStartNewConversation]);
 
   // Token monitoring
   const { state: tokenState } = useTokenMonitoring();
@@ -93,59 +135,39 @@ export const DifyChatInterface = ({
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await authService.getCurrentUser();
-        setUser(currentUser);
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
       } catch (error) {
         console.error('Failed to load user:', error);
-        setError('Failed to load user data');
       }
     };
 
     loadUser();
-  }, [setError]);
+  }, []);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [chatState.messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || chatState.isLoading) return;
-
-    const message = inputMessage.trim();
-    setInputMessage('');
-
-    // 根据消息内容动态添加输入参数
-    const dynamicInputs = {
-      "message_length": message.length,
-      "message_type": message.includes('?') || message.includes('？') ? 'question' : 'statement',
-      "is_greeting": /^(你好|hi|hello|嗨)/i.test(message),
-      "requires_analysis": message.length > 50,
-      "user_emotion": "neutral", // 可以根据消息内容分析情绪
-      "priority": "normal",
-      "current_datetime": new Date().toISOString(),
-    };
-
-    try {
-      await sendMessage(message, dynamicInputs);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('发送消息失败，请重试');
+  // Update user balance after token consumption
+  useEffect(() => {
+    if (tokenState.lastConsumption && user) {
+      setUser(prev => prev ? {
+        ...prev,
+        balance: prev.balance - tokenState.lastConsumption!.totalCost
+      } : null);
     }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
+  }, [tokenState.lastConsumption, user]);
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       toast.success('已复制到剪贴板');
     } catch (error) {
+      console.error('Failed to copy:', error);
       toast.error('复制失败');
     }
   };
@@ -155,6 +177,43 @@ export const DifyChatInterface = ({
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || chatState.isLoading) return;
+    
+    const message = inputMessage.trim();
+    setInputMessage('');
+    
+    // 发送消息时添加当前输入的上下文
+    const messageInputs = {
+      "current_input": message,
+      "input_length": message.length,
+      "has_questions": message.includes('?') || message.includes('？'),
+      "message_type": message.length > 100 ? "detailed" : "simple",
+    };
+    
+    await sendMessage(message, messageInputs);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleClearMessages = () => {
+    if (window.confirm('确定要清空当前对话吗？这将保留对话ID但清除所有消息。')) {
+      clearMessages();
+      setInputMessage('');
+    }
+  };
+
+  const handleStartNewConversation = () => {
+    if (window.confirm('确定要开始新对话吗？这将创建一个全新的对话会话。')) {
+      startNewConversation();
+    }
   };
 
   const MessageItem = ({ message }: { message: ChatMessage }) => {
@@ -181,7 +240,7 @@ export const DifyChatInterface = ({
         )}>
           {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm font-medium">
@@ -238,6 +297,17 @@ export const DifyChatInterface = ({
     );
   };
 
+  if (!user) {
+    return (
+      <div className={`flex items-center justify-center h-64 ${className}`}>
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">正在加载用户信息...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Header */}
@@ -255,6 +325,17 @@ export const DifyChatInterface = ({
                     <Zap className="h-3 w-3 mr-1" />
                     原生API
                   </Badge>
+                  {chatState.conversationId && (
+                    <Badge variant="outline" className="text-xs">
+                      对话ID: {chatState.conversationId.slice(0, 8)}...
+                    </Badge>
+                  )}
+                  {chatState.isStreaming && (
+                    <Badge variant="secondary" className="text-xs animate-pulse">
+                      <Activity className="h-3 w-3 mr-1" />
+                      正在输入...
+                    </Badge>
+                  )}
                 </CardTitle>
                 <p className="text-sm text-gray-600">
                   直接调用Dify API，100%准确的Token监控
@@ -266,36 +347,64 @@ export const DifyChatInterface = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowTokenDetails(!showTokenDetails)}
+                onClick={handleStartNewConversation}
+                disabled={chatState.isLoading}
               >
-                <Settings className="h-4 w-4" />
+                <RefreshCw className="h-3 w-3 mr-1" />
+                新对话
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setStreamingEnabled(!streamingEnabled)}
-              >
-                {streamingEnabled ? 'Streaming: On' : 'Streaming: Off'}
-              </Button>
+              
+              {showMetadata && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowTokenDetails(!showTokenDetails)}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )}
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="streaming"
+                  checked={streamingEnabled}
+                  onCheckedChange={setStreamingEnabled}
+                  disabled={chatState.isLoading}
+                />
+                <Label htmlFor="streaming" className="text-xs">
+                  流式输出
+                </Label>
+              </div>
             </div>
           </div>
 
-          {showTokenDetails && tokenState.lastUsage && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span>输入Tokens:</span>
-                  <span>{tokenState.lastUsage.prompt_tokens}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>输出Tokens:</span>
-                  <span>{tokenState.lastUsage.completion_tokens}</span>
-                </div>
-                <div className="flex justify-between font-semibold">
-                  <span>总计Tokens:</span>
-                  <span>{tokenState.lastUsage.total_tokens}</span>
-                </div>
+          {/* Token Details */}
+          {showTokenDetails && tokenState.isMonitoring && (
+            <div className="mt-3 p-3 bg-white rounded-lg border text-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-4 w-4 text-yellow-500" />
+                <span className="font-medium">Token 监控状态</span>
+                <Badge variant="secondary" className="text-xs">
+                  {tokenState.isMonitoring ? '活跃' : '未活跃'}
+                </Badge>
               </div>
+              
+              {tokenState.lastConsumption && (
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-gray-600">最近消费:</span>
+                    <span className="font-medium ml-1">
+                      {tokenState.lastConsumption.totalTokens} tokens
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">费用:</span>
+                    <span className="font-medium ml-1">
+                      {tokenState.lastConsumption.totalCost.toFixed(6)} 积分
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardHeader>
@@ -360,6 +469,7 @@ export const DifyChatInterface = ({
                 <Button
                   onClick={handleSendMessage}
                   disabled={chatState.isLoading || !inputMessage.trim()}
+                  size="sm"
                   className="h-[60px] px-4"
                 >
                   {chatState.isLoading ? (
@@ -386,7 +496,7 @@ export const DifyChatInterface = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={clearMessages}
+                  onClick={handleClearMessages}
                   disabled={chatState.isLoading || chatState.messages.length === 0}
                 >
                   <Trash2 className="h-3 w-3 mr-1" />
@@ -395,7 +505,7 @@ export const DifyChatInterface = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={startNewConversation}
+                  onClick={handleStartNewConversation}
                   disabled={chatState.isLoading}
                 >
                   <RefreshCw className="h-3 w-3 mr-1" />
