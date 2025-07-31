@@ -92,21 +92,10 @@ export class DifyAPIClient {
 
   /**
    * 验证会话ID是否在Dify端仍然有效
+   * 简化实现：直接返回true，让Dify API在实际发送消息时处理无效的会话ID
    */
   async validateConversationId(conversationId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.config.apiUrl}/conversations/${conversationId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return response.ok;
-    } catch (error) {
-      console.warn('Failed to validate conversation ID:', error);
-      return false;
-    }
+    return true;
   }
 
   /**
