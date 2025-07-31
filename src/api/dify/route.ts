@@ -1,40 +1,27 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { createBrowserClient } from '@/lib/supabase/browser-client'
+import { createClient } from '@supabase/supabase-js'
+import { DIFY_API_KEY, DIFY_API_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL } from '@/lib/config'
+import { saveMessages } from '@/lib/save-messages'
 
-const DIFY_API_URL = process.env.DIFY_API_URL || 'https://api.dify.ai/v1'
-const DIFY_API_KEY = process.env.DIFY_API_KEY
-
-export async function POST(
-  request: Request,
-  { params }: { params: { conversationId: string } }
-) {
+export async function POST(request: Request, { params }: { params: { conversationId: string } }) {
   try {
-    const cookieStore = cookies()
-    const supabase = createBrowserClient(cookieStore)
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { message } = await request.json()
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const { message, inputs = {} } = await request.json()
-
-    // 获取对话信息
-    const { data: conversation } = await supabase
+    // 查找当前会话的 dify_conversation_id
+    const { data: conversationRow } = await supabase
       .from('conversations')
       .select('dify_conversation_id')
       .eq('id', params.conversationId)
       .single()
 
-    let difyConversationId = conversation?.dify_conversation_id
+    let difyConversationId = conversationRow?.dify_conversation_id || null
 
-    // 构建请求体
     const requestBody: any = {
-      inputs,
+      inputs: {},
       query: message,
-      user: user.id,
       response_mode: 'blocking',
+      user: 'default-user'
     }
 
     // 只有在 dify_conversation_id 存在且有效时才添加
@@ -56,11 +43,12 @@ export async function POST(
           .from('conversations')
           .update({ dify_conversation_id: null })
           .eq('id', params.conversationId)
+        // 不直接 return，继续往下走，让 chat-messages 创建新对话
       }
     }
 
-    // 调用 Dify API
-    const response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+    // 发送消息到 Dify
+    let response = await fetch(`${DIFY_API_URL}/chat-messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${DIFY_API_KEY}`,
@@ -69,16 +57,16 @@ export async function POST(
       body: JSON.stringify(requestBody),
     })
 
+    // 如果是对话不存在的错误，尝试去掉 conversation_id 再试一次
     if (!response.ok) {
       const errorData = await response.json()
       console.error('Dify API error:', errorData)
-      
-      // 如果是对话不存在的错误，尝试创建新对话
+
       if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
         console.log('Retrying without conversation_id')
         delete requestBody.conversation_id
-        
-        const retryResponse = await fetch(`${DIFY_API_URL}/chat-messages`, {
+
+        response = await fetch(`${DIFY_API_URL}/chat-messages`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${DIFY_API_KEY}`,
@@ -87,32 +75,20 @@ export async function POST(
           body: JSON.stringify(requestBody),
         })
 
-        if (!retryResponse.ok) {
-          const retryError = await retryResponse.json()
-          return NextResponse.json(retryError, { status: retryResponse.status })
+        // 如果重试依然失败，返回错误
+        if (!response.ok) {
+          const retryErrorData = await response.json()
+          return NextResponse.json(
+            { error: retryErrorData.message || 'Dify API error', detail: retryErrorData },
+            { status: response.status }
+          )
         }
-
-        const retryData = await retryResponse.json()
-        
-        // 保存新的 conversation_id
-        if (retryData.conversation_id) {
-          await supabase
-            .from('conversations')
-            .update({ dify_conversation_id: retryData.conversation_id })
-            .eq('id', params.conversationId)
-        }
-
-        // 保存消息
-        await saveMessages(supabase, params.conversationId, message, retryData)
-        
-        return NextResponse.json({
-          answer: retryData.answer,
-          conversation_id: retryData.conversation_id,
-          message_id: retryData.message_id,
-        })
+      } else {
+        return NextResponse.json(
+          { error: errorData.message || 'Dify API error', detail: errorData },
+          { status: response.status }
+        )
       }
-      
-      return NextResponse.json(errorData, { status: response.status })
     }
 
     const data = await response.json()
@@ -140,27 +116,4 @@ export async function POST(
       { status: 500 }
     )
   }
-}
-
-async function saveMessages(supabase: any, conversationId: string, userMessage: string, difyResponse: any) {
-  const messages = [
-    {
-      conversation_id: conversationId,
-      role: 'user',
-      content: userMessage,
-      created_at: new Date().toISOString(),
-    },
-    {
-      conversation_id: conversationId,
-      role: 'assistant',
-      content: difyResponse.answer,
-      created_at: new Date().toISOString(),
-      metadata: {
-        message_id: difyResponse.message_id,
-        tokens: difyResponse.metadata?.usage,
-      },
-    },
-  ]
-
-  await supabase.from('messages').insert(messages)
 }
