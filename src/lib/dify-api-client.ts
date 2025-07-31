@@ -81,20 +81,159 @@ export interface DifyAPIClientConfig {
   apiUrl: string;
   appId: string;
   apiKey: string;
+  conversationExpiryHours?: number; // Default 24 hours
+}
+
+export interface ConversationMetadata {
+  id: string;
+  createdAt: number;
+  lastUsed: number;
 }
 
 export class DifyAPIClient {
   private config: DifyAPIClientConfig;
+  private readonly STORAGE_KEY = 'dify_conversation_metadata';
+  private readonly DEFAULT_EXPIRY_HOURS = 24;
 
   constructor(config: DifyAPIClientConfig) {
     this.config = config;
   }
 
   /**
-   * 验证会话ID是否在Dify端仍然有效
-   * 简化实现：直接返回true，让Dify API在实际发送消息时处理无效的会话ID
+   * Store conversation metadata with timestamp
+   */
+  private storeConversationMetadata(conversationId: string): void {
+    try {
+      const now = Date.now();
+      const metadata: ConversationMetadata = {
+        id: conversationId,
+        createdAt: now,
+        lastUsed: now
+      };
+      
+      // Store both individual conversation and update the list
+      localStorage.setItem(`${this.STORAGE_KEY}_${conversationId}`, JSON.stringify(metadata));
+      
+      // Also maintain conversation ID in the old location for backward compatibility
+      localStorage.setItem('dify_conversation_id', conversationId);
+      
+      console.log('💾 Stored conversation metadata:', { conversationId, createdAt: new Date(now).toISOString() });
+    } catch (error) {
+      console.warn('⚠️ Failed to store conversation metadata:', error);
+    }
+  }
+
+  /**
+   * Get conversation metadata from storage
+   */
+  private getConversationMetadata(conversationId: string): ConversationMetadata | null {
+    try {
+      const stored = localStorage.getItem(`${this.STORAGE_KEY}_${conversationId}`);
+      if (!stored) {
+        return null;
+      }
+      
+      const metadata: ConversationMetadata = JSON.parse(stored);
+      return metadata;
+    } catch (error) {
+      console.warn('⚠️ Failed to get conversation metadata:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update last used timestamp for conversation
+   */
+  private updateConversationLastUsed(conversationId: string): void {
+    try {
+      const metadata = this.getConversationMetadata(conversationId);
+      if (metadata) {
+        metadata.lastUsed = Date.now();
+        localStorage.setItem(`${this.STORAGE_KEY}_${conversationId}`, JSON.stringify(metadata));
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to update conversation last used:', error);
+    }
+  }
+
+  /**
+   * Clear conversation metadata from storage
+   */
+  private clearConversationMetadata(conversationId: string): void {
+    try {
+      localStorage.removeItem(`${this.STORAGE_KEY}_${conversationId}`);
+      
+      // Also clear main conversation ID if it matches
+      const storedConversationId = localStorage.getItem('dify_conversation_id');
+      if (storedConversationId === conversationId) {
+        localStorage.removeItem('dify_conversation_id');
+      }
+      
+      console.log('🗑️ Cleared conversation metadata:', conversationId);
+    } catch (error) {
+      console.warn('⚠️ Failed to clear conversation metadata:', error);
+    }
+  }
+
+  /**
+   * Check if conversation is expired based on local timestamp
+   * Avoids CORS issues by not making API calls
+   */
+  private isConversationExpired(metadata: ConversationMetadata): boolean {
+    const expiryHours = this.config.conversationExpiryHours || this.DEFAULT_EXPIRY_HOURS;
+    const expiryMs = expiryHours * 60 * 60 * 1000; // Convert hours to milliseconds
+    const now = Date.now();
+    
+    const ageMs = now - metadata.createdAt;
+    const isExpired = ageMs > expiryMs;
+    
+    if (isExpired) {
+      console.log('⏰ Conversation expired:', {
+        conversationId: metadata.id,
+        ageHours: Math.round(ageMs / (60 * 60 * 1000) * 10) / 10,
+        expiryHours
+      });
+    }
+    
+    return isExpired;
+  }
+
+  /**
+   * 验证会话ID是否有效 - 使用本地时间验证，避免CORS问题
+   * Local validation to avoid CORS issues while gracefully handling expired conversations
    */
   async validateConversationId(conversationId: string): Promise<boolean> {
+    // Basic format validation
+    if (!conversationId || !conversationId.trim()) {
+      console.log('❌ Conversation ID is empty');
+      return false;
+    }
+
+    // UUID format validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(conversationId)) {
+      console.log('❌ Conversation ID is not a valid UUID format:', conversationId);
+      this.clearConversationMetadata(conversationId);
+      return false;
+    }
+
+    // Get stored metadata
+    const metadata = this.getConversationMetadata(conversationId);
+    if (!metadata) {
+      console.log('❌ No metadata found for conversation:', conversationId);
+      return false;
+    }
+
+    // Check if expired
+    if (this.isConversationExpired(metadata)) {
+      console.log('⏰ Conversation expired, clearing:', conversationId);
+      this.clearConversationMetadata(conversationId);
+      return false;
+    }
+
+    // Update last used timestamp
+    this.updateConversationLastUsed(conversationId);
+    console.log('✅ Conversation is valid:', conversationId);
     return true;
   }
 
@@ -150,7 +289,20 @@ export class DifyAPIClient {
       throw new Error(`Dify API error: ${response.status} - ${errorText}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    
+    // Store metadata for new or validated conversations
+    if (result.conversation_id) {
+      // If this is a new conversation (no valid input conversation ID), store metadata
+      if (!validConversationId) {
+        this.storeConversationMetadata(result.conversation_id);
+      } else {
+        // Update last used timestamp for existing conversation
+        this.updateConversationLastUsed(result.conversation_id);
+      }
+    }
+    
+    return result;
   }
 
   /**
@@ -207,6 +359,7 @@ export class DifyAPIClient {
     }
 
     const decoder = new TextDecoder();
+    let detectedConversationId: string | null = null;
     
     try {
       while (true) {
@@ -221,11 +374,23 @@ export class DifyAPIClient {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
+              // Store metadata if we detected a new conversation ID
+              if (detectedConversationId && !validConversationId) {
+                this.storeConversationMetadata(detectedConversationId);
+              } else if (detectedConversationId && validConversationId) {
+                this.updateConversationLastUsed(detectedConversationId);
+              }
               return;
             }
             
             try {
               const parsed: DifyStreamResponse = JSON.parse(data);
+              
+              // Track conversation ID from stream
+              if (parsed.conversation_id) {
+                detectedConversationId = parsed.conversation_id;
+              }
+              
               onChunk(parsed);
             } catch (e) {
               console.warn('Failed to parse stream chunk:', data);
@@ -235,6 +400,13 @@ export class DifyAPIClient {
       }
     } finally {
       reader.releaseLock();
+      
+      // Final attempt to store metadata if we haven't already
+      if (detectedConversationId && !validConversationId) {
+        this.storeConversationMetadata(detectedConversationId);
+      } else if (detectedConversationId && validConversationId) {
+        this.updateConversationLastUsed(detectedConversationId);
+      }
     }
   }
 
@@ -361,7 +533,12 @@ export class DifyAPIClient {
     // Dify doesn't have explicit "start conversation" endpoint
     // Conversations are created automatically when sending first message
     // Return a proper UUID v4 identifier for tracking
-    return generateUUID();
+    const newConversationId = generateUUID();
+    
+    // Store metadata for the new conversation ID
+    this.storeConversationMetadata(newConversationId);
+    
+    return newConversationId;
   }
 
   /**
@@ -435,6 +612,7 @@ export function createDifyAPIClient(): DifyAPIClient {
     apiUrl: import.meta.env.VITE_DIFY_API_URL || '',
     appId: import.meta.env.VITE_DIFY_APP_ID || '',
     apiKey: import.meta.env.VITE_DIFY_API_KEY || '',
+    conversationExpiryHours: 24, // Default 24 hours expiry
   };
 
   // Validate configuration
