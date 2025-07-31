@@ -90,24 +90,7 @@ export class DifyAPIClient {
     this.config = config;
   }
 
-  /**
-   * 验证会话ID是否在Dify端仍然有效
-   */
-  async validateConversationId(conversationId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.config.apiUrl}/conversations/${conversationId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return response.ok;
-    } catch (error) {
-      console.warn('Failed to validate conversation ID:', error);
-      return false;
-    }
-  }
+
 
   /**
    * Send a message to Dify and get response
@@ -118,17 +101,6 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
-    // 如果有conversationId，先验证是否有效
-    let validConversationId = conversationId;
-    if (conversationId) {
-      const isValid = await this.validateConversationId(conversationId);
-      if (!isValid) {
-        // 如果无效，设置为undefined，让Dify创建新会话
-        validConversationId = undefined;
-        console.log('Conversation ID is invalid, creating new conversation');
-      }
-    }
-
     const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
       method: 'POST',
       headers: {
@@ -139,7 +111,7 @@ export class DifyAPIClient {
         inputs: inputs || {},
         query: message,
         response_mode: 'blocking',
-        conversation_id: validConversationId || undefined,
+        conversation_id: conversationId || undefined,
         user: user || 'default-user',
         files: []
       }),
@@ -174,17 +146,6 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<void> {
-    // 如果有conversationId，先验证是否有效
-    let validConversationId = conversationId;
-    if (conversationId) {
-      const isValid = await this.validateConversationId(conversationId);
-      if (!isValid) {
-        // 如果无效，设置为undefined，让Dify创建新会话
-        validConversationId = undefined;
-        console.log('Conversation ID is invalid, creating new conversation for streaming');
-      }
-    }
-
     const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
       method: 'POST',
       headers: {
@@ -195,7 +156,7 @@ export class DifyAPIClient {
         inputs: inputs || {},
         query: message,
         response_mode: 'streaming',
-        conversation_id: validConversationId || undefined,
+        conversation_id: conversationId || undefined,
         user: user || 'default-user',
         files: []
       }),
