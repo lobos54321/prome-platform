@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { db } from '@/lib/supabase';
 import { difyIframeMonitor } from '@/lib/dify-iframe-monitor';
 import { authService } from '@/lib/auth';
+import { WorkflowDiagnosticsOverview } from '@/components/WorkflowDiagnosticsOverview';
 import { 
   Bug, 
   Database, 
@@ -19,7 +21,8 @@ import {
   ExternalLink,
   DollarSign,
   Users,
-  Settings 
+  Settings,
+  Activity
 } from 'lucide-react';
 
 export default function AdminDebugTools() {
@@ -50,6 +53,7 @@ export default function AdminDebugTools() {
   });
 
   const currentUser = authService.getCurrentUserSync();
+  const isDifyEnabled = import.meta.env.VITE_ENABLE_DIFY_INTEGRATION === 'true';
 
   const addCredits = async () => {
     setIsLoading(true);
@@ -247,6 +251,27 @@ node admin-scripts/test-token-monitoring.js
         <h2 className="text-2xl font-bold">调试工具</h2>
         <Badge variant="outline">管理员专用</Badge>
       </div>
+
+      {/* Workflow Diagnostics Overview */}
+      {isDifyEnabled && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                工作流诊断概览
+              </CardTitle>
+              <CardDescription>
+                Dify 工作流实时监控和诊断状态 • 完整功能请查看 "工作流诊断" 标签页
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <WorkflowDiagnosticsOverview />
+            </CardContent>
+          </Card>
+          <Separator />
+        </>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Credit Management */}

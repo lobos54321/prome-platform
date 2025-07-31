@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createDifyAPIClient, DifyAPIClient, DifyResponse, DifyStreamResponse } from '@/lib/dify-api-client';
 import { generateUUID, isValidUUID } from '@/lib/utils';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
+import { useWorkflowDiagnostics } from '@/hooks/useWorkflowDiagnostics';
 
 export interface ChatMessage {
   id: string;
@@ -64,7 +65,10 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
   const [state, setState] = useState<ChatState>(INITIAL_STATE);
   const clientRef = useRef<DifyAPIClient>();
   const { processTokenUsage } = useTokenMonitoring();
+  const { recordEvent, recordParameters } = useWorkflowDiagnostics();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const workflowStartTimeRef = useRef<number | null>(null);
+  const nodeStartTimesRef = useRef<Map<string, number>>(new Map());
 
   // Initialize Dify client and clean up invalid conversation IDs
   useEffect(() => {
@@ -241,6 +245,9 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       bypassInitialization: baseInputs.bypass_initialization
     });
     
+    // Record parameters for diagnostics
+    recordParameters(state.conversationId || 'unknown', baseInputs, userMessageCount);
+    
     return baseInputs;
   }, [user, state.conversationId, state.messages, inputs, workflowInputs]);
 
@@ -350,16 +357,71 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
                 // Update stored conversation ID
                 localStorage.setItem('dify_conversation_id', finalConversationId);
               }
+
+              // Record workflow event for diagnostics
+              recordEvent(finalConversationId || state.conversationId, {
+                event: 'message_end',
+                data: {
+                  messageId: finalMessageId,
+                  usage: finalUsage,
+                  contentLength: fullContent.length
+                }
+              });
             } else if (chunk.event === 'error') {
+              // Record error event for diagnostics
+              recordEvent(state.conversationId, {
+                event: 'error',
+                data: chunk.data || 'Unknown error in stream'
+              });
               throw new Error(chunk.data || 'Dify API error in stream');
             } else if (chunk.event === 'workflow_started') {
               console.log('🚀 Workflow started:', chunk);
+              workflowStartTimeRef.current = Date.now();
+              // Record workflow started event for diagnostics
+              recordEvent(state.conversationId, {
+                event: 'workflow_started',
+                data: chunk,
+                metadata: {
+                  parameters: completeInputs
+                }
+              });
             } else if (chunk.event === 'workflow_finished') {
               console.log('✅ Workflow finished:', chunk);
+              const executionTime = workflowStartTimeRef.current 
+                ? Date.now() - workflowStartTimeRef.current 
+                : undefined;
+              // Record workflow finished event for diagnostics
+              recordEvent(state.conversationId, {
+                event: 'workflow_finished',
+                data: chunk,
+                executionTime
+              });
+              workflowStartTimeRef.current = null;
             } else if (chunk.event === 'node_started') {
               console.log('🔄 Node started:', chunk);
+              const nodeId = chunk.node_id || 'unknown_node';
+              nodeStartTimesRef.current.set(nodeId, Date.now());
+              // Record node started event for diagnostics
+              recordEvent(state.conversationId, {
+                event: 'node_started',
+                nodeId,
+                nodeName: chunk.node_name || chunk.node_title || nodeId,
+                data: chunk
+              });
             } else if (chunk.event === 'node_finished') {
               console.log('✅ Node finished:', chunk);
+              const nodeId = chunk.node_id || 'unknown_node';
+              const startTime = nodeStartTimesRef.current.get(nodeId);
+              const executionTime = startTime ? Date.now() - startTime : undefined;
+              nodeStartTimesRef.current.delete(nodeId);
+              // Record node finished event for diagnostics
+              recordEvent(state.conversationId, {
+                event: 'node_finished',
+                nodeId,
+                nodeName: chunk.node_name || chunk.node_title || nodeId,
+                data: chunk,
+                executionTime
+              });
             }
           },
           state.conversationId || undefined,
