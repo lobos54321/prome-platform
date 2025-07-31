@@ -40,7 +40,7 @@ export interface WorkflowSession {
 
 export interface DiagnosticIssue {
   id: string;
-  type: 'infinite_loop' | 'stuck_node' | 'timeout' | 'parameter_anomaly' | 'memory_leak';
+  type: 'infinite_loop' | 'stuck_node' | 'timeout' | 'parameter_anomaly' | 'memory_leak' | 'cors_error' | 'method_not_allowed';
   severity: 'low' | 'medium' | 'high' | 'critical';
   message: string;
   details: Record<string, unknown>;

@@ -126,7 +126,7 @@ export function DifyChat({ className }: DifyChatProps) {
       // 重置重试计数
       setRetryCount(0);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending message:', error);
       
       // 移除用户消息，因为发送失败
@@ -136,10 +136,11 @@ export function DifyChat({ className }: DifyChatProps) {
       setRetryCount(prev => prev + 1);
 
       // 处理不同类型的错误
-      if (error.message.includes('404') || 
-          error.message.includes('Not Exists') || 
-          error.message.includes('Conversation ID format error') ||
-          error.message.includes('conversation not found')) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('404') || 
+          errorMessage.includes('Not Exists') || 
+          errorMessage.includes('Conversation ID format error') ||
+          errorMessage.includes('conversation not found')) {
         
         console.log('🔄 Conversation expired, clearing conversation state...');
         handleClearConversation();
@@ -152,12 +153,12 @@ export function DifyChat({ className }: DifyChatProps) {
             toast.info('正在自动重试...');
           }, 1000);
         }
-      } else if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
+      } else if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
         setError('请求过于频繁，请稍后再试');
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
         setError('网络连接失败，请检查网络连接后重试');
       } else {
-        setError(error.message || '发送消息失败，请重试');
+        setError(errorMessage || '发送消息失败，请重试');
       }
     } finally {
       setIsLoading(false);
