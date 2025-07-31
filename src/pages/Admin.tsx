@@ -9,6 +9,7 @@ import ModelManagement from './Admin/ModelManagement';
 import TokenConsumptionMonitor from './Admin/TokenConsumptionMonitor';
 import RechargePackageManagement from './Admin/RechargePackageManagement';
 import AdminDebugTools from './Admin/AdminDebugTools';
+import { WorkflowDiagnostics } from '@/components/WorkflowDiagnostics';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -103,6 +104,7 @@ export default function Admin() {
           <TabsTrigger value="models">模型管理</TabsTrigger>
           <TabsTrigger value="recharge">充值方案</TabsTrigger>
           {isDifyEnabled && <TabsTrigger value="consumption">消耗监控</TabsTrigger>}
+          {isDifyEnabled && <TabsTrigger value="workflow-diagnostics">工作流诊断</TabsTrigger>}
           <TabsTrigger value="users">用户管理</TabsTrigger>
           <TabsTrigger value="services">服务管理</TabsTrigger>
           <TabsTrigger value="stats">平台统计</TabsTrigger>
@@ -120,6 +122,12 @@ export default function Admin() {
         {isDifyEnabled && (
           <TabsContent value="consumption">
             <TokenConsumptionMonitor />
+          </TabsContent>
+        )}
+
+        {isDifyEnabled && (
+          <TabsContent value="workflow-diagnostics">
+            <WorkflowDiagnostics />
           </TabsContent>
         )}
 
