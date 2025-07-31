@@ -1,16 +1,7 @@
-/**
- * Dify Chat Hook
- * 
- * Provides chat functionality with direct Dify API integration,
- * including message management, streaming support, and conversation handling.
- */
-
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { DifyAPIClient, DifyMessage, DifyResponse, DifyStreamResponse, createDifyAPIClient } from '@/lib/dify-api-client';
-import { useTokenMonitoring } from './useTokenMonitoring';
-import { authService } from '@/lib/auth';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createDifyAPIClient, DifyAPIClient, DifyResponse, DifyStreamResponse } from '@/lib/dify-api-client';
 import { generateUUID, isValidUUID } from '@/lib/utils';
-import { toast } from 'sonner';
+import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
 
 export interface ChatMessage {
   id: string;
@@ -43,16 +34,7 @@ export interface UseDifyChatOptions {
   enableStreaming?: boolean;
   user?: string;
   inputs?: Record<string, unknown>;
-}
-
-export interface UseDifyChatReturn {
-  state: ChatState;
-  sendMessage: (content: string) => Promise<void>;
-  clearMessages: () => void;
-  regenerateLastMessage: () => Promise<void>;
-  startNewConversation: () => void;
-  setError: (error: string | null) => void;
-  retryLastMessage: () => Promise<void>;
+  workflowInputs?: Record<string, unknown>; // 新增：专门用于工作流的输入参数
 }
 
 const INITIAL_STATE: ChatState = {
@@ -64,12 +46,19 @@ const INITIAL_STATE: ChatState = {
   currentStreamingId: null,
 };
 
-export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn {
+// Helper function to check if a string is a valid UUID
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+export function useDifyChat(options: UseDifyChatOptions = {}) {
   const {
     autoStartConversation = true,
     enableStreaming = true,
     user,
-    inputs = {}
+    inputs = {},
+    workflowInputs = {} // 新增：工作流专用输入
   } = options;
 
   const [state, setState] = useState<ChatState>(INITIAL_STATE);
@@ -91,10 +80,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
       }
     } catch (error) {
       console.error('Failed to initialize Dify client:', error);
-      setState(prev => ({ 
-        ...prev, 
-        error: 'Dify API not configured. Please check environment variables.' 
-      }));
+      setState(prev => ({ ...prev, error: 'Failed to initialize chat client' }));
     }
   }, []);
 
@@ -103,41 +89,12 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
     if (autoStartConversation && !state.conversationId && clientRef.current) {
       startNewConversation();
     }
-  }, [autoStartConversation, state.conversationId]);
-
-  const generateMessageId = useCallback(() => {
-    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }, []);
-
-  const startNewConversation = useCallback(() => {
-    // Clear any invalid conversation IDs from storage
-    const oldConversationId = localStorage.getItem('dify_conversation_id');
-    if (oldConversationId && !isValidUUID(oldConversationId)) {
-      localStorage.removeItem('dify_conversation_id');
-      sessionStorage.removeItem('dify_conversation_id');
-    }
-    
-    const newConversationId = generateUUID();
-    
-    setState(prev => ({
-      ...prev,
-      conversationId: newConversationId,
-      messages: [],
-      error: null
-    }));
-
-    // Store the new UUID for potential reuse
-    localStorage.setItem('dify_conversation_id', newConversationId);
-    
-    toast.success('已开始新对话', {
-      description: '对话ID已生成，可以开始聊天了'
-    });
-  }, []);
+  }, [autoStartConversation]);
 
   const addMessage = useCallback((message: ChatMessage) => {
     setState(prev => ({
       ...prev,
-      messages: [...prev.messages, message]
+      messages: [...prev.messages, message],
     }));
   }, []);
 
@@ -146,17 +103,114 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
       ...prev,
       messages: prev.messages.map(msg => 
         msg.id === messageId ? { ...msg, ...updates } : msg
-      )
+      ),
     }));
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const clearMessages = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      messages: [],
+      error: null,
+    }));
+  }, []);
+
+  const setError = useCallback((error: string | null) => {
+    setState(prev => ({
+      ...prev,
+      error,
+      isLoading: false,
+      isStreaming: false,
+      currentStreamingId: null,
+    }));
+  }, []);
+
+  const startNewConversation = useCallback(async () => {
+    try {
+      if (!clientRef.current) {
+        throw new Error('Chat client not initialized');
+      }
+
+      const newConversationId = await clientRef.current.startNewConversation();
+      setState(prev => ({
+        ...prev,
+        conversationId: newConversationId,
+        error: null,
+      }));
+      
+      // Store the new conversation ID
+      localStorage.setItem('dify_conversation_id', newConversationId);
+      console.log('Started new conversation:', newConversationId);
+      
+      return newConversationId;
+    } catch (error) {
+      console.error('Failed to start new conversation:', error);
+      setError('Failed to start new conversation');
+      return null;
+    }
+  }, [setError]);
+
+  // 构建完整的输入参数
+  const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
+    const currentTime = new Date();
+    
+    // 基础输入参数
+    const baseInputs = {
+      // 系统参数
+      "user_id": user || 'default-user',
+      "session_id": state.conversationId || 'new-session',
+      "timestamp": currentTime.toISOString(),
+      "datetime": currentTime.toLocaleString('zh-CN'),
+      "current_date": currentTime.toLocaleDateString('zh-CN'),
+      "current_time": currentTime.toLocaleTimeString('zh-CN'),
+      
+      // 消息相关参数
+      "user_message": message,
+      "query": message,
+      "user_input": message,
+      "question": message,
+      
+      // 会话控制参数
+      "language": "zh-CN",
+      "locale": "zh-CN",
+      "chat_mode": "workflow",
+      "workflow_mode": "full_execution",
+      "enable_workflow": true,
+      "execute_all_nodes": true,
+      
+      // 流程控制参数
+      "continue_workflow": true,
+      "skip_first_node": false,
+      "force_execution": true,
+      
+      // 条件判断可能需要的参数
+      "has_context": state.messages.length > 0,
+      "message_count": state.messages.length,
+      "is_first_message": state.messages.length === 0,
+      "conversation_started": !!state.conversationId,
+      
+      // 用户首选项（可以根据实际需求调整）
+      "user_preference": "detailed",
+      "response_style": "helpful",
+      "output_format": "markdown",
+      
+      ...inputs, // 来自 useDifyChat 选项的输入
+      ...workflowInputs, // 工作流专用输入
+      ...customInputs, // 自定义输入（优先级最高）
+    };
+
+    console.log('🔧 Complete inputs for Dify workflow:', baseInputs);
+    return baseInputs;
+  }, [user, state.conversationId, state.messages.length, inputs, workflowInputs]);
+
+  const sendMessage = useCallback(async (content: string, customInputs?: Record<string, unknown>) => {
     if (!clientRef.current) {
-      toast.error('Dify API client not initialized');
+      setError('Chat client not initialized');
       return;
     }
 
     if (!content.trim()) {
+      setError('Message cannot be empty');
       return;
     }
 
@@ -165,21 +219,24 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
       abortControllerRef.current.abort();
     }
 
-    const currentUser = await authService.getCurrentUser();
-    const userId = user || currentUser?.id || 'default-user';
+    const userId = user || 'default-user';
+    const userMessageId = generateUUID();
+    const assistantMessageId = generateUUID();
     
+    // 构建完整的输入参数
+    const completeInputs = buildCompleteInputs(content, customInputs);
+
     // Add user message
     const userMessage: ChatMessage = {
-      id: generateMessageId(),
+      id: userMessageId,
       role: 'user',
-      content: content.trim(),
+      content,
       timestamp: new Date().toISOString(),
     };
 
     addMessage(userMessage);
 
-    // Create assistant message placeholder
-    const assistantMessageId = generateMessageId();
+    // Add assistant message placeholder
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
       role: 'assistant',
@@ -209,6 +266,8 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
         await clientRef.current.sendMessageStream(
           content,
           (chunk: DifyStreamResponse) => {
+            console.log('📨 Received stream chunk:', chunk);
+            
             if (chunk.event === 'message') {
               if (chunk.answer) {
                 fullContent += chunk.answer;
@@ -244,14 +303,24 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
                   ...prev,
                   conversationId: finalConversationId,
                 }));
+                // Update stored conversation ID
+                localStorage.setItem('dify_conversation_id', finalConversationId);
               }
             } else if (chunk.event === 'error') {
               throw new Error('Dify API error in stream');
+            } else if (chunk.event === 'workflow_started') {
+              console.log('🚀 Workflow started:', chunk);
+            } else if (chunk.event === 'workflow_finished') {
+              console.log('✅ Workflow finished:', chunk);
+            } else if (chunk.event === 'node_started') {
+              console.log('🔄 Node started:', chunk);
+            } else if (chunk.event === 'node_finished') {
+              console.log('✅ Node finished:', chunk);
             }
           },
           state.conversationId || undefined,
           userId,
-          inputs
+          completeInputs // 使用完整的输入参数
         );
 
         // Process token usage if available
@@ -270,7 +339,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
           content,
           state.conversationId || undefined,
           userId,
-          inputs
+          completeInputs // 使用完整的输入参数
         );
 
         updateMessage(assistantMessageId, {
@@ -288,6 +357,9 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
           conversationId: response.conversation_id,
         }));
 
+        // Store conversation ID
+        localStorage.setItem('dify_conversation_id', response.conversation_id);
+
         // Process token usage
         if (response.metadata.usage) {
           await processTokenUsage(
@@ -300,38 +372,27 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
       }
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       console.error('Error sending message:', error);
       
-      // Handle conversation ID format errors
-      if (errorMessage.includes('Conversation ID format error')) {
-        console.log('Conversation ID format error detected, starting new conversation');
-        startNewConversation();
-        toast.warning('对话ID格式错误，已自动开始新对话', {
-          description: '请重新发送您的消息'
-        });
-        
-        updateMessage(assistantMessageId, {
-          content: '',
-          isStreaming: false,
-          error: '对话ID格式错误，已开始新对话，请重新发送消息'
-        });
-      } else {
-        updateMessage(assistantMessageId, {
-          content: '',
-          isStreaming: false,
-          error: errorMessage
-        });
-
-        toast.error('发送消息失败', {
-          description: errorMessage
-        });
+      let errorMessage = 'Failed to send message';
+      if (error instanceof Error) {
+        if (error.message.includes('Conversation Not Exists') || error.message.includes('Conversation ID format error')) {
+          // Handle conversation not exists error
+          console.log('Conversation no longer exists, starting new conversation...');
+          await startNewConversation();
+          errorMessage = 'Conversation expired. Please try again.';
+        } else {
+          errorMessage = error.message;
+        }
       }
 
-      setState(prev => ({
-        ...prev,
+      updateMessage(assistantMessageId, {
+        content: '',
+        isStreaming: false,
         error: errorMessage
-      }));
+      });
+
+      setError(errorMessage);
     } finally {
       setState(prev => ({
         ...prev,
@@ -341,65 +402,151 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
       }));
     }
   }, [
+    user, 
     state.conversationId, 
     enableStreaming, 
-    user, 
-    inputs, 
-    generateMessageId, 
     addMessage, 
     updateMessage, 
-    processTokenUsage
+    setError, 
+    startNewConversation, 
+    processTokenUsage,
+    buildCompleteInputs
   ]);
 
-  const clearMessages = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      messages: [],
-      error: null
-    }));
-  }, []);
+  const regenerateLastMessage = useCallback(async (customInputs?: Record<string, unknown>) => {
+    const lastUserMessage = state.messages
+      .slice()
+      .reverse()
+      .find(msg => msg.role === 'user');
 
-  const regenerateLastMessage = useCallback(async () => {
-    const messages = state.messages;
-    if (messages.length < 2) {
-      return;
+    if (lastUserMessage) {
+      // Remove the last assistant message if it exists
+      setState(prev => ({
+        ...prev,
+        messages: prev.messages.filter((msg, index) => {
+          // Keep all messages except the last assistant message
+          const isLastAssistant = msg.role === 'assistant' && 
+            index === prev.messages.findLastIndex(m => m.role === 'assistant');
+          return !isLastAssistant;
+        }),
+      }));
+
+      await sendMessage(lastUserMessage.content, customInputs);
     }
-
-    const lastUserMessage = [...messages].reverse().find(msg => msg.role === 'user');
-    if (!lastUserMessage) {
-      return;
-    }
-
-    // Remove the last assistant message
-    setState(prev => ({
-      ...prev,
-      messages: prev.messages.filter((_, index) => index !== prev.messages.length - 1)
-    }));
-
-    // Resend the last user message
-    await sendMessage(lastUserMessage.content);
   }, [state.messages, sendMessage]);
 
   const retryLastMessage = useCallback(async () => {
-    const messages = state.messages;
-    if (messages.length === 0) {
-      return;
-    }
+    await regenerateLastMessage();
+  }, [regenerateLastMessage]);
 
-    const lastMessage = messages[messages.length - 1];
-    
-    if (lastMessage.role === 'user') {
-      // If last message was from user, resend it
-      await sendMessage(lastMessage.content);
-    } else if (lastMessage.role === 'assistant' && lastMessage.error) {
-      // If last message was assistant with error, regenerate
-      await regenerateLastMessage();
-    }
-  }, [state.messages, sendMessage, regenerateLastMessage]);
+  // Load conversation from storage on mount
+  useEffect(() => {
+    const loadStoredConversation = () => {
+      try {
+        // Try to load conversation ID from storage
+        const storedConversationId = localStorage.getItem('dify_conversation_id');
+        if (storedConversationId && isValidUUID(storedConversationId)) {
+          setState(prev => ({
+            ...prev,
+            conversationId: storedConversationId,
+          }));
+          console.log('Loaded conversation ID from storage:', storedConversationId);
+        }
 
-  const setError = useCallback((error: string | null) => {
-    setState(prev => ({ ...prev, error }));
+        // Try to load messages from storage
+        const storedMessages = localStorage.getItem('dify_messages');
+        if (storedMessages) {
+          try {
+            const messages = JSON.parse(storedMessages);
+            if (Array.isArray(messages)) {
+              setState(prev => ({
+                ...prev,
+                messages: messages,
+              }));
+              console.log('Loaded messages from storage:', messages.length);
+            }
+          } catch (error) {
+            console.warn('Failed to parse stored messages:', error);
+            localStorage.removeItem('dify_messages');
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to load stored conversation:', error);
+      }
+    };
+
+    loadStoredConversation();
   }, []);
+
+  // Save messages to storage when they change
+  useEffect(() => {
+    if (state.messages.length > 0) {
+      try {
+        localStorage.setItem('dify_messages', JSON.stringify(state.messages));
+      } catch (error) {
+        console.warn('Failed to save messages to storage:', error);
+      }
+    }
+  }, [state.messages]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Clear conversation data
+  const clearConversation = useCallback(() => {
+    setState(INITIAL_STATE);
+    localStorage.removeItem('dify_conversation_id');
+    localStorage.removeItem('dify_messages');
+    console.log('Cleared conversation data');
+  }, []);
+
+  // Export conversation data
+  const exportConversation = useCallback(() => {
+    const exportData = {
+      conversationId: state.conversationId,
+      messages: state.messages,
+      timestamp: new Date().toISOString(),
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dify-conversation-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    URL.revokeObjectURL(url);
+  }, [state.conversationId, state.messages]);
+
+  // Get conversation statistics
+  const getConversationStats = useCallback(() => {
+    const totalMessages = state.messages.length;
+    const userMessages = state.messages.filter(msg => msg.role === 'user').length;
+    const assistantMessages = state.messages.filter(msg => msg.role === 'assistant').length;
+    
+    const totalTokens = state.messages.reduce((sum, msg) => {
+      return sum + (msg.metadata?.usage?.total_tokens || 0);
+    }, 0);
+
+    return {
+      totalMessages,
+      userMessages,
+      assistantMessages,
+      totalTokens,
+      conversationId: state.conversationId,
+      hasActiveConversation: !!state.conversationId,
+    };
+  }, [state.messages, state.conversationId]);
 
   return {
     state,
@@ -409,5 +556,8 @@ export function useDifyChat(options: UseDifyChatOptions = {}): UseDifyChatReturn
     startNewConversation,
     setError,
     retryLastMessage,
+    clearConversation,
+    exportConversation,
+    getConversationStats,
   };
 }
