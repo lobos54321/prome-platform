@@ -26,25 +26,7 @@ export async function POST(request: Request, { params }: { params: { conversatio
 
     // 只有在 dify_conversation_id 存在且有效时才添加
     if (difyConversationId) {
-      // 先验证对话是否仍然存在
-      const checkResponse = await fetch(`${DIFY_API_URL}/conversations/${difyConversationId}`, {
-        headers: {
-          'Authorization': `Bearer ${DIFY_API_KEY}`,
-        },
-      })
-
-      if (checkResponse.ok) {
-        requestBody.conversation_id = difyConversationId
-      } else {
-        // 对话不存在，清除无效的 ID
-        console.log('Dify conversation not found, creating new one')
-        difyConversationId = null
-        await supabase
-          .from('conversations')
-          .update({ dify_conversation_id: null })
-          .eq('id', params.conversationId)
-        // 不直接 return，继续往下走，让 chat-messages 创建新对话
-      }
+      requestBody.conversation_id = difyConversationId
     }
 
     // 发送消息到 Dify
