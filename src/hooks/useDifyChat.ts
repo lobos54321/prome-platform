@@ -47,11 +47,6 @@ const INITIAL_STATE: ChatState = {
   currentStreamingId: null,
 };
 
-// Helper function to check if a string is a valid UUID
-function isValidUUID(str: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
-}
 
 export function useDifyChat(options: UseDifyChatOptions = {}) {
   const {
@@ -158,15 +153,16 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-  // 构建完整的输入参数 - 关键修复点：精确的工作流控制
+  // 构建完整的输入参数 - 修复工作流状态判断逻辑
   const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
     const currentTime = new Date();
     
-    // 关键修复：计算发送前的状态，不包括当前正在发送的消息
+    // 关键修复：正确计算即将发送消息后的状态
     const existingUserMessages = state.messages.filter(msg => msg.role === 'user');
-    const userMessageCount = existingUserMessages.length; // 不包括当前消息
-    const totalMessageCount = state.messages.length;
-    const hasConversationHistory = userMessageCount > 0; // 基于已有消息判断
+    const currentUserMessageCount = existingUserMessages.length + 1; // 包括当前正要发送的消息
+    const totalMessageCount = state.messages.length + 1; // 包括当前消息
+    const hasConversationHistory = existingUserMessages.length > 0; // 基于已有消息判断
+    const isFirstMessage = existingUserMessages.length === 0; // 是否为第一条消息
     
     // 精确的工作流控制参数 - 核心修复
     const baseInputs = {
@@ -190,20 +186,20 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       "locale": "zh-CN",
       "chat_mode": "workflow",
       
-      // 关键的工作流状态控制 - 基于发送前状态
-      "conversation_turn": userMessageCount, // 当前是第几轮（0=首次）
-      "is_first_turn": userMessageCount === 0, // 是否首次对话
-      "is_continuation": userMessageCount > 0, // 是否继续对话
+      // 关键的工作流状态控制 - 修复后的逻辑
+      "conversation_turn": currentUserMessageCount, // 当前是第几轮（1=首次，2=第二轮...）
+      "is_first_turn": isFirstMessage, // 是否首次对话
+      "is_continuation": !isFirstMessage, // 是否继续对话
       "has_conversation_history": hasConversationHistory,
       "conversation_id": state.conversationId,
       
-      // 工作流执行模式 - 关键修复
-      "workflow_mode": hasConversationHistory ? "continue" : "start",
-      "node_filter": hasConversationHistory ? "response_only" : "full_flow",
-      "execution_mode": hasConversationHistory ? "targeted" : "full",
-      "skip_intro": hasConversationHistory,
-      "direct_response": hasConversationHistory,
-      "bypass_initialization": hasConversationHistory,
+      // 工作流执行模式 - 根据正确的状态设置
+      "workflow_mode": isFirstMessage ? "start" : "continue",
+      "node_filter": isFirstMessage ? "full_flow" : "response_only", 
+      "execution_mode": isFirstMessage ? "full" : "targeted",
+      "skip_intro": !isFirstMessage, // 非首次对话跳过介绍
+      "direct_response": !isFirstMessage, // 非首次直接响应
+      "bypass_initialization": !isFirstMessage, // 非首次跳过初始化
       
       // 防止循环的关键参数
       "max_node_executions": 1, // 每个节点最多执行1次
@@ -212,15 +208,17 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       "prevent_infinite_loops": true,
       "workflow_step_limit": 1, // 严格限制步数
       
-      // 执行控制
-      "enable_all_nodes": !hasConversationHistory, // 只在首次启用所有节点
-      "force_exit": hasConversationHistory, // 有历史记录时强制退出
+      // 执行控制 - 修复节点控制逻辑
+      "enable_all_nodes": isFirstMessage, // 只在首次启用所有节点
+      "force_exit": !isFirstMessage, // 非首次强制在响应后退出
+      "target_node": !isFirstMessage ? "response_node" : undefined, // 非首次直接跳转到响应节点
       
       // 上下文信息（简化）
       "has_context": hasConversationHistory,
       "context_length": state.messages.length,
-      "message_count": userMessageCount,
+      "message_count": currentUserMessageCount,
       "total_message_count": totalMessageCount,
+      "previous_turn_count": existingUserMessages.length,
       
       // 简化的上下文信息
       "previous_messages": state.messages.slice(-2).map(msg => ({
@@ -234,19 +232,22 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       ...customInputs, // 自定义输入（优先级最高）
     };
 
-    console.log('🎯 Workflow control state:', {
+    console.log('🎯 Workflow control state (FIXED):', {
       existingUserMessages: existingUserMessages.length,
-      userMessageCount,
+      currentUserMessageCount,
       hasConversationHistory,
+      isFirstMessage,
       workflowMode: baseInputs.workflow_mode,
       isFirstTurn: baseInputs.is_first_turn,
       isContinuation: baseInputs.is_continuation,
       nodeFilter: baseInputs.node_filter,
-      executionMode: baseInputs.execution_mode
+      executionMode: baseInputs.execution_mode,
+      skipIntro: baseInputs.skip_intro,
+      bypassInit: baseInputs.bypass_initialization
     });
     
     // Record parameters for diagnostics
-    recordParameters(state.conversationId || 'unknown', baseInputs, userMessageCount);
+    recordParameters(state.conversationId || 'unknown', baseInputs, currentUserMessageCount);
     
     return baseInputs;
   }, [user, state.conversationId, state.messages, inputs, workflowInputs, recordParameters]);
@@ -558,10 +559,10 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       // Remove the last assistant message if it exists
       setState(prev => ({
         ...prev,
-        messages: prev.messages.filter((msg, index) => {
+        messages: prev.messages.filter((msg, index, arr) => {
           // Keep all messages except the last assistant message
-          const isLastAssistant = msg.role === 'assistant' && 
-            index === prev.messages.findLastIndex(m => m.role === 'assistant');
+          const lastAssistantIndex = arr.map(m => m.role).lastIndexOf('assistant');
+          const isLastAssistant = msg.role === 'assistant' && index === lastAssistantIndex;
           return !isLastAssistant;
         }),
       }));
