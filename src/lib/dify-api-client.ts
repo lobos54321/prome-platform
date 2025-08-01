@@ -238,7 +238,7 @@ export class DifyAPIClient {
   }
 
   /**
-   * Send a message to Dify and get response
+   * Send a message to Dify via backend proxy and get response
    */
   async sendMessage(
     message: string, 
@@ -246,74 +246,46 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
-    // 如果有conversationId，先验证是否有效
-    let validConversationId = conversationId;
-    if (conversationId) {
-      const isValid = await this.validateConversationId(conversationId);
-      if (!isValid) {
-        // 如果无效，设置为undefined，让Dify创建新会话
-        validConversationId = undefined;
-        console.log('Conversation ID is invalid, creating new conversation');
-      }
-    }
-
-    // Prepare request body - only include conversation_id if it's valid
-    const requestBody: any = {
-      inputs: inputs || {},
-      query: message,
-      response_mode: 'blocking',
-      user: user || 'default-user',
-      files: []
-    };
-
-    // Only add conversation_id if we have a valid one
-    if (validConversationId) {
-      requestBody.conversation_id = validConversationId;
-    }
-
-    const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
+    // If no conversationId provided, use a fallback
+    const targetConversationId = conversationId || 'default';
+    
+    // Call backend API instead of Dify directly
+    const response = await fetch(`/api/dify/${targetConversationId}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        message,
+        user: user || 'default-user',
+        inputs: inputs || {}
+      }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      
-      // Special handling for conversation ID format errors
-      if (response.status === 400 && errorText.includes('not a valid uuid')) {
-        throw new Error('Conversation ID format error. Please start a new conversation.');
-      }
+      const errorData = await response.json();
       
       // Handle conversation not found errors
-      if (response.status === 404 && errorText.includes('Conversation')) {
+      if (response.status === 404 && errorData.error?.includes('Conversation')) {
         throw new Error('Conversation Not Exists. Starting new conversation.');
       }
       
-      throw new Error(`Dify API error: ${response.status} - ${errorText}`);
+      throw new Error(`Backend API error: ${response.status} - ${errorData.error || errorData.message || 'Unknown error'}`);
     }
 
     const result = await response.json();
     
     // Store metadata for new or validated conversations
     if (result.conversation_id) {
-      // If this is a new conversation (no valid input conversation ID), store metadata
-      if (!validConversationId) {
-        this.storeConversationMetadata(result.conversation_id);
-      } else {
-        // Update last used timestamp for existing conversation
-        this.updateConversationLastUsed(result.conversation_id);
-      }
+      // Store the conversation ID mapping
+      this.storeConversationMetadata(result.conversation_id);
     }
     
     return result;
   }
 
   /**
-   * Send a message with streaming response
+   * Send a message with streaming response via backend proxy
    */
   async sendMessageStream(
     message: string,
@@ -322,53 +294,32 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<void> {
-    // 如果有conversationId，先验证是否有效
-    let validConversationId = conversationId;
-    if (conversationId) {
-      const isValid = await this.validateConversationId(conversationId);
-      if (!isValid) {
-        // 如果无效，设置为undefined，让Dify创建新会话
-        validConversationId = undefined;
-        console.log('🔄 Conversation ID is invalid, creating new conversation for streaming');
-      }
-    }
+    // If no conversationId provided, use a fallback
+    const targetConversationId = conversationId || 'default';
 
-    // Prepare request body - only include conversation_id if it's valid
-    const requestBody: any = {
-      inputs: inputs || {},
-      query: message,
-      response_mode: 'streaming',
-      user: user || 'default-user',
-      files: []
-    };
-
-    // Only add conversation_id if we have a valid one
-    if (validConversationId) {
-      requestBody.conversation_id = validConversationId;
-      console.log('✅ Using valid conversation ID for streaming:', validConversationId);
-    } else {
-      console.log('🆕 Starting new conversation for streaming (no conversation_id will be sent)');
-    }
-
-    const response = await fetch(`${this.config.apiUrl}/chat-messages`, {
+    // Call backend streaming API
+    const response = await fetch(`/api/dify/${targetConversationId}/stream`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        message,
+        user: user || 'default-user',
+        inputs: inputs || {}
+      }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorData = await response.json();
       
       // Handle conversation errors for streaming
-      if (response.status === 404 && errorText.includes('Conversation')) {
+      if (response.status === 404 && errorData.error?.includes('Conversation')) {
         console.log('❌ Error sending message:', new Error('Conversation Not Exists. Starting new conversation.'));
         throw new Error('Conversation Not Exists. Starting new conversation.');
       }
       
-      throw new Error(`Dify API error: ${response.status} - ${errorText}`);
+      throw new Error(`Backend API error: ${response.status} - ${errorData.error || errorData.message || 'Unknown error'}`);
     }
 
     const reader = response.body?.getReader();
@@ -393,11 +344,9 @@ export class DifyAPIClient {
             const data = line.slice(6);
             if (data === '[DONE]') {
               // Store metadata if we detected a new conversation ID
-              if (detectedConversationId && !validConversationId) {
+              if (detectedConversationId) {
                 this.storeConversationMetadata(detectedConversationId);
                 console.log('🆕 Started new conversation:', detectedConversationId);
-              } else if (detectedConversationId && validConversationId) {
-                this.updateConversationLastUsed(detectedConversationId);
               }
               return;
             }
@@ -421,11 +370,9 @@ export class DifyAPIClient {
       reader.releaseLock();
       
       // Final attempt to store metadata if we haven't already
-      if (detectedConversationId && !validConversationId) {
+      if (detectedConversationId) {
         this.storeConversationMetadata(detectedConversationId);
         console.log('🆕 Started new conversation:', detectedConversationId);
-      } else if (detectedConversationId && validConversationId) {
-        this.updateConversationLastUsed(detectedConversationId);
       }
     }
   }
