@@ -1,327 +1,328 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChatHistory } from './ChatHistory';
-import { ChatInput } from './ChatInput';
-import { useDifyChat } from '@/hooks/useDifyChat';
-import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
-import { authService } from '@/lib/auth';
-import { 
-  Send, 
-  Loader2, 
-  Copy, 
-  RotateCcw, 
-  Trash2, 
-  RefreshCw,
-  Settings,
-  Eye,
-  EyeOff,
-  Zap,
-  ZapOff
-} from 'lucide-react';
-import { User as UserType } from '@/types';
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { Send, Loader2, RotateCcw, Bot, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+
+interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: Date;
+  metadata?: any;
+}
 
 interface DifyChatInterfaceProps {
   className?: string;
-  showMetadata?: boolean;
-  enableStreaming?: boolean;
-  autoStartConversation?: boolean;
+  placeholder?: string;
+  welcomeMessage?: string;
+  mode?: 'chat' | 'workflow'; // 支持不同模式
 }
 
-export const DifyChatInterface = ({
+export function DifyChatInterface({
   className,
-  showMetadata = false,
-  enableStreaming = true,
-  autoStartConversation = true
-}: DifyChatInterfaceProps) => {
-  const [user, setUser] = useState<UserType | null>(null);
-  const [showTokenDetails, setShowTokenDetails] = useState(false);
-  const [streamingEnabled, setStreamingEnabled] = useState(enableStreaming);
-  const [inputMessage, setInputMessage] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // 简化的工作流输入 - 移除复杂参数，只保留必要的标识
-  const workflowInputs = useMemo(() => {
-    return {
-      // 基础标识
-      "interface_type": "chat_interface",
-      "client_version": "v1.0",
+  placeholder = "Type your message...",
+  welcomeMessage = "Hello! How can I help you today?",
+  mode = 'chat'
+}: DifyChatInterfaceProps) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  // 生成唯一用户ID（在生产环境应该使用真实的用户ID）
+  const [userId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('dify_user_id');
+      if (stored) return stored;
       
-      // 简单的用户意图标识（让工作流自己判断）
-      "user_query": inputMessage || "",
-      
-      // 移除所有复杂的执行控制参数
-      // 让 useDifyChat 统一管理
-    };
-  }, [inputMessage]);
-
-  // Chat functionality with simplified workflow inputs
-  const {
-    state: chatState,
-    sendMessage,
-    clearMessages,
-    regenerateLastMessage,
-    startNewConversation,
-    setError,
-    retryLastMessage,
-  } = useDifyChat({
-    autoStartConversation,
-    enableStreaming: streamingEnabled,
-    user: user?.id,
-    workflowInputs, // 传递简化的工作流输入
+      const newId = `user_${Math.random().toString(36).substring(2, 15)}`;
+      localStorage.setItem('dify_user_id', newId);
+      return newId;
+    }
+    return `user_${Math.random().toString(36).substring(2, 15)}`;
   });
 
-  // Token monitoring
-  const { state: tokenState } = useTokenMonitoring();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load user data
+  // 自动滚动到底部
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await authService.getCurrentUser();
-        setUser(userData);
-      } catch (error) {
-        console.error('Failed to load user:', error);
-      }
+    scrollToBottom();
+  }, [messages]);
+
+  // 添加欢迎消息
+  useEffect(() => {
+    if (messages.length === 0 && welcomeMessage) {
+      setMessages([{
+        id: 'welcome',
+        content: welcomeMessage,
+        role: 'assistant',
+        timestamp: new Date(),
+      }]);
+    }
+  }, [welcomeMessage]);
+
+  // 发送消息
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: `user_${Date.now()}`,
+      content: input.trim(),
+      role: 'user',
+      timestamp: new Date(),
     };
 
-    loadUser();
-  }, []);
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+    setError(null);
 
-  // Auto scroll to bottom
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatState.messages]);
-
-  // Update user balance after token consumption
-  useEffect(() => {
-    if (tokenState.lastConsumption && user) {
-      setUser(prev => prev ? {
-        ...prev,
-        balance: prev.balance - tokenState.lastConsumption!.totalCost
-      } : null);
-    }
-  }, [tokenState.lastConsumption, user]);
-
-  const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success('已复制到剪贴板');
+      console.log('[Chat] Sending message:', {
+        message: userMessage.content,
+        conversationId,
+        userId,
+        mode
+      });
+
+      const response = await fetch('/api/dify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: userMessage.content,
+          user: userId,
+          conversation_id: conversationId,
+          mode: mode,
+          inputs: {
+            // 可以添加额外的输入参数
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[Chat] Received response:', data);
+
+      // 更新会话ID
+      if (data.conversation_id && data.conversation_id !== conversationId) {
+        setConversationId(data.conversation_id);
+        console.log('[Chat] Updated conversation ID:', data.conversation_id);
+      }
+
+      // 添加助手回复
+      const assistantMessage: Message = {
+        id: `assistant_${Date.now()}`,
+        content: data.answer || 'Sorry, I could not process your request.',
+        role: 'assistant',
+        timestamp: new Date(),
+        metadata: data.metadata,
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Failed to copy:', error);
-      toast.error('复制失败');
+      console.error('[Chat] Error:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
+      
+      // 添加错误消息
+      const errorMessage: Message = {
+        id: `error_${Date.now()}`,
+        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        role: 'assistant',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      // 聚焦输入框
+      inputRef.current?.focus();
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  // 开始新对话
+  const handleNewConversation = () => {
+    setMessages(welcomeMessage ? [{
+      id: 'welcome',
+      content: welcomeMessage,
+      role: 'assistant',
+      timestamp: new Date(),
+    }] : []);
+    setConversationId(null);
+    setInput('');
+    setError(null);
+    console.log('[Chat] Started new conversation');
+    inputRef.current?.focus();
   };
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || chatState.isLoading) return;
-    
-    const message = inputMessage.trim();
-    setInputMessage('');
-    
-    try {
-      await sendMessage(message);
-    } catch (error) {
-      console.error('发送消息失败:', error);
-      toast.error('发送消息失败，请重试');
-    }
-  };
-
-  const handleClearMessages = () => {
-    if (window.confirm('确定要清空所有消息吗？')) {
-      clearMessages();
-      toast.success('消息已清空');
-    }
-  };
-
-  const handleStartNewConversation = async () => {
-    if (window.confirm('确定要开始新对话吗？这将清空当前对话历史。')) {
-      await startNewConversation();
-      toast.success('已开始新对话');
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  // 处理键盘事件
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleSubmit(e as any);
     }
   };
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      <Card className="flex-1 flex flex-col">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg">AI 助手</CardTitle>
-              {chatState.conversationId && (
-                <Badge variant="secondary" className="text-xs">
-                  ID: {chatState.conversationId.slice(0, 8)}...
-                </Badge>
+    <div className={cn("flex flex-col h-full bg-white rounded-lg shadow-lg", className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="flex items-center gap-2">
+          <Bot className="w-6 h-6 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-800">AI Assistant</h3>
+          {mode === 'workflow' && (
+            <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded">
+              Workflow Mode
+            </span>
+          )}
+        </div>
+        <button
+          onClick={handleNewConversation}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all"
+          title="Start New Conversation"
+        >
+          <RotateCcw className="w-4 h-4" />
+          New Chat
+        </button>
+      </div>
+
+      {/* Messages Container */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={cn(
+              "flex gap-3",
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            )}
+          >
+            {message.role === 'assistant' && (
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-blue-600" />
+              </div>
+            )}
+            
+            <div
+              className={cn(
+                "max-w-[70%] rounded-lg px-4 py-3",
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-800'
               )}
-              {chatState.isLoading && (
-                <Badge variant="outline" className="text-xs">
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  处理中
-                </Badge>
-              )}
+            >
+              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              <span className={cn(
+                "text-xs mt-2 block",
+                message.role === 'user' ? 'text-blue-200' : 'text-gray-500'
+              )}>
+                {message.timestamp.toLocaleTimeString()}
+              </span>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowTokenDetails(!showTokenDetails)}
-              >
-                {showTokenDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-              
-              <div className="flex items-center gap-1">
-                <Switch
-                  id="streaming"
-                  checked={streamingEnabled}
-                  onCheckedChange={setStreamingEnabled}
-                  disabled={chatState.isLoading}
-                />
-                <Label htmlFor="streaming" className="text-xs">
-                  {streamingEnabled ? <Zap className="h-3 w-3" /> : <ZapOff className="h-3 w-3" />}
-                </Label>
+            {message.role === 'user' && (
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                <User className="w-5 h-5 text-gray-600" />
+              </div>
+            )}
+          </div>
+        ))}
+        
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="flex gap-3 justify-start">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+              <Bot className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="bg-gray-100 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+                <span className="text-gray-600">Thinking...</span>
               </div>
             </div>
           </div>
-          
-          {showTokenDetails && user && (
-            <div className="bg-gray-50 p-3 rounded-lg text-sm">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-medium">当前余额</span>
-                <span className="text-green-600 font-mono">
-                  {user.balance.toLocaleString()} 积分
-                </span>
-              </div>
-              
-              {tokenState.lastConsumption && (
-                <div className="border-t pt-2 space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">上次消费</span>
-                    <span className="font-mono">
-                      {tokenState.lastConsumption.totalTokens.toLocaleString()} tokens
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">费用</span>
-                    <span className="font-mono text-red-600">
-                      -{tokenState.lastConsumption.totalCost.toLocaleString()} 积分
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </CardHeader>
-
-        <CardContent className="flex-1 flex flex-col p-0">
-          {/* Chat History */}
-          <div className="flex-1 min-h-0">
-            <ChatHistory
-              messages={chatState.messages}
-              isLoading={chatState.isLoading}
-              isStreaming={chatState.isStreaming}
-              error={chatState.error}
-              showMetadata={showMetadata}
-              onCopyMessage={copyToClipboard}
-              onRetryMessage={retryLastMessage}
-            />
-            <div ref={messagesEndRef} />
+        )}
+        
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <p className="text-sm">{error}</p>
           </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
 
-          <Separator />
-          
-          {/* Input Area */}
-          <div className="p-4">
-            <div className="flex gap-2 mb-3">
-              <Textarea
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={chatState.isLoading ? "AI 正在回复中..." : "输入您的消息... (Shift+Enter 换行，Enter 发送)"}
-                disabled={chatState.isLoading}
-                className="resize-none"
-                rows={3}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={chatState.isLoading || !inputMessage.trim()}
-                className="h-[72px] px-4"
-              >
-                {chatState.isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
+      {/* Input Form */}
+      <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading}
+            className={cn(
+              "px-4 py-2.5 rounded-lg font-medium transition-all",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              !input.trim() || isLoading
+                ? "bg-gray-300 text-gray-500"
+                : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+            )}
+          >
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
+          </button>
+        </div>
+        
+        {/* Character count */}
+        <div className="mt-2 text-xs text-gray-500 text-right">
+          {input.length} / 2000 characters
+        </div>
+      </form>
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={regenerateLastMessage}
-                  disabled={chatState.isLoading || chatState.messages.length === 0}
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  重新生成
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClearMessages}
-                  disabled={chatState.isLoading || chatState.messages.length === 0}
-                >
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  清空对话
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleStartNewConversation}
-                  disabled={chatState.isLoading}
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  新对话
-                </Button>
-              </div>
-              
-              <div className="text-xs text-gray-500">
-                {chatState.messages.length > 0 && (
-                  <span>{chatState.messages.filter(m => m.role === 'user').length} 条对话</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Debug Info (仅开发环境) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="px-4 py-2 bg-gray-100 text-xs text-gray-600 border-t space-y-1">
+          <div>Mode: {mode}</div>
+          <div>User ID: {userId}</div>
+          <div>Conversation ID: {conversationId || 'None'}</div>
+          <div>Messages: {messages.length}</div>
+        </div>
+      )}
     </div>
   );
-};
+}
 
-export default DifyChatInterface;
+// 导出默认配置的聊天组件
+export function ChatWidget() {
+  return (
+    <div className="fixed bottom-4 right-4 w-96 h-[600px] z-50">
+      <DifyChatInterface 
+        className="h-full"
+        welcomeMessage="Hi! I'm your AI assistant. How can I help you today?"
+      />
+    </div>
+  );
+}
