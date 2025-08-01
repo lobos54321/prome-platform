@@ -72,12 +72,18 @@ async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOU
         continue;
       }
 
-      // If all retries failed, throw the last error
-      throw error;
+      // If all retries failed, throw the last error with a more user-friendly message
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out. Please try again.');
+      } else if (error.code === 'EAI_AGAIN' || error.code === 'ENOTFOUND') {
+        throw new Error('Cannot connect to Dify API. Please check your internet connection or try again later.');
+      } else {
+        throw error;
+      }
     }
   }
 
-  throw new Error('All retry attempts failed');
+  throw new Error('All retry attempts failed. Please check your connection and try again.');
 }
 
 // Utility function to save messages
@@ -127,6 +133,52 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
   }
 }
 
+// Utility function to handle conversation mapping operations
+async function updateConversationMapping(supabase, conversationId, difyConversationId) {
+  if (!supabase || !difyConversationId) {
+    console.log('📝 Skipping conversation mapping (Supabase not configured or no dify conversation ID)');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('conversations')
+      .upsert({ 
+        id: conversationId,
+        dify_conversation_id: difyConversationId,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error updating conversation mapping:', error);
+    } else {
+      console.log('✅ Conversation mapping updated successfully');
+    }
+  } catch (error) {
+    console.error('Error in updateConversationMapping:', error);
+  }
+}
+
+// Utility function to get stored conversation ID
+async function getStoredConversationId(supabase, conversationId) {
+  if (!supabase || !conversationId) {
+    return null;
+  }
+
+  try {
+    const { data } = await supabase
+      .from('conversations')
+      .select('dify_conversation_id')
+      .eq('id', conversationId)
+      .single();
+
+    return data?.dify_conversation_id || null;
+  } catch (error) {
+    console.log('Could not retrieve stored conversation ID:', error.message);
+    return null;
+  }
+}
+
 // Dify chat proxy API (generic endpoint without conversationId - for backward compatibility)
 app.post('/api/dify', async (req, res) => {
   try {
@@ -152,7 +204,7 @@ app.post('/api/dify', async (req, res) => {
     let conversationId = conversation_id || 'default';
 
     // If we have a conversation_id, check if it exists in our database
-    if (difyConversationId) {
+    if (difyConversationId && supabase) {
       const { data: conversationRow } = await supabase
         .from('conversations')
         .select('dify_conversation_id')
@@ -172,7 +224,7 @@ app.post('/api/dify', async (req, res) => {
     };
 
     // Only add conversation_id if it exists and is valid
-    if (difyConversationId) {
+    if (difyConversationId && supabase) {
       requestBody.conversation_id = difyConversationId;
     }
 
@@ -286,7 +338,7 @@ app.post('/api/dify/workflow', async (req, res) => {
     let conversationId = conversation_id || 'default';
 
     // If we have a conversation_id, check if it exists in our database
-    if (difyConversationId) {
+    if (difyConversationId && supabase) {
       const { data: conversationRow } = await supabase
         .from('conversations')
         .select('dify_conversation_id')
@@ -308,7 +360,7 @@ app.post('/api/dify/workflow', async (req, res) => {
     };
 
     // Only add conversation_id if it exists and is valid
-    if (difyConversationId) {
+    if (difyConversationId && supabase) {
       requestBody.conversation_id = difyConversationId;
     }
 
@@ -539,7 +591,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     };
 
     // 只有在 dify_conversation_id 存在且有效时才添加
-    if (difyConversationId) {
+    if (difyConversationId && supabase) {
       requestBody.conversation_id = difyConversationId;
     }
 
@@ -671,7 +723,7 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     };
 
     // 只有在 dify_conversation_id 存在且有效时才添加
-    if (difyConversationId) {
+    if (difyConversationId && supabase) {
       // 先验证对话是否仍然存在
       const checkResponse = await fetch(`${DIFY_API_URL}/conversations/${difyConversationId}`, {
         headers: {
