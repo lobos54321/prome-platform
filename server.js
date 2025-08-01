@@ -3,6 +3,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,6 +65,127 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
     console.error('Error in saveMessages:', error);
   }
 }
+
+// Dify chat proxy API (generic endpoint without conversationId - for backward compatibility)
+app.post('/api/dify', async (req, res) => {
+  try {
+    const { message, query, user, conversation_id, inputs = {} } = req.body;
+    const actualMessage = message || query; // Support both message and query fields
+    
+    if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Server configuration error: Missing required environment variables' });
+    }
+    
+    if (!actualMessage) {
+      return res.status(400).json({ error: 'Message or query is required' });
+    }
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Use conversation_id from request body, or generate a new one
+    let difyConversationId = conversation_id || null;
+    let conversationId = conversation_id || 'default';
+
+    // If we have a conversation_id, check if it exists in our database
+    if (difyConversationId) {
+      const { data: conversationRow } = await supabase
+        .from('conversations')
+        .select('dify_conversation_id')
+        .eq('id', conversationId)
+        .single();
+
+      if (conversationRow?.dify_conversation_id) {
+        difyConversationId = conversationRow.dify_conversation_id;
+      }
+    }
+
+    const requestBody = {
+      inputs: inputs,
+      query: actualMessage,
+      response_mode: 'blocking',
+      user: user || 'default-user'
+    };
+
+    // Only add conversation_id if it exists and is valid
+    if (difyConversationId) {
+      requestBody.conversation_id = difyConversationId;
+    }
+
+    // Send message to Dify
+    let response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    // Handle conversation not found errors
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Dify API error:', errorData);
+
+      if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
+        console.log('Retrying without conversation_id');
+        delete requestBody.conversation_id;
+
+        response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${DIFY_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+          const retryErrorData = await response.json();
+          return res.status(response.status).json({
+            error: retryErrorData.message || 'Dify API error',
+            detail: retryErrorData
+          });
+        }
+      } else {
+        return res.status(response.status).json({
+          error: errorData.message || 'Dify API error',
+          detail: errorData
+        });
+      }
+    }
+
+    const data = await response.json();
+
+    // If this was a new conversation, save the mapping
+    if (!difyConversationId && data.conversation_id) {
+      // Create or update conversation mapping
+      const { error: upsertError } = await supabase
+        .from('conversations')
+        .upsert({ 
+          id: conversationId,
+          dify_conversation_id: data.conversation_id,
+          updated_at: new Date().toISOString()
+        });
+
+      if (upsertError) {
+        console.error('Error saving conversation mapping:', upsertError);
+      }
+    }
+
+    // Save messages
+    await saveMessages(supabase, conversationId, actualMessage, data);
+
+    res.json({
+      answer: data.answer,
+      conversation_id: data.conversation_id,
+      message_id: data.message_id,
+      metadata: data.metadata
+    });
+  } catch (error) {
+    console.error('Generic Dify API error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Dify chat proxy API (streaming)
 app.post('/api/dify/:conversationId/stream', async (req, res) => {

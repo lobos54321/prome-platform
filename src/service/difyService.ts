@@ -26,7 +26,12 @@ export interface DifyStreamChunk {
 
 export const sendDifyRequest = async (params: DifyRequestParams): Promise<DifyResponse> => {
   try {
-    const response = await axios.post('/api/dify', params, {
+    // Use the correct route with conversation_id
+    const endpoint = params.conversation_id 
+      ? `/api/dify/${params.conversation_id}` 
+      : '/api/dify';
+    
+    const response = await axios.post(endpoint, params, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -48,8 +53,13 @@ export const streamDifyRequest = (
   // Set stream to true
   const streamParams = { ...params, stream: true };
   
+  // Use the correct streaming endpoint
+  const endpoint = params.conversation_id 
+    ? `/api/dify/${params.conversation_id}/stream`
+    : '/api/dify/default/stream';
+  
   // Create EventSource for SSE connection
-  const eventSource = new EventSource('/api/dify/stream');
+  const eventSource = new EventSource(endpoint);
   
   // Process events
   eventSource.onmessage = (event) => {

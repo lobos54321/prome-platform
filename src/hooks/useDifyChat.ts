@@ -153,78 +153,40 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-  // 构建完整的输入参数 - 修复工作流状态判断逻辑
+  // 构建完整的输入参数 - 简化工作流控制逻辑
   const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
     const currentTime = new Date();
     
-    // 关键修复：正确计算即将发送消息后的状态
+    // 计算当前状态
     const existingUserMessages = state.messages.filter(msg => msg.role === 'user');
-    const currentUserMessageCount = existingUserMessages.length + 1; // 包括当前正要发送的消息
-    const totalMessageCount = state.messages.length + 1; // 包括当前消息
-    const hasConversationHistory = existingUserMessages.length > 0; // 基于已有消息判断
-    const isFirstMessage = existingUserMessages.length === 0; // 是否为第一条消息
+    const currentUserMessageCount = existingUserMessages.length + 1;
+    const isFirstMessage = existingUserMessages.length === 0;
     
-    // 精确的工作流控制参数 - 核心修复
+    // 简化的输入参数 - 只包含必要的Dify标准参数
     const baseInputs = {
-      // 基础参数
+      // 基础用户信息
       "user_id": user || 'default-user',
       "session_id": state.conversationId || 'new-session',
       "timestamp": currentTime.toISOString(),
-      "datetime": currentTime.toLocaleString('zh-CN'),
-      "current_date": currentTime.toLocaleDateString('zh-CN'),
-      "current_time": currentTime.toLocaleTimeString('zh-CN'),
       
-      // 消息相关参数
+      // 消息内容
       "user_message": message,
       "query": message,
       "user_input": message,
-      "question": message,
-      "current_message": message,
       
-      // 会话控制参数
+      // 会话状态 - 使用标准Dify参数
+      "conversation_id": state.conversationId,
+      "message_count": currentUserMessageCount,
+      "is_first_message": isFirstMessage,
+      
+      // 语言设置
       "language": "zh-CN",
       "locale": "zh-CN",
-      "chat_mode": "workflow",
       
-      // 关键的工作流状态控制 - 修复后的逻辑
-      "conversation_turn": currentUserMessageCount, // 当前是第几轮（1=首次，2=第二轮...）
-      "is_first_turn": isFirstMessage, // 是否首次对话
-      "is_continuation": !isFirstMessage, // 是否继续对话
-      "has_conversation_history": hasConversationHistory,
-      "conversation_id": state.conversationId,
-      
-      // 工作流执行模式 - 根据正确的状态设置
-      "workflow_mode": isFirstMessage ? "start" : "continue",
-      "node_filter": isFirstMessage ? "full_flow" : "response_only", 
-      "execution_mode": isFirstMessage ? "full" : "targeted",
-      "skip_intro": !isFirstMessage, // 非首次对话跳过介绍
-      "direct_response": !isFirstMessage, // 非首次直接响应
-      "bypass_initialization": !isFirstMessage, // 非首次跳过初始化
-      
-      // 防止循环的关键参数
-      "max_node_executions": 1, // 每个节点最多执行1次
-      "force_single_pass": true, // 强制单次执行
-      "exit_after_response": true, // 生成响应后立即退出
-      "prevent_infinite_loops": true,
-      "workflow_step_limit": 1, // 严格限制步数
-      
-      // 执行控制 - 修复节点控制逻辑
-      "enable_all_nodes": isFirstMessage, // 只在首次启用所有节点
-      "force_exit": !isFirstMessage, // 非首次强制在响应后退出
-      "target_node": !isFirstMessage ? "response_node" : undefined, // 非首次直接跳转到响应节点
-      
-      // 上下文信息（简化）
-      "has_context": hasConversationHistory,
-      "context_length": state.messages.length,
-      "message_count": currentUserMessageCount,
-      "total_message_count": totalMessageCount,
-      "previous_turn_count": existingUserMessages.length,
-      
-      // 简化的上下文信息
-      "previous_messages": state.messages.slice(-2).map(msg => ({
-        role: msg.role,
-        content: msg.content.substring(0, 100) // 限制长度
-      })),
+      // 简化的上下文（如果需要）
+      "previous_message": state.messages.length > 0 
+        ? state.messages[state.messages.length - 1]?.content?.substring(0, 200)
+        : "",
       
       // 合并其他参数
       ...inputs, // 来自 useDifyChat 选项的输入
@@ -232,18 +194,11 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       ...customInputs, // 自定义输入（优先级最高）
     };
 
-    console.log('🎯 Workflow control state (FIXED):', {
-      existingUserMessages: existingUserMessages.length,
-      currentUserMessageCount,
-      hasConversationHistory,
+    console.log('🎯 Simplified workflow inputs:', {
       isFirstMessage,
-      workflowMode: baseInputs.workflow_mode,
-      isFirstTurn: baseInputs.is_first_turn,
-      isContinuation: baseInputs.is_continuation,
-      nodeFilter: baseInputs.node_filter,
-      executionMode: baseInputs.execution_mode,
-      skipIntro: baseInputs.skip_intro,
-      bypassInit: baseInputs.bypass_initialization
+      messageCount: currentUserMessageCount,
+      conversationId: state.conversationId,
+      hasContext: state.messages.length > 0
     });
     
     // Record parameters for diagnostics
@@ -314,7 +269,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
         let finalUsage = null;
         let finalMessageId = null;
         let finalConversationId = state.conversationId;
-        let jsonBuffer = ''; // Buffer for handling split JSON data
+        const jsonBuffer = ''; // Buffer for handling split JSON data
 
         await clientRef.current.sendMessageStream(
           content,
