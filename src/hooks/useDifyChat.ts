@@ -481,7 +481,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
         console.log('✅ Non-streaming message sent successfully');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error sending message:', error);
       
       // Handle specific error cases

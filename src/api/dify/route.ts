@@ -5,7 +5,7 @@ import { saveMessages } from '@/lib/save-messages'
 
 export async function POST(request: Request, { params }: { params: { conversationId: string } }) {
   try {
-    const { message } = await request.json()
+    const { message, inputs = {} } = await request.json()
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
     // 查找当前会话的 dify_conversation_id
@@ -17,8 +17,14 @@ export async function POST(request: Request, { params }: { params: { conversatio
 
     let difyConversationId = conversationRow?.dify_conversation_id || null
 
-    const requestBody: any = {
-      inputs: {},
+    const requestBody: {
+      inputs: Record<string, unknown>;
+      query: string;
+      response_mode: string;
+      user: string;
+      conversation_id?: string;
+    } = {
+      inputs: inputs,
       query: message,
       response_mode: 'blocking',
       user: 'default-user'

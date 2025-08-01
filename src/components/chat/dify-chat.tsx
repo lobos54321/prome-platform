@@ -126,7 +126,7 @@ export function DifyChat({ className }: DifyChatProps) {
       // 重置重试计数
       setRetryCount(0);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending message:', error);
       
       // 移除用户消息，因为发送失败
