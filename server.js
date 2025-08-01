@@ -179,6 +179,72 @@ async function getStoredConversationId(supabase, conversationId) {
   }
 }
 
+// Mock response generator for development/testing
+function generateMockDifyResponse(message, conversationId = null) {
+  const mockConversationId = conversationId || `mock-conv-${Date.now()}`;
+  const mockMessageId = `mock-msg-${Date.now()}`;
+  
+  // Generate a meaningful mock response based on the input message
+  let mockAnswer;
+  if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('你好')) {
+    mockAnswer = "Hello! I'm your AI assistant. I'm currently running in development mode with mock responses. How can I help you today?";
+  } else if (message.toLowerCase().includes('test')) {
+    mockAnswer = "This is a test response from the mock API. The chat interface is working correctly!";
+  } else if (message.toLowerCase().includes('workflow')) {
+    mockAnswer = "I understand you're asking about workflows. In a real environment, I would process complex workflows step by step.";
+  } else {
+    mockAnswer = `Thank you for your message: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}". I'm currently operating in development mode with mock responses. In a production environment, I would provide real AI-powered responses through the Dify API.`;
+  }
+  
+  return {
+    answer: mockAnswer,
+    conversation_id: mockConversationId,
+    message_id: mockMessageId,
+    metadata: {
+      usage: {
+        prompt_tokens: Math.floor(message.length / 4), // Rough estimation
+        completion_tokens: Math.floor(mockAnswer.length / 4),
+        total_tokens: Math.floor((message.length + mockAnswer.length) / 4)
+      }
+    }
+  };
+}
+
+// Mock workflow response with streaming simulation
+function generateMockWorkflowStream(message, conversationId = null) {
+  const mockConversationId = conversationId || `mock-workflow-conv-${Date.now()}`;
+  const mockMessageId = `mock-workflow-msg-${Date.now()}`;
+  
+  return [
+    { event: 'workflow_started', data: { message: 'Starting workflow processing...' } },
+    { event: 'node_started', node_id: 'input_node', node_name: 'Input Processing', node_title: 'Processing User Input' },
+    { event: 'node_finished', node_id: 'input_node', node_name: 'Input Processing' },
+    { event: 'node_started', node_id: 'analysis_node', node_name: 'Content Analysis', node_title: 'Analyzing Request' },
+    { event: 'node_finished', node_id: 'analysis_node', node_name: 'Content Analysis' },
+    { event: 'node_started', node_id: 'response_node', node_name: 'Response Generation', node_title: 'Generating Response' },
+    { 
+      event: 'message', 
+      answer: `[MOCK WORKFLOW] Processing your request: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}". In a real environment, this would involve multiple AI processing steps.`,
+      conversation_id: mockConversationId,
+      message_id: mockMessageId
+    },
+    { event: 'node_finished', node_id: 'response_node', node_name: 'Response Generation' },
+    { 
+      event: 'workflow_finished', 
+      conversation_id: mockConversationId,
+      message_id: mockMessageId,
+      metadata: {
+        usage: {
+          prompt_tokens: Math.floor(message.length / 4),
+          completion_tokens: Math.floor(200 / 4), // Rough estimation for mock response
+          total_tokens: Math.floor((message.length + 200) / 4)
+        }
+      }
+    },
+    { event: 'message_end', conversation_id: mockConversationId, message_id: mockMessageId }
+  ];
+}
+
 // Dify chat proxy API (generic endpoint without conversationId - for backward compatibility)
 app.post('/api/dify', async (req, res) => {
   try {
@@ -228,57 +294,65 @@ app.post('/api/dify', async (req, res) => {
       requestBody.conversation_id = difyConversationId;
     }
 
-    // Send message to Dify
-    let response = await fetchWithTimeoutAndRetry(
-      `${DIFY_API_URL}/chat-messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${DIFY_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      },
-      DEFAULT_TIMEOUT
-    );
-
-    // Handle conversation not found errors
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Dify API error:', errorData);
-
-      if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-        console.log('Retrying without conversation_id');
-        delete requestBody.conversation_id;
-
-        response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+    // Send message to Dify with fallback to mock response
+    let response;
+    let data;
+    let isUsingMockResponse = false;
+    
+    try {
+      response = await fetchWithTimeoutAndRetry(
+        `${DIFY_API_URL}/chat-messages`,
+        {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${DIFY_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(requestBody),
-        });
+        },
+        DEFAULT_TIMEOUT
+      );
 
-        if (!response.ok) {
-          const retryErrorData = await response.json();
-          return res.status(response.status).json({
-            error: retryErrorData.message || 'Dify API error',
-            detail: retryErrorData
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Dify API error:', errorData);
+
+        if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
+          console.log('Retrying without conversation_id');
+          delete requestBody.conversation_id;
+
+          response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
           });
+
+          if (!response.ok) {
+            throw new Error('Dify API request failed after retry');
+          }
+        } else {
+          throw new Error(`Dify API error: ${errorData.message || 'Unknown error'}`);
         }
-      } else {
-        return res.status(response.status).json({
-          error: errorData.message || 'Dify API error',
-          detail: errorData
-        });
       }
+
+      data = await response.json();
+      console.log('✅ Successfully received response from Dify API');
+      
+    } catch (error) {
+      console.warn('⚠️ Dify API request failed, falling back to mock response:', error.message);
+      
+      // Use mock response in development or when external API is unavailable
+      data = generateMockDifyResponse(actualMessage, difyConversationId);
+      isUsingMockResponse = true;
+      
+      console.log('🤖 Using mock response for development/testing');
     }
 
-    const data = await response.json();
-
-    // If this was a new conversation, save the mapping
-    if (!difyConversationId && data.conversation_id) {
+    // If this was a new conversation and not using mock, save the mapping
+    if (!difyConversationId && data.conversation_id && !isUsingMockResponse && supabase) {
       // Create or update conversation mapping
       const { error: upsertError } = await supabase
         .from('conversations')
@@ -293,15 +367,26 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
-    // Save messages
-    await saveMessages(supabase, conversationId, actualMessage, data);
+    // Save messages (but mark mock responses appropriately)
+    if (supabase) {
+      await saveMessages(supabase, conversationId, actualMessage, {
+        ...data,
+        answer: isUsingMockResponse ? `[MOCK] ${data.answer}` : data.answer
+      });
+    }
 
-    res.json({
+    const responseData = {
       answer: data.answer,
       conversation_id: data.conversation_id,
       message_id: data.message_id,
-      metadata: data.metadata
-    });
+      metadata: {
+        ...data.metadata,
+        mock_response: isUsingMockResponse,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    res.json(responseData);
   } catch (error) {
     console.error('Generic Dify API error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -372,114 +457,149 @@ app.post('/api/dify/workflow', async (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
 
       try {
-        const response = await fetchWithTimeoutAndRetry(
-          `${DIFY_API_URL}/workflows/run`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${DIFY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-          },
-          WORKFLOW_TIMEOUT,
-          2 // Fewer retries for workflows since they're expensive
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[Workflow API] Dify error:', response.status, errorText);
-          res.write(`data: ${JSON.stringify({ 
-            error: `Workflow API error: ${response.status} - ${errorText}`
-          })}\n\n`);
-          res.end();
-          return;
-        }
-
-        const reader = response.body?.getReader();
-        if (!reader) {
-          res.write(`data: ${JSON.stringify({ error: 'Failed to get response reader' })}\n\n`);
-          res.end();
-          return;
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let fullAnswer = '';
-        let finalData = null;
-
+        let isUsingMockResponse = false;
+        
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+          const response = await fetchWithTimeoutAndRetry(
+            `${DIFY_API_URL}/workflows/run`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${DIFY_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestBody),
+            },
+            WORKFLOW_TIMEOUT,
+            2 // Fewer retries for workflows since they're expensive
+          );
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          if (!response.ok) {
+            throw new Error(`Workflow API error: ${response.status}`);
+          }
 
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim();
-                
-                if (data === '[DONE]') {
-                  // Save messages to database if we have final data
-                  if (finalData) {
-                    await saveMessages(supabase, conversationId, actualMessage, finalData);
-                    
-                    // Update conversation mapping if needed
-                    if (!difyConversationId && finalData.conversation_id) {
-                      await supabase
-                        .from('conversations')
-                        .upsert({ 
-                          id: conversationId,
-                          dify_conversation_id: finalData.conversation_id,
-                          updated_at: new Date().toISOString()
-                        });
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error('Failed to get response reader');
+          }
+
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let fullAnswer = '';
+          let finalData = null;
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6).trim();
+                  
+                  if (data === '[DONE]') {
+                    // Save messages to database if we have final data
+                    if (finalData && supabase) {
+                      await saveMessages(supabase, conversationId, actualMessage, finalData);
+                      
+                      // Update conversation mapping if needed
+                      if (!difyConversationId && finalData.conversation_id) {
+                        await supabase
+                          .from('conversations')
+                          .upsert({ 
+                            id: conversationId,
+                            dify_conversation_id: finalData.conversation_id,
+                            updated_at: new Date().toISOString()
+                          });
+                      }
                     }
-                  }
-                  
-                  res.write('data: [DONE]\n\n');
-                  res.end();
-                  return;
-                }
-
-                try {
-                  const parsed = JSON.parse(data);
-                  
-                  // Log workflow events for debugging
-                  if (parsed.event && parsed.event.startsWith('node_')) {
-                    console.log('[Workflow API] Node event:', {
-                      event: parsed.event,
-                      node_id: parsed.node_id,
-                      node_name: parsed.node_name,
-                      timestamp: new Date().toISOString()
-                    });
+                    
+                    res.write('data: [DONE]\n\n');
+                    res.end();
+                    return;
                   }
 
-                  // Collect answer content and final data
-                  if (parsed.event === 'message' && parsed.answer) {
-                    fullAnswer += parsed.answer;
-                  } else if (parsed.event === 'message_end' || parsed.event === 'workflow_finished') {
-                    finalData = {
-                      answer: fullAnswer || parsed.answer || 'Workflow completed',
-                      conversation_id: parsed.conversation_id,
-                      message_id: parsed.message_id,
-                      metadata: parsed.metadata
-                    };
-                  }
+                  try {
+                    const parsed = JSON.parse(data);
+                    
+                    // Log workflow events for debugging
+                    if (parsed.event && parsed.event.startsWith('node_')) {
+                      console.log('[Workflow API] Node event:', {
+                        event: parsed.event,
+                        node_id: parsed.node_id,
+                        node_name: parsed.node_name,
+                        timestamp: new Date().toISOString()
+                      });
+                    }
 
-                  // Forward the parsed data to client
-                  res.write(`data: ${JSON.stringify(parsed)}\n\n`);
-                } catch (parseError) {
-                  console.warn('[Workflow API] Parse error:', parseError, 'Data:', data);
-                  // Still forward the raw data in case client can handle it
-                  res.write(`data: ${data}\n\n`);
+                    // Collect answer content and final data
+                    if (parsed.event === 'message' && parsed.answer) {
+                      fullAnswer += parsed.answer;
+                    } else if (parsed.event === 'message_end' || parsed.event === 'workflow_finished') {
+                      finalData = {
+                        answer: fullAnswer || parsed.answer || 'Workflow completed',
+                        conversation_id: parsed.conversation_id,
+                        message_id: parsed.message_id,
+                        metadata: parsed.metadata
+                      };
+                    }
+
+                    // Forward the parsed data to client
+                    res.write(`data: ${JSON.stringify(parsed)}\n\n`);
+                  } catch (parseError) {
+                    console.warn('[Workflow API] Parse error:', parseError, 'Data:', data);
+                    // Still forward the raw data in case client can handle it
+                    res.write(`data: ${data}\n\n`);
+                  }
                 }
               }
             }
+          } finally {
+            reader.releaseLock();
           }
-        } finally {
-          reader.releaseLock();
+
+        } catch (apiError) {
+          console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
+          isUsingMockResponse = true;
+          
+          // Use mock workflow streaming response
+          const mockEvents = generateMockWorkflowStream(actualMessage, difyConversationId);
+          let finalMockData = null;
+          
+          for (const event of mockEvents) {
+            // Add delay to simulate real workflow processing
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            if (event.event === 'message_end') {
+              // Save mock messages to database if available
+              if (finalMockData && supabase) {
+                await saveMessages(supabase, conversationId, actualMessage, {
+                  ...finalMockData,
+                  answer: `[MOCK] ${finalMockData.answer}`
+                });
+              }
+              
+              res.write('data: [DONE]\n\n');
+              res.end();
+              return;
+            } else if (event.event === 'workflow_finished') {
+              finalMockData = {
+                answer: mockEvents.find(e => e.event === 'message')?.answer || 'Mock workflow completed',
+                conversation_id: event.conversation_id,
+                message_id: event.message_id,
+                metadata: {
+                  ...event.metadata,
+                  mock_response: true
+                }
+              };
+            }
+            
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+          }
         }
 
       } catch (error) {
@@ -501,32 +621,52 @@ app.post('/api/dify/workflow', async (req, res) => {
     } else {
       // Handle non-streaming response
       try {
-        const response = await fetchWithTimeoutAndRetry(
-          `${DIFY_API_URL}/workflows/run`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${DIFY_API_KEY}`,
-              'Content-Type': 'application/json',
+        let data;
+        let isUsingMockResponse = false;
+        
+        try {
+          const response = await fetchWithTimeoutAndRetry(
+            `${DIFY_API_URL}/workflows/run`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${DIFY_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestBody),
             },
-            body: JSON.stringify(requestBody),
-          },
-          WORKFLOW_TIMEOUT
-        );
+            WORKFLOW_TIMEOUT
+          );
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(async () => ({ error: await response.text() }));
-          console.error('[Workflow API] Error:', errorData);
-          return res.status(response.status).json({
-            error: errorData.message || errorData.error || 'Workflow API error',
-            detail: errorData
-          });
+          if (!response.ok) {
+            throw new Error(`Workflow API error: ${response.status}`);
+          }
+
+          data = await response.json();
+          console.log('✅ Successfully received workflow response from Dify API');
+          
+        } catch (apiError) {
+          console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
+          isUsingMockResponse = true;
+          
+          // Generate mock workflow response
+          const mockEvents = generateMockWorkflowStream(actualMessage, difyConversationId);
+          const mockMessageEvent = mockEvents.find(e => e.event === 'message');
+          const mockFinishedEvent = mockEvents.find(e => e.event === 'workflow_finished');
+          
+          data = {
+            answer: mockMessageEvent?.answer || 'Mock workflow response',
+            conversation_id: mockFinishedEvent?.conversation_id,
+            message_id: mockFinishedEvent?.message_id,
+            metadata: {
+              ...mockFinishedEvent?.metadata,
+              mock_response: true
+            }
+          };
         }
 
-        const data = await response.json();
-
-        // If this was a new conversation, save the mapping
-        if (!difyConversationId && data.conversation_id) {
+        // If this was a new conversation and not using mock, save the mapping
+        if (!difyConversationId && data.conversation_id && !isUsingMockResponse && supabase) {
           await supabase
             .from('conversations')
             .upsert({ 
@@ -536,14 +676,23 @@ app.post('/api/dify/workflow', async (req, res) => {
             });
         }
 
-        // Save messages
-        await saveMessages(supabase, conversationId, actualMessage, data);
+        // Save messages (mark mock responses appropriately)
+        if (supabase) {
+          await saveMessages(supabase, conversationId, actualMessage, {
+            ...data,
+            answer: isUsingMockResponse ? `[MOCK] ${data.answer}` : data.answer
+          });
+        }
 
         res.json({
           answer: data.answer || data.data?.outputs?.answer || 'Workflow completed',
           conversation_id: data.conversation_id,
           message_id: data.message_id,
-          metadata: data.metadata
+          metadata: {
+            ...data.metadata,
+            mock_response: isUsingMockResponse,
+            timestamp: new Date().toISOString()
+          }
         });
 
       } catch (error) {

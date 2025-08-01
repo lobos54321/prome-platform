@@ -461,16 +461,6 @@ class AuthService {
     }, 2000); // Wait 2 seconds before validating
   }
   
-  // Check if user is authenticated
-  isAuthenticated(): boolean {
-    return this.currentUser !== null && 
-           this.currentUser !== undefined && 
-           this.currentUser.id !== undefined && 
-           this.currentUser.id !== null && 
-           typeof this.currentUser.id === 'string' && 
-           this.currentUser.id.trim() !== '';
-  }
-  
   // Logout - 修复路由跳转问题
   async logout(): Promise<void> {
     console.log('Starting logout process...');
