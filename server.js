@@ -25,6 +25,10 @@ const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.DIFY_API_KEY |
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+// Environment and development settings
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const ENABLE_MOCK_FALLBACK = process.env.ENABLE_MOCK_FALLBACK === 'true';
+
 // Timeout configurations
 const DEFAULT_TIMEOUT = parseInt(process.env.VITE_DIFY_TIMEOUT_MS) || 30000; // 30 seconds
 const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 120000; // 2 minutes
@@ -436,10 +440,8 @@ app.post('/api/dify/workflow', async (req, res) => {
     }
 
     const requestBody = {
-      inputs: {
-        ...inputs,
-        query: actualMessage // For workflows, message goes in inputs.query
-      },
+      inputs: inputs,
+      query: actualMessage, // For chat-messages, query is at the top level
       response_mode: stream ? 'streaming' : 'blocking',
       user: user || 'default-user'
     };
@@ -461,7 +463,7 @@ app.post('/api/dify/workflow', async (req, res) => {
         
         try {
           const response = await fetchWithTimeoutAndRetry(
-            `${DIFY_API_URL}/workflows/run`,
+            `${DIFY_API_URL}/chat-messages`,
             {
               method: 'POST',
               headers: {
@@ -563,29 +565,30 @@ app.post('/api/dify/workflow', async (req, res) => {
           }
 
         } catch (apiError) {
-          console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
-          isUsingMockResponse = true;
-          
-          // Use mock workflow streaming response
-          const mockEvents = generateMockWorkflowStream(actualMessage, difyConversationId);
-          let finalMockData = null;
-          
-          for (const event of mockEvents) {
-            // Add delay to simulate real workflow processing
-            await new Promise(resolve => setTimeout(resolve, 500));
+          if (ENABLE_MOCK_FALLBACK) {
+            console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
+            isUsingMockResponse = true;
             
-            if (event.event === 'message_end') {
-              // Save mock messages to database if available
-              if (finalMockData && supabase) {
-                await saveMessages(supabase, conversationId, actualMessage, {
-                  ...finalMockData,
-                  answer: `[MOCK] ${finalMockData.answer}`
-                });
-              }
+            // Use mock workflow streaming response for development
+            const mockEvents = generateMockWorkflowStream(actualMessage, difyConversationId);
+            let finalMockData = null;
+            
+            for (const event of mockEvents) {
+              // Add delay to simulate real workflow processing
+              await new Promise(resolve => setTimeout(resolve, 500));
               
-              res.write('data: [DONE]\n\n');
-              res.end();
-              return;
+              if (event.event === 'message_end') {
+                // Save mock messages to database if available
+                if (finalMockData && supabase) {
+                  await saveMessages(supabase, conversationId, actualMessage, {
+                    ...finalMockData,
+                    answer: `[DEV MOCK] ${finalMockData.answer}`
+                  });
+                }
+                
+                res.write('data: [DONE]\n\n');
+                res.end();
+                return;
             } else if (event.event === 'workflow_finished') {
               finalMockData = {
                 answer: mockEvents.find(e => e.event === 'message')?.answer || 'Mock workflow completed',
@@ -599,6 +602,17 @@ app.post('/api/dify/workflow', async (req, res) => {
             }
             
             res.write(`data: ${JSON.stringify(event)}\n\n`);
+          }
+          } else {
+            // In production, return proper error instead of mock response
+            console.error('[Workflow API] Dify API streaming failed:', apiError.message);
+            res.write(`data: ${JSON.stringify({ 
+              error: 'Service temporarily unavailable. Please try again later.',
+              details: apiError.message,
+              timestamp: new Date().toISOString()
+            })}\n\n`);
+            res.end();
+            return;
           }
         }
 
@@ -626,7 +640,7 @@ app.post('/api/dify/workflow', async (req, res) => {
         
         try {
           const response = await fetchWithTimeoutAndRetry(
-            `${DIFY_API_URL}/workflows/run`,
+            `${DIFY_API_URL}/chat-messages`,
             {
               method: 'POST',
               headers: {
@@ -646,23 +660,33 @@ app.post('/api/dify/workflow', async (req, res) => {
           console.log('✅ Successfully received workflow response from Dify API');
           
         } catch (apiError) {
-          console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
-          isUsingMockResponse = true;
-          
-          // Generate mock workflow response
-          const mockEvents = generateMockWorkflowStream(actualMessage, difyConversationId);
-          const mockMessageEvent = mockEvents.find(e => e.event === 'message');
-          const mockFinishedEvent = mockEvents.find(e => e.event === 'workflow_finished');
-          
-          data = {
-            answer: mockMessageEvent?.answer || 'Mock workflow response',
-            conversation_id: mockFinishedEvent?.conversation_id,
-            message_id: mockFinishedEvent?.message_id,
-            metadata: {
-              ...mockFinishedEvent?.metadata,
-              mock_response: true
-            }
-          };
+          if (ENABLE_MOCK_FALLBACK) {
+            console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
+            isUsingMockResponse = true;
+            
+            // Generate mock workflow response for development
+            const mockEvents = generateMockWorkflowStream(actualMessage, difyConversationId);
+            const mockMessageEvent = mockEvents.find(e => e.event === 'message');
+            const mockFinishedEvent = mockEvents.find(e => e.event === 'workflow_finished');
+            
+            data = {
+              answer: mockMessageEvent?.answer || 'Mock workflow response',
+              conversation_id: mockFinishedEvent?.conversation_id,
+              message_id: mockFinishedEvent?.message_id,
+              metadata: {
+                ...mockFinishedEvent?.metadata,
+                mock_response: true
+              }
+            };
+          } else {
+            // In production, return proper error instead of mock response
+            console.error('[Workflow API] Dify API call failed:', apiError.message);
+            return res.status(503).json({ 
+              error: 'Service temporarily unavailable. Please try again later.',
+              details: apiError.message,
+              timestamp: new Date().toISOString()
+            });
+          }
         }
 
         // If this was a new conversation and not using mock, save the mapping
