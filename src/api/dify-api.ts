@@ -192,7 +192,7 @@ export async function streamMessage(
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let finalResponse: DifyResponse = {};
+    const finalResponse: DifyResponse = {};
     let fullAnswer = '';
     
     while (true) {

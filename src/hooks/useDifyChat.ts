@@ -269,7 +269,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
         let finalUsage = null;
         let finalMessageId = null;
         let finalConversationId = state.conversationId;
-        let jsonBuffer = ''; // Buffer for handling split JSON data
+        const jsonBuffer = ''; // Buffer for handling split JSON data
 
         await clientRef.current.sendMessageStream(
           content,
