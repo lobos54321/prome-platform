@@ -25,6 +25,9 @@ const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.DIFY_API_KEY |
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+// Production mode configuration - when true, disables mock fallbacks
+const DIFY_PRODUCTION_MODE = process.env.VITE_DIFY_PRODUCTION_MODE === 'true';
+
 // Timeout configurations
 const DEFAULT_TIMEOUT = parseInt(process.env.VITE_DIFY_TIMEOUT_MS) || 30000; // 30 seconds
 const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 120000; // 2 minutes
@@ -342,7 +345,16 @@ app.post('/api/dify', async (req, res) => {
       console.log('✅ Successfully received response from Dify API');
       
     } catch (error) {
-      console.warn('⚠️ Dify API request failed, falling back to mock response:', error.message);
+      console.warn('⚠️ Dify API request failed:', error.message);
+      
+      // In production mode, don't use mock responses - return error instead
+      if (DIFY_PRODUCTION_MODE) {
+        return res.status(503).json({ 
+          error: 'Dify API unavailable', 
+          message: 'Unable to connect to Dify API. Please check your configuration and network connectivity.',
+          details: error.message 
+        });
+      }
       
       // Use mock response in development or when external API is unavailable
       data = generateMockDifyResponse(actualMessage, difyConversationId);
@@ -563,7 +575,18 @@ app.post('/api/dify/workflow', async (req, res) => {
           }
 
         } catch (apiError) {
-          console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
+          console.warn('[Workflow API] External API failed:', apiError.message);
+          
+          // In production mode, don't use mock responses - return error instead
+          if (DIFY_PRODUCTION_MODE) {
+            res.status(503).json({ 
+              error: 'Dify Workflow API unavailable', 
+              message: 'Unable to connect to Dify Workflow API. Please check your configuration and network connectivity.',
+              details: apiError.message 
+            });
+            return;
+          }
+          
           isUsingMockResponse = true;
           
           // Use mock workflow streaming response
@@ -646,7 +669,17 @@ app.post('/api/dify/workflow', async (req, res) => {
           console.log('✅ Successfully received workflow response from Dify API');
           
         } catch (apiError) {
-          console.warn('[Workflow API] External API failed, using mock response:', apiError.message);
+          console.warn('[Workflow API] External API failed:', apiError.message);
+          
+          // In production mode, don't use mock responses - return error instead
+          if (DIFY_PRODUCTION_MODE) {
+            return res.status(503).json({ 
+              error: 'Dify Workflow API unavailable', 
+              message: 'Unable to connect to Dify Workflow API. Please check your configuration and network connectivity.',
+              details: apiError.message 
+            });
+          }
+          
           isUsingMockResponse = true;
           
           // Generate mock workflow response
