@@ -1,7 +1,5 @@
-// 完整的Dify API客户端 - API方式替代iframe方式
-// 这将处理会话管理和多轮对话问题
-
-// 响应类型定义
+// 修改前端API客户端，使用相对路径而非绝对路径
+// 定义响应类型
 export interface DifyResponse {
   conversation_id?: string;
   message_id?: string;
@@ -11,7 +9,6 @@ export interface DifyResponse {
     prompt_tokens: number;
     completion_tokens: number;
   };
-  created_at?: string;
 }
 
 // 统计数据接口
@@ -32,11 +29,13 @@ let usageStats: DifyUsageStats = {
   lastUpdated: new Date().toISOString()
 };
 
-// 从localStorage加载使用统计数据
+// 尝试从localStorage加载使用统计数据
 try {
-  const savedStats = localStorage.getItem('dify_usage_stats');
-  if (savedStats) {
-    usageStats = JSON.parse(savedStats);
+  if (typeof window !== 'undefined') {
+    const savedStats = localStorage.getItem('dify_usage_stats');
+    if (savedStats) {
+      usageStats = JSON.parse(savedStats);
+    }
   }
 } catch (e) {
   console.warn('Failed to load Dify usage stats from localStorage', e);
@@ -45,7 +44,9 @@ try {
 // 保存使用统计到localStorage
 function saveUsageStats() {
   try {
-    localStorage.setItem('dify_usage_stats', JSON.stringify(usageStats));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dify_usage_stats', JSON.stringify(usageStats));
+    }
   } catch (e) {
     console.warn('Failed to save Dify usage stats to localStorage', e);
   }
@@ -71,13 +72,54 @@ export function getDifyUsageStats(): DifyUsageStats {
 
 // 检查Dify是否启用
 export const isDifyEnabled = (): boolean => {
-  return true; // 假设始终启用，根据需要调整
+  return true; // 假设始终启用
 };
+
+// 直接调用Dify API的函数
+// 这将绕过我们的API路由，直接调用Dify
+export async function callDifyDirectly(message: string, conversationId?: string): Promise<DifyResponse> {
+  try {
+    // 这里需要从环境变量或配置中获取Dify API密钥和URL
+    // 在浏览器端无法安全获取服务器端环境变量，所以这只是一个示例
+    // 实际项目中应该通过后端API代理这个请求
+    const apiKey = 'your-dify-api-key'; // 不要直接在前端暴露API密钥
+    const apiUrl = 'https://api.dify.ai/v1/chat-messages';
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: message,
+        response_mode: 'blocking',
+        conversation_id: conversationId,
+        user: 'user-id'
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Error calling Dify directly:", error);
+    throw error;
+  }
+}
 
 // 发送消息（非流式）
 export async function sendMessage(message: string, conversationId?: string): Promise<DifyResponse> {
   try {
-    const response = await fetch('/api/dify', {
+    // 使用相对路径，而不是绝对路径
+    // 或者，如果您的网站托管在子路径下，可能需要调整
+    const apiPath = window.location.origin + '/api/dify';
+    console.log(`[Dify Client] 发送请求到: ${apiPath}`);
+    
+    const response = await fetch(apiPath, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -89,19 +131,26 @@ export async function sendMessage(message: string, conversationId?: string): Pro
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Dify Client] API错误 (${response.status}):`, errorText);
+      throw new Error(`API error: ${response.status} - ${errorText.substring(0, 100)}...`);
     }
     
-    const data = await response.json();
-    
-    // 更新使用统计
-    if (data.usage) {
-      updateUsageStats(data.usage);
+    try {
+      const data = await response.json();
+      
+      // 更新使用统计
+      if (data.usage) {
+        updateUsageStats(data.usage);
+      }
+      
+      return data;
+    } catch (parseError) {
+      console.error("[Dify Client] JSON解析错误:", await response.text());
+      throw new Error("Invalid JSON response");
     }
-    
-    return data;
   } catch (error) {
-    console.error("Error sending message to Dify:", error);
+    console.error("[Dify Client] 发送消息错误:", error);
     throw error;
   }
 }
@@ -115,7 +164,11 @@ export async function streamMessage(
   onComplete?: (usage: DifyResponse['usage']) => void
 ): Promise<DifyResponse> {
   try {
-    const response = await fetch('/api/dify?stream=true', {
+    // 使用相对路径
+    const apiPath = window.location.origin + '/api/dify?stream=true';
+    console.log(`[Dify Client] 发送流请求到: ${apiPath}`);
+    
+    const response = await fetch(apiPath, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -127,7 +180,9 @@ export async function streamMessage(
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Dify Client] API流错误 (${response.status}):`, errorText);
+      throw new Error(`API stream error: ${response.status} - ${errorText.substring(0, 100)}...`);
     }
 
     if (!response.body) throw new Error("No response body");
@@ -180,7 +235,7 @@ export async function streamMessage(
     return finalResponse;
   } catch (error) {
     if (onError) onError(error);
-    console.error("Error streaming message from Dify:", error);
+    console.error("[Dify Client] 流消息错误:", error);
     throw error;
   }
 }
