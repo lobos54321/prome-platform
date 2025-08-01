@@ -1,112 +1,132 @@
-// 创建这个新文件：pages/api/dify.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { difyClient } from '@/lib/dify-client';
+import axios from 'axios';
 
 // 存储会话状态
 const conversationState = new Map<string, {
   conversationId: string;
   lastInteraction: number;
-  context: any;
+  userId: string;
 }>();
+
+// 定期清理过期会话（1小时不活动则过期）
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, session] of conversationState.entries()) {
+    if (now - session.lastInteraction > 3600000) { // 1小时
+      conversationState.delete(key);
+    }
+  }
+}, 300000); // 每5分钟检查一次
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // 只允许 POST 请求
-  if (req.method !== 'POST' && req.method !== 'GET') {
+  // 处理OPTIONS请求（CORS预检）
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(200).end();
+  }
+
+  // 仅接受POST请求
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // GET 请求用于测试
-  if (req.method === 'GET') {
-    return res.status(200).json({ 
-      status: 'ok',
-      message: 'Dify API route is working',
-      timestamp: new Date().toISOString()
-    });
-  }
-
   try {
-    const { query, user, conversation_id, inputs = {}, mode = 'chat' } = req.body;
+    const { message, conversation_id, user_id = 'default-user' } = req.body;
+    const isStream = req.query.stream === 'true';
+    
+    console.log(`[Dify API] 收到请求: ${message.substring(0, 50)}... | 会话ID: ${conversation_id || '新会话'}`);
 
-    console.log('[API Route] Received request:', { query, user, conversation_id, mode });
-
-    if (!query || !user) {
-      return res.status(400).json({ error: 'Query and user are required' });
-    }
-
-    // 获取或使用会话ID
+    // 获取或创建会话状态
+    let sessionId = user_id;
     let conversationId = conversation_id;
-    const sessionState = conversationState.get(user);
     
-    if (!conversationId && sessionState) {
-      conversationId = sessionState.conversationId;
-    }
-
-    console.log('=== Dify Route Debug ===');
-    console.log('Mode:', mode);
-    console.log('User:', user);
-    console.log('Query:', query);
-    console.log('Conversation ID:', conversationId || 'New');
-    console.log('Inputs:', inputs);
-
-    let response;
-    
-    // 根据模式选择不同的 API
-    if (mode === 'workflow') {
-      response = await difyClient.workflowRun(query, user, conversationId, inputs);
-    } else {
-      response = await difyClient.chat(query, user, conversationId, inputs);
-    }
-
-    console.log('[API Route] Dify response:', response);
-
-    // 更新会话状态
-    const responseConversationId = response.conversation_id || response.data?.conversation_id;
-    if (responseConversationId) {
-      conversationState.set(user, {
-        conversationId: responseConversationId,
+    if (conversationId) {
+      // 更新现有会话
+      conversationState.set(sessionId, {
+        conversationId,
         lastInteraction: Date.now(),
-        context: response.data?.outputs || {}
+        userId: user_id
       });
+      console.log(`[Dify API] 继续现有会话: ${conversationId}`);
+    } else if (conversationState.has(sessionId)) {
+      // 恢复之前的会话
+      conversationId = conversationState.get(sessionId)?.conversationId;
+      console.log(`[Dify API] 恢复会话: ${conversationId}`);
     }
 
-    // 提取答案
-    const answer = response.data?.outputs?.answer || 
-                   response.data?.outputs?.text || 
-                   response.answer ||
-                   'No response';
+    // 准备Dify API请求
+    const difyUrl = `${process.env.DIFY_API_URL}/chat-messages`;
+    const headers = {
+      'Authorization': `Bearer ${process.env.DIFY_API_KEY}`,
+      'Content-Type': 'application/json'
+    };
+    
+    const payload = {
+      inputs: {},
+      query: message,
+      response_mode: isStream ? 'streaming' : 'blocking',
+      conversation_id: conversationId,
+      user: user_id
+    };
 
-    return res.status(200).json({
-      answer,
-      conversation_id: responseConversationId,
-      metadata: {
-        workflow_run_id: response.data?.workflow_run_id,
-        elapsed_time: response.data?.elapsed_time,
-        total_tokens: response.data?.total_tokens || response.usage?.total_tokens,
-        created_at: response.data?.created_at || response.created_at,
+    console.log(`[Dify API] 发送请求到: ${difyUrl}`);
+    console.log(`[Dify API] 请求负载: ${JSON.stringify(payload)}`);
+
+    if (isStream) {
+      // 流式响应处理
+      const difyResponse = await fetch(difyUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (!difyResponse.ok) {
+        const errorText = await difyResponse.text();
+        console.error(`[Dify API] 错误: ${difyResponse.status} ${errorText}`);
+        return res.status(difyResponse.status).json({ 
+          error: `Dify API error: ${difyResponse.status}`,
+          details: errorText
+        });
       }
-    });
-  } catch (error) {
-    console.error('[API Route] Error:', error);
+
+      // 设置流响应头
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      // 将Dify响应流转发到客户端
+      difyResponse.body?.pipe(res);
+      
+      // 当流结束时，我们无法获取conversation_id
+      // 客户端需要从流中解析并在下次请求时发送
+    } else {
+      // 阻塞式响应
+      const difyResponse = await axios.post(difyUrl, payload, { headers });
+      
+      // 保存或更新会话状态
+      if (difyResponse.data.conversation_id) {
+        conversationState.set(sessionId, {
+          conversationId: difyResponse.data.conversation_id,
+          lastInteraction: Date.now(),
+          userId: user_id
+        });
+        console.log(`[Dify API] 保存新会话ID: ${difyResponse.data.conversation_id}`);
+      }
+      
+      // 返回响应
+      return res.status(200).json(difyResponse.data);
+    }
+  } catch (error: any) {
+    console.error('[Dify API] 处理请求时出错:', error);
     return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
+      error: 'Error processing request', 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
-}
-
-// 清理超时的会话
-if (typeof window === 'undefined') {
-  setInterval(() => {
-    const now = Date.now();
-    const timeout = 30 * 60 * 1000; // 30分钟超时
-    
-    for (const [user, state] of conversationState.entries()) {
-      if (now - state.lastInteraction > timeout) {
-        conversationState.delete(user);
-        console.log(`Cleared timeout session for user: ${user}`);
-      }
-    }
-  }, 5 * 60 * 1000); // 每5分钟检查一次
 }
