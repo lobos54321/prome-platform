@@ -59,15 +59,16 @@ export default async function handler(
     }
 
     // 准备Dify API请求
-    const difyUrl = `${process.env.DIFY_API_URL}/chat-messages`;
+    const difyUrl = `${process.env.DIFY_API_URL}/v1/chat-messages`;
     const headers = {
       'Authorization': `Bearer ${process.env.DIFY_API_KEY}`,
       'Content-Type': 'application/json'
     };
     
+    // 关键修复：确保请求格式符合Dify工作流预期
     const payload = {
-      inputs: {},
-      query: message,
+      inputs: {}, // 工作流的输入参数
+      query: message, // 用户查询
       response_mode: isStream ? 'streaming' : 'blocking',
       conversation_id: conversationId,
       user: user_id
@@ -99,8 +100,63 @@ export default async function handler(
       res.setHeader('Connection', 'keep-alive');
 
       // 将Dify响应流转发到客户端
-      difyResponse.body?.pipe(res);
+      const reader = difyResponse.body?.getReader();
+      if (!reader) {
+        return res.status(500).json({ error: 'Failed to read response stream' });
+      }
+
+      // 开始流式传输
+      const encoder = new TextEncoder();
       
+      // 保存会话ID以在流结束时更新
+      let extractedConversationId: string | undefined;
+      
+      // 手动处理流
+      try {
+        const decoder = new TextDecoder();
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          
+          // 尝试提取conversation_id
+          try {
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = JSON.parse(line.substring(6));
+                if (data.conversation_id && !extractedConversationId) {
+                  extractedConversationId = data.conversation_id;
+                  // 更新会话状态
+                  conversationState.set(sessionId, {
+                    conversationId: extractedConversationId,
+                    lastInteraction: Date.now(),
+                    userId: user_id
+                  });
+                  console.log(`[Dify API] 从流中提取并保存会话ID: ${extractedConversationId}`);
+                }
+              }
+            }
+          } catch (e) {
+            // 忽略解析错误
+          }
+          
+          // 将原始块转发给客户端
+          res.write(chunk);
+          
+          // 确保立即刷新
+          if (typeof (res as any).flush === 'function') {
+            (res as any).flush();
+          }
+        }
+        
+        res.end();
+      } catch (streamError) {
+        console.error("[Dify API] 流处理错误:", streamError);
+        res.end();
+      }
     } else {
       // 阻塞式响应
       const difyResponse = await fetch(difyUrl, {
