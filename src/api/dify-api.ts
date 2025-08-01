@@ -9,6 +9,13 @@ export interface DifyResponse {
   // 添加其他可能的字段
 }
 
+// 检查Dify是否启用
+export const isDifyEnabled = (): boolean => {
+  // 根据配置判断Dify是否启用
+  // 这应该与您原始代码中的逻辑保持一致
+  return true; // 假设始终启用，或者根据您的实际需求调整
+};
+
 // 导出使用的函数
 export async function sendMessage(message: string, conversationId?: string): Promise<DifyResponse> {
   try {
