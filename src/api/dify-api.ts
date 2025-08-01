@@ -1,5 +1,5 @@
 // 这是一个替代文件，将调用重定向到正确的API路由
-import axios from 'axios';
+// 使用原生fetch代替axios
 
 // 定义响应类型
 export interface DifyResponse {
@@ -13,11 +13,22 @@ export interface DifyResponse {
 export async function sendMessage(message: string, conversationId?: string): Promise<DifyResponse> {
   try {
     // 调用正确路径的API
-    const response = await axios.post('/api/dify', {
-      message,
-      conversation_id: conversationId
+    const response = await fetch('/api/dify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId
+      })
     });
-    return response.data;
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    return await response.json();
   } catch (error) {
     console.error("Error sending message to Dify:", error);
     throw error;
@@ -37,6 +48,10 @@ export async function streamMessage(message: string, conversationId?: string,
         conversation_id: conversationId
       })
     });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
 
     // 处理流式响应
     if (!response.body) throw new Error("No response body");
