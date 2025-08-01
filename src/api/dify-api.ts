@@ -114,9 +114,10 @@ export async function callDifyDirectly(message: string, conversationId?: string)
 // 发送消息（非流式）
 export async function sendMessage(message: string, conversationId?: string): Promise<DifyResponse> {
   try {
-    // 使用相对路径，而不是绝对路径
-    // 或者，如果您的网站托管在子路径下，可能需要调整
-    const apiPath = window.location.origin + '/api/dify';
+    // 使用正确的路径格式
+    const apiPath = conversationId 
+      ? `/api/dify/${conversationId}` 
+      : '/api/dify';
     console.log(`[Dify Client] 发送请求到: ${apiPath}`);
     
     const response = await fetch(apiPath, {
@@ -164,8 +165,10 @@ export async function streamMessage(
   onComplete?: (usage: DifyResponse['usage']) => void
 ): Promise<DifyResponse> {
   try {
-    // 使用相对路径
-    const apiPath = window.location.origin + '/api/dify?stream=true';
+    // 使用正确的流式路径格式
+    const apiPath = conversationId 
+      ? `/api/dify/${conversationId}/stream` 
+      : '/api/dify/default/stream';
     console.log(`[Dify Client] 发送流请求到: ${apiPath}`);
     
     const response = await fetch(apiPath, {
