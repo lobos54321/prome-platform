@@ -1,73 +1,88 @@
-import { useState, useEffect } from 'react';
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Activity, CircleCheck, CircleX } from 'lucide-react';
-import { isDifyEnabled } from '@/api/dify-api';
-import { difyIframeMonitor } from '@/lib/dify-iframe-monitor';
-import { authService } from '@/lib/auth';
+import { Activity, CircleCheck, CircleX, Zap } from 'lucide-react';
+import { isDifyEnabled, getDifyUsageStats } from '@/api/dify-api';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function DifyMonitorStatus() {
-  const [isMonitoring, setIsMonitoring] = useState(false);
-  const [user, setUser] = useState(authService.getCurrentUserSync());
-
+  const [status, setStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
+  const [usageStats, setUsageStats] = useState(getDifyUsageStats());
+  
   useEffect(() => {
-    // Check initial monitoring state
-    setIsMonitoring(difyIframeMonitor.isCurrentlyListening());
-
-    // Listen for auth state changes
-    const handleAuthStateChange = (event: CustomEvent) => {
-      const { user } = event.detail;
-      setUser(user);
-    };
-
-    // Listen for monitoring state changes
-    const handleTokenConsumed = () => {
-      // Update monitoring state when we detect activity
-      setIsMonitoring(difyIframeMonitor.isCurrentlyListening());
-    };
-
-    window.addEventListener('auth-state-changed', handleAuthStateChange as EventListener);
-    window.addEventListener('token-consumed', handleTokenConsumed as EventListener);
-
-    // Check monitoring state periodically (fallback)
-    const interval = setInterval(() => {
-      const currentState = difyIframeMonitor.isCurrentlyListening();
-      if (currentState !== isMonitoring) {
-        setIsMonitoring(currentState);
+    // 检查Dify状态
+    const checkDifyStatus = async () => {
+      try {
+        const enabled = isDifyEnabled();
+        
+        if (enabled) {
+          setStatus('connected');
+        } else {
+          setStatus('disconnected');
+        }
+      } catch (error) {
+        console.error('Error checking Dify status:', error);
+        setStatus('disconnected');
       }
-    }, 5000);
-
-    return () => {
-      window.removeEventListener('auth-state-changed', handleAuthStateChange as EventListener);
-      window.removeEventListener('token-consumed', handleTokenConsumed as EventListener);
-      clearInterval(interval);
     };
-  }, [isMonitoring]);
-
-  // Don't show if Dify is not enabled or user is not logged in
-  if (!isDifyEnabled() || !user) {
-    return null;
+    
+    checkDifyStatus();
+    
+    // 定期更新使用统计
+    const intervalId = setInterval(() => {
+      setUsageStats(getDifyUsageStats());
+    }, 30000); // 每30秒更新一次
+    
+    return () => clearInterval(intervalId);
+  }, []);
+  
+  if (!isDifyEnabled()) {
+    return null; // 如果Dify未启用，不显示组件
   }
-
+  
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <Activity className="h-4 w-4" />
-      <span className="hidden sm:inline">Token监控:</span>
-      <Badge 
-        variant={isMonitoring ? "default" : "secondary"}
-        className="flex items-center gap-1"
-      >
-        {isMonitoring ? (
-          <>
+    <div className="flex items-center gap-2">
+      {status === 'loading' && (
+        <Badge variant="outline" className="gap-1">
+          <Activity className="h-3 w-3 animate-pulse" />
+          <span>连接中...</span>
+        </Badge>
+      )}
+      {status === 'connected' && (
+        <>
+          <Badge variant="outline" className="gap-1 bg-green-50 text-green-700 border-green-200">
             <CircleCheck className="h-3 w-3" />
-            运行中
-          </>
-        ) : (
-          <>
-            <CircleX className="h-3 w-3" />
-            已停止
-          </>
-        )}
-      </Badge>
+            <span>Dify已连接</span>
+          </Badge>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="cursor-help gap-1 bg-blue-50 text-blue-700 border-blue-200">
+                <Zap className="h-3 w-3" />
+                <span>{usageStats.totalTokens.toLocaleString()} tokens</span>
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-xs">
+                <p>总请求数: {usageStats.totalRequests}</p>
+                <p>提示词tokens: {usageStats.promptTokens.toLocaleString()}</p>
+                <p>补全tokens: {usageStats.completionTokens.toLocaleString()}</p>
+                <p>总tokens: {usageStats.totalTokens.toLocaleString()}</p>
+                <p>最后更新: {new Date(usageStats.lastUpdated).toLocaleString()}</p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </>
+      )}
+      {status === 'disconnected' && (
+        <Badge variant="outline" className="gap-1 bg-red-50 text-red-700 border-red-200">
+          <CircleX className="h-3 w-3" />
+          <span>Dify未连接</span>
+        </Badge>
+      )}
     </div>
   );
 }
+
+export default DifyMonitorStatus;
