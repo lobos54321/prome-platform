@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
 
 // 存储会话状态
 const conversationState = new Map<string, {
@@ -39,7 +38,7 @@ export default async function handler(
     const { message, conversation_id, user_id = 'default-user' } = req.body;
     const isStream = req.query.stream === 'true';
     
-    console.log(`[Dify API] 收到请求: ${message.substring(0, 50)}... | 会话ID: ${conversation_id || '新会话'}`);
+    console.log(`[Dify API] 收到请求: ${message?.substring(0, 50)}... | 会话ID: ${conversation_id || '新会话'}`);
 
     // 获取或创建会话状态
     let sessionId = user_id;
@@ -102,24 +101,37 @@ export default async function handler(
       // 将Dify响应流转发到客户端
       difyResponse.body?.pipe(res);
       
-      // 当流结束时，我们无法获取conversation_id
-      // 客户端需要从流中解析并在下次请求时发送
     } else {
       // 阻塞式响应
-      const difyResponse = await axios.post(difyUrl, payload, { headers });
+      const difyResponse = await fetch(difyUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (!difyResponse.ok) {
+        const errorText = await difyResponse.text();
+        console.error(`[Dify API] 错误: ${difyResponse.status} ${errorText}`);
+        return res.status(difyResponse.status).json({ 
+          error: `Dify API error: ${difyResponse.status}`,
+          details: errorText
+        });
+      }
+      
+      const responseData = await difyResponse.json();
       
       // 保存或更新会话状态
-      if (difyResponse.data.conversation_id) {
+      if (responseData.conversation_id) {
         conversationState.set(sessionId, {
-          conversationId: difyResponse.data.conversation_id,
+          conversationId: responseData.conversation_id,
           lastInteraction: Date.now(),
           userId: user_id
         });
-        console.log(`[Dify API] 保存新会话ID: ${difyResponse.data.conversation_id}`);
+        console.log(`[Dify API] 保存新会话ID: ${responseData.conversation_id}`);
       }
       
       // 返回响应
-      return res.status(200).json(difyResponse.data);
+      return res.status(200).json(responseData);
     }
   } catch (error: any) {
     console.error('[Dify API] 处理请求时出错:', error);
