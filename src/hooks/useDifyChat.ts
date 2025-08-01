@@ -162,10 +162,11 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
   const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
     const currentTime = new Date();
     
-    // 计算用户消息数量（排除系统消息和助手消息）
-    const userMessageCount = state.messages.filter(msg => msg.role === 'user').length;
+    // 关键修复：计算发送前的状态，不包括当前正在发送的消息
+    const existingUserMessages = state.messages.filter(msg => msg.role === 'user');
+    const userMessageCount = existingUserMessages.length; // 不包括当前消息
     const totalMessageCount = state.messages.length;
-    const hasConversationHistory = userMessageCount > 0;
+    const hasConversationHistory = userMessageCount > 0; // 基于已有消息判断
     
     // 精确的工作流控制参数 - 核心修复
     const baseInputs = {
@@ -189,19 +190,20 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       "locale": "zh-CN",
       "chat_mode": "workflow",
       
-      // 关键的工作流状态控制 - 精确控制
-      "conversation_turn": userMessageCount, // 对话轮次（0=首次，1+=后续）
+      // 关键的工作流状态控制 - 基于发送前状态
+      "conversation_turn": userMessageCount, // 当前是第几轮（0=首次）
       "is_first_turn": userMessageCount === 0, // 是否首次对话
       "is_continuation": userMessageCount > 0, // 是否继续对话
       "has_conversation_history": hasConversationHistory,
       "conversation_id": state.conversationId,
       
       // 工作流执行模式 - 关键修复
-      "workflow_mode": hasConversationHistory ? "continue" : "start", // 明确模式
-      "node_filter": hasConversationHistory ? "response_only" : "full_flow", // 节点过滤
-      "skip_intro": hasConversationHistory, // 跳过介绍性节点
-      "direct_response": hasConversationHistory, // 直接响应模式
-      "bypass_initialization": hasConversationHistory, // 绕过初始化
+      "workflow_mode": hasConversationHistory ? "continue" : "start",
+      "node_filter": hasConversationHistory ? "response_only" : "full_flow",
+      "execution_mode": hasConversationHistory ? "targeted" : "full",
+      "skip_intro": hasConversationHistory,
+      "direct_response": hasConversationHistory,
+      "bypass_initialization": hasConversationHistory,
       
       // 防止循环的关键参数
       "max_node_executions": 1, // 每个节点最多执行1次
@@ -211,7 +213,6 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       "workflow_step_limit": 1, // 严格限制步数
       
       // 执行控制
-      "execution_mode": hasConversationHistory ? "targeted" : "full",
       "enable_all_nodes": !hasConversationHistory, // 只在首次启用所有节点
       "force_exit": hasConversationHistory, // 有历史记录时强制退出
       
@@ -233,23 +234,22 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       ...customInputs, // 自定义输入（优先级最高）
     };
 
-    console.log('🎯 Precise workflow control:', {
-      conversationTurn: baseInputs.conversation_turn,
+    console.log('🎯 Workflow control state:', {
+      existingUserMessages: existingUserMessages.length,
+      userMessageCount,
+      hasConversationHistory,
       workflowMode: baseInputs.workflow_mode,
+      isFirstTurn: baseInputs.is_first_turn,
+      isContinuation: baseInputs.is_continuation,
       nodeFilter: baseInputs.node_filter,
-      skipIntro: baseInputs.skip_intro,
-      directResponse: baseInputs.direct_response,
-      maxNodeExecutions: baseInputs.max_node_executions,
-      forceSinglePass: baseInputs.force_single_pass,
-      exitAfterResponse: baseInputs.exit_after_response,
-      bypassInitialization: baseInputs.bypass_initialization
+      executionMode: baseInputs.execution_mode
     });
     
     // Record parameters for diagnostics
     recordParameters(state.conversationId || 'unknown', baseInputs, userMessageCount);
     
     return baseInputs;
-  }, [user, state.conversationId, state.messages, inputs, workflowInputs]);
+  }, [user, state.conversationId, state.messages, inputs, workflowInputs, recordParameters]);
 
   const sendMessage = useCallback(async (content: string, customInputs?: Record<string, unknown>) => {
     if (!clientRef.current) {
@@ -271,7 +271,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     const userMessageId = generateUUID();
     const assistantMessageId = generateUUID();
     
-    // 构建完整的输入参数
+    // 关键修复：在添加消息之前构建输入参数
     const completeInputs = buildCompleteInputs(content, customInputs);
 
     // Add user message
@@ -308,11 +308,12 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       abortControllerRef.current = new AbortController();
 
       if (enableStreaming) {
-        // Streaming response
+        // Streaming response with buffer for handling large JSON chunks
         let fullContent = '';
         let finalUsage = null;
         let finalMessageId = null;
         let finalConversationId = state.conversationId;
+        let jsonBuffer = ''; // Buffer for handling split JSON data
 
         await clientRef.current.sendMessageStream(
           content,
@@ -422,6 +423,8 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
                 data: chunk,
                 executionTime
               });
+            } else if (chunk.event === 'parallel_branch_finished') {
+              console.log('🔀 Parallel branch finished:', chunk);
             }
           },
           state.conversationId || undefined,
@@ -485,7 +488,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       console.error('❌ Error sending message:', error);
       
       // Handle specific error cases
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log('🛑 Request was aborted');
         return;
       }
@@ -541,7 +544,8 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     setError, 
     startNewConversation, 
     processTokenUsage,
-    buildCompleteInputs
+    buildCompleteInputs,
+    recordEvent
   ]);
 
   const regenerateLastMessage = useCallback(async (customInputs?: Record<string, unknown>) => {
