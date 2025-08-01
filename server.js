@@ -82,6 +82,12 @@ async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOU
 
 // Utility function to save messages
 async function saveMessages(supabase, conversationId, userMessage, difyResponse) {
+  // Skip saving if Supabase is not configured
+  if (!supabase) {
+    console.log('📝 Skipping message saving (Supabase not configured)');
+    return;
+  }
+
   try {
     // Save user message
     const { error: userError } = await supabase
@@ -127,15 +133,19 @@ app.post('/api/dify', async (req, res) => {
     const { message, query, user, conversation_id, inputs = {} } = req.body;
     const actualMessage = message || query; // Support both message and query fields
     
-    if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Server configuration error: Missing required environment variables' });
+    if (!DIFY_API_URL || !DIFY_API_KEY) {
+      return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
     }
     
     if (!actualMessage) {
       return res.status(400).json({ error: 'Message or query is required' });
     }
     
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // Initialize Supabase only if fully configured
+    let supabase = null;
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    }
 
     // Use conversation_id from request body, or generate a new one
     let difyConversationId = conversation_id || null;
@@ -252,8 +262,8 @@ app.post('/api/dify/workflow', async (req, res) => {
     const { message, query, user, conversation_id, inputs = {}, stream = true } = req.body;
     const actualMessage = message || query; // Support both message and query fields
     
-    if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Server configuration error: Missing required environment variables' });
+    if (!DIFY_API_URL || !DIFY_API_KEY) {
+      return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
     }
     
     if (!actualMessage) {
@@ -268,7 +278,8 @@ app.post('/api/dify/workflow', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // Initialize Supabase only if fully configured
+    const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
     // Use conversation_id from request body, or generate a new one
     let difyConversationId = conversation_id || null;
