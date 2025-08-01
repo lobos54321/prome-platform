@@ -1,200 +1,78 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import axios from 'axios';
 
-// 存储会话状态
-const conversationState = new Map<string, {
-  conversationId: string;
-  lastInteraction: number;
-  userId: string;
-}>();
+// Configure your Dify API details
+const DIFY_API_URL = process.env.DIFY_API_URL || 'https://api.dify.ai/v1';
+const DIFY_API_KEY = process.env.DIFY_API_KEY;
 
-// 定期清理过期会话（1小时不活动则过期）
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, session] of conversationState.entries()) {
-    if (now - session.lastInteraction > 3600000) { // 1小时
-      conversationState.delete(key);
-    }
-  }
-}, 300000); // 每5分钟检查一次
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // 处理OPTIONS请求（CORS预检）
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    return res.status(200).end();
-  }
-
-  // 仅接受POST请求
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { message, conversation_id, user_id = 'default-user' } = req.body;
-    const isStream = req.query.stream === 'true';
-    
-    console.log(`[Dify API] 收到请求: ${message?.substring(0, 50)}... | 会话ID: ${conversation_id || '新会话'}`);
+    // Extract the necessary data from the request
+    const { conversation_id, user_input, query_params, stream = true } = req.body;
 
-    // 获取或创建会话状态
-    let sessionId = user_id;
-    let conversationId = conversation_id;
-    
-    if (conversationId) {
-      // 更新现有会话
-      conversationState.set(sessionId, {
-        conversationId,
-        lastInteraction: Date.now(),
-        userId: user_id
-      });
-      console.log(`[Dify API] 继续现有会话: ${conversationId}`);
-    } else if (conversationState.has(sessionId)) {
-      // 恢复之前的会话
-      conversationId = conversationState.get(sessionId)?.conversationId;
-      console.log(`[Dify API] 恢复会话: ${conversationId}`);
-    }
-
-    // 准备Dify API请求
-    const difyUrl = `${process.env.DIFY_API_URL}/v1/chat-messages`;
+    // Prepare headers for Dify API request
     const headers = {
-      'Authorization': `Bearer ${process.env.DIFY_API_KEY}`,
-      'Content-Type': 'application/json'
-    };
-    
-    // 关键修复：确保请求格式符合Dify工作流预期
-    const payload = {
-      inputs: {}, // 工作流的输入参数
-      query: message, // 用户查询
-      response_mode: isStream ? 'streaming' : 'blocking',
-      conversation_id: conversationId,
-      user: user_id
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${DIFY_API_KEY}`
     };
 
-    console.log(`[Dify API] 发送请求到: ${difyUrl}`);
-    console.log(`[Dify API] 请求负载: ${JSON.stringify(payload)}`);
+    // Prepare request body
+    const requestBody = {
+      conversation_id,
+      inputs: { user_input },
+      query: query_params || {},
+      response_mode: stream ? "streaming" : "blocking",
+      user: req.body.user || undefined
+    };
 
-    if (isStream) {
-      // 流式响应处理
-      const difyResponse = await fetch(difyUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-      });
+    if (stream) {
+      // Handle streaming response
+      const response = await axios.post(
+        `${DIFY_API_URL}/chat-messages`,
+        requestBody,
+        {
+          headers,
+          responseType: 'stream'
+        }
+      );
 
-      if (!difyResponse.ok) {
-        const errorText = await difyResponse.text();
-        console.error(`[Dify API] 错误: ${difyResponse.status} ${errorText}`);
-        return res.status(difyResponse.status).json({ 
-          error: `Dify API error: ${difyResponse.status}`,
-          details: errorText
-        });
-      }
-
-      // 设置流响应头
+      // Set appropriate headers for streaming response
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      // 将Dify响应流转发到客户端
-      const reader = difyResponse.body?.getReader();
-      if (!reader) {
-        return res.status(500).json({ error: 'Failed to read response stream' });
-      }
-
-      // 开始流式传输
-      const encoder = new TextEncoder();
+      // Pipe the stream directly to the response
+      response.data.pipe(res);
       
-      // 保存会话ID以在流结束时更新
-      let extractedConversationId: string | undefined;
-      
-      // 手动处理流
-      try {
-        const decoder = new TextDecoder();
-        
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value);
-          
-          // 尝试提取conversation_id
-          try {
-            const lines = chunk.split('\n').filter(line => line.trim() !== '');
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = JSON.parse(line.substring(6));
-                if (data.conversation_id && !extractedConversationId) {
-                  extractedConversationId = data.conversation_id;
-                  // 更新会话状态
-                  conversationState.set(sessionId, {
-                    conversationId: extractedConversationId,
-                    lastInteraction: Date.now(),
-                    userId: user_id
-                  });
-                  console.log(`[Dify API] 从流中提取并保存会话ID: ${extractedConversationId}`);
-                }
-              }
-            }
-          } catch (e) {
-            // 忽略解析错误
-          }
-          
-          // 将原始块转发给客户端
-          res.write(chunk);
-          
-          // 确保立即刷新
-          if (typeof (res as any).flush === 'function') {
-            (res as any).flush();
-          }
-        }
-        
-        res.end();
-      } catch (streamError) {
-        console.error("[Dify API] 流处理错误:", streamError);
-        res.end();
-      }
-    } else {
-      // 阻塞式响应
-      const difyResponse = await fetch(difyUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
+      // Handle errors in the stream
+      response.data.on('error', (err: Error) => {
+        console.error('Stream error:', err);
+        res.end(`data: ${JSON.stringify({ error: 'Stream error occurred' })}\n\n`);
       });
-
-      if (!difyResponse.ok) {
-        const errorText = await difyResponse.text();
-        console.error(`[Dify API] 错误: ${difyResponse.status} ${errorText}`);
-        return res.status(difyResponse.status).json({ 
-          error: `Dify API error: ${difyResponse.status}`,
-          details: errorText
-        });
-      }
+    } else {
+      // Handle non-streaming response
+      const response = await axios.post(
+        `${DIFY_API_URL}/chat-messages`,
+        requestBody,
+        { headers }
+      );
       
-      const responseData = await difyResponse.json();
-      
-      // 保存或更新会话状态
-      if (responseData.conversation_id) {
-        conversationState.set(sessionId, {
-          conversationId: responseData.conversation_id,
-          lastInteraction: Date.now(),
-          userId: user_id
-        });
-        console.log(`[Dify API] 保存新会话ID: ${responseData.conversation_id}`);
-      }
-      
-      // 返回响应
-      return res.status(200).json(responseData);
+      res.status(200).json(response.data);
     }
-  } catch (error: any) {
-    console.error('[Dify API] 处理请求时出错:', error);
-    return res.status(500).json({ 
-      error: 'Error processing request', 
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+  } catch (error) {
+    console.error('Dify API error:', error);
+    
+    // Provide more detailed error information
+    const errorMessage = error.response?.data?.message || 'Failed to process request to Dify API';
+    const statusCode = error.response?.status || 500;
+    
+    res.status(statusCode).json({ 
+      error: errorMessage,
+      details: error.message
     });
   }
 }
