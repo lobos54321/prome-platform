@@ -65,7 +65,7 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
 // Dify chat proxy API (streaming)
 app.post('/api/dify/:conversationId/stream', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, inputs = {} } = req.body;
     const { conversationId } = req.params;
     
     if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -84,7 +84,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     let difyConversationId = conversationRow?.dify_conversation_id || null;
 
     const requestBody = {
-      inputs: {},
+      inputs: inputs,
       query: message,
       response_mode: 'streaming',
       user: 'default-user'
@@ -197,7 +197,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
 // Dify chat proxy API (blocking)
 app.post('/api/dify/:conversationId', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, inputs = {} } = req.body;
     const { conversationId } = req.params;
     
     if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -216,7 +216,7 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     let difyConversationId = conversationRow?.dify_conversation_id || null;
 
     const requestBody = {
-      inputs: {},
+      inputs: inputs,
       query: message,
       response_mode: 'blocking',
       user: 'default-user'

@@ -16,7 +16,13 @@ export class DifyClient {
   async sendMessage(message: string, conversationId?: string, user?: string): Promise<DifyResponse> {
     const url = `${this.baseUrl}/chat-messages`;
     
-    const payload: any = {
+    const payload: {
+      inputs: Record<string, unknown>;
+      query: string;
+      response_mode: string;
+      user: string;
+      conversation_id?: string;
+    } = {
       inputs: {},
       query: message,
       response_mode: 'blocking',
