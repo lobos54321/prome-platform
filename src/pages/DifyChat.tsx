@@ -264,6 +264,11 @@ export default function DifyChat() {
             showMetadata={false}
             enableStreaming={true}
             autoStartConversation={true}
+            mode="workflow" // Enable workflow mode by default
+            showWorkflowProgress={true}
+            enableRetry={true}
+            placeholder="输入您的消息或工作流指令..."
+            welcomeMessage="您好！我是您的AI助手。我支持普通聊天和复杂工作流处理。有什么可以帮助您的吗？"
           />
         </div>
       </div>
