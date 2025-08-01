@@ -28,6 +28,7 @@ import DifyChat from './pages/DifyChat';
 import TokenMonitorTest from './pages/TokenMonitorTest';
 import SystemDiagnostics from './pages/SystemDiagnostics';
 import SessionIdTest from './pages/SessionIdTest';
+import TestWorkflowProgress from './pages/TestWorkflowProgress';
 
 import NotFound from './pages/NotFound';
 
@@ -213,6 +214,7 @@ const App = () => {
               <Route path="/token-monitor-test" element={<TokenMonitorTest />} />
               <Route path="/session-id-test" element={<SessionIdTest />} />
               <Route path="/system-diagnostics" element={<SystemDiagnostics />} />
+              <Route path="/test-workflow-progress" element={<TestWorkflowProgress />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

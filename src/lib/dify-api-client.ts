@@ -86,6 +86,10 @@ export interface DifyAPIClientConfig {
   appId: string;
   apiKey: string;
   conversationExpiryHours?: number; // Default 24 hours
+  timeoutMs?: number; // Default timeout in milliseconds
+  workflowTimeoutMs?: number; // Extended timeout for workflows
+  maxRetries?: number; // Maximum retry attempts
+  retryDelayMs?: number; // Delay between retries
 }
 
 export interface ConversationMetadata {
@@ -100,6 +104,66 @@ export class DifyAPIClient {
 
   constructor(config: DifyAPIClientConfig) {
     this.config = config;
+  }
+
+  /**
+   * Create a fetch request with timeout and retry logic
+   */
+  private async fetchWithTimeoutAndRetry(
+    url: string, 
+    options: RequestInit, 
+    timeoutMs?: number,
+    maxRetries?: number
+  ): Promise<Response> {
+    const timeout = timeoutMs || this.config.timeoutMs || 30000; // Default 30 seconds
+    const retries = maxRetries || this.config.maxRetries || 3;
+    const retryDelay = this.config.retryDelayMs || 1000;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        // If request succeeded or it's a client error (4xx), don't retry
+        if (response.ok || (response.status >= 400 && response.status < 500)) {
+          return response;
+        }
+
+        // For server errors (5xx), retry
+        if (attempt < retries) {
+          console.warn(`🔄 Request failed with ${response.status}, retrying... (attempt ${attempt + 1}/${retries})`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt))); // Exponential backoff
+          continue;
+        }
+
+        return response;
+      } catch (error) {
+        // Handle timeout and network errors
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn(`⏰ Request timed out after ${timeout}ms (attempt ${attempt + 1}/${retries + 1})`);
+        } else {
+          console.warn(`❌ Network error: ${error} (attempt ${attempt + 1}/${retries + 1})`);
+        }
+
+        if (attempt < retries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+          continue;
+        }
+
+        // If all retries failed, throw the last error
+        throw error;
+      }
+    }
+
+    throw new Error('All retry attempts failed');
   }
 
   /**
@@ -228,18 +292,22 @@ export class DifyAPIClient {
     // If no conversationId provided, use a fallback
     const targetConversationId = conversationId || 'default';
     
-    // Call backend API instead of Dify directly
-    const response = await fetch(`/api/dify/${targetConversationId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    // Call backend API instead of Dify directly using enhanced fetch
+    const response = await this.fetchWithTimeoutAndRetry(
+      `/api/dify/${targetConversationId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          user: user || 'default-user',
+          inputs: inputs || {}
+        }),
       },
-      body: JSON.stringify({
-        message,
-        user: user || 'default-user',
-        inputs: inputs || {}
-      }),
-    });
+      this.config.timeoutMs // Use standard timeout for regular messages
+    );
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -264,8 +332,58 @@ export class DifyAPIClient {
   }
 
   /**
-   * Send a message with streaming response via backend proxy
+   * Send a workflow message with extended timeout for large workflows
    */
+  async sendWorkflowMessage(
+    message: string, 
+    conversationId?: string,
+    user?: string,
+    inputs?: Record<string, unknown>
+  ): Promise<DifyResponse> {
+    console.log('📈 Starting workflow request with extended timeout...');
+    
+    // If no conversationId provided, use a fallback
+    const targetConversationId = conversationId || 'default';
+    
+    // Call backend API with extended timeout for workflows
+    const response = await this.fetchWithTimeoutAndRetry(
+      `/api/dify/${targetConversationId}/workflow`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          user: user || 'default-user',
+          inputs: inputs || {}
+        }),
+      },
+      this.config.workflowTimeoutMs || 120000, // Use extended timeout for workflows
+      2 // Fewer retries for workflows since they're expensive
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      
+      // Handle conversation not found errors
+      if (response.status === 404 && errorData.error?.includes('Conversation')) {
+        throw new Error('Conversation Not Exists. Starting new conversation.');
+      }
+      
+      throw new Error(`Workflow API error: ${response.status} - ${errorData.error || errorData.message || 'Unknown error'}`);
+    }
+
+    const result = await response.json();
+    
+    // Store metadata for new or validated conversations
+    if (result.conversation_id) {
+      this.storeConversationMetadata(result.conversation_id);
+    }
+    
+    console.log('✅ Workflow request completed successfully');
+    return result;
+  }
   async sendMessageStream(
     message: string,
     onChunk: (chunk: DifyStreamResponse) => void,
@@ -276,18 +394,22 @@ export class DifyAPIClient {
     // If no conversationId provided, use a fallback
     const targetConversationId = conversationId || 'default';
 
-    // Call backend streaming API
-    const response = await fetch(`/api/dify/${targetConversationId}/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    // Call backend streaming API with enhanced timeout handling
+    const response = await this.fetchWithTimeoutAndRetry(
+      `/api/dify/${targetConversationId}/stream`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          user: user || 'default-user',
+          inputs: inputs || {}
+        }),
       },
-      body: JSON.stringify({
-        message,
-        user: user || 'default-user',
-        inputs: inputs || {}
-      }),
-    });
+      this.config.workflowTimeoutMs || this.config.timeoutMs || 60000 // Use extended timeout for streaming
+    );
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -546,12 +668,22 @@ export function createDifyAPIClient(): DifyAPIClient {
     appId: import.meta.env.VITE_DIFY_APP_ID || '',
     apiKey: import.meta.env.VITE_DIFY_API_KEY || '',
     conversationExpiryHours: 24, // Default 24 hours expiry
+    timeoutMs: parseInt(import.meta.env.VITE_DIFY_TIMEOUT_MS) || 30000, // Default 30 seconds
+    workflowTimeoutMs: parseInt(import.meta.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 120000, // Default 2 minutes
+    maxRetries: parseInt(import.meta.env.VITE_DIFY_MAX_RETRIES) || 3, // Default 3 retries
+    retryDelayMs: 1000, // 1 second base delay between retries
   };
 
   // Validate configuration
   if (!config.apiUrl || !config.appId || !config.apiKey) {
     throw new Error('Dify API configuration is incomplete. Please check environment variables.');
   }
+
+  console.log('📡 Dify API Client configured with:', {
+    timeoutMs: config.timeoutMs,
+    workflowTimeoutMs: config.workflowTimeoutMs,
+    maxRetries: config.maxRetries
+  });
 
   return new DifyAPIClient(config);
 }

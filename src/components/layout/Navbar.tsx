@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Menu, X, User, Settings, LogOut, CreditCard, Activity, Coins, Shield } from 'lucide-react';
+import { Menu, X, User, Settings, LogOut, CreditCard, Activity, Coins, Shield, MessageSquare } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
 import { User as UserType } from '@/types';
@@ -89,7 +89,10 @@ export function Navbar() {
           <Link to="/services" className="text-gray-600 hover:text-gray-900">服务目录</Link>
           <Link to="/pricing" className="text-gray-600 hover:text-gray-900">价格</Link>
           {user && (
-            <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">控制台</Link>
+            <>
+              <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">控制台</Link>
+              <Link to="/chat/dify" className="text-gray-600 hover:text-gray-900">Dify AI聊天</Link>
+            </>
           )}
           {user && isAdmin(user) && (
             <Link to="/admin" className="text-blue-600 hover:text-blue-900 font-medium">管理后台</Link>
@@ -120,6 +123,10 @@ export function Navbar() {
                 <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                   <User className="mr-2 h-4 w-4" />
                   控制台
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/chat/dify')}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Dify AI聊天
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/token-dashboard')}>
                   <Activity className="mr-2 h-4 w-4" />
@@ -194,6 +201,13 @@ export function Navbar() {
                   onClick={() => setIsOpen(false)}
                 >
                   控制台
+                </Link>
+                <Link 
+                  to="/chat/dify" 
+                  className="block py-2 text-gray-600 hover:text-gray-900"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Dify AI聊天
                 </Link>
                 <Link 
                   to="/token-dashboard" 

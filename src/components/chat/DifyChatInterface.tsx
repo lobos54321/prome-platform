@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, RotateCcw, Bot, User } from 'lucide-react';
+import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -12,24 +12,52 @@ interface Message {
   metadata?: any;
 }
 
+interface WorkflowProgress {
+  nodeId: string;
+  nodeName: string;
+  nodeTitle?: string;
+  status: 'waiting' | 'running' | 'completed' | 'failed';
+  startTime?: Date;
+  endTime?: Date;
+  error?: string;
+}
+
+interface WorkflowState {
+  isWorkflow: boolean;
+  nodes: WorkflowProgress[];
+  currentNodeId?: string;
+  totalNodes?: number;
+  completedNodes: number;
+}
+
 interface DifyChatInterfaceProps {
   className?: string;
   placeholder?: string;
   welcomeMessage?: string;
   mode?: 'chat' | 'workflow'; // 支持不同模式
+  showWorkflowProgress?: boolean; // 是否显示工作流进度
+  enableRetry?: boolean; // 是否启用重试功能
 }
 
 export function DifyChatInterface({
   className,
   placeholder = "Type your message...",
   welcomeMessage = "Hello! How can I help you today?",
-  mode = 'chat'
+  mode = 'chat',
+  showWorkflowProgress = true,
+  enableRetry = true
 }: DifyChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [workflowState, setWorkflowState] = useState<WorkflowState>({
+    isWorkflow: false,
+    nodes: [],
+    completedNodes: 0
+  });
   
   // 生成唯一用户ID（在生产环境应该使用真实的用户ID）
   const [userId] = useState(() => {
@@ -68,7 +96,253 @@ export function DifyChatInterface({
     }
   }, [welcomeMessage]);
 
-  // 发送消息
+  // 工作流进度更新处理
+  const updateWorkflowProgress = (nodeUpdate: Partial<WorkflowProgress> & { nodeId: string }) => {
+    setWorkflowState(prev => {
+      const existingNodeIndex = prev.nodes.findIndex(n => n.nodeId === nodeUpdate.nodeId);
+      const newNodes = [...prev.nodes];
+      
+      if (existingNodeIndex >= 0) {
+        // 更新现有节点
+        newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], ...nodeUpdate };
+      } else {
+        // 添加新节点
+        newNodes.push({
+          nodeId: nodeUpdate.nodeId,
+          nodeName: nodeUpdate.nodeName || nodeUpdate.nodeId,
+          nodeTitle: nodeUpdate.nodeTitle,
+          status: nodeUpdate.status || 'waiting',
+          startTime: nodeUpdate.startTime,
+          endTime: nodeUpdate.endTime,
+          error: nodeUpdate.error
+        });
+      }
+
+      // 计算完成的节点数
+      const completedNodes = newNodes.filter(n => n.status === 'completed').length;
+      
+      return {
+        ...prev,
+        nodes: newNodes,
+        currentNodeId: nodeUpdate.status === 'running' ? nodeUpdate.nodeId : prev.currentNodeId,
+        completedNodes
+      };
+    });
+  };
+
+  // 发送消息（支持重试）
+  const sendMessageWithRetry = async (messageContent: string, currentRetry = 0): Promise<void> => {
+    const maxRetries = enableRetry ? 3 : 0;
+    
+    try {
+      console.log('[Chat] Sending message:', {
+        message: messageContent,
+        conversationId,
+        userId,
+        mode,
+        attempt: currentRetry + 1
+      });
+
+      // 重置工作流状态
+      if (mode === 'workflow') {
+        setWorkflowState({
+          isWorkflow: true,
+          nodes: [],
+          completedNodes: 0
+        });
+      }
+
+      // 选择合适的端点
+      const endpoint = mode === 'workflow' ? '/api/dify/workflow' : '/api/dify';
+      const timeoutMs = mode === 'workflow' ? 120000 : 30000; // 工作流使用更长的超时
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: messageContent,
+          user: userId,
+          conversation_id: conversationId,
+          mode: mode,
+          stream: mode === 'workflow' && showWorkflowProgress, // 工作流时启用流式响应以获取进度
+          inputs: {
+            // 可以添加额外的输入参数
+          }
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        
+        // 检查是否是可重试的错误
+        const isRetriableError = response.status >= 500 || response.status === 408 || response.status === 429;
+        
+        if (isRetriableError && currentRetry < maxRetries) {
+          console.warn(`🔄 Request failed with ${response.status}, retrying... (attempt ${currentRetry + 1}/${maxRetries + 1})`);
+          setRetryCount(currentRetry + 1);
+          
+          // 指数退避
+          const delay = Math.min(1000 * Math.pow(2, currentRetry), 10000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          return sendMessageWithRetry(messageContent, currentRetry + 1);
+        }
+        
+        throw new Error(errorData.error || `服务器错误 (${response.status})`);
+      }
+
+      // 处理流式响应（主要用于工作流进度）
+      if (mode === 'workflow' && showWorkflowProgress && response.body) {
+        await handleWorkflowStream(response, messageContent);
+      } else {
+        // 处理普通响应
+        const data = await response.json();
+        await handleRegularResponse(data, messageContent);
+      }
+
+      // 重置重试计数
+      setRetryCount(0);
+      
+    } catch (error) {
+      console.error('[Chat] Error:', error);
+      
+      // 处理取消请求
+      if (error instanceof Error && error.name === 'AbortError') {
+        const timeoutError = mode === 'workflow' 
+          ? '工作流执行超时，请稍后重试或联系管理员'
+          : '请求超时，请稍后重试';
+        throw new Error(timeoutError);
+      }
+      
+      // 如果还有重试机会且是网络错误
+      if (currentRetry < maxRetries && enableRetry) {
+        console.warn(`🔄 Network error, retrying... (attempt ${currentRetry + 1}/${maxRetries + 1})`);
+        setRetryCount(currentRetry + 1);
+        
+        const delay = Math.min(1000 * Math.pow(2, currentRetry), 10000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        return sendMessageWithRetry(messageContent, currentRetry + 1);
+      }
+      
+      throw error;
+    }
+  };
+
+  // 处理工作流流式响应
+  const handleWorkflowStream = async (response: Response, messageContent: string) => {
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('无法获取响应流');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalResponse = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 保留未完成的行
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') {
+              // 流结束，添加最终消息
+              if (finalResponse) {
+                const assistantMessage: Message = {
+                  id: `assistant_${Date.now()}`,
+                  content: finalResponse,
+                  role: 'assistant',
+                  timestamp: new Date(),
+                };
+                setMessages(prev => [...prev, assistantMessage]);
+              }
+              return;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              
+              // 更新会话ID
+              if (parsed.conversation_id && parsed.conversation_id !== conversationId) {
+                setConversationId(parsed.conversation_id);
+              }
+
+              // 处理工作流节点事件
+              if (parsed.event === 'node_started' && parsed.node_id) {
+                updateWorkflowProgress({
+                  nodeId: parsed.node_id,
+                  nodeName: parsed.node_name || parsed.node_id,
+                  nodeTitle: parsed.node_title,
+                  status: 'running',
+                  startTime: new Date()
+                });
+              } else if (parsed.event === 'node_finished' && parsed.node_id) {
+                updateWorkflowProgress({
+                  nodeId: parsed.node_id,
+                  status: 'completed',
+                  endTime: new Date()
+                });
+              } else if (parsed.event === 'node_failed' && parsed.node_id) {
+                updateWorkflowProgress({
+                  nodeId: parsed.node_id,
+                  status: 'failed',
+                  endTime: new Date(),
+                  error: parsed.error || '节点执行失败'
+                });
+              }
+
+              // 累积最终答案
+              if (parsed.answer) {
+                finalResponse += parsed.answer;
+              }
+
+            } catch (parseError) {
+              console.warn('解析流数据失败:', data, parseError);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
+  // 处理普通响应
+  const handleRegularResponse = async (data: any, messageContent: string) => {
+    console.log('[Chat] Received response:', data);
+
+    // 更新会话ID
+    if (data.conversation_id && data.conversation_id !== conversationId) {
+      setConversationId(data.conversation_id);
+      console.log('[Chat] Updated conversation ID:', data.conversation_id);
+    }
+
+    // 添加助手回复
+    const assistantMessage: Message = {
+      id: `assistant_${Date.now()}`,
+      content: data.answer || '抱歉，我无法处理您的请求。',
+      role: 'assistant',
+      timestamp: new Date(),
+      metadata: data.metadata,
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+  };
+
+  // 主要的表单提交处理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -84,74 +358,49 @@ export function DifyChatInterface({
     setInput('');
     setIsLoading(true);
     setError(null);
+    setRetryCount(0);
 
     try {
-      console.log('[Chat] Sending message:', {
-        message: userMessage.content,
-        conversationId,
-        userId,
-        mode
-      });
-
-      const response = await fetch('/api/dify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: userMessage.content,
-          user: userId,
-          conversation_id: conversationId,
-          mode: mode,
-          inputs: {
-            // 可以添加额外的输入参数
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('[Chat] Received response:', data);
-
-      // 更新会话ID
-      if (data.conversation_id && data.conversation_id !== conversationId) {
-        setConversationId(data.conversation_id);
-        console.log('[Chat] Updated conversation ID:', data.conversation_id);
-      }
-
-      // 添加助手回复
-      const assistantMessage: Message = {
-        id: `assistant_${Date.now()}`,
-        content: data.answer || 'Sorry, I could not process your request.',
-        role: 'assistant',
-        timestamp: new Date(),
-        metadata: data.metadata,
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      await sendMessageWithRetry(userMessage.content);
     } catch (error) {
-      console.error('[Chat] Error:', error);
+      console.error('[Chat] Final Error:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
       
       // 添加错误消息
       const errorMessage: Message = {
         id: `error_${Date.now()}`,
-        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `抱歉，我遇到了一个错误：${error instanceof Error ? error.message : '未知错误'}`,
         role: 'assistant',
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
       // 聚焦输入框
       inputRef.current?.focus();
     }
   };
 
+  // 重试最后一条消息
+  const handleRetry = async () => {
+    const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user');
+    if (!lastUserMessage || isLoading) return;
+
+    setIsLoading(true);
+    setError(null);
+    setRetryCount(0);
+
+    try {
+      await sendMessageWithRetry(lastUserMessage.content);
+    } catch (error) {
+      console.error('[Chat] Retry Error:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+      setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
+    }
+  };
   // 开始新对话
   const handleNewConversation = () => {
     setMessages(welcomeMessage ? [{
@@ -163,6 +412,12 @@ export function DifyChatInterface({
     setConversationId(null);
     setInput('');
     setError(null);
+    setRetryCount(0);
+    setWorkflowState({
+      isWorkflow: false,
+      nodes: [],
+      completedNodes: 0
+    });
     console.log('[Chat] Started new conversation');
     inputRef.current?.focus();
   };
@@ -245,11 +500,91 @@ export function DifyChatInterface({
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
               <Bot className="w-5 h-5 text-blue-600" />
             </div>
-            <div className="bg-gray-100 rounded-lg px-4 py-3">
-              <div className="flex items-center gap-2">
+            <div className="bg-gray-100 rounded-lg px-4 py-3 max-w-[70%]">
+              <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
-                <span className="text-gray-600">Thinking...</span>
+                <span className="text-gray-600">
+                  {mode === 'workflow' ? '执行工作流中...' : 'AI思考中...'}
+                </span>
+                {retryCount > 0 && (
+                  <span className="text-xs text-orange-600">
+                    (重试 {retryCount}/3)
+                  </span>
+                )}
               </div>
+              
+              {/* 工作流进度显示 */}
+              {mode === 'workflow' && showWorkflowProgress && workflowState.isWorkflow && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs text-gray-500 mb-2">
+                    工作流进度: {workflowState.completedNodes}/{workflowState.nodes.length} 个节点已完成
+                  </div>
+                  
+                  {/* 进度条 */}
+                  {workflowState.nodes.length > 0 && (
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${(workflowState.completedNodes / workflowState.nodes.length) * 100}%` 
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* 节点状态列表 */}
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {workflowState.nodes.map((node) => (
+                      <div 
+                        key={node.nodeId} 
+                        className={cn(
+                          "flex items-center gap-2 text-xs p-2 rounded",
+                          node.status === 'running' && "bg-blue-50 border border-blue-200",
+                          node.status === 'completed' && "bg-green-50 border border-green-200",
+                          node.status === 'failed' && "bg-red-50 border border-red-200",
+                          node.status === 'waiting' && "bg-gray-50 border border-gray-200"
+                        )}
+                      >
+                        {/* 状态图标 */}
+                        {node.status === 'waiting' && <Clock className="w-3 h-3 text-gray-400" />}
+                        {node.status === 'running' && <Play className="w-3 h-3 text-blue-600 animate-pulse" />}
+                        {node.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
+                        {node.status === 'failed' && <AlertCircle className="w-3 h-3 text-red-600" />}
+                        
+                        {/* 节点信息 */}
+                        <div className="flex-1 min-w-0">
+                          <div className={cn(
+                            "font-medium truncate",
+                            node.status === 'running' && "text-blue-700",
+                            node.status === 'completed' && "text-green-700",
+                            node.status === 'failed' && "text-red-700",
+                            node.status === 'waiting' && "text-gray-600"
+                          )}>
+                            {node.nodeTitle || node.nodeName}
+                          </div>
+                          {node.error && (
+                            <div className="text-red-600 text-xs mt-1">
+                              错误: {node.error}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 执行时间 */}
+                        {node.status === 'running' && node.startTime && (
+                          <div className="text-gray-500 text-xs">
+                            {Math.floor((Date.now() - node.startTime.getTime()) / 1000)}s
+                          </div>
+                        )}
+                        {node.status === 'completed' && node.startTime && node.endTime && (
+                          <div className="text-gray-500 text-xs">
+                            {Math.floor((node.endTime.getTime() - node.startTime.getTime()) / 1000)}s
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -257,7 +592,16 @@ export function DifyChatInterface({
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            <p className="text-sm">{error}</p>
+            <p className="text-sm mb-2">{error}</p>
+            {enableRetry && (
+              <button
+                onClick={handleRetry}
+                disabled={isLoading}
+                className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded transition-all disabled:opacity-50"
+              >
+                重试发送
+              </button>
+            )}
           </div>
         )}
         
@@ -309,6 +653,14 @@ export function DifyChatInterface({
           <div>User ID: {userId}</div>
           <div>Conversation ID: {conversationId || 'None'}</div>
           <div>Messages: {messages.length}</div>
+          <div>Retry Count: {retryCount}</div>
+          {workflowState.isWorkflow && (
+            <>
+              <div>Workflow Nodes: {workflowState.nodes.length}</div>
+              <div>Completed: {workflowState.completedNodes}</div>
+              <div>Current Node: {workflowState.currentNodeId || 'None'}</div>
+            </>
+          )}
         </div>
       )}
     </div>

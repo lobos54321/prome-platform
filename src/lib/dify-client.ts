@@ -5,10 +5,39 @@ export class DifyClient {
   private apiKey: string;
   private baseUrl: string;
   private conversationStore: Map<string, string> = new Map(); // 添加会话存储
+  private timeoutMs: number = 30000; // Default 30 seconds
+  private workflowTimeoutMs: number = 120000; // Default 2 minutes for workflows
 
-  constructor(apiKey: string, baseUrl: string = 'https://api.dify.ai/v1') {
+  constructor(apiKey: string, baseUrl: string = 'https://api.dify.ai/v1', timeoutMs?: number, workflowTimeoutMs?: number) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
+    if (timeoutMs) this.timeoutMs = timeoutMs;
+    if (workflowTimeoutMs) this.workflowTimeoutMs = workflowTimeoutMs;
+  }
+
+  /**
+   * Create a fetch request with timeout
+   */
+  private async fetchWithTimeout(url: string, options: RequestInit, timeoutMs?: number): Promise<Response> {
+    const timeout = timeoutMs || this.timeoutMs;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeout}ms`);
+      }
+      throw error;
+    }
   }
 
   async chat(
@@ -31,7 +60,7 @@ export class DifyClient {
 
       console.log('[Dify Client] Chat Request:', JSON.stringify(payload, null, 2));
 
-      const response = await fetch(`${this.baseUrl}/chat-messages`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/chat-messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
@@ -79,14 +108,14 @@ export class DifyClient {
 
       console.log('[Dify Client] Stream Request:', JSON.stringify(payload, null, 2));
 
-      const response = await fetch(`${this.baseUrl}/chat-messages`, {
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/chat-messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload)
-      });
+      }, this.workflowTimeoutMs); // Use extended timeout for streaming
 
       if (!response.ok) {
         throw new Error(`Dify API error: ${response.status}`);
@@ -124,14 +153,15 @@ export class DifyClient {
 
       console.log('[Dify Client] Workflow Request:', JSON.stringify(payload, null, 2));
 
-      const response = await fetch(`${this.baseUrl}/workflows/run`, {
+      // Use extended timeout for workflows
+      const response = await this.fetchWithTimeout(`${this.baseUrl}/workflows/run`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-      });
+      }, this.workflowTimeoutMs);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -167,5 +197,7 @@ export class DifyClient {
 // 导出单例
 export const difyClient = new DifyClient(
   process.env.NEXT_PUBLIC_DIFY_API_KEY || '',
-  process.env.NEXT_PUBLIC_DIFY_API_URL
+  process.env.NEXT_PUBLIC_DIFY_API_URL,
+  parseInt(process.env.NEXT_PUBLIC_DIFY_TIMEOUT_MS || '') || 30000, // 30 seconds for regular chat
+  parseInt(process.env.NEXT_PUBLIC_DIFY_WORKFLOW_TIMEOUT_MS || '') || 120000 // 2 minutes for workflows
 );
