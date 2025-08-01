@@ -1,125 +1,100 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { DIFY_API_KEY, DIFY_API_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL } from '@/lib/config'
-import { saveMessages } from '@/lib/save-messages'
+// 更新您现有的路由文件
+import { NextRequest, NextResponse } from 'next/server';
+import { difyClient } from '@/lib/dify-client';
 
-export async function POST(request: Request, { params }: { params: { conversationId: string } }) {
+// 存储会话状态（在生产环境中应该使用 Redis 或数据库）
+const conversationState = new Map<string, {
+  conversationId: string;
+  lastInteraction: number;
+  context: any;
+}>();
+
+export async function POST(req: NextRequest) {
   try {
-    const { message, inputs = {} } = await request.json()
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const body = await req.json();
+    const { query, user, conversation_id, inputs = {}, mode = 'chat' } = body;
 
-    // 查找当前会话的 dify_conversation_id
-    const { data: conversationRow } = await supabase
-      .from('conversations')
-      .select('dify_conversation_id')
-      .eq('id', params.conversationId)
-      .single()
-
-    let difyConversationId = conversationRow?.dify_conversation_id || null
-
-    const requestBody: {
-      inputs: Record<string, unknown>;
-      query: string;
-      response_mode: string;
-      user: string;
-      conversation_id?: string;
-    } = {
-      inputs: inputs,
-      query: message,
-      response_mode: 'blocking',
-      user: 'default-user'
+    if (!query || !user) {
+      return NextResponse.json(
+        { error: 'Query and user are required' },
+        { status: 400 }
+      );
     }
 
-    // 只有在 dify_conversation_id 存在且有效时才添加
-    if (difyConversationId) {
-      // 先验证对话是否仍然存在
-      const checkResponse = await fetch(`${DIFY_API_URL}/conversations/${difyConversationId}`, {
-        headers: {
-          'Authorization': `Bearer ${DIFY_API_KEY}`,
-        },
-      })
-
-      if (checkResponse.ok) {
-        requestBody.conversation_id = difyConversationId
-      } else {
-        // 对话不存在，清除无效的 ID
-        console.log('Dify conversation not found, creating new one')
-        difyConversationId = null
-        await supabase
-          .from('conversations')
-          .update({ dify_conversation_id: null })
-          .eq('id', params.conversationId)
-        // 不直接 return，继续往下走，让 chat-messages 创建新对话
-      }
+    // 获取或使用会话ID
+    let conversationId = conversation_id;
+    const sessionState = conversationState.get(user);
+    
+    if (!conversationId && sessionState) {
+      conversationId = sessionState.conversationId;
     }
 
-    // 发送消息到 Dify
-    let response = await fetch(`${DIFY_API_URL}/chat-messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DIFY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    })
+    console.log('=== Dify Route Debug ===');
+    console.log('Mode:', mode);
+    console.log('User:', user);
+    console.log('Query:', query);
+    console.log('Conversation ID:', conversationId || 'New');
+    console.log('Inputs:', inputs);
 
-    // 如果是对话不存在的错误，尝试去掉 conversation_id 再试一次
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('Dify API error:', errorData)
-
-      if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-        console.log('Retrying without conversation_id')
-        delete requestBody.conversation_id
-
-        response = await fetch(`${DIFY_API_URL}/chat-messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${DIFY_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        })
-
-        // 如果重试依然失败，返回错误
-        if (!response.ok) {
-          const retryErrorData = await response.json()
-          return NextResponse.json(
-            { error: retryErrorData.message || 'Dify API error', detail: retryErrorData },
-            { status: response.status }
-          )
-        }
-      } else {
-        return NextResponse.json(
-          { error: errorData.message || 'Dify API error', detail: errorData },
-          { status: response.status }
-        )
-      }
+    let response;
+    
+    // 根据模式选择不同的 API
+    if (mode === 'workflow') {
+      response = await difyClient.workflowRun(query, user, conversationId, inputs);
+    } else {
+      response = await difyClient.chat(query, user, conversationId, inputs);
     }
 
-    const data = await response.json()
-
-    // 如果是新对话，保存 Dify 的 conversation_id
-    if (!difyConversationId && data.conversation_id) {
-      await supabase
-        .from('conversations')
-        .update({ dify_conversation_id: data.conversation_id })
-        .eq('id', params.conversationId)
+    // 更新会话状态
+    const responseConversationId = response.conversation_id || response.data?.conversation_id;
+    if (responseConversationId) {
+      conversationState.set(user, {
+        conversationId: responseConversationId,
+        lastInteraction: Date.now(),
+        context: response.data?.outputs || {}
+      });
     }
 
-    // 保存消息
-    await saveMessages(supabase, params.conversationId, message, data)
+    // 提取答案
+    const answer = response.data?.outputs?.answer || 
+                   response.data?.outputs?.text || 
+                   response.answer ||
+                   'No response';
 
     return NextResponse.json({
-      answer: data.answer,
-      conversation_id: data.conversation_id,
-      message_id: data.message_id,
-    })
+      answer,
+      conversation_id: responseConversationId,
+      metadata: {
+        workflow_run_id: response.data?.workflow_run_id,
+        elapsed_time: response.data?.elapsed_time,
+        total_tokens: response.data?.total_tokens || response.usage?.total_tokens,
+        created_at: response.data?.created_at || response.created_at,
+      }
+    });
   } catch (error) {
-    console.error('Chat API error:', error)
+    console.error('Dify Route Error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
-    )
+    );
   }
+}
+
+export async function GET(req: NextRequest) {
+  return NextResponse.json({ message: 'Dify API is running' });
+}
+
+// 清理超时的会话
+if (typeof window === 'undefined') { // 只在服务器端运行
+  setInterval(() => {
+    const now = Date.now();
+    const timeout = 30 * 60 * 1000; // 30分钟超时
+    
+    for (const [user, state] of conversationState.entries()) {
+      if (now - state.lastInteraction > timeout) {
+        conversationState.delete(user);
+        console.log(`Cleared timeout session for user: ${user}`);
+      }
+    }
+  }, 5 * 60 * 1000); // 每5分钟检查一次
 }
