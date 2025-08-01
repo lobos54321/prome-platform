@@ -1,25 +1,82 @@
-// 这是一个替代文件，将调用重定向到正确的API路由
-// 使用原生fetch代替axios
+// 完整的Dify API客户端 - API方式替代iframe方式
+// 这将处理会话管理和多轮对话问题
 
-// 定义响应类型
+// 响应类型定义
 export interface DifyResponse {
   conversation_id?: string;
   message_id?: string;
   answer?: string;
-  // 添加其他可能的字段
+  usage?: {
+    total_tokens: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+  };
+  created_at?: string;
+}
+
+// 统计数据接口
+export interface DifyUsageStats {
+  totalRequests: number;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  lastUpdated: string;
+}
+
+// 本地存储的使用数据
+let usageStats: DifyUsageStats = {
+  totalRequests: 0,
+  totalTokens: 0,
+  promptTokens: 0,
+  completionTokens: 0,
+  lastUpdated: new Date().toISOString()
+};
+
+// 从localStorage加载使用统计数据
+try {
+  const savedStats = localStorage.getItem('dify_usage_stats');
+  if (savedStats) {
+    usageStats = JSON.parse(savedStats);
+  }
+} catch (e) {
+  console.warn('Failed to load Dify usage stats from localStorage', e);
+}
+
+// 保存使用统计到localStorage
+function saveUsageStats() {
+  try {
+    localStorage.setItem('dify_usage_stats', JSON.stringify(usageStats));
+  } catch (e) {
+    console.warn('Failed to save Dify usage stats to localStorage', e);
+  }
+}
+
+// 更新使用统计
+function updateUsageStats(usage?: { total_tokens: number; prompt_tokens: number; completion_tokens: number }) {
+  if (!usage) return;
+  
+  usageStats.totalRequests++;
+  usageStats.totalTokens += usage.total_tokens || 0;
+  usageStats.promptTokens += usage.prompt_tokens || 0;
+  usageStats.completionTokens += usage.completion_tokens || 0;
+  usageStats.lastUpdated = new Date().toISOString();
+  
+  saveUsageStats();
+}
+
+// 获取使用统计
+export function getDifyUsageStats(): DifyUsageStats {
+  return {...usageStats};
 }
 
 // 检查Dify是否启用
 export const isDifyEnabled = (): boolean => {
-  // 根据配置判断Dify是否启用
-  // 这应该与您原始代码中的逻辑保持一致
-  return true; // 假设始终启用，或者根据您的实际需求调整
+  return true; // 假设始终启用，根据需要调整
 };
 
-// 导出使用的函数
+// 发送消息（非流式）
 export async function sendMessage(message: string, conversationId?: string): Promise<DifyResponse> {
   try {
-    // 调用正确路径的API
     const response = await fetch('/api/dify', {
       method: 'POST',
       headers: {
@@ -35,15 +92,28 @@ export async function sendMessage(message: string, conversationId?: string): Pro
       throw new Error(`API error: ${response.status}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    
+    // 更新使用统计
+    if (data.usage) {
+      updateUsageStats(data.usage);
+    }
+    
+    return data;
   } catch (error) {
     console.error("Error sending message to Dify:", error);
     throw error;
   }
 }
 
-export async function streamMessage(message: string, conversationId?: string, 
-  onMessage?: (chunk: string) => void, onError?: (error: any) => void): Promise<DifyResponse> {
+// 流式发送消息
+export async function streamMessage(
+  message: string, 
+  conversationId?: string, 
+  onMessage?: (chunk: string) => void, 
+  onError?: (error: any) => void,
+  onComplete?: (usage: DifyResponse['usage']) => void
+): Promise<DifyResponse> {
   try {
     const response = await fetch('/api/dify?stream=true', {
       method: 'POST',
@@ -60,12 +130,12 @@ export async function streamMessage(message: string, conversationId?: string,
       throw new Error(`API error: ${response.status}`);
     }
 
-    // 处理流式响应
     if (!response.body) throw new Error("No response body");
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let finalResponse: DifyResponse = {};
+    let fullAnswer = '';
     
     while (true) {
       const { done, value } = await reader.read();
@@ -73,23 +143,40 @@ export async function streamMessage(message: string, conversationId?: string,
       
       const chunk = decoder.decode(value);
       try {
-        // 尝试解析每个块
         const lines = chunk.split('\n').filter(line => line.trim() !== '');
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.substring(6));
-            if (onMessage && data.answer) onMessage(data.answer);
-            // 保存最后一个响应的会话ID
-            if (data.conversation_id) finalResponse.conversation_id = data.conversation_id;
-            if (data.message_id) finalResponse.message_id = data.message_id;
+            try {
+              const data = JSON.parse(line.substring(6));
+              
+              // 处理回答内容
+              if (data.answer) {
+                if (onMessage) onMessage(data.answer);
+                fullAnswer += data.answer;
+              }
+              
+              // 保存会话ID和消息ID
+              if (data.conversation_id) finalResponse.conversation_id = data.conversation_id;
+              if (data.message_id) finalResponse.message_id = data.message_id;
+              
+              // 处理使用统计数据
+              if (data.usage) {
+                finalResponse.usage = data.usage;
+                if (onComplete) onComplete(data.usage);
+                updateUsageStats(data.usage);
+              }
+            } catch (parseError) {
+              console.warn("Error parsing JSON from stream:", parseError);
+            }
           }
         }
       } catch (e) {
-        console.warn("Error parsing chunk:", chunk, e);
+        console.warn("Error processing chunk:", chunk, e);
         if (onMessage) onMessage(chunk);
       }
     }
     
+    finalResponse.answer = fullAnswer;
     return finalResponse;
   } catch (error) {
     if (onError) onError(error);
