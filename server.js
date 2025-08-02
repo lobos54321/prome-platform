@@ -1071,11 +1071,11 @@ app.post('/api/payment/stripe', async (req, res) => {
 // 其它 API 路由可继续添加...
 
 // 静态文件服务
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(dirname, 'dist')));
 
 // SPA 路由
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+ res.sendFile(path.join(dirname, 'dist', 'index.html'));
 });
 
 app.listen(port, () => {
