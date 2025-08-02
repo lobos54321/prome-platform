@@ -28,6 +28,28 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 
 // Production mode configuration - when true, disables mock fallbacks
 const DIFY_PRODUCTION_MODE = process.env.VITE_DIFY_PRODUCTION_MODE === 'true';
 
+// Environment validation for production mode
+if (DIFY_PRODUCTION_MODE) {
+  console.log('🔥 PRODUCTION MODE ENABLED - Mock responses disabled');
+  
+  // Validate required environment variables for production
+  const requiredVars = ['DIFY_API_URL', 'DIFY_API_KEY'];
+  const missing = requiredVars.filter(varName => !process.env[`VITE_${varName}`] && !process.env[varName]);
+  
+  if (missing.length > 0) {
+    console.error('❌ PRODUCTION MODE ERROR: Missing required environment variables:', missing);
+    console.error('Please set the following environment variables:');
+    missing.forEach(varName => {
+      console.error(`  - VITE_${varName} or ${varName}`);
+    });
+    console.error('Continuing with current configuration, but API calls may fail.');
+  } else {
+    console.log('✅ All required Dify API environment variables are configured');
+  }
+} else {
+  console.log('🔧 DEVELOPMENT MODE - Mock responses enabled for fallback');
+}
+
 // Timeout configurations
 const DEFAULT_TIMEOUT = parseInt(process.env.VITE_DIFY_TIMEOUT_MS) || 30000; // 30 seconds
 const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 120000; // 2 minutes
@@ -247,6 +269,31 @@ function generateMockWorkflowStream(message, conversationId = null) {
     { event: 'message_end', conversation_id: mockConversationId, message_id: mockMessageId }
   ];
 }
+
+// Configuration debug endpoint
+app.get('/api/config/status', (req, res) => {
+  res.json({
+    production_mode: DIFY_PRODUCTION_MODE,
+    mock_responses_enabled: !DIFY_PRODUCTION_MODE,
+    environment_configured: {
+      dify_api_url: !!(DIFY_API_URL),
+      dify_api_key: !!(DIFY_API_KEY),
+      supabase_url: !!(SUPABASE_URL),
+      supabase_service_key: !!(SUPABASE_SERVICE_ROLE_KEY)
+    },
+    api_endpoints: {
+      chat: '/api/dify',
+      workflow: '/api/dify/workflow',
+      streaming_chat: '/api/dify/:conversationId/stream',
+      blocking_chat: '/api/dify/:conversationId'
+    },
+    timeouts: {
+      default_timeout_ms: DEFAULT_TIMEOUT,
+      workflow_timeout_ms: WORKFLOW_TIMEOUT,
+      max_retries: MAX_RETRIES
+    }
+  });
+});
 
 // Dify chat proxy API (generic endpoint without conversationId - for backward compatibility)
 app.post('/api/dify', async (req, res) => {
@@ -579,11 +626,12 @@ app.post('/api/dify/workflow', async (req, res) => {
           
           // In production mode, don't use mock responses - return error instead
           if (DIFY_PRODUCTION_MODE) {
-            res.status(503).json({ 
+            res.write(`data: ${JSON.stringify({ 
               error: 'Dify Workflow API unavailable', 
               message: 'Unable to connect to Dify Workflow API. Please check your configuration and network connectivity.',
               details: apiError.message 
-            });
+            })}\n\n`);
+            res.end();
             return;
           }
           
