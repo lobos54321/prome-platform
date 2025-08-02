@@ -35,10 +35,10 @@ export default function Chat() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // 获取用户信息 - 使用 useState 确保响应式更新
+  // 获取用户信息 - 使用同步方法避免时间死区错误
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      return authService.getCurrentUser();
+      return authService.getCurrentUserSync();
     } catch (error) {
       console.error('Failed to get current user:', error);
       return null;
@@ -80,8 +80,21 @@ export default function Chat() {
   useEffect(() => {
     const initializeComponent = async () => {
       try {
+        // 异步验证和更新用户状态
+        let validUser = currentUser;
+        if (!validUser) {
+          try {
+            validUser = await authService.getCurrentUser();
+            if (validUser) {
+              setCurrentUser(validUser);
+            }
+          } catch (error) {
+            console.error('Failed to get current user async:', error);
+          }
+        }
+
         // 检查用户认证
-        if (!currentUser) {
+        if (!validUser) {
           console.log('User not authenticated, redirecting to login');
           navigate('/login');
           return;
@@ -120,7 +133,7 @@ export default function Chat() {
     };
 
     initializeComponent();
-  }, [serviceId, currentUser, navigate]);
+  }, [serviceId, navigate]); // 移除 currentUser 依赖，因为我们在内部处理用户状态
 
   // 输入变化处理函数
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -212,7 +225,9 @@ ${userMessage}
       return;
     }
     
-    if (!isInitialized || !service || !currentUser) {
+    // 获取当前用户状态
+    const user = currentUser || authService.getCurrentUserSync();
+    if (!isInitialized || !service || !user) {
       setError('系统尚未初始化完成，请稍后重试');
       return;
     }
@@ -258,11 +273,11 @@ ${userMessage}
       const cost = (totalTokens * pricePerToken) / 1000;
       
       // Create usage record
-      if (!settings.testMode && currentUser?.id) {
+      if (!settings.testMode && user?.id) {
         try {
           const usage: TokenUsage = {
             id: `usage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            userId: currentUser.id,
+            userId: user.id,
             serviceId: service.name || service.id,
             tokensUsed: totalTokens,
             cost: cost,
@@ -281,7 +296,7 @@ ${userMessage}
         // Just display the would-be usage in test mode
         setLastUsage({
           id: `test-${Date.now()}`,
-          userId: currentUser?.id || 'test-user',
+          userId: user?.id || 'test-user',
           serviceId: service.name || service.id,
           tokensUsed: totalTokens,
           cost: cost,

@@ -1,6 +1,29 @@
 import { DifyMessageEndEvent, DifyWorkflowFinishedEvent, DifyRealUsageEvent, DifyReadyEvent, DifyGenericEvent, ModelConfig } from '@/types';
 import { db } from '@/lib/supabase';
 
+/**
+ * Dify Iframe Monitor
+ * 
+ * This class monitors Dify iframe integrations for token consumption events.
+ * 
+ * IMPORTANT: This is primarily used for iframe-based Dify integrations.
+ * If you're using direct API integration with Dify, you may not need this monitoring
+ * as token usage is tracked directly through API responses.
+ * 
+ * Configure with VITE_ENABLE_DIFY_IFRAME_MONITORING=true to enable this monitoring.
+ * By default, this is disabled in favor of direct API integration.
+ * 
+ * Use cases for iframe monitoring:
+ * - Embedded Dify chatbots in iframes
+ * - Third-party Dify integrations that send postMessage events
+ * - Legacy iframe-based implementations
+ * 
+ * Use direct API integration when:
+ * - Making direct API calls to Dify
+ * - You have full control over the Dify integration
+ * - You want more reliable token tracking
+ */
+
 export interface TokenConsumptionEvent {
   modelName: string;
   inputTokens: number;
