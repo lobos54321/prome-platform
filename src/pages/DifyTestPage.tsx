@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Play, 
   StopCircle, 
@@ -11,11 +12,13 @@ import {
   DollarSign, 
   CheckCircle, 
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Bug
 } from 'lucide-react';
 import { difyIframeMonitor, TokenConsumptionEvent } from '@/lib/dify-iframe-monitor';
 import { authService } from '@/lib/auth';
 import { isDifyEnabled } from '@/api/dify-api';
+import { DifyChatInterface } from '@/components/chat/DifyChatInterface';
 import { User } from '@/types';
 import { toast } from 'sonner';
 
@@ -178,10 +181,95 @@ export default function DifyTestPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Dify集成测试</h1>
-        <p className="text-gray-600">测试iframe通信和Token消费监控功能</p>
+        <p className="text-gray-600">测试iframe通信、Token消费监控和聊天界面修复</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 mb-8">
+      <Tabs defaultValue="chat-test" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="chat-test" className="flex items-center gap-2">
+            <Bug className="h-4 w-4" />
+            聊天界面测试
+          </TabsTrigger>
+          <TabsTrigger value="monitor-test" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            监控测试
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="chat-test" className="space-y-6">
+          {/* Chat Interface Test */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bug className="h-5 w-5 text-orange-600" />
+                修复后的聊天界面测试
+                <Badge variant="secondary">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Fixed
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                测试聊天界面修复 - 发送消息如"你好"或"测试"来验证修复效果
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                <Alert className="bg-blue-50 border-blue-200">
+                  <MessageSquare className="h-4 w-4" />
+                  <AlertDescription className="text-blue-800">
+                    <strong>测试场景:</strong> 此页面测试修复后的聊天界面，无需认证。
+                    发送消息验证修复是否成功。
+                  </AlertDescription>
+                </Alert>
+
+                <Alert className="bg-green-50 border-green-200">
+                  <AlertDescription className="text-green-800">
+                    <strong>修复内容:</strong> 端点选择优化、请求格式标准化、
+                    错误处理增强、响应验证改进。
+                  </AlertDescription>
+                </Alert>
+              </div>
+
+              <div className="h-[500px] border rounded-lg">
+                <DifyChatInterface 
+                  className="h-full"
+                  mode="chat"
+                  showWorkflowProgress={false}
+                  enableRetry={true}
+                  placeholder="输入测试消息（如：你好、测试）..."
+                  welcomeMessage="🔧 测试模式已启动！这是修复后的聊天界面。您可以发送消息来测试修复是否成功。请查看浏览器控制台获取详细日志。"
+                />
+              </div>
+
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2">🔍 修复内容详情:</h4>
+                <div className="grid md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <strong className="text-green-600">✅ 已修复:</strong>
+                    <ul className="mt-1 space-y-1 text-gray-600">
+                      <li>• 端点选择逻辑优化（处理无效conversationId）</li>
+                      <li>• 请求格式标准化（query + message字段）</li>
+                      <li>• 增强错误处理和详细日志记录</li>
+                      <li>• 流处理回退机制</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-blue-600">🔍 预期日志:</strong>
+                    <ul className="mt-1 space-y-1 text-gray-600">
+                      <li>• [Chat Debug] Sending request: &#123;...&#125;</li>
+                      <li>• [Chat] Received response: &#123;...&#125;</li>
+                      <li>• [Chat Error] Response not OK: &#123;...&#125;</li>
+                      <li>• [Chat Error] Request failed: &#123;...&#125;</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="monitor-test" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
         {/* Global Monitor Status */}
         <Card>
           <CardHeader>
@@ -332,66 +420,68 @@ export default function DifyTestPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+          </div>
 
-      {/* Recent Events */}
-      <Card>
-        <CardHeader>
-          <CardTitle>最近事件</CardTitle>
-          <CardDescription>
-            最近检测到的Token消费事件
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {recentEvents.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <p>暂无事件记录</p>
-              <p className="text-sm">启动监控并模拟事件来测试功能</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {recentEvents.map((event, index) => (
-                <div key={`${event.timestamp}-${index}`} className="p-3 border rounded-lg">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium">{event.modelName}</div>
-                      <div className="text-sm text-gray-500">
-                        输入: {event.inputTokens} • 输出: {event.outputTokens} • 总计: {event.totalTokens}
-                      </div>
-                      {event.conversationId && (
-                        <div className="text-xs text-gray-400">
-                          会话: {event.conversationId}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(event.timestamp).toLocaleTimeString()}
-                    </div>
-                  </div>
+          {/* Recent Events */}
+          <Card>
+            <CardHeader>
+              <CardTitle>最近事件</CardTitle>
+              <CardDescription>
+                最近检测到的Token消费事件
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentEvents.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>暂无事件记录</p>
+                  <p className="text-sm">启动监控并模拟事件来测试功能</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : (
+                <div className="space-y-3">
+                  {recentEvents.map((event, index) => (
+                    <div key={`${event.timestamp}-${index}`} className="p-3 border rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium">{event.modelName}</div>
+                          <div className="text-sm text-gray-500">
+                            输入: {event.inputTokens} • 输出: {event.outputTokens} • 总计: {event.totalTokens}
+                          </div>
+                          {event.conversationId && (
+                            <div className="text-xs text-gray-400">
+                              会话: {event.conversationId}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {new Date(event.timestamp).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Instructions */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>使用说明</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <ol className="list-decimal list-inside space-y-2 text-sm">
-            <li>登录后，全局监控会自动启动（无需手动操作）</li>
-            <li>查看页面顶部导航栏的"Token监控"状态指示器</li>
-            <li>确保已在管理面板中配置了模型定价</li>
-            <li>使用"模拟Token消费事件"测试系统响应</li>
-            <li>观察余额变化和事件记录</li>
-            <li>在实际环境中，系统会自动监听Dify iframe的message_end事件</li>
-            <li>如果全局监控未启动，可以手动使用本地监控进行测试</li>
-          </ol>
-        </CardContent>
-      </Card>
+          {/* Instructions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>使用说明</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ol className="list-decimal list-inside space-y-2 text-sm">
+                <li>登录后，全局监控会自动启动（无需手动操作）</li>
+                <li>查看页面顶部导航栏的"Token监控"状态指示器</li>
+                <li>确保已在管理面板中配置了模型定价</li>
+                <li>使用"模拟Token消费事件"测试系统响应</li>
+                <li>观察余额变化和事件记录</li>
+                <li>在实际环境中，系统会自动监听Dify iframe的message_end事件</li>
+                <li>如果全局监控未启动，可以手动使用本地监控进行测试</li>
+              </ol>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
