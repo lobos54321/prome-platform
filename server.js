@@ -579,11 +579,12 @@ app.post('/api/dify/workflow', async (req, res) => {
           
           // In production mode, don't use mock responses - return error instead
           if (DIFY_PRODUCTION_MODE) {
-            res.status(503).json({ 
+            res.write(`data: ${JSON.stringify({ 
               error: 'Dify Workflow API unavailable', 
               message: 'Unable to connect to Dify Workflow API. Please check your configuration and network connectivity.',
               details: apiError.message 
-            });
+            })}\n\n`);
+            res.end();
             return;
           }
           
