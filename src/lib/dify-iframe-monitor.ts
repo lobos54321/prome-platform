@@ -1539,7 +1539,8 @@ export class DifyIframeMonitor {
     } as MessageEvent;
 
     this.handleMessage(mockEvent, userId);
-  }      
+  }  
+}   
         /**
  * Get current monitor status for debugging
  */
@@ -1551,4 +1552,5 @@ public getStatus() {
     processedEventsCount: this.processedEvents.size,
     lastEventTime: this.lastEventTime
   };
+}
 }
