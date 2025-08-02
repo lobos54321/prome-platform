@@ -144,7 +144,7 @@ export function DifyChatInterface({
       });
 
       // 重置工作流状态
-      if (mode === 'workflow') {
+      if (showWorkflowProgress) {
         setWorkflowState({
           isWorkflow: true,
           nodes: [],
@@ -152,9 +152,9 @@ export function DifyChatInterface({
         });
       }
 
-      // 选择合适的端点
-      const endpoint = mode === 'workflow' ? '/api/dify/workflow' : '/api/dify';
-      const timeoutMs = mode === 'workflow' ? 120000 : 30000; // 工作流使用更长的超时
+      // 选择合适的端点 - 总是使用聊天API端点，工作流进度通过聊天API响应获取
+      const endpoint = conversationId ? `/api/dify/${conversationId}` : '/api/dify';
+      const timeoutMs = showWorkflowProgress ? 120000 : 30000; // 显示工作流进度时使用更长的超时
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -165,14 +165,11 @@ export function DifyChatInterface({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: messageContent,
+          message: messageContent,  // 使用 'message' 字段用于聊天API
           user: userId,
           conversation_id: conversationId,
-          mode: mode,
-          stream: mode === 'workflow' && showWorkflowProgress, // 工作流时启用流式响应以获取进度
-          inputs: {
-            // 可以添加额外的输入参数
-          }
+          stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
+          inputs: {}
         }),
         signal: controller.signal
       });
@@ -199,8 +196,8 @@ export function DifyChatInterface({
         throw new Error(errorData.error || `服务器错误 (${response.status})`);
       }
 
-      // 处理流式响应（主要用于工作流进度）
-      if (mode === 'workflow' && showWorkflowProgress && response.body) {
+      // 处理流式响应（用于工作流进度）
+      if (showWorkflowProgress && response.body) {
         await handleWorkflowStream(response, messageContent);
       } else {
         // 处理普通响应
@@ -216,7 +213,7 @@ export function DifyChatInterface({
       
       // 处理取消请求
       if (error instanceof Error && error.name === 'AbortError') {
-        const timeoutError = mode === 'workflow' 
+        const timeoutError = showWorkflowProgress 
           ? '工作流执行超时，请稍后重试或联系管理员'
           : '请求超时，请稍后重试';
         throw new Error(timeoutError);
@@ -437,6 +434,11 @@ export function DifyChatInterface({
         <div className="flex items-center gap-2">
           <Bot className="w-6 h-6 text-blue-600" />
           <h3 className="text-lg font-semibold text-gray-800">AI Assistant</h3>
+          {mode === 'chat' && showWorkflowProgress && (
+            <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">
+              Chat + Workflow Progress
+            </span>
+          )}
           {mode === 'workflow' && (
             <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded">
               Workflow Mode
@@ -504,7 +506,7 @@ export function DifyChatInterface({
               <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
                 <span className="text-gray-600">
-                  {mode === 'workflow' ? '执行工作流中...' : 'AI思考中...'}
+                  {showWorkflowProgress ? '执行工作流中...' : 'AI思考中...'}
                 </span>
                 {retryCount > 0 && (
                   <span className="text-xs text-orange-600">
@@ -514,7 +516,7 @@ export function DifyChatInterface({
               </div>
               
               {/* 工作流进度显示 */}
-              {mode === 'workflow' && showWorkflowProgress && workflowState.isWorkflow && (
+              {showWorkflowProgress && workflowState.isWorkflow && (
                 <div className="mt-3 space-y-2">
                   <div className="text-xs text-gray-500 mb-2">
                     工作流进度: {workflowState.completedNodes}/{workflowState.nodes.length} 个节点已完成
