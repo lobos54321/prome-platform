@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,9 +33,19 @@ interface ChatSettings {
 export default function Chat() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
-  const user = authService.getCurrentUser();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // 获取用户信息 - 使用 useState 确保响应式更新
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return authService.getCurrentUser();
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+      return null;
+    }
+  });
+  
+  // 状态变量声明 - 确保正确的初始化顺序
   const [service, setService] = useState<Service | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -43,6 +53,7 @@ export default function Chat() {
   const [error, setError] = useState('');
   const [lastUsage, setLastUsage] = useState<TokenUsage | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [settings, setSettings] = useState<ChatSettings>({
     model: 'GPT-4',
     temperature: 0.7,
@@ -51,6 +62,7 @@ export default function Chat() {
     maxTokens: 1000
   });
 
+  // 可用模型列表 - 确保在组件外部初始化
   const availableModels = [
     'GPT-4', 'GPT-4o', 'GPT-3.5', 
     'Claude 3 Opus', 'Claude 3 Sonnet', 'Claude 3 Haiku',
@@ -59,93 +71,173 @@ export default function Chat() {
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
+  // 初始化用户认证和服务加载
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    const loadService = async () => {
+    const initializeComponent = async () => {
       try {
-        if (!serviceId) return;
+        // 检查用户认证
+        if (!currentUser) {
+          console.log('User not authenticated, redirecting to login');
+          navigate('/login');
+          return;
+        }
+
+        // 加载服务信息
+        if (!serviceId) {
+          setError('服务ID未提供');
+          return;
+        }
+
         const serviceData = await servicesAPI.getService(serviceId);
         if (!serviceData) {
           setError('服务不存在或已下线');
           return;
         }
+        
         setService(serviceData);
         
         // Initialize with a system message
-        setMessages([
-          {
-            id: 'system-1',
-            role: 'system',
-            content: `你是${serviceData.name}，专注于生成口播文案的AI助手。你会提供专业、自然、流畅的口播内容。`,
-            timestamp: new Date()
-          }
-        ]);
+        const systemMessage: Message = {
+          id: 'system-1',
+          role: 'system',
+          content: `你是${serviceData.name}，专注于生成口播文案的AI助手。你会提供专业、自然、流畅的口播内容。`,
+          timestamp: new Date()
+        };
+        
+        setMessages([systemMessage]);
+        setIsInitialized(true);
+        setError(''); // 清除之前的错误
+        
       } catch (error) {
-        setError('加载服务信息失败');
+        console.error('Failed to initialize component:', error);
+        setError('加载服务信息失败，请刷新页面重试');
       }
     };
-    
-    loadService();
-  }, [serviceId, user, navigate]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    initializeComponent();
+  }, [serviceId, currentUser, navigate]);
+
+  // 输入变化处理函数
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-  };
+  }, []);
 
-  const simulateTokenUsage = (text: string) => {
+  // Token使用量模拟函数
+  const simulateTokenUsage = useCallback((text: string): number => {
+    if (!text || typeof text !== 'string') return 0;
     // Simulate token counting - rough approximation
     const tokenCount = Math.ceil(text.length / 4);
-    return tokenCount;
-  };
+    return Math.max(1, tokenCount); // 确保至少返回1
+  }, []);
 
-  const simulateResponse = async (userMessage: string): Promise<string> => {
+  // 响应模拟函数
+  const simulateResponse = useCallback(async (userMessage: string): Promise<string> => {
+    if (!userMessage || !service) {
+      throw new Error('Invalid input or service not loaded');
+    }
+
     // Simulate waiting for API response
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Generate a response based on the service type
-    if (service?.id === 'broadcast-script') {
-      return `以下是根据您的需求生成的口播文案：\n\n【开场】\n亲爱的观众朋友们，大家好！\n\n【正文】\n${userMessage}的核心内容已经为您精心组织成易于播报的段落。文案语言流畅自然，适合直接口播使用，添加了适当的停顿标记和语气提示。\n\n【结尾】\n感谢您的收听，我们下期再会！`;
-    } 
-    else if (service?.id === 'voice-optimization') {
-      return `已为您优化的口播稿：\n\n${userMessage}\n\n【优化要点】\n• 添加了停顿标记 (/) 帮助控制语速和节奏\n• 调整了语句长度，确保每句话在一次呼吸内可以完成\n• 标注了重音词 (*) 以增强表现力\n• 简化了复杂句式，提高可读性`;
-    }
-    else if (service?.id === 'ad-script-generator') {
-      return `【30秒广告脚本】\n\n[轻快的背景音乐渐入]\n\n旁白(热情洋溢)：想让您的产品脱颖而出吗？\n\n[停顿2秒]\n\n旁白(确信)：${userMessage}是您的最佳选择！我们提供优质服务，价格实惠，客户满意度高达98%！\n\n[音效：清脆的铃声]\n\n旁白(亲切)：现在拨打屏幕下方电话，前100名顾客还可获得超值赠品！\n\n[音乐渐强后渐弱]\n\n旁白(有力)：${userMessage} - 让选择变得简单！`;
-    }
-    else {
-      return `已收到您关于"${userMessage}"的请求，这是专业口播稿版本：\n\n[专业播音腔调]\n${userMessage}\n\n以上内容已经过语言优化，添加了适当的停顿和语气变化，适合直接用于口播。`;
-    }
-  };
+    switch (service.id) {
+      case 'broadcast-script':
+        return `以下是根据您的需求生成的口播文案：
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || isGenerating) return;
+【开场】
+亲爱的观众朋友们，大家好！
+
+【正文】
+${userMessage}的核心内容已经为您精心组织，让我们一起来了解一下。
+
+【结尾】
+感谢您的收看，我们下期再见！
+
+这个脚本已经优化了语言节奏和表达方式，适合直接用于口播。`;
+
+      case 'voice-optimization':
+        return `已为您优化的口播稿：
+
+${userMessage}
+
+【优化要点】
+• 添加了停顿标记 (/) 帮助控制语速和节奏
+• 调整了语句长度，确保每句话在一个呼吸内可以完成
+• 增强了语言的感染力和表现力
+• 优化了用词选择，使其更适合口语表达
+
+这个版本已经准备好可以直接录制了。`;
+
+      case 'ad-script-generator':
+        return `【30秒广告脚本】
+
+[轻快的背景音乐渐入]
+
+旁白(热情洋溢)：想让您的产品脱颖而出吗？
+
+[停顿2秒]
+
+旁白(确信)：${userMessage}是您的完美选择！
+
+[音乐转为激昂]
+
+旁白(加速)：立即行动，机会有限！
+
+[音乐渐弱]
+
+旁白(温和但坚定)：选择我们，选择成功！
+
+[背景音乐结束]`;
+
+      default:
+        return `已收到您关于"${userMessage}"的请求，这是专业口播稿版本：
+
+[专业播音腔调]
+${userMessage}
+
+以上内容已经过语言优化，添加了适当的停顿和语气变化，适合直接用于口播。`;
+    }
+  }, [service]);
+
+  // 发送消息处理函数 - 添加更多错误检查和防护
+  const handleSendMessage = useCallback(async () => {
+    // 基础验证
+    if (!input?.trim() || isGenerating) {
+      console.log('Send message blocked:', { hasInput: !!input?.trim(), isGenerating });
+      return;
+    }
     
-    // Add user message
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: input,
-      timestamp: new Date()
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsGenerating(true);
-    setError('');
+    if (!isInitialized || !service || !currentUser) {
+      setError('系统尚未初始化完成，请稍后重试');
+      return;
+    }
+
+    const trimmedInput = input.trim();
     
     try {
+      // Add user message
+      const userMessage: Message = {
+        id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        role: 'user',
+        content: trimmedInput,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      setIsGenerating(true);
+      setError('');
+      
       // Simulate token usage for user message
-      const userTokens = simulateTokenUsage(input);
+      const userTokens = simulateTokenUsage(trimmedInput);
       
       // Simulate AI response
-      const responseText = await simulateResponse(input);
+      const responseText = await simulateResponse(trimmedInput);
       
       // Simulate token usage for AI response
       const assistantTokens = simulateTokenUsage(responseText);
@@ -153,7 +245,7 @@ export default function Chat() {
       
       // Add assistant message
       const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
+        id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: responseText,
         timestamp: new Date()
@@ -162,29 +254,35 @@ export default function Chat() {
       setMessages(prev => [...prev, assistantMessage]);
       
       // Calculate cost
-      const cost = totalTokens * (service?.pricePerToken || 0.0002) / 1000;
+      const pricePerToken = service?.pricePerToken || 0.0002;
+      const cost = (totalTokens * pricePerToken) / 1000;
       
       // Create usage record
-      if (!settings.testMode) {
-        const usage: TokenUsage = {
-          id: `usage-${Date.now()}`,
-          userId: user?.id || '',
-          serviceId: service?.name || '',
-          tokensUsed: totalTokens,
-          cost: cost,
-          timestamp: new Date().toISOString(),
-          sessionId: `session-${serviceId}-${Date.now()}`
-        };
-        
-        await servicesAPI.addTokenUsage(usage);
-        await authService.updateBalance(-cost);
-        setLastUsage(usage);
+      if (!settings.testMode && currentUser?.id) {
+        try {
+          const usage: TokenUsage = {
+            id: `usage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            userId: currentUser.id,
+            serviceId: service.name || service.id,
+            tokensUsed: totalTokens,
+            cost: cost,
+            timestamp: new Date().toISOString(),
+            sessionId: `session-${serviceId}-${Date.now()}`
+          };
+          
+          await servicesAPI.addTokenUsage(usage);
+          await authService.updateBalance(-cost);
+          setLastUsage(usage);
+        } catch (usageError) {
+          console.error('Failed to record usage:', usageError);
+          // 不阻止消息显示，只记录错误
+        }
       } else {
         // Just display the would-be usage in test mode
         setLastUsage({
           id: `test-${Date.now()}`,
-          userId: user?.id || '',
-          serviceId: service?.name || '',
+          userId: currentUser?.id || 'test-user',
+          serviceId: service.name || service.id,
           tokensUsed: totalTokens,
           cost: cost,
           timestamp: new Date().toISOString(),
@@ -192,52 +290,92 @@ export default function Chat() {
         });
       }
     } catch (err) {
-      setError('生成回复时出错，请稍后重试');
+      console.error('Error in handleSendMessage:', err);
+      const errorMessage = err instanceof Error ? err.message : '生成回复时出错，请稍后重试';
+      setError(errorMessage);
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [input, isGenerating, isInitialized, service, currentUser, simulateTokenUsage, simulateResponse, settings.testMode, serviceId]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  // 键盘事件处理
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
-  };
+  }, [handleSendMessage]);
 
-  const clearConversation = () => {
-    if (window.confirm('确定要清空当前会话吗？')) {
-      setMessages([
-        {
-          id: 'system-1',
-          role: 'system',
-          content: `你是${service?.name}，专注于生成口播文案的AI助手。你会提供专业、自然、流畅的口播内容。`,
-          timestamp: new Date()
-        }
-      ]);
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  const downloadChat = () => {
-    const chatText = messages
-      .filter(msg => msg.role !== 'system')
-      .map(msg => `${msg.role === 'user' ? '用户' : '助手'}: ${msg.content}`)
-      .join('\n\n');
+  // 清空对话
+  const clearConversation = useCallback(() => {
+    if (!service) return;
     
-    const blob = new Blob([chatText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `propen-chat-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+    if (window.confirm('确定要清空当前会话吗？')) {
+      const systemMessage: Message = {
+        id: `system-${Date.now()}`,
+        role: 'system',
+        content: `你是${service.name}，专注于生成口播文案的AI助手。你会提供专业、自然、流畅的口播内容。`,
+        timestamp: new Date()
+      };
+      setMessages([systemMessage]);
+      setError('');
+      setLastUsage(null);
+    }
+  }, [service]);
+
+  // 复制到剪贴板
+  const copyToClipboard = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // 可以添加一个成功提示
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+      // 降级方案
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+  }, []);
+
+  // 下载聊天记录
+  const downloadChat = useCallback(() => {
+    if (messages.length <= 1) return;
+    
+    try {
+      const chatText = messages
+        .filter(msg => msg.role !== 'system')
+        .map(msg => `${msg.role === 'user' ? '用户' : '助手'}: ${msg.content}`)
+        .join('\n\n');
+      
+      const blob = new Blob([chatText], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `propen-chat-${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download chat:', err);
+      setError('下载聊天记录失败');
+    }
+  }, [messages]);
+
+  // 如果还未初始化，显示加载状态
+  if (!isInitialized) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3">正在加载服务...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -266,7 +404,7 @@ export default function Chat() {
                 </p>
                 
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {service?.features.map((feature, index) => (
+                  {service?.features?.map((feature, index) => (
                     <Badge key={index} variant="secondary">
                       {feature}
                     </Badge>
@@ -291,7 +429,7 @@ export default function Chat() {
                       <Label>AI 模型</Label>
                       <Select
                         value={settings.model}
-                        onValueChange={(value) => setSettings({...settings, model: value})}
+                        onValueChange={(value) => setSettings(prev => ({...prev, model: value}))}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -315,7 +453,7 @@ export default function Chat() {
                         max={1}
                         step={0.1}
                         value={[settings.temperature]}
-                        onValueChange={(values) => setSettings({...settings, temperature: values[0]})}
+                        onValueChange={(values) => setSettings(prev => ({...prev, temperature: values[0]}))}
                       />
                       <p className="text-xs text-gray-500">
                         较低值使输出更确定，较高值使输出更随机
@@ -326,7 +464,7 @@ export default function Chat() {
                       <Switch
                         id="testMode"
                         checked={settings.testMode}
-                        onCheckedChange={(checked) => setSettings({...settings, testMode: checked})}
+                        onCheckedChange={(checked) => setSettings(prev => ({...prev, testMode: checked}))}
                       />
                       <Label htmlFor="testMode">测试模式（不消耗余额）</Label>
                     </div>
@@ -335,7 +473,7 @@ export default function Chat() {
                       <Switch
                         id="saveHistory"
                         checked={settings.saveHistory}
-                        onCheckedChange={(checked) => setSettings({...settings, saveHistory: checked})}
+                        onCheckedChange={(checked) => setSettings(prev => ({...prev, saveHistory: checked}))}
                       />
                       <Label htmlFor="saveHistory">保存聊天记录</Label>
                     </div>
@@ -433,7 +571,7 @@ export default function Chat() {
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               className="min-h-[100px] pr-20"
-              disabled={isGenerating}
+              disabled={isGenerating || !isInitialized}
             />
             <div className="absolute bottom-3 right-3 flex space-x-2">
               <Button 
@@ -457,7 +595,7 @@ export default function Chat() {
               <Button 
                 size="icon" 
                 onClick={handleSendMessage}
-                disabled={!input.trim() || isGenerating}
+                disabled={!input.trim() || isGenerating || !isInitialized}
                 className="rounded-full h-8 w-8"
               >
                 {isGenerating ? (
