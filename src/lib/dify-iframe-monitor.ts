@@ -1527,6 +1527,8 @@ export class DifyIframeMonitor {
             usage: {
               prompt_tokens: 2913,
               completion_tokens: 701,
+              total_prompt_tokens: 2913,
+              completion_tokens: 701,
               total_tokens: 3614,
               prompt_price: "0.005826",
               completion_price: "0.005608",
@@ -1539,24 +1541,113 @@ export class DifyIframeMonitor {
     } as MessageEvent;
 
     this.handleMessage(mockEvent, userId);
-  }  
-}   
-        /**
- * Get current monitor status for debugging
- */
+  }
+
   /**
    * Get current monitor status for debugging
    */
   public getStatus() {
     return {
       isListening: this.isListening,
-      modelConfigsLoaded: this.modelConfigs.length,
-      exchangeRate: this.currentExchangeRate,
+      initialized: this.initialized,
+      modelConfigsCount: this.modelConfigs.length,
       processedEventsCount: this.processedEvents.size,
-      lastEventTime: this.lastEventTime
+      currentExchangeRate: this.currentExchangeRate,
+      lastEventTime: this.lastEventTime,
+      validOrigins: this.getValidOrigins()
     };
   }
 }
 
-// Export singleton instance
-export const difyIframeMonitor = new DifyIframeMonitor();
+// 修改导出方式 - 延迟创建实例
+let _difyIframeMonitor: DifyIframeMonitor | null = null;
+
+export const difyIframeMonitor = {
+  getInstance(): DifyIframeMonitor {
+    if (!_difyIframeMonitor) {
+      _difyIframeMonitor = new DifyIframeMonitor();
+    }
+    return _difyIframeMonitor;
+  },
+  
+  // 代理所有方法
+  async startListening(userId: string) {
+    const instance = this.getInstance();
+    return await instance.startListening(userId);
+  },
+  
+  stopListening() {
+    const instance = this.getInstance();
+    return instance.stopListening();
+  },
+  
+  setOnTokenConsumption(callback: (event: TokenConsumptionEvent) => void) {
+    const instance = this.getInstance();
+    return instance.setOnTokenConsumption(callback);
+  },
+  
+  setOnBalanceUpdate(callback: (newBalance: number) => void) {
+    const instance = this.getInstance();
+    return instance.setOnBalanceUpdate(callback);
+  },
+  
+  isCurrentlyListening(): boolean {
+    const instance = this.getInstance();
+    return instance.isCurrentlyListening();
+  },
+  
+  getStatus() {
+    const instance = this.getInstance();
+    return instance.getStatus();
+  },
+  
+  async refreshConfigs() {
+    const instance = this.getInstance();
+    return await instance.refreshConfigs();
+  },
+  
+  setOnNewModelDetected(callback: (model: ModelConfig) => void) {
+    const instance = this.getInstance();
+    return instance.setOnNewModelDetected(callback);
+  },
+  
+  setOnConfigurationFailed(callback: (reason: string) => void) {
+    const instance = this.getInstance();
+    return instance.setOnConfigurationFailed(callback);
+  },
+  
+  async simulateTokenConsumption(userId: string, modelName?: string, inputTokens?: number, outputTokens?: number) {
+    const instance = this.getInstance();
+    return await instance.simulateTokenConsumption(userId, modelName, inputTokens, outputTokens);
+  },
+  
+  async simulateRealDifyUsage(userId: string, inputTokens?: number, outputTokens?: number, inputPrice?: number, outputPrice?: number) {
+    const instance = this.getInstance();
+    return await instance.simulateRealDifyUsage(userId, inputTokens, outputTokens, inputPrice, outputPrice);
+  },
+  
+  async simulateWorkflowTokenConsumption(userId: string, inputTokens?: number, outputTokens?: number, inputPrice?: number, outputPrice?: number) {
+    const instance = this.getInstance();
+    return await instance.simulateWorkflowTokenConsumption(userId, inputTokens, outputTokens, inputPrice, outputPrice);
+  },
+  
+  async recordManualTokenUsage(userId: string, modelName: string, inputTokens: number, outputTokens: number, description?: string) {
+    const instance = this.getInstance();
+    return await instance.recordManualTokenUsage(userId, modelName, inputTokens, outputTokens, description);
+  },
+  
+  async simulateDifyReady(userId: string, origin?: string) {
+    const instance = this.getInstance();
+    return await instance.simulateDifyReady(userId, origin);
+  },
+  
+  testOriginValidation(origin: string): boolean {
+    const instance = this.getInstance();
+    return instance.testOriginValidation(origin);
+  },
+  
+  simulateMessageFromOrigin(origin: string, userId: string, messageData?: any) {
+    const instance = this.getInstance();
+    return instance.simulateMessageFromOrigin(origin, userId, messageData);
+  }
+};
