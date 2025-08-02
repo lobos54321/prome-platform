@@ -35,10 +35,27 @@ The AI chat interface was showing "[MOCK WORKFLOW]" instead of connecting to the
 ## Production Deployment
 The fix is ready for production. In environments with proper network access to `api.dify.ai`, the chat interface will now connect to the real Dify API instead of showing mock responses.
 
-**Environment Variables Required:**
+**CRITICAL FIX: To stop showing mock responses and display real workflow node processes:**
+
+1. **Create `.env` file** from `.env.example`:
+```bash
+cp .env.example .env
+```
+
+2. **Set Production Mode** in `.env`:
 ```env
 VITE_DIFY_API_URL=https://api.dify.ai/v1
 VITE_DIFY_APP_ID=your_app_id_here
 VITE_DIFY_API_KEY=your_api_key_here
-VITE_DIFY_PRODUCTION_MODE=true
+VITE_DIFY_PRODUCTION_MODE=true  # ← CRITICAL: This disables mock responses
 ```
+
+3. **Restart the server** to load new environment variables
+
+**Before Fix (Mock Mode):**
+- Returns: `[MOCK WORKFLOW] Processing your request...`
+- Shows simulated responses instead of real workflow nodes
+
+**After Fix (Production Mode):**
+- Returns: Proper error messages when API unavailable
+- Shows real workflow node processes when API accessible
