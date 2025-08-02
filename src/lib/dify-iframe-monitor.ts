@@ -1547,3 +1547,15 @@ export class DifyIframeMonitor {
   public getStatus() {
     return {
       isListening: this.
+        /**
+ * Get current monitor status for debugging
+ */
+public getStatus() {
+  return {
+    isListening: this.isListening,
+    modelConfigsLoaded: this.modelConfigs.length,
+    exchangeRate: this.currentExchangeRate,
+    processedEventsCount: this.processedEvents.size,
+    lastEventTime: this.lastEventTime
+  };
+}
