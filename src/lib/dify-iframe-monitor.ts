@@ -247,7 +247,7 @@ export class DifyIframeMonitor {
     return true; // Always valid in compatibility mode
   }
 
-  public simulateMessageFromOrigin(origin: string, userId: string, messageData?: any): void {
+  public simulateMessageFromOrigin(origin: string, userId: string, messageData?: unknown): void {
     console.log(`[DifyIframeMonitor] Simulating message from origin (compatibility mode): ${origin}`);
   }
 
