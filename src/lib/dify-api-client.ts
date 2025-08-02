@@ -699,3 +699,19 @@ export function isDifyEnabled(): boolean {
 
   return enabled && !!apiUrl && !!appId && !!apiKey;
 }
+
+/**
+ * Check if Dify iframe monitoring should be enabled
+ * This is separate from main Dify integration to allow disabling iframe monitoring
+ * while keeping direct API integration enabled
+ */
+export function isDifyIframeMonitoringEnabled(): boolean {
+  // First check if Dify integration is enabled at all
+  if (!isDifyEnabled()) {
+    return false;
+  }
+  
+  // Then check if iframe monitoring is specifically enabled
+  // Default to false for production safety (since direct API is preferred)
+  return import.meta.env.VITE_ENABLE_DIFY_IFRAME_MONITORING === 'true';
+}

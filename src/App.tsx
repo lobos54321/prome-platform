@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Layout } from './components/layout/Layout';
 import { authService } from './lib/auth';
 import { difyIframeMonitor } from './lib/dify-iframe-monitor';
-import { isDifyEnabled } from './api/dify-api';
+import { isDifyEnabled, isDifyIframeMonitoringEnabled } from './lib/dify-api-client';
 import { environmentValidator } from './lib/environment-validator';
 import { databaseTester } from './lib/database-tester';
 import { User } from './types';
@@ -67,7 +67,7 @@ const App = () => {
         setCurrentUser(user);
         
         // Initialize Dify monitoring if enabled and user is valid
-        if (isDifyEnabled() && user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
+        if (isDifyIframeMonitoringEnabled() && user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
           console.log('Initializing Dify iframe monitoring for user:', user.id);
           try {
             initializeDifyMonitoring(user);
@@ -76,7 +76,7 @@ const App = () => {
             // 继续应用启动，不因 Dify 监控失败而中断
           }
         } else if (isDifyEnabled()) {
-          console.log('Dify enabled but no valid user for monitoring');
+          console.log('Dify enabled but iframe monitoring disabled or no valid user');
         }
       } catch (error) {
         console.error('Application initialization failed:', error);
@@ -97,7 +97,7 @@ const App = () => {
         const { user } = event.detail;
         setCurrentUser(user);
         
-        if (isDifyEnabled()) {
+        if (isDifyIframeMonitoringEnabled()) {
           if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
             console.log('User logged in, starting Dify monitoring:', user.id);
             initializeDifyMonitoring(user);
@@ -119,8 +119,8 @@ const App = () => {
   }, []);
 
   const initializeDifyMonitoring = (user: User) => {
-    if (!isDifyEnabled() || !user?.id) {
-      console.log('Dify monitoring disabled or user invalid');
+    if (!isDifyIframeMonitoringEnabled() || !user?.id) {
+      console.log('Dify iframe monitoring disabled or user invalid');
       return;
     }
 
