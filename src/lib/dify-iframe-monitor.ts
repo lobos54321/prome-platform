@@ -1547,6 +1547,7 @@ export class DifyIframeMonitor {
   public getStatus() {
     return {
       isListening: this.
+        }
         /**
  * Get current monitor status for debugging
  */
