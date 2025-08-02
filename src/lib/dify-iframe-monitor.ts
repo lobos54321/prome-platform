@@ -1544,13 +1544,19 @@ export class DifyIframeMonitor {
         /**
  * Get current monitor status for debugging
  */
-public getStatus() {
-  return {
-    isListening: this.isListening,
-    modelConfigsLoaded: this.modelConfigs.length,
-    exchangeRate: this.currentExchangeRate,
-    processedEventsCount: this.processedEvents.size,
-    lastEventTime: this.lastEventTime
-  };
+  /**
+   * Get current monitor status for debugging
+   */
+  public getStatus() {
+    return {
+      isListening: this.isListening,
+      modelConfigsLoaded: this.modelConfigs.length,
+      exchangeRate: this.currentExchangeRate,
+      processedEventsCount: this.processedEvents.size,
+      lastEventTime: this.lastEventTime
+    };
+  }
 }
-}
+
+// Export singleton instance
+export const difyIframeMonitor = new DifyIframeMonitor();
