@@ -9,7 +9,7 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface WorkflowProgress {
@@ -135,10 +135,14 @@ export function DifyChatInterface({
     const maxRetries = enableRetry ? 3 : 0;
     
     try {
-      console.log('[Chat] Sending message:', {
-        message: messageContent,
-        conversationId,
+      console.log('[Chat Debug] Sending request:', {
+        endpoint: conversationId && conversationId !== 'default' && conversationId !== 'null' && conversationId !== 'undefined' && conversationId.trim() !== ''
+          ? `/api/dify/${conversationId}` 
+          : '/api/dify',
+        messageContent: messageContent.substring(0, 50),
         userId,
+        conversationId,
+        showWorkflowProgress,
         mode,
         attempt: currentRetry + 1
       });
@@ -152,32 +156,51 @@ export function DifyChatInterface({
         });
       }
 
-      // 选择合适的端点 - 总是使用聊天API端点，工作流进度通过聊天API响应获取
-      const endpoint = conversationId ? `/api/dify/${conversationId}` : '/api/dify';
+      // 更好的端点选择逻辑 - 处理无效的 conversationId
+      const endpoint = conversationId && conversationId !== 'default' && conversationId !== 'null' && conversationId !== 'undefined' && conversationId.trim() !== ''
+        ? `/api/dify/${conversationId}` 
+        : '/api/dify';
+      
       const timeoutMs = showWorkflowProgress ? 120000 : 30000; // 显示工作流进度时使用更长的超时
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      // 标准化请求格式 - 发送兼容的字段
+      const requestBody = {
+        query: messageContent,     // 使用标准 'query' 字段
+        message: messageContent,   // 保持 'message' 字段以兼容性
+        user: userId || 'default-user',
+        conversation_id: conversationId,
+        response_mode: showWorkflowProgress ? 'streaming' : 'blocking',
+        inputs: {}
+      };
 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: messageContent,  // 使用 'message' 字段用于聊天API
-          user: userId,
-          conversation_id: conversationId,
-          stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
-          inputs: {}
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        const errorText = await response.text();
+        console.error('[Chat Error] Response not OK:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.substring(0, 200)
+        });
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: `HTTP ${response.status}` };
+        }
         
         // 检查是否是可重试的错误
         const isRetriableError = response.status >= 500 || response.status === 408 || response.status === 429;
@@ -193,12 +216,24 @@ export function DifyChatInterface({
           return sendMessageWithRetry(messageContent, currentRetry + 1);
         }
         
-        throw new Error(errorData.error || `服务器错误 (${response.status})`);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       // 处理流式响应（用于工作流进度）
       if (showWorkflowProgress && response.body) {
-        await handleWorkflowStream(response, messageContent);
+        try {
+          await handleWorkflowStream(response, messageContent);
+        } catch (streamError) {
+          console.warn('[Chat] Stream processing failed, falling back to regular response:', streamError);
+          // 如果流处理失败，尝试获取常规响应
+          try {
+            const data = await response.json();
+            await handleRegularResponse(data, messageContent);
+          } catch (fallbackError) {
+            console.error('[Chat] Fallback to regular response also failed:', fallbackError);
+            throw new Error('流式响应处理失败，常规响应回退也失败');
+          }
+        }
       } else {
         // 处理普通响应
         const data = await response.json();
@@ -209,7 +244,7 @@ export function DifyChatInterface({
       setRetryCount(0);
       
     } catch (error) {
-      console.error('[Chat] Error:', error);
+      console.error('[Chat Error] Request failed:', error);
       
       // 处理取消请求
       if (error instanceof Error && error.name === 'AbortError') {
@@ -230,6 +265,14 @@ export function DifyChatInterface({
         return sendMessageWithRetry(messageContent, currentRetry + 1);
       }
       
+      // 增强错误消息处理
+      let errorMessage = '请求失败，请重试';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      console.error('[Chat Error] Final error:', errorMessage);
+      setError(errorMessage);
       throw error;
     }
   };
@@ -318,22 +361,28 @@ export function DifyChatInterface({
   };
 
   // 处理普通响应
-  const handleRegularResponse = async (data: any, messageContent: string) => {
+  const handleRegularResponse = async (data: Record<string, unknown>, messageContent: string) => {
     console.log('[Chat] Received response:', data);
+
+    // 验证响应结构
+    if (!data || (!data.answer && !data.content && !data.message)) {
+      console.error('[Chat] Invalid response structure:', data);
+      throw new Error('服务器返回了无效的响应格式');
+    }
 
     // 更新会话ID
     if (data.conversation_id && data.conversation_id !== conversationId) {
-      setConversationId(data.conversation_id);
+      setConversationId(data.conversation_id as string);
       console.log('[Chat] Updated conversation ID:', data.conversation_id);
     }
 
-    // 添加助手回复
+    // 添加助手回复 - 更好的内容提取
     const assistantMessage: Message = {
       id: `assistant_${Date.now()}`,
-      content: data.answer || '抱歉，我无法处理您的请求。',
+      content: (data.answer as string) || (data.content as string) || (data.message as string) || '抱歉，我无法处理您的请求。',
       role: 'assistant',
       timestamp: new Date(),
-      metadata: data.metadata,
+      metadata: data.metadata as Record<string, unknown>,
     };
 
     setMessages(prev => [...prev, assistantMessage]);
@@ -361,16 +410,17 @@ export function DifyChatInterface({
       await sendMessageWithRetry(userMessage.content);
     } catch (error) {
       console.error('[Chat] Final Error:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      const errorMessage = error instanceof Error ? error.message : '请求失败，请重试';
+      setError(errorMessage);
       
-      // 添加错误消息
-      const errorMessage: Message = {
+      // 添加错误消息到聊天界面
+      const errorResponseMessage: Message = {
         id: `error_${Date.now()}`,
-        content: `抱歉，我遇到了一个错误：${error instanceof Error ? error.message : '未知错误'}`,
+        content: `抱歉，我遇到了一个错误：${errorMessage}`,
         role: 'assistant',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, errorResponseMessage]);
     } finally {
       setIsLoading(false);
       setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
@@ -423,7 +473,7 @@ export function DifyChatInterface({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as any);
+      handleSubmit(e as React.FormEvent);
     }
   };
 
