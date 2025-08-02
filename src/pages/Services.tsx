@@ -15,7 +15,7 @@ export default function Services() {
   const [services, setServices] = useState<Service[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const user = authService.getCurrentUser();
+  const user = authService.getCurrentUserSync();
 
   useEffect(() => {
     const fetchServices = async () => {
