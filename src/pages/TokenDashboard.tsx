@@ -9,7 +9,6 @@ import { BarChart2, InfoIcon, Activity, Wallet, TrendingUp, Clock, Loader2 } fro
 import { authService } from '@/lib/auth';
 import { isDifyEnabled } from '@/api/dify-api';
 import { db } from '@/lib/supabase';
-import { difyIframeMonitor } from '@/lib/dify-iframe-monitor';
 import { User, TokenUsage, BillingRecord } from '@/types';
 import { toast } from 'sonner';
 
@@ -34,7 +33,6 @@ export default function TokenDashboard() {
 
         if (isDifyEnabled()) {
           await loadUserData(currentUser.id);
-          setupIframeMonitoring(currentUser.id);
         }
       } catch (error) {
         console.error('Failed to get current user:', error);
@@ -45,10 +43,6 @@ export default function TokenDashboard() {
     };
 
     initUser();
-
-    return () => {
-      difyIframeMonitor.stopListening();
-    };
   }, [navigate]);
 
   const loadUserData = async (userId: string) => {
@@ -67,22 +61,6 @@ export default function TokenDashboard() {
     } finally {
       setIsDataLoading(false);
     }
-  };
-
-  const setupIframeMonitoring = (userId: string) => {
-    difyIframeMonitor.setOnTokenConsumption((event) => {
-      console.log('Token consumption event:', event);
-      toast.success(`Token已消费: ${event.totalTokens} tokens (${event.modelName})`);
-      loadUserData(userId); // Reload data
-    });
-
-    difyIframeMonitor.setOnBalanceUpdate((newBalance) => {
-      if (user) {
-        setUser({ ...user, balance: newBalance });
-      }
-    });
-
-    difyIframeMonitor.startListening(userId);
   };
 
   const calculateStats = () => {
@@ -279,9 +257,9 @@ export default function TokenDashboard() {
               <Badge variant="default">已启用</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm">实时监控</span>
-              <Badge variant={difyIframeMonitor.isCurrentlyListening() ? "default" : "secondary"}>
-                {difyIframeMonitor.isCurrentlyListening() ? '运行中' : '已停止'}
+              <span className="text-sm">API模式</span>
+              <Badge variant="default">
+                Direct API
               </Badge>
             </div>
             <div className="flex items-center justify-between">

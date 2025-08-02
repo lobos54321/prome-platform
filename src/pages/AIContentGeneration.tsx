@@ -14,7 +14,7 @@ export default function AIContentGeneration() {
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const user = authService.getCurrentUser();
+  const user = authService.getCurrentUserSync();
 
   useEffect(() => {
     const loadService = async () => {

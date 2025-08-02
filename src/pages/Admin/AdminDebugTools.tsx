@@ -9,20 +9,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { db } from '@/lib/supabase';
-import { difyIframeMonitor } from '@/lib/dify-iframe-monitor';
 import { authService } from '@/lib/auth';
 import { WorkflowDiagnosticsOverview } from '@/components/WorkflowDiagnosticsOverview';
 import { 
   Bug, 
   Database, 
-  PlayCircle, 
   TestTube, 
   RefreshCw, 
-  ExternalLink,
   DollarSign,
   Users,
   Settings,
-  Activity
+  Activity,
+  AlertCircle
 } from 'lucide-react';
 
 export default function AdminDebugTools() {
@@ -35,21 +33,6 @@ export default function AdminDebugTools() {
     email: 'lobos54321@gmail.com',
     amount: '10000',
     description: 'Test credits'
-  });
-
-  // Token simulation form
-  const [tokenForm, setTokenForm] = useState({
-    modelName: 'gpt-4',
-    inputTokens: '1500',
-    outputTokens: '800'
-  });
-
-  // Real Dify usage simulation form
-  const [realDifyForm, setRealDifyForm] = useState({
-    inputTokens: '2913',
-    outputTokens: '686',
-    inputPrice: '0.005826',
-    outputPrice: '0.005488'
   });
 
   const currentUser = authService.getCurrentUserSync();
@@ -85,85 +68,6 @@ export default function AdminDebugTools() {
     }
   };
 
-  const simulateRealDifyUsage = async () => {
-    if (!currentUser) {
-      setResult('❌ You must be logged in to simulate real Dify usage');
-      return;
-    }
-
-    setIsLoading(true);
-    setResult('Simulating real Dify usage...');
-    
-    try {
-      const inputTokens = parseInt(realDifyForm.inputTokens);
-      const outputTokens = parseInt(realDifyForm.outputTokens);
-      const inputPrice = parseFloat(realDifyForm.inputPrice);
-      const outputPrice = parseFloat(realDifyForm.outputPrice);
-      
-      if (isNaN(inputTokens) || isNaN(outputTokens) || inputTokens <= 0 || outputTokens <= 0) {
-        setResult('❌ Invalid token counts. Please enter positive numbers.');
-        return;
-      }
-
-      if (isNaN(inputPrice) || isNaN(outputPrice) || inputPrice <= 0 || outputPrice <= 0) {
-        setResult('❌ Invalid prices. Please enter positive numbers.');
-        return;
-      }
-
-      await difyIframeMonitor.simulateRealDifyUsage(
-        currentUser.id,
-        inputTokens,
-        outputTokens,
-        inputPrice,
-        outputPrice
-      );
-
-      const totalTokens = inputTokens + outputTokens;
-      const totalPrice = inputPrice + outputPrice;
-
-      setResult(`✅ Simulated real Dify usage:\nInput: ${inputTokens} tokens ($${inputPrice})\nOutput: ${outputTokens} tokens ($${outputPrice})\nTotal: ${totalTokens} tokens ($${totalPrice.toFixed(6)})`);
-    } catch (error) {
-      console.error('Error simulating real Dify usage:', error);
-      setResult(`❌ Error simulating real Dify usage: ${error}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const simulateTokenUsage = async () => {
-    if (!currentUser) {
-      setResult('❌ You must be logged in to simulate token usage');
-      return;
-    }
-
-    setIsLoading(true);
-    setResult('Simulating token usage...');
-    
-    try {
-      const inputTokens = parseInt(tokenForm.inputTokens);
-      const outputTokens = parseInt(tokenForm.outputTokens);
-      
-      if (isNaN(inputTokens) || isNaN(outputTokens) || inputTokens <= 0 || outputTokens <= 0) {
-        setResult('❌ Invalid token counts. Please enter positive numbers.');
-        return;
-      }
-
-      await difyIframeMonitor.simulateTokenConsumption(
-        currentUser.id,
-        tokenForm.modelName,
-        inputTokens,
-        outputTokens
-      );
-
-      setResult(`✅ Simulated token usage:\nModel: ${tokenForm.modelName}\nInput: ${inputTokens} tokens\nOutput: ${outputTokens} tokens\nTotal: ${inputTokens + outputTokens} tokens`);
-    } catch (error) {
-      console.error('Error simulating token usage:', error);
-      setResult(`❌ Error simulating token usage: ${error}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const testDatabaseConnection = async () => {
     setIsLoading(true);
     setResult('Testing database connection...');
@@ -185,63 +89,36 @@ export default function AdminDebugTools() {
     }
   };
 
-  const testOriginValidation = (origin: string) => {
-    const isValid = difyIframeMonitor.testOriginValidation(origin);
-    setResult(`🔍 Origin validation test for: ${origin}\nResult: ${isValid ? '✅ VALID' : '❌ INVALID'}\nCheck console for detailed logs.`);
-  };
-
-  const simulateUdifyMessage = () => {
-    if (!currentUser) {
-      setResult('❌ You must be logged in to simulate udify message');
-      return;
-    }
-
-    setResult('📨 Simulating udify.app message...\nCheck console for detailed processing logs.');
+  const testAuthSystem = async () => {
+    setIsLoading(true);
+    setResult('Testing authentication system...');
     
-    // Simulate a real udify.app message
-    difyIframeMonitor.simulateMessageFromOrigin(
-      'https://chatbot.udify.app',
-      currentUser.id,
-      {
-        event: '', // Real udify messages might not have this
-        data: {
-          usage: {
-            prompt_tokens: 2913,
-            prompt_unit_price: "2",
-            prompt_price_unit: "0.000001",
-            prompt_price: "0.005826",
-            completion_tokens: 686,
-            completion_unit_price: "8", 
-            completion_price_unit: "0.000001",
-            completion_price: "0.005488",
-            total_tokens: 3599,
-            total_price: "0.011314",
-            currency: "USD",
-            latency: 2.6395470835268497
-          },
-          finish_reason: "stop",
-          files: []
-        }
-      }
-    );
+    try {
+      const syncUser = authService.getCurrentUserSync();
+      const asyncUser = await authService.getCurrentUser();
+      const isAuth = authService.isAuthenticated();
+      
+      setResult(`✅ Authentication system test:\n` +
+        `Sync user: ${syncUser ? syncUser.email : 'None'}\n` +
+        `Async user: ${asyncUser ? asyncUser.email : 'None'}\n` +
+        `Is authenticated: ${isAuth}\n` +
+        `User balance: ${syncUser?.balance || 0}`);
+    } catch (error) {
+      console.error('Auth test failed:', error);
+      setResult(`❌ Authentication test failed: ${error}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const refreshMonitorStatus = () => {
-    const status = difyIframeMonitor.getStatus();
-    setResult(`📊 Monitor Status:\n${JSON.stringify(status, null, 2)}`);
-  };
-
-  const openTestPage = () => {
-    navigate('/token-monitor-test');
-  };
-
-  const runTokenTest = () => {
-    // Open a new window to run the admin script
-    const script = `
-cd /home/runner/work/prome-platform/prome-platform
-node admin-scripts/test-token-monitoring.js
-`;
-    setResult(`📝 Run this command in terminal:\n${script}`);
+  const runSystemDiagnostics = () => {
+    setResult(`📋 系统诊断信息:\n` +
+      `环境: ${import.meta.env.DEV ? '开发' : '生产'}\n` +
+      `Dify集成: ${isDifyEnabled ? '启用' : '禁用'}\n` +
+      `当前用户: ${currentUser?.email || '未登录'}\n` +
+      `用户余额: ${currentUser?.balance || 0}\n` +
+      `API模式: Direct API (不使用iframe监控)\n` +
+      `时间戳: ${new Date().toISOString()}`);
   };
 
   return (
@@ -321,188 +198,41 @@ node admin-scripts/test-token-monitoring.js
           </CardContent>
         </Card>
 
-        {/* Token Usage Simulation */}
+        {/* System Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <PlayCircle className="h-5 w-5" />
-              Token消耗模拟 (传统格式)
+              <Activity className="h-5 w-5" />
+              系统状态
             </CardTitle>
             <CardDescription>
-              模拟传统AI模型的token消耗事件
+              检查各系统组件的运行状态
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="modelName">模型名称</Label>
-              <Input
-                id="modelName"
-                value={tokenForm.modelName}
-                onChange={(e) => setTokenForm(prev => ({ ...prev, modelName: e.target.value }))}
-                placeholder="gpt-4"
-              />
-            </div>
-            <div>
-              <Label htmlFor="inputTokens">输入Token数</Label>
-              <Input
-                id="inputTokens"
-                value={tokenForm.inputTokens}
-                onChange={(e) => setTokenForm(prev => ({ ...prev, inputTokens: e.target.value }))}
-                placeholder="1500"
-                type="number"
-              />
-            </div>
-            <div>
-              <Label htmlFor="outputTokens">输出Token数</Label>
-              <Input
-                id="outputTokens"
-                value={tokenForm.outputTokens}
-                onChange={(e) => setTokenForm(prev => ({ ...prev, outputTokens: e.target.value }))}
-                placeholder="800"
-                type="number"
-              />
-            </div>
-            <Button onClick={simulateTokenUsage} disabled={isLoading} className="w-full">
-              <PlayCircle className="h-4 w-4 mr-2" />
-              模拟传统消耗
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Real Dify Usage Simulation */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TestTube className="h-5 w-5" />
-              真实Dify格式模拟
-            </CardTitle>
-            <CardDescription>
-              模拟真实udify.app的token消耗事件 (基于实际格式)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="realInputTokens">输入Token数</Label>
-              <Input
-                id="realInputTokens"
-                value={realDifyForm.inputTokens}
-                onChange={(e) => setRealDifyForm(prev => ({ ...prev, inputTokens: e.target.value }))}
-                placeholder="2913"
-                type="number"
-              />
-            </div>
-            <div>
-              <Label htmlFor="realOutputTokens">输出Token数</Label>
-              <Input
-                id="realOutputTokens"
-                value={realDifyForm.outputTokens}
-                onChange={(e) => setRealDifyForm(prev => ({ ...prev, outputTokens: e.target.value }))}
-                placeholder="686"
-                type="number"
-              />
-            </div>
-            <div>
-              <Label htmlFor="realInputPrice">输入价格 (USD)</Label>
-              <Input
-                id="realInputPrice"
-                value={realDifyForm.inputPrice}
-                onChange={(e) => setRealDifyForm(prev => ({ ...prev, inputPrice: e.target.value }))}
-                placeholder="0.005826"
-                type="number"
-                step="0.000001"
-              />
-            </div>
-            <div>
-              <Label htmlFor="realOutputPrice">输出价格 (USD)</Label>
-              <Input
-                id="realOutputPrice"
-                value={realDifyForm.outputPrice}
-                onChange={(e) => setRealDifyForm(prev => ({ ...prev, outputPrice: e.target.value }))}
-                placeholder="0.005488"
-                type="number"
-                step="0.000001"
-              />
-            </div>
-            <Button onClick={simulateRealDifyUsage} disabled={isLoading} className="w-full">
-              <TestTube className="h-4 w-4 mr-2" />
-              模拟真实Dify
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        {/* Message Origin Testing */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ExternalLink className="h-5 w-5" />
-              消息来源测试
-            </CardTitle>
-            <CardDescription>
-              测试不同来源的消息处理和调试udify.app集成
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button 
-                onClick={() => testOriginValidation('https://udify.app')} 
-                variant="outline" 
-                disabled={isLoading}
-              >
-                测试 udify.app
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Direct API mode: Iframe monitoring has been removed in favor of direct API calls for better reliability.
+              </AlertDescription>
+            </Alert>
+            <div className="grid grid-cols-1 gap-2">
+              <Button onClick={testDatabaseConnection} variant="outline" disabled={isLoading}>
+                <Database className="h-4 w-4 mr-2" />
+                数据库连接测试
               </Button>
-              <Button 
-                onClick={() => testOriginValidation('https://chatbot.udify.app')} 
-                variant="outline" 
-                disabled={isLoading}
-              >
-                测试 chatbot.udify.app
+              <Button onClick={testAuthSystem} variant="outline" disabled={isLoading}>
+                <Users className="h-4 w-4 mr-2" />
+                认证系统测试
               </Button>
-              <Button 
-                onClick={() => simulateUdifyMessage()} 
-                variant="outline" 
-                disabled={isLoading}
-              >
-                模拟udify消息
+              <Button onClick={runSystemDiagnostics} variant="outline" disabled={isLoading}>
+                <Settings className="h-4 w-4 mr-2" />
+                系统诊断
               </Button>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* System Tests */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TestTube className="h-5 w-5" />
-            系统测试
-          </CardTitle>
-          <CardDescription>
-            测试各系统组件的功能状态
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <Button onClick={testDatabaseConnection} variant="outline" disabled={isLoading}>
-              <Database className="h-4 w-4 mr-2" />
-              数据库测试
-            </Button>
-            <Button onClick={refreshMonitorStatus} variant="outline" disabled={isLoading}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              监控状态
-            </Button>
-            <Button onClick={openTestPage} variant="outline">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              测试页面
-            </Button>
-            <Button onClick={runTokenTest} variant="outline">
-              <Settings className="h-4 w-4 mr-2" />
-              完整测试
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Results */}
       {result && (
@@ -551,9 +281,9 @@ node admin-scripts/test-token-monitoring.js
               <p className="text-sm">{currentUser?.email || 'Not logged in'}</p>
             </div>
             <div>
-              <Label>监控状态</Label>
-              <Badge variant={difyIframeMonitor.isCurrentlyListening() ? 'default' : 'secondary'}>
-                {difyIframeMonitor.isCurrentlyListening() ? '运行中' : '已停止'}
+              <Label>API模式</Label>
+              <Badge variant="default">
+                Direct API (Iframe monitoring removed)
               </Badge>
             </div>
           </div>

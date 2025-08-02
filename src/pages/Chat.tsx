@@ -35,10 +35,10 @@ export default function Chat() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // 获取用户信息 - 使用 useState 确保响应式更新
+  // 获取用户信息 - 使用同步方法获取缓存用户，异步加载完整信息
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      return authService.getCurrentUser();
+      return authService.getCurrentUserSync();
     } catch (error) {
       console.error('Failed to get current user:', error);
       return null;
@@ -80,8 +80,12 @@ export default function Chat() {
   useEffect(() => {
     const initializeComponent = async () => {
       try {
+        // 异步加载完整的用户信息
+        const user = await authService.getCurrentUser();
+        setCurrentUser(user);
+        
         // 检查用户认证
-        if (!currentUser) {
+        if (!user) {
           console.log('User not authenticated, redirecting to login');
           navigate('/login');
           return;
@@ -120,7 +124,7 @@ export default function Chat() {
     };
 
     initializeComponent();
-  }, [serviceId, currentUser, navigate]);
+  }, [serviceId, navigate]); // 移除 currentUser 依赖以避免无限循环
 
   // 输入变化处理函数
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
