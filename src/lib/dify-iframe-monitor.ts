@@ -46,9 +46,26 @@ export class DifyIframeMonitor {
   private lastEventTime = 0;
   private minEventInterval = 1000; // Minimum 1 second between events
   private boundMessageHandler?: (event: MessageEvent) => void; // Store bound handler for cleanup
+  private initialized = false; // 添加初始化标志
 
   constructor() {
-    this.initialize();
+    // 移除直接的初始化调用，改为延迟初始化
+    // this.initialize();
+  }
+
+  // 延迟初始化方法
+  public async ensureInitialized(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+    
+    try {
+      await this.initialize();
+      this.initialized = true;
+    } catch (error) {
+      console.error('[DifyIframeMonitor] Initialization failed:', error);
+      this.initialized = true; // 防止重复初始化
+    }
   }
 
   private async initialize() {
@@ -106,7 +123,9 @@ export class DifyIframeMonitor {
     }
   }
 
-  public startListening(userId: string) {
+  public async startListening(userId: string) {
+    await this.ensureInitialized();
+    
     if (this.isListening) {
       console.warn('[DifyIframeMonitor] Monitor is already listening');
       return;
@@ -1145,6 +1164,7 @@ export class DifyIframeMonitor {
   }
 
   public async refreshConfigs() {
+    await this.ensureInitialized();
     await this.loadModelConfigs();
     await this.loadExchangeRate();
   }
@@ -1272,6 +1292,7 @@ export class DifyIframeMonitor {
     inputTokens: number = 1000,
     outputTokens: number = 500
   ): Promise<void> {
+    await this.ensureInitialized();
     console.log('[DifyIframeMonitor] Simulating token consumption event');
     
     const mockEvent: DifyMessageEndEvent = {
@@ -1303,6 +1324,7 @@ export class DifyIframeMonitor {
     inputPrice: number = 0.005826,
     outputPrice: number = 0.005488
   ): Promise<void> {
+    await this.ensureInitialized();
     console.log('[DifyIframeMonitor] Simulating real Dify usage event');
     
     const totalTokens = inputTokens + outputTokens;
@@ -1331,6 +1353,7 @@ export class DifyIframeMonitor {
 
     await this.processRealDifyUsage(mockEvent, userId);
   }
+
   public async simulateWorkflowTokenConsumption(
     userId: string,
     inputTokens: number = 2913,
@@ -1338,6 +1361,7 @@ export class DifyIframeMonitor {
     inputPrice: number = 0.005826,
     outputPrice: number = 0.005608
   ): Promise<void> {
+    await this.ensureInitialized();
     console.log('[DifyIframeMonitor] Simulating workflow token consumption event');
     
     const totalTokens = inputTokens + outputTokens;
@@ -1377,6 +1401,7 @@ export class DifyIframeMonitor {
     description: string = 'Manual token usage entry'
   ): Promise<{ success: boolean; message: string; newBalance?: number }> {
     try {
+      await this.ensureInitialized();
       console.log('[DifyIframeMonitor] 📝 Recording manual token usage:', {
         userId, modelName, inputTokens, outputTokens, description
       });
@@ -1450,6 +1475,7 @@ export class DifyIframeMonitor {
    * Simulate a Dify ready message for testing
    */
   public async simulateDifyReady(userId: string, origin: string = 'https://udify.app'): Promise<void> {
+    await this.ensureInitialized();
     console.log('[DifyIframeMonitor] Simulating Dify ready message from:', origin);
     
     const mockEvent = {
@@ -1520,14 +1546,4 @@ export class DifyIframeMonitor {
    */
   public getStatus() {
     return {
-      isListening: this.isListening,
-      modelConfigsLoaded: this.modelConfigs.length,
-      exchangeRate: this.currentExchangeRate,
-      processedEventsCount: this.processedEvents.size,
-      lastEventTime: this.lastEventTime
-    };
-  }
-}
-
-// Export singleton instance
-export const difyIframeMonitor = new DifyIframeMonitor();
+      isListening: this.
