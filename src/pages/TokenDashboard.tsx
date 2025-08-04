@@ -7,9 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BarChart2, InfoIcon, Activity, Wallet, TrendingUp, Clock, Loader2 } from 'lucide-react';
 import { authService } from '@/lib/auth';
-import { isDifyEnabled } from '@/api/dify-api';
-import { db } from '@/lib/supabase';
 import { isDifyEnabled } from '@/lib/dify-api-client';
+import { db } from '@/lib/supabase';
 import { User, TokenUsage, BillingRecord } from '@/types';
 import { toast } from 'sonner';
 
