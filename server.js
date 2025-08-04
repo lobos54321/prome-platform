@@ -301,12 +301,13 @@ app.post('/api/dify', async (req, res) => {
     const { message, query, user, conversation_id, inputs = {} } = req.body;
     const actualMessage = message || query; // Support both message and query fields
     
-    if (!DIFY_API_URL || !DIFY_API_KEY) {
-      return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
-    }
-    
     if (!actualMessage) {
       return res.status(400).json({ error: 'Message or query is required' });
+    }
+
+    // In production mode, require API configuration
+    if (DIFY_PRODUCTION_MODE && (!DIFY_API_URL || !DIFY_API_KEY)) {
+      return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
     }
     
     // Initialize Supabase only if fully configured
@@ -349,65 +350,78 @@ app.post('/api/dify', async (req, res) => {
     let data;
     let isUsingMockResponse = false;
     
-    try {
-      response = await fetchWithTimeoutAndRetry(
-        `${DIFY_API_URL}/chat-messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${DIFY_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        },
-        DEFAULT_TIMEOUT
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Dify API error:', errorData);
-
-        if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-          console.log('Retrying without conversation_id');
-          delete requestBody.conversation_id;
-
-          response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+    // Check if API credentials are available
+    if (!DIFY_API_URL || !DIFY_API_KEY) {
+      // In development mode, use mock response if API is not configured
+      if (!DIFY_PRODUCTION_MODE) {
+        console.log('🤖 API credentials not configured, using mock response in development mode');
+        data = generateMockDifyResponse(actualMessage, difyConversationId);
+        isUsingMockResponse = true;
+      } else {
+        return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
+      }
+    } else {
+      // API credentials are available, try to make the request
+      try {
+        response = await fetchWithTimeoutAndRetry(
+          `${DIFY_API_URL}/chat-messages`,
+          {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${DIFY_API_KEY}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(requestBody),
-          });
+          },
+          DEFAULT_TIMEOUT
+        );
 
-          if (!response.ok) {
-            throw new Error('Dify API request failed after retry');
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Dify API error:', errorData);
+
+          if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
+            console.log('Retrying without conversation_id');
+            delete requestBody.conversation_id;
+
+            response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${DIFY_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+              throw new Error('Dify API request failed after retry');
+            }
+          } else {
+            throw new Error(`Dify API error: ${errorData.message || 'Unknown error'}`);
           }
-        } else {
-          throw new Error(`Dify API error: ${errorData.message || 'Unknown error'}`);
         }
-      }
 
-      data = await response.json();
-      console.log('✅ Successfully received response from Dify API');
-      
-    } catch (error) {
-      console.warn('⚠️ Dify API request failed:', error.message);
-      
-      // In production mode, don't use mock responses - return error instead
-      if (DIFY_PRODUCTION_MODE) {
-        return res.status(503).json({ 
-          error: 'Dify API unavailable', 
-          message: 'Unable to connect to Dify API. Please check your configuration and network connectivity.',
-          details: error.message 
-        });
+        data = await response.json();
+        console.log('✅ Successfully received response from Dify API');
+        
+      } catch (error) {
+        console.warn('⚠️ Dify API request failed:', error.message);
+        
+        // In production mode, don't use mock responses - return error instead
+        if (DIFY_PRODUCTION_MODE) {
+          return res.status(503).json({ 
+            error: 'Dify API unavailable', 
+            message: 'Unable to connect to Dify API. Please check your configuration and network connectivity.',
+            details: error.message 
+          });
+        }
+        
+        // Use mock response in development or when external API is unavailable
+        data = generateMockDifyResponse(actualMessage, difyConversationId);
+        isUsingMockResponse = true;
+        
+        console.log('🤖 Using mock response for development/testing');
       }
-      
-      // Use mock response in development or when external API is unavailable
-      data = generateMockDifyResponse(actualMessage, difyConversationId);
-      isUsingMockResponse = true;
-      
-      console.log('🤖 Using mock response for development/testing');
     }
 
     // If this was a new conversation and not using mock, save the mapping
