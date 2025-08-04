@@ -178,7 +178,17 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
       abortControllerRef.current.abort();
     }
 
-    const userId = user || 'default-user';
+    const userId = user || (() => {
+      // For default users, generate a consistent UUID
+      const defaultUserId = localStorage.getItem('dify_default_user_id');
+      if (defaultUserId && isValidUUID(defaultUserId)) {
+        return defaultUserId;
+      }
+      // Generate a new UUID for the default user and store it
+      const newUserId = generateUUID();
+      localStorage.setItem('dify_default_user_id', newUserId);
+      return newUserId;
+    })();
     const userMessageId = generateUUID();
     const assistantMessageId = generateUUID();
     

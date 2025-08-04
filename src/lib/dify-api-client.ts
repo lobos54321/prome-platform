@@ -5,7 +5,7 @@
  * accurate token monitoring and billing.
  */
 
-import { generateUUID } from '@/lib/utils';
+import { generateUUID, isValidUUID } from '@/lib/utils';
 
 export interface DifyMessage {
   role: 'user' | 'assistant';
@@ -104,6 +104,24 @@ export class DifyAPIClient {
 
   constructor(config: DifyAPIClientConfig) {
     this.config = config;
+  }
+
+  /**
+   * Get a valid user ID - either the provided one or generate a UUID for default user
+   */
+  private getValidUserId(user?: string): string {
+    if (user && user !== 'default-user') {
+      return user;
+    }
+    // For default users, generate a consistent UUID
+    const defaultUserId = localStorage.getItem('dify_default_user_id');
+    if (defaultUserId && isValidUUID(defaultUserId)) {
+      return defaultUserId;
+    }
+    // Generate a new UUID for the default user and store it
+    const newUserId = generateUUID();
+    localStorage.setItem('dify_default_user_id', newUserId);
+    return newUserId;
   }
 
   /**
@@ -242,7 +260,7 @@ export class DifyAPIClient {
   private async validateConversationId(conversationId: string): Promise<boolean> {
     try {
       // Try to get conversation history to validate
-      await this.getConversationHistory(conversationId, 'default-user', 1);
+      await this.getConversationHistory(conversationId, this.getValidUserId(), 1);
       return true;
     } catch (error) {
       console.log('❌ Conversation validation failed:', conversationId, error);
@@ -289,8 +307,8 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
-    // If no conversationId provided, use a fallback
-    const targetConversationId = conversationId || 'default';
+    // If no conversationId provided, generate a new UUID instead of using "default"
+    const targetConversationId = conversationId && isValidUUID(conversationId) ? conversationId : generateUUID();
     
     // Call backend API instead of Dify directly using enhanced fetch
     const response = await this.fetchWithTimeoutAndRetry(
@@ -302,7 +320,7 @@ export class DifyAPIClient {
         },
         body: JSON.stringify({
           message,
-          user: user || 'default-user',
+          user: this.getValidUserId(user),
           inputs: inputs || {}
         }),
       },
@@ -342,8 +360,8 @@ export class DifyAPIClient {
   ): Promise<DifyResponse> {
     console.log('📈 Starting workflow request with extended timeout...');
     
-    // If no conversationId provided, use a fallback
-    const targetConversationId = conversationId || 'default';
+    // If no conversationId provided, generate a new UUID instead of using "default"
+    const targetConversationId = conversationId && isValidUUID(conversationId) ? conversationId : generateUUID();
     
     // Call backend API with extended timeout for workflows
     const response = await this.fetchWithTimeoutAndRetry(
@@ -355,7 +373,7 @@ export class DifyAPIClient {
         },
         body: JSON.stringify({
           message,
-          user: user || 'default-user',
+          user: this.getValidUserId(user),
           inputs: inputs || {}
         }),
       },
@@ -391,8 +409,8 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<void> {
-    // If no conversationId provided, use a fallback
-    const targetConversationId = conversationId || 'default';
+    // If no conversationId provided, generate a new UUID instead of using "default"
+    const targetConversationId = conversationId && isValidUUID(conversationId) ? conversationId : generateUUID();
 
     // Call backend streaming API with enhanced timeout handling
     const response = await this.fetchWithTimeoutAndRetry(
@@ -404,7 +422,7 @@ export class DifyAPIClient {
         },
         body: JSON.stringify({
           message,
-          user: user || 'default-user',
+          user: this.getValidUserId(user),
           inputs: inputs || {}
         }),
       },
@@ -480,7 +498,7 @@ export class DifyAPIClient {
     limit?: number
   ): Promise<DifyConversationHistoryResponse> {
     const params = new URLSearchParams({
-      user: user || 'default-user',
+      user: this.getValidUserId(user),
       limit: (limit || 20).toString()
     });
 
@@ -509,7 +527,7 @@ export class DifyAPIClient {
     pinned?: boolean
   ): Promise<{ limit: number; has_more: boolean; data: DifyConversation[] }> {
     const params = new URLSearchParams({
-      user: user || 'default-user',
+      user: this.getValidUserId(user),
       limit: (limit || 20).toString()
     });
 
@@ -549,7 +567,7 @@ export class DifyAPIClient {
       },
       body: JSON.stringify({
         name,
-        user: user || 'default-user'
+        user: this.getValidUserId(user)
       }),
     });
 
@@ -575,7 +593,7 @@ export class DifyAPIClient {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user: user || 'default-user'
+        user: this.getValidUserId(user)
       }),
     });
 
@@ -639,7 +657,7 @@ export class DifyAPIClient {
     };
   }> {
     const params = new URLSearchParams({
-      user: user || 'default-user'
+      user: this.getValidUserId(user)
     });
 
     const response = await fetch(`${this.config.apiUrl}/parameters?${params}`, {
