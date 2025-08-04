@@ -153,59 +153,27 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-  // 构建完整的输入参数 - 简化工作流控制逻辑
-  const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
-    const currentTime = new Date();
-    
-    // 计算当前状态
-    const existingUserMessages = state.messages.filter(msg => msg.role === 'user');
-    const currentUserMessageCount = existingUserMessages.length + 1;
-    const isFirstMessage = existingUserMessages.length === 0;
-    
-    // 简化的输入参数 - 只包含必要的Dify标准参数
-    const baseInputs = {
-      // 基础用户信息
-      "user_id": user || 'default-user',
-      "session_id": state.conversationId || 'new-session',
-      "timestamp": currentTime.toISOString(),
-      
-      // 消息内容
-      "user_message": message,
-      "query": message,
-      "user_input": message,
-      
-      // 会话状态 - 使用标准Dify参数
-      "conversation_id": state.conversationId,
-      "message_count": currentUserMessageCount,
-      "is_first_message": isFirstMessage,
-      
-      // 语言设置
-      "language": "zh-CN",
-      "locale": "zh-CN",
-      
-      // 简化的上下文（如果需要）
-      "previous_message": state.messages.length > 0 
-        ? state.messages[state.messages.length - 1]?.content?.substring(0, 200)
-        : "",
-      
-      // 合并其他参数
-      ...inputs, // 来自 useDifyChat 选项的输入
-      ...workflowInputs, // 工作流专用输入
-      ...customInputs, // 自定义输入（优先级最高）
+  // 构建简化的输入参数 - 只传递必要的参数给Dify API
+  const buildInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
+    // 简化的输入参数 - 只包含Dify API需要的基本参数
+    const simpleInputs = {
+      // 合并输入参数，优先级: customInputs > workflowInputs > inputs
+      ...inputs,
+      ...workflowInputs,
+      ...customInputs,
     };
 
-    console.log('🎯 Simplified workflow inputs:', {
-      isFirstMessage,
-      messageCount: currentUserMessageCount,
+    console.log('🎯 Simple Dify inputs:', {
       conversationId: state.conversationId,
-      hasContext: state.messages.length > 0
+      messageLength: message.length,
+      inputKeys: Object.keys(simpleInputs)
     });
     
     // Record parameters for diagnostics
-    recordParameters(state.conversationId || 'unknown', baseInputs, currentUserMessageCount);
+    recordParameters(state.conversationId || 'unknown', simpleInputs, state.messages.filter(m => m.role === 'user').length + 1);
     
-    return baseInputs;
-  }, [user, state.conversationId, state.messages, inputs, workflowInputs, recordParameters]);
+    return simpleInputs;
+  }, [inputs, workflowInputs, state.conversationId, state.messages, recordParameters]);
 
   const sendMessage = useCallback(async (content: string, customInputs?: Record<string, unknown>) => {
     if (!clientRef.current) {
@@ -227,8 +195,8 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     const userMessageId = generateUUID();
     const assistantMessageId = generateUUID();
     
-    // 关键修复：在添加消息之前构建输入参数
-    const completeInputs = buildCompleteInputs(content, customInputs);
+    // 简化：在发送消息之前构建输入参数
+    const simpleInputs = buildInputs(content, customInputs);
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -334,12 +302,12 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
             } else if (chunk.event === 'workflow_started') {
               console.log('🚀 Workflow started:', chunk);
               workflowStartTimeRef.current = Date.now();
-              // Record workflow started event for diagnostics
+                // Record workflow started event for diagnostics
               recordEvent(state.conversationId, {
                 event: 'workflow_started',
                 data: chunk,
                 metadata: {
-                  parameters: completeInputs
+                  parameters: simpleInputs
                 }
               });
             } else if (chunk.event === 'workflow_finished') {
@@ -406,7 +374,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
           content,
           state.conversationId || undefined,
           userId,
-          completeInputs // 使用精确的输入参数
+          simpleInputs // 使用简化的输入参数
         );
 
         updateMessage(assistantMessageId, {
@@ -500,7 +468,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     setError, 
     startNewConversation, 
     processTokenUsage,
-    buildCompleteInputs,
+    buildInputs,
     recordEvent
   ]);
 
