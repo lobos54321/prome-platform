@@ -50,6 +50,30 @@ if (DIFY_PRODUCTION_MODE) {
   console.log('🔧 DEVELOPMENT MODE - Mock responses enabled for fallback');
 }
 
+// UUID utility functions
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function isValidUUID(str) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+// Helper function to get a valid user ID
+function getValidUserId(user) {
+  if (user && user !== getValidUserId()) {
+    return user;
+  }
+  // For server-side, we'll generate a session-based user ID
+  // In a real application, this should come from authentication
+  return `anonymous-${generateUUID()}`;
+}
+
 // Timeout configurations
 const DEFAULT_TIMEOUT = parseInt(process.env.VITE_DIFY_TIMEOUT_MS) || 30000; // 30 seconds
 const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 120000; // 2 minutes
@@ -337,7 +361,7 @@ app.post('/api/dify', async (req, res) => {
       inputs: inputs,
       query: actualMessage,
       response_mode: 'blocking',
-      user: user || 'default-user'
+      user: getValidUserId(user)
     };
 
     // Only add conversation_id if it exists and is valid
@@ -514,7 +538,7 @@ app.post('/api/dify/workflow', async (req, res) => {
         query: actualMessage // For workflows, message goes in inputs.query
       },
       response_mode: stream ? 'streaming' : 'blocking',
-      user: user || 'default-user'
+      user: getValidUserId(user)
     };
 
     // Only add conversation_id if it exists and is valid
@@ -810,7 +834,13 @@ app.post('/api/dify/workflow', async (req, res) => {
 app.post('/api/dify/:conversationId/stream', async (req, res) => {
   try {
     const { message, inputs = {} } = req.body;
-    const { conversationId } = req.params;
+    const { conversationId: rawConversationId } = req.params;
+    
+    // Validate and fix conversation ID - generate new UUID if invalid
+    const conversationId = isValidUUID(rawConversationId) ? rawConversationId : generateUUID();
+    if (conversationId !== rawConversationId) {
+      console.log(`🔧 Generated new UUID for invalid conversation ID: ${rawConversationId} -> ${conversationId}`);
+    }
     
     if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ error: 'Server configuration error: Missing required environment variables' });
@@ -831,7 +861,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       inputs: inputs,
       query: message,
       response_mode: 'streaming',
-      user: 'default-user'
+      user: getValidUserId()
     };
 
     // 只有在 dify_conversation_id 存在且有效时才添加
@@ -942,7 +972,13 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
 app.post('/api/dify/:conversationId', async (req, res) => {
   try {
     const { message, inputs = {} } = req.body;
-    const { conversationId } = req.params;
+    const { conversationId: rawConversationId } = req.params;
+    
+    // Validate and fix conversation ID - generate new UUID if invalid
+    const conversationId = isValidUUID(rawConversationId) ? rawConversationId : generateUUID();
+    if (conversationId !== rawConversationId) {
+      console.log(`🔧 Generated new UUID for invalid conversation ID: ${rawConversationId} -> ${conversationId}`);
+    }
     
     if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ error: 'Server configuration error: Missing required environment variables' });
@@ -963,7 +999,7 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       inputs: inputs,
       query: message,
       response_mode: 'blocking',
-      user: 'default-user'
+      user: getValidUserId()
     };
 
     // 只有在 dify_conversation_id 存在且有效时才添加
