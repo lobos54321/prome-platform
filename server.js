@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -318,7 +319,13 @@ app.post('/api/dify', async (req, res) => {
 
     // Use conversation_id from request body, or generate a new one
     let difyConversationId = conversation_id || null;
-    let conversationId = conversation_id || 'default';
+    let conversationId = conversation_id || crypto.randomUUID();
+    
+    // If conversation_id is "default", treat it as null and generate a new UUID
+    if (conversationId === 'default') {
+      conversationId = crypto.randomUUID();
+      difyConversationId = null;
+    }
 
     // If we have a conversation_id, check if it exists in our database
     if (difyConversationId && supabase) {
@@ -493,7 +500,13 @@ app.post('/api/dify/workflow', async (req, res) => {
 
     // Use conversation_id from request body, or generate a new one
     let difyConversationId = conversation_id || null;
-    let conversationId = conversation_id || 'default';
+    let conversationId = conversation_id || crypto.randomUUID();
+    
+    // If conversation_id is "default", treat it as null and generate a new UUID
+    if (conversationId === 'default') {
+      conversationId = crypto.randomUUID();
+      difyConversationId = null;
+    }
 
     // If we have a conversation_id, check if it exists in our database
     if (difyConversationId && supabase) {
