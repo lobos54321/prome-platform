@@ -153,8 +153,20 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-
-    });
+  // Helper function to build input parameters for API calls
+  const buildInputs = useCallback((content: string, customInputs?: Record<string, unknown>) => {
+    // Combine all input sources
+    const completeInputs = {
+      ...inputs,
+      ...workflowInputs,
+      ...customInputs,
+    };
+    
+    // For simple chat calls, use basic inputs
+    const simpleInputs = {
+      ...inputs,
+      ...customInputs,
+    };
     
     // Record parameters for diagnostics
     recordParameters(state.conversationId || 'unknown', simpleInputs, state.messages.filter(m => m.role === 'user').length + 1);

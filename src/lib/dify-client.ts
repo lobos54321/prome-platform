@@ -44,7 +44,7 @@ export class DifyClient {
     query: string, 
     user: string, 
     conversationId?: string,
-    inputs?: Record<string, any>
+    inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
     try {
       // 使用存储的 conversation_id 或传入的
@@ -93,7 +93,7 @@ export class DifyClient {
     query: string, 
     user: string, 
     conversationId?: string,
-    inputs?: Record<string, any>
+    inputs?: Record<string, unknown>
   ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     try {
       const actualConversationId = conversationId || this.conversationStore.get(user);
@@ -136,7 +136,7 @@ export class DifyClient {
     query: string,
     user: string,
     conversationId?: string,
-    inputs?: Record<string, any>
+    inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
     try {
       const actualConversationId = conversationId || this.conversationStore.get(user);

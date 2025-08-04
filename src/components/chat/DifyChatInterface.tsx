@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, isValidUUID } from '@/lib/utils';
 
 interface Message {
   id: string;
@@ -150,8 +150,8 @@ export function DifyChatInterface({
     const maxRetries = enableRetry ? 3 : 0;
     
     try {
-      // 🔧 修复：先定义 endpoint 再使用
-      const endpoint = conversationId && conversationId !== 'default' && conversationId !== 'null' && conversationId.length > 0
+      // Check if we have a valid conversation ID for targeted API calls
+      const endpoint = conversationId && isValidUUID(conversationId)
         ? `/api/dify/${conversationId}` 
         : '/api/dify';
       
