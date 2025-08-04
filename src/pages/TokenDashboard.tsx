@@ -9,7 +9,7 @@ import { BarChart2, InfoIcon, Activity, Wallet, TrendingUp, Clock, Loader2 } fro
 import { authService } from '@/lib/auth';
 import { isDifyEnabled } from '@/api/dify-api';
 import { db } from '@/lib/supabase';
-import { difyIframeMonitor } from '@/lib/dify-iframe-monitor';
+import { isDifyEnabled } from '@/lib/dify-api-client';
 import { User, TokenUsage, BillingRecord } from '@/types';
 import { toast } from 'sonner';
 
@@ -34,7 +34,7 @@ export default function TokenDashboard() {
 
         if (isDifyEnabled()) {
           await loadUserData(currentUser.id);
-          setupIframeMonitoring(currentUser.id);
+          // Token monitoring is now handled automatically through API integration
         }
       } catch (error) {
         console.error('Failed to get current user:', error);
@@ -47,7 +47,7 @@ export default function TokenDashboard() {
     initUser();
 
     return () => {
-      difyIframeMonitor.stopListening();
+      // Cleanup if needed
     };
   }, [navigate]);
 
@@ -69,21 +69,8 @@ export default function TokenDashboard() {
     }
   };
 
-  const setupIframeMonitoring = (userId: string) => {
-    difyIframeMonitor.setOnTokenConsumption((event) => {
-      console.log('Token consumption event:', event);
-      toast.success(`Token已消费: ${event.totalTokens} tokens (${event.modelName})`);
-      loadUserData(userId); // Reload data
-    });
-
-    difyIframeMonitor.setOnBalanceUpdate((newBalance) => {
-      if (user) {
-        setUser({ ...user, balance: newBalance });
-      }
-    });
-
-    difyIframeMonitor.startListening(userId);
-  };
+  // Token monitoring is now handled automatically through the API integration
+  // No need for separate iframe monitoring setup
 
   const calculateStats = () => {
     const now = new Date();
@@ -280,8 +267,8 @@ export default function TokenDashboard() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">实时监控</span>
-              <Badge variant={difyIframeMonitor.isCurrentlyListening() ? "default" : "secondary"}>
-                {difyIframeMonitor.isCurrentlyListening() ? '运行中' : '已停止'}
+              <Badge variant="default">
+                API集成模式
               </Badge>
             </div>
             <div className="flex items-center justify-between">

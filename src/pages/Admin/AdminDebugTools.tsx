@@ -9,7 +9,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { db } from '@/lib/supabase';
-import { difyIframeMonitor } from '@/lib/dify-iframe-monitor';
 import { authService } from '@/lib/auth';
 import { WorkflowDiagnosticsOverview } from '@/components/WorkflowDiagnosticsOverview';
 import { 
@@ -110,18 +109,7 @@ export default function AdminDebugTools() {
         return;
       }
 
-      await difyIframeMonitor.simulateRealDifyUsage(
-        currentUser.id,
-        inputTokens,
-        outputTokens,
-        inputPrice,
-        outputPrice
-      );
-
-      const totalTokens = inputTokens + outputTokens;
-      const totalPrice = inputPrice + outputPrice;
-
-      setResult(`✅ Simulated real Dify usage:\nInput: ${inputTokens} tokens ($${inputPrice})\nOutput: ${outputTokens} tokens ($${outputPrice})\nTotal: ${totalTokens} tokens ($${totalPrice.toFixed(6)})`);
+      setResult('Real Dify usage simulation has been removed. Please use the DifyChat interface for real API testing.');
     } catch (error) {
       console.error('Error simulating real Dify usage:', error);
       setResult(`❌ Error simulating real Dify usage: ${error}`);
@@ -148,14 +136,7 @@ export default function AdminDebugTools() {
         return;
       }
 
-      await difyIframeMonitor.simulateTokenConsumption(
-        currentUser.id,
-        tokenForm.modelName,
-        inputTokens,
-        outputTokens
-      );
-
-      setResult(`✅ Simulated token usage:\nModel: ${tokenForm.modelName}\nInput: ${inputTokens} tokens\nOutput: ${outputTokens} tokens\nTotal: ${inputTokens + outputTokens} tokens`);
+      setResult('Token usage simulation has been removed. Please use the DifyChat interface for real API testing.');
     } catch (error) {
       console.error('Error simulating token usage:', error);
       setResult(`❌ Error simulating token usage: ${error}`);
@@ -186,8 +167,7 @@ export default function AdminDebugTools() {
   };
 
   const testOriginValidation = (origin: string) => {
-    const isValid = difyIframeMonitor.testOriginValidation(origin);
-    setResult(`🔍 Origin validation test for: ${origin}\nResult: ${isValid ? '✅ VALID' : '❌ INVALID'}\nCheck console for detailed logs.`);
+    setResult('Origin validation testing has been removed as iframe monitoring is no longer supported.');
   };
 
   const simulateUdifyMessage = () => {
@@ -196,39 +176,11 @@ export default function AdminDebugTools() {
       return;
     }
 
-    setResult('📨 Simulating udify.app message...\nCheck console for detailed processing logs.');
-    
-    // Simulate a real udify.app message
-    difyIframeMonitor.simulateMessageFromOrigin(
-      'https://chatbot.udify.app',
-      currentUser.id,
-      {
-        event: '', // Real udify messages might not have this
-        data: {
-          usage: {
-            prompt_tokens: 2913,
-            prompt_unit_price: "2",
-            prompt_price_unit: "0.000001",
-            prompt_price: "0.005826",
-            completion_tokens: 686,
-            completion_unit_price: "8", 
-            completion_price_unit: "0.000001",
-            completion_price: "0.005488",
-            total_tokens: 3599,
-            total_price: "0.011314",
-            currency: "USD",
-            latency: 2.6395470835268497
-          },
-          finish_reason: "stop",
-          files: []
-        }
-      }
-    );
+    setResult('Message simulation has been removed as iframe monitoring is no longer supported.');
   };
 
   const refreshMonitorStatus = () => {
-    const status = difyIframeMonitor.getStatus();
-    setResult(`📊 Monitor Status:\n${JSON.stringify(status, null, 2)}`);
+    setResult('Monitor status checking has been removed. Please use the DifyChat interface for API status.');
   };
 
   const openTestPage = () => {
@@ -552,8 +504,8 @@ node admin-scripts/test-token-monitoring.js
             </div>
             <div>
               <Label>监控状态</Label>
-              <Badge variant={difyIframeMonitor.isCurrentlyListening() ? 'default' : 'secondary'}>
-                {difyIframeMonitor.isCurrentlyListening() ? '运行中' : '已停止'}
+              <Badge variant="secondary">
+                API-only mode
               </Badge>
             </div>
           </div>

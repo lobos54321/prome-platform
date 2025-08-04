@@ -146,7 +146,7 @@ export class EnvironmentValidator {
       recommendations.push('✅ Validate CSP settings allow necessary external resources');
       
       if (validation.config.difyIntegration) {
-        recommendations.push('✅ Test Dify iframe integration and token monitoring');
+        recommendations.push('✅ Test Dify API integration and token monitoring');
       }
       
       if (validation.config.stripeKey) {
