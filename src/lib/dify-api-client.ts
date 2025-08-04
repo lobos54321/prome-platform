@@ -289,8 +289,8 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<DifyResponse> {
-    // If no conversationId provided, use a fallback
-    const targetConversationId = conversationId || 'default';
+    // If no conversationId provided, use a generated UUID instead of "default"
+    const targetConversationId = conversationId || generateUUID();
     
     // Call backend API instead of Dify directly using enhanced fetch
     const response = await this.fetchWithTimeoutAndRetry(
@@ -342,8 +342,8 @@ export class DifyAPIClient {
   ): Promise<DifyResponse> {
     console.log('📈 Starting workflow request with extended timeout...');
     
-    // If no conversationId provided, use a fallback
-    const targetConversationId = conversationId || 'default';
+    // If no conversationId provided, use a generated UUID instead of "default"
+    const targetConversationId = conversationId || generateUUID();
     
     // Call backend API with extended timeout for workflows
     const response = await this.fetchWithTimeoutAndRetry(
@@ -391,8 +391,8 @@ export class DifyAPIClient {
     user?: string,
     inputs?: Record<string, unknown>
   ): Promise<void> {
-    // If no conversationId provided, use a fallback
-    const targetConversationId = conversationId || 'default';
+    // If no conversationId provided, use a generated UUID instead of "default"
+    const targetConversationId = conversationId || generateUUID();
 
     // Call backend streaming API with enhanced timeout handling
     const response = await this.fetchWithTimeoutAndRetry(
