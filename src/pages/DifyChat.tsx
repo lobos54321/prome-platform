@@ -2,9 +2,11 @@
  * Dify Chat Page
  * 
  * Main page for Dify native API chat interface with integrated token monitoring.
+ * Now supports service-specific configurations for unified chat experience.
  */
 
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,32 +18,50 @@ import {
   DollarSign,
   Users,
   TrendingUp,
-  CheckCircle
+  CheckCircle,
+  Bot,
+  ArrowLeft
 } from 'lucide-react';
 import { DifyChatInterface } from '@/components/chat/DifyChatInterface';
 import { authService } from '@/lib/auth';
-import { User } from '@/types';
+import { servicesAPI } from '@/lib/services';
+import { User, Service } from '@/types';
 import { toast } from 'sonner';
 
 export default function DifyChat() {
+  const { serviceId } = useParams();
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [service, setService] = useState<Service | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadUser = async () => {
+    const loadUserAndService = async () => {
       try {
+        // Load user
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
+
+        // Load service if serviceId is provided
+        if (serviceId) {
+          const serviceData = await servicesAPI.getService(serviceId);
+          if (!serviceData) {
+            toast.error('服务不存在或已下线');
+            navigate('/services');
+            return;
+          }
+          setService(serviceData);
+        }
       } catch (error) {
-        console.error('Failed to load user:', error);
-        toast.error('用户认证失败');
+        console.error('Failed to load user or service:', error);
+        toast.error('加载失败');
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadUser();
-  }, []);
+    loadUserAndService();
+  }, [serviceId, navigate]);
 
   // Check if Dify is configured
   const isDifyConfigured = !!(
@@ -95,18 +115,39 @@ export default function DifyChat() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
+          {/* Back to services button if we have a serviceId */}
+          {service && (
+            <div className="mb-6">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/services')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                返回服务列表
+              </Button>
+            </div>
+          )}
+
           {/* Hero Section */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
               <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
-                <MessageSquare className="h-8 w-8 text-blue-600" />
+                {service ? (
+                  <Bot className="h-8 w-8 text-blue-600" />
+                ) : (
+                  <MessageSquare className="h-8 w-8 text-blue-600" />
+                )}
               </div>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Dify AI聊天助手
+              {service ? service.name : 'Dify AI聊天助手'}
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              基于Dify原生API的智能聊天界面，提供100%准确的Token监控和实时计费
+              {service 
+                ? service.description 
+                : '基于Dify原生API的智能聊天界面，提供100%准确的Token监控和实时计费'
+              }
             </p>
           </div>
 
@@ -149,7 +190,10 @@ export default function DifyChat() {
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-4">请先登录</h3>
               <p className="text-gray-600 mb-6">
-                需要登录账户才能使用AI聊天功能并进行Token计费
+                {service 
+                  ? `需要登录账户才能使用${service.name}并进行Token计费`
+                  : '需要登录账户才能使用AI聊天功能并进行Token计费'
+                }
               </p>
               <div className="flex gap-4 justify-center">
                 <Button 
@@ -221,13 +265,36 @@ export default function DifyChat() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-7xl mx-auto">
+        {/* Back to services button if we have a service */}
+        {service && (
+          <div className="mb-6">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/services')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              返回服务列表
+            </Button>
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <MessageSquare className="h-6 w-6 text-blue-600" />
-                Dify AI聊天
+                {service ? (
+                  <>
+                    <Bot className="h-6 w-6 text-blue-600" />
+                    {service.name}
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="h-6 w-6 text-blue-600" />
+                    Dify AI聊天
+                  </>
+                )}
                 <Badge variant="secondary" className="ml-2">
                   <Zap className="h-3 w-3 mr-1" />
                   原生API
@@ -235,6 +302,11 @@ export default function DifyChat() {
               </h1>
               <p className="text-gray-600 mt-1">
                 欢迎 {user.name}，当前余额: <span className="font-semibold text-green-600">{user.balance.toLocaleString()}</span> 积分
+                {service && (
+                  <span className="ml-2 text-sm">
+                    • {service.description}
+                  </span>
+                )}
               </p>
             </div>
 
@@ -267,8 +339,14 @@ export default function DifyChat() {
             mode="workflow" // Enable workflow mode by default
             showWorkflowProgress={true}
             enableRetry={true}
-            placeholder="输入您的消息或工作流指令..."
-            welcomeMessage="您好！我是您的AI助手。我支持普通聊天和复杂工作流处理。有什么可以帮助您的吗？"
+            placeholder={service 
+              ? `输入您的${service.name}需求...` 
+              : "输入您的消息或工作流指令..."
+            }
+            welcomeMessage={service 
+              ? `您好！我是${service.name}。${service.description}有什么可以帮助您的吗？`
+              : "您好！我是您的AI助手。我支持普通聊天和复杂工作流处理。有什么可以帮助您的吗？"
+            }
           />
         </div>
       </div>
