@@ -153,20 +153,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-  // 构建简化的输入参数 - 只传递必要的参数给Dify API
-  const buildInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
-    // 简化的输入参数 - 只包含Dify API需要的基本参数
-    const simpleInputs = {
-      // 合并输入参数，优先级: customInputs > workflowInputs > inputs
-      ...inputs,
-      ...workflowInputs,
-      ...customInputs,
-    };
 
-    console.log('🎯 Simple Dify inputs:', {
-      conversationId: state.conversationId,
-      messageLength: message.length,
-      inputKeys: Object.keys(simpleInputs)
     });
     
     // Record parameters for diagnostics
