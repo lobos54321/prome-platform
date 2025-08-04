@@ -1,13 +1,19 @@
-// 修改前端API客户端，使用相对路径而非绝对路径
+/**
+ * Simplified Dify API Client for Frontend
+ * Calls backend proxy endpoints instead of direct Dify API calls
+ */
+
 // 定义响应类型
 export interface DifyResponse {
   conversation_id?: string;
   message_id?: string;
   answer?: string;
-  usage?: {
-    total_tokens: number;
-    prompt_tokens: number;
-    completion_tokens: number;
+  metadata?: {
+    usage?: {
+      total_tokens: number;
+      prompt_tokens: number;
+      completion_tokens: number;
+    };
   };
 }
 
@@ -75,59 +81,21 @@ export const isDifyEnabled = (): boolean => {
   return true; // 假设始终启用
 };
 
-// 直接调用Dify API的函数
-// 这将绕过我们的API路由，直接调用Dify
-export async function callDifyDirectly(message: string, conversationId?: string): Promise<DifyResponse> {
+// 发送消息（非流式） - 简化版本
+export async function sendMessage(message: string, conversationId?: string, inputs?: Record<string, unknown>): Promise<DifyResponse> {
   try {
-    // 这里需要从环境变量或配置中获取Dify API密钥和URL
-    // 在浏览器端无法安全获取服务器端环境变量，所以这只是一个示例
-    // 实际项目中应该通过后端API代理这个请求
-    const apiKey = 'your-dify-api-key'; // 不要直接在前端暴露API密钥
-    const apiUrl = 'https://api.dify.ai/v1/chat-messages';
+    console.log(`[Dify Client] 发送请求，消息长度: ${message.length}, 会话ID: ${conversationId || '新会话'}`);
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        inputs: {},
-        query: message,
-        response_mode: 'blocking',
-        conversation_id: conversationId,
-        user: 'user-id'
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error("Error calling Dify directly:", error);
-    throw error;
-  }
-}
-
-// 发送消息（非流式）
-export async function sendMessage(message: string, conversationId?: string): Promise<DifyResponse> {
-  try {
-    // 使用正确的路径格式
-    const apiPath = conversationId 
-      ? `/api/dify/${conversationId}` 
-      : '/api/dify';
-    console.log(`[Dify Client] 发送请求到: ${apiPath}`);
-    
-    const response = await fetch(apiPath, {
+    const response = await fetch('/api/dify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         message,
-        conversation_id: conversationId
+        query: message, // 支持两种字段名
+        conversation_id: conversationId,
+        inputs: inputs || {}
       })
     });
     
@@ -137,48 +105,45 @@ export async function sendMessage(message: string, conversationId?: string): Pro
       throw new Error(`API error: ${response.status} - ${errorText.substring(0, 100)}...`);
     }
     
-    try {
-      const data = await response.json();
-      
-      // 更新使用统计
-      if (data.usage) {
-        updateUsageStats(data.usage);
-      }
-      
-      return data;
-    } catch (parseError) {
-      console.error("[Dify Client] JSON解析错误:", await response.text());
-      throw new Error("Invalid JSON response");
+    const data = await response.json();
+    
+    // 更新使用统计
+    if (data.metadata?.usage) {
+      updateUsageStats(data.metadata.usage);
     }
+    
+    console.log(`[Dify Client] 响应成功，答案长度: ${data.answer?.length || 0}`);
+    return data;
   } catch (error) {
     console.error("[Dify Client] 发送消息错误:", error);
     throw error;
   }
 }
 
-// 流式发送消息
+// 流式发送消息 - 简化版本
 export async function streamMessage(
   message: string, 
   conversationId?: string, 
   onMessage?: (chunk: string) => void, 
-  onError?: (error: any) => void,
-  onComplete?: (usage: DifyResponse['usage']) => void
+  onError?: (error: Error) => void,
+  onComplete?: (usage: DifyResponse['metadata']) => void,
+  inputs?: Record<string, unknown>
 ): Promise<DifyResponse> {
   try {
-    // 使用正确的流式路径格式
-    const apiPath = conversationId 
-      ? `/api/dify/${conversationId}/stream` 
-      : '/api/dify/default/stream';
-    console.log(`[Dify Client] 发送流请求到: ${apiPath}`);
+    console.log(`[Dify Client] 发送流请求，消息长度: ${message.length}, 会话ID: ${conversationId || '新会话'}`);
     
-    const response = await fetch(apiPath, {
+    // 使用通用的Dify API端点，让服务器决定使用哪种模式
+    const response = await fetch('/api/dify/workflow', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         message,
-        conversation_id: conversationId
+        query: message, // 支持两种字段名  
+        conversation_id: conversationId,
+        inputs: inputs || {},
+        stream: true // 明确指定要流式响应
       })
     });
 
@@ -204,8 +169,18 @@ export async function streamMessage(
         const lines = chunk.split('\n').filter(line => line.trim() !== '');
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            const dataStr = line.substring(6);
+            if (dataStr === '[DONE]') {
+              // 流结束
+              if (onComplete && finalResponse.metadata) {
+                onComplete(finalResponse.metadata);
+              }
+              finalResponse.answer = fullAnswer;
+              return finalResponse;
+            }
+            
             try {
-              const data = JSON.parse(line.substring(6));
+              const data = JSON.parse(dataStr);
               
               // 处理回答内容
               if (data.answer) {
@@ -218,13 +193,12 @@ export async function streamMessage(
               if (data.message_id) finalResponse.message_id = data.message_id;
               
               // 处理使用统计数据
-              if (data.usage) {
-                finalResponse.usage = data.usage;
-                if (onComplete) onComplete(data.usage);
-                updateUsageStats(data.usage);
+              if (data.metadata?.usage) {
+                finalResponse.metadata = data.metadata;
+                updateUsageStats(data.metadata.usage);
               }
             } catch (parseError) {
-              console.warn("Error parsing JSON from stream:", parseError);
+              console.warn("Error parsing JSON from stream:", parseError, dataStr);
             }
           }
         }

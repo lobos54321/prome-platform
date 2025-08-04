@@ -153,34 +153,14 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-  // 构建Dify API标准输入参数 - 使用最简化的格式以避免API解析错误
-  const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
-    // 计算会话状态用于诊断
-    const existingUserMessages = state.messages.filter(msg => msg.role === 'user');
-    const currentUserMessageCount = existingUserMessages.length + 1;
-    const isFirstMessage = existingUserMessages.length === 0;
-    
-    // 使用最简单的Dify API标准输入格式
-    // 只包含必要的工作流输入参数，避免过多的元数据字段
-    const baseInputs = {
-      // 合并外部提供的输入参数
-      ...inputs, // 来自 useDifyChat 选项的输入
-      ...workflowInputs, // 工作流专用输入
-      ...customInputs, // 自定义输入（优先级最高）
-    };
 
-    console.log('🎯 Dify API inputs:', {
-      isFirstMessage,
-      messageCount: currentUserMessageCount,
-      conversationId: state.conversationId,
-      inputsCount: Object.keys(baseInputs).length
     });
     
     // Record parameters for diagnostics
-    recordParameters(state.conversationId || 'unknown', baseInputs, currentUserMessageCount);
+    recordParameters(state.conversationId || 'unknown', simpleInputs, state.messages.filter(m => m.role === 'user').length + 1);
     
-    return baseInputs;
-  }, [user, state.conversationId, state.messages, inputs, workflowInputs, recordParameters]);
+    return simpleInputs;
+  }, [inputs, workflowInputs, state.conversationId, state.messages, recordParameters]);
 
   const sendMessage = useCallback(async (content: string, customInputs?: Record<string, unknown>) => {
     if (!clientRef.current) {
@@ -202,8 +182,8 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     const userMessageId = generateUUID();
     const assistantMessageId = generateUUID();
     
-    // 关键修复：在添加消息之前构建输入参数
-    const completeInputs = buildCompleteInputs(content, customInputs);
+    // 简化：在发送消息之前构建输入参数
+    const simpleInputs = buildInputs(content, customInputs);
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -309,12 +289,12 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
             } else if (chunk.event === 'workflow_started') {
               console.log('🚀 Workflow started:', chunk);
               workflowStartTimeRef.current = Date.now();
-              // Record workflow started event for diagnostics
+                // Record workflow started event for diagnostics
               recordEvent(state.conversationId, {
                 event: 'workflow_started',
                 data: chunk,
                 metadata: {
-                  parameters: completeInputs
+                  parameters: simpleInputs
                 }
               });
             } else if (chunk.event === 'workflow_finished') {
@@ -381,7 +361,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
           content,
           state.conversationId || undefined,
           userId,
-          completeInputs // 使用精确的输入参数
+          simpleInputs // 使用简化的输入参数
         );
 
         updateMessage(assistantMessageId, {
@@ -475,7 +455,7 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     setError, 
     startNewConversation, 
     processTokenUsage,
-    buildCompleteInputs,
+    buildInputs,
     recordEvent
   ]);
 
