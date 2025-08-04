@@ -3,7 +3,7 @@ import axios from 'axios';
 export interface DifyRequestParams {
   conversation_id?: string;
   user_input: string;
-  query_params?: Record<string, any>;
+  query_params?: Record<string, unknown>;
   stream?: boolean;
   user?: {
     user_id?: string;
@@ -16,12 +16,12 @@ export interface DifyResponse {
   conversation_id: string;
   created_at: string;
   id: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DifyStreamChunk {
   event: string;
-  data: any;
+  data: unknown;
 }
 
 export const sendDifyRequest = async (params: DifyRequestParams): Promise<DifyResponse> => {

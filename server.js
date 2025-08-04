@@ -230,8 +230,8 @@ async function getStoredConversationId(supabase, conversationId) {
 
 // Mock response generator for development/testing
 function generateMockDifyResponse(message, conversationId = null) {
-  const mockConversationId = conversationId || `mock-conv-${Date.now()}`;
-  const mockMessageId = `mock-msg-${Date.now()}`;
+  const mockConversationId = conversationId || generateUUID();
+  const mockMessageId = generateUUID();
   
   // Generate a meaningful mock response based on the input message
   let mockAnswer;
@@ -261,8 +261,8 @@ function generateMockDifyResponse(message, conversationId = null) {
 
 // Mock workflow response with streaming simulation
 function generateMockWorkflowStream(message, conversationId = null) {
-  const mockConversationId = conversationId || `mock-workflow-conv-${Date.now()}`;
-  const mockMessageId = `mock-workflow-msg-${Date.now()}`;
+  const mockConversationId = conversationId || generateUUID();
+  const mockMessageId = generateUUID();
   
   return [
     { event: 'workflow_started', data: { message: 'Starting workflow processing...' } },
@@ -340,9 +340,16 @@ app.post('/api/dify', async (req, res) => {
       supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     }
 
-    // Use conversation_id from request body, or generate a new one
+    // Use conversation_id from request body, or generate a new UUID if invalid
     let difyConversationId = conversation_id || null;
-    let conversationId = conversation_id || 'default';
+    let conversationId = conversation_id && isValidUUID(conversation_id) ? conversation_id : generateUUID();
+    
+    // Log UUID generation for debugging
+    if (conversation_id && !isValidUUID(conversation_id)) {
+      console.log(`🔧 Generated new UUID for invalid conversation ID: ${conversation_id} -> ${conversationId}`);
+    } else if (!conversation_id) {
+      console.log(`🆕 Generated new conversation UUID: ${conversationId}`);
+    }
 
     // If we have a conversation_id, check if it exists in our database
     if (difyConversationId && supabase) {
@@ -515,9 +522,16 @@ app.post('/api/dify/workflow', async (req, res) => {
     // Initialize Supabase only if fully configured
     const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
-    // Use conversation_id from request body, or generate a new one
+    // Use conversation_id from request body, or generate a new UUID if invalid
     let difyConversationId = conversation_id || null;
-    let conversationId = conversation_id || 'default';
+    let conversationId = conversation_id && isValidUUID(conversation_id) ? conversation_id : generateUUID();
+    
+    // Log UUID generation for debugging
+    if (conversation_id && !isValidUUID(conversation_id)) {
+      console.log(`🔧 Generated new UUID for invalid conversation ID: ${conversation_id} -> ${conversationId}`);
+    } else if (!conversation_id) {
+      console.log(`🆕 Generated new conversation UUID: ${conversationId}`);
+    }
 
     // If we have a conversation_id, check if it exists in our database
     if (difyConversationId && supabase) {

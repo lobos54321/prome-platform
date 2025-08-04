@@ -237,7 +237,7 @@ export function useWorkflowDiagnostics() {
     };
 
     setState(prevState => {
-      const sessionId = conversationId || 'default';
+      const sessionId = conversationId || `diagnostics-${generateUUID()}`;
       let session = prevState.activeSessions.get(sessionId);
 
       // Create new session if needed
