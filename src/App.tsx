@@ -16,7 +16,6 @@ import Register from './pages/Register';
 import Services from './pages/Services';
 import Dashboard from './pages/Dashboard';
 import TokenDashboard from './pages/TokenDashboard';
-import Chat from './pages/Chat';
 import Admin from './pages/Admin';
 import Pricing from './pages/Pricing';
 import Purchase from './pages/Purchase';
@@ -134,7 +133,7 @@ const App = () => {
               <Route path="/purchase" element={<Purchase />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/token-dashboard" element={<TokenDashboard />} />
-              <Route path="/chat/:serviceId" element={<Chat />} />
+              <Route path="/chat/:serviceId" element={<DifyChat />} />
               <Route path="/chat/dify" element={<DifyChat />} />
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
               <Route path="/admin" element={<Admin />} />
