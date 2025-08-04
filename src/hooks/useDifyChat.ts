@@ -153,52 +153,27 @@ export function useDifyChat(options: UseDifyChatOptions = {}) {
     }
   }, [setError]);
 
-  // 构建完整的输入参数 - 简化工作流控制逻辑
+  // 构建Dify API标准输入参数 - 使用最简化的格式以避免API解析错误
   const buildCompleteInputs = useCallback((message: string, customInputs?: Record<string, unknown>) => {
-    const currentTime = new Date();
-    
-    // 计算当前状态
+    // 计算会话状态用于诊断
     const existingUserMessages = state.messages.filter(msg => msg.role === 'user');
     const currentUserMessageCount = existingUserMessages.length + 1;
     const isFirstMessage = existingUserMessages.length === 0;
     
-    // 简化的输入参数 - 只包含必要的Dify标准参数
+    // 使用最简单的Dify API标准输入格式
+    // 只包含必要的工作流输入参数，避免过多的元数据字段
     const baseInputs = {
-      // 基础用户信息
-      "user_id": user || 'default-user',
-      "session_id": state.conversationId || 'new-session',
-      "timestamp": currentTime.toISOString(),
-      
-      // 消息内容
-      "user_message": message,
-      "query": message,
-      "user_input": message,
-      
-      // 会话状态 - 使用标准Dify参数
-      "conversation_id": state.conversationId,
-      "message_count": currentUserMessageCount,
-      "is_first_message": isFirstMessage,
-      
-      // 语言设置
-      "language": "zh-CN",
-      "locale": "zh-CN",
-      
-      // 简化的上下文（如果需要）
-      "previous_message": state.messages.length > 0 
-        ? state.messages[state.messages.length - 1]?.content?.substring(0, 200)
-        : "",
-      
-      // 合并其他参数
+      // 合并外部提供的输入参数
       ...inputs, // 来自 useDifyChat 选项的输入
       ...workflowInputs, // 工作流专用输入
       ...customInputs, // 自定义输入（优先级最高）
     };
 
-    console.log('🎯 Simplified workflow inputs:', {
+    console.log('🎯 Dify API inputs:', {
       isFirstMessage,
       messageCount: currentUserMessageCount,
       conversationId: state.conversationId,
-      hasContext: state.messages.length > 0
+      inputsCount: Object.keys(baseInputs).length
     });
     
     // Record parameters for diagnostics
