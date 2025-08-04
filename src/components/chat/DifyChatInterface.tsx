@@ -59,21 +59,36 @@ export function DifyChatInterface({
     completedNodes: 0
   });
   
-  // 生成唯一用户ID（在生产环境应该使用真实的用户ID）
-  const [userId] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('dify_user_id');
-      if (stored) return stored;
-      
-      const newId = `user_${Math.random().toString(36).substring(2, 15)}`;
-      localStorage.setItem('dify_user_id', newId);
-      return newId;
-    }
-    return `user_${Math.random().toString(36).substring(2, 15)}`;
-  });
+  // 🔧 修复：安全的用户ID初始化
+  const [userId, setUserId] = useState<string>('');
+  const [isUserIdReady, setIsUserIdReady] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 🔧 修复：在 useEffect 中安全初始化 userId
+  useEffect(() => {
+    const initUserId = () => {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('dify_user_id');
+        if (stored) {
+          setUserId(stored);
+          setIsUserIdReady(true);
+          return;
+        }
+      }
+      
+      const newId = `user_${Math.random().toString(36).substring(2, 15)}`;
+      setUserId(newId);
+      setIsUserIdReady(true);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dify_user_id', newId);
+      }
+    };
+    
+    initUserId();
+  }, []);
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -84,9 +99,9 @@ export function DifyChatInterface({
     scrollToBottom();
   }, [messages]);
 
-  // 添加欢迎消息
+  // 添加欢迎消息 - 等待 userId 准备完成
   useEffect(() => {
-    if (messages.length === 0 && welcomeMessage) {
+    if (messages.length === 0 && welcomeMessage && isUserIdReady) {
       setMessages([{
         id: 'welcome',
         content: welcomeMessage,
@@ -94,7 +109,7 @@ export function DifyChatInterface({
         timestamp: new Date(),
       }]);
     }
-  }, [welcomeMessage]);
+  }, [welcomeMessage, isUserIdReady]);
 
   // 工作流进度更新处理
   const updateWorkflowProgress = (nodeUpdate: Partial<WorkflowProgress> & { nodeId: string }) => {
@@ -135,6 +150,11 @@ export function DifyChatInterface({
     const maxRetries = enableRetry ? 3 : 0;
     
     try {
+      // 🔧 修复：先定义 endpoint 再使用
+      const endpoint = conversationId && conversationId !== 'default' && conversationId !== 'null' && conversationId.length > 0
+        ? `/api/dify/${conversationId}` 
+        : '/api/dify';
+      
       // Fix 3: Enhanced Error Handling and Debugging - Add comprehensive logging
       console.log('[Chat Debug] Sending request:', {
         endpoint,
@@ -154,10 +174,6 @@ export function DifyChatInterface({
         });
       }
 
-      // Fix 1: Improve API endpoint selection - Better handle conversationId validation
-      const endpoint = conversationId && conversationId !== 'default' && conversationId !== 'null' && conversationId.length > 0
-        ? `/api/dify/${conversationId}` 
-        : '/api/dify';
       const timeoutMs = showWorkflowProgress ? 120000 : 30000; // 显示工作流进度时使用更长的超时
 
       const controller = new AbortController();
@@ -421,7 +437,7 @@ export function DifyChatInterface({
   // 主要的表单提交处理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !isUserIdReady) return;
 
     const userMessage: Message = {
       id: `user_${Date.now()}`,
@@ -477,6 +493,7 @@ export function DifyChatInterface({
       setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
     }
   };
+  
   // 开始新对话
   const handleNewConversation = () => {
     setMessages(welcomeMessage ? [{
@@ -700,15 +717,15 @@ export function DifyChatInterface({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            disabled={isLoading}
+            disabled={isLoading || !isUserIdReady}
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !isUserIdReady}
             className={cn(
               "px-4 py-2.5 rounded-lg font-medium transition-all",
               "disabled:opacity-50 disabled:cursor-not-allowed",
-              !input.trim() || isLoading
+              !input.trim() || isLoading || !isUserIdReady
                 ? "bg-gray-300 text-gray-500"
                 : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
             )}
@@ -732,6 +749,7 @@ export function DifyChatInterface({
         <div className="px-4 py-2 bg-gray-100 text-xs text-gray-600 border-t space-y-1">
           <div>Mode: {mode}</div>
           <div>User ID: {userId}</div>
+          <div>User ID Ready: {isUserIdReady ? 'Yes' : 'No'}</div>
           <div>Conversation ID: {conversationId || 'None'}</div>
           <div>Messages: {messages.length}</div>
           <div>Retry Count: {retryCount}</div>
