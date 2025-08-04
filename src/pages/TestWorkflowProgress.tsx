@@ -41,7 +41,7 @@ export default function TestWorkflowProgress() {
         <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
           <h3 className="font-semibold mb-2 text-green-800">✅ Fix Applied:</h3>
           <ul className="text-sm text-green-700 space-y-1">
-            <li>• <strong>BEFORE:</strong> mode="workflow" called `/api/dify/workflow` (returned mock responses)</li>
+            <li>• <strong>BEFORE:</strong> mode="workflow" called `/api/dify/workflow` (unreliable responses)</li>
             <li>• <strong>AFTER:</strong> mode="chat" with showWorkflowProgress=true calls `/api/dify` (real chat API)</li>
             <li>• <strong>RESULT:</strong> Users get real Dify responses while still seeing workflow progress</li>
             <li>• <strong>KEY CHANGE:</strong> Endpoint selection now based on conversationId, not mode</li>
