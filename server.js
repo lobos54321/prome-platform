@@ -194,16 +194,21 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
   }
 
   try {
-    // Check if conversation already exists
-    const { data: existingConversation } = await supabase
+    // First check if conversation already exists
+    const { data: existingConversation, error: checkError } = await supabase
       .from('conversations')
       .select('id, dify_conversation_id')
       .eq('id', conversationId)
-      .single();
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking existing conversation:', checkError);
+      return;
+    }
 
     if (existingConversation) {
-      // Update dify_conversation_id if provided and not already set
-      if (difyConversationId && !existingConversation.dify_conversation_id) {
+      // Update dify_conversation_id if it's missing
+      if (!existingConversation.dify_conversation_id && difyConversationId) {
         const { error: updateError } = await supabase
           .from('conversations')
           .update({ 
@@ -221,16 +226,23 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
       return;
     }
 
-    // Create new conversation record
+    // Create new conversation record with proper user_id handling
+    const insertData = {
+      id: conversationId,
+      dify_conversation_id: difyConversationId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Only add user_id if it's a valid UUID
+    if (userId && isValidUUID(userId)) {
+      insertData.user_id = userId;
+    }
+    // If userId is null or invalid, user_id will be null (allowed by schema)
+
     const { error: insertError } = await supabase
       .from('conversations')
-      .insert({
-        id: conversationId,
-        dify_conversation_id: difyConversationId,
-        user_id: userId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+      .insert(insertData);
 
     if (insertError) {
       console.error('Error creating conversation record:', insertError);
