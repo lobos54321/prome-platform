@@ -57,12 +57,21 @@ function isValidUUID(str) {
 
 // Helper function to get a valid user ID
 function getValidUserId(user) {
-  if (user && user !== getValidUserId()) {
+  // If user is provided and it's a valid UUID, use it
+  if (user && isValidUUID(user)) {
     return user;
   }
-  // For server-side, we'll generate a session-based user ID
-  // In a real application, this should come from authentication
-  return `anonymous-${generateUUID()}`;
+  
+  // If user is provided but not a UUID, try to extract UUID from it
+  if (user && typeof user === 'string') {
+    const uuidMatch = user.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+    if (uuidMatch) {
+      return uuidMatch[0];
+    }
+  }
+  
+  // For anonymous users, return null instead of generating invalid UUID strings
+  return null;
 }
 
 // Timeout configurations - Optimized for complex workflows
