@@ -66,16 +66,36 @@ export function DifyChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 🔧 修复：在 useEffect 中安全初始化 userId
+  // 🔧 修复：在 useEffect 中安全初始化 userId 和恢复会话状态
   useEffect(() => {
-    const initUserId = () => {
+    const initUserIdAndSession = () => {
       if (typeof window !== 'undefined') {
+        // 初始化用户ID
         const stored = localStorage.getItem('dify_user_id');
         if (stored) {
           setUserId(stored);
-          setIsUserIdReady(true);
-          return;
+        } else {
+          const newId = `user_${Math.random().toString(36).substring(2, 15)}`;
+          setUserId(newId);
+          localStorage.setItem('dify_user_id', newId);
         }
+        
+        // 🔧 修复：恢复工作流会话状态 - 确保会话连续性
+        const workflowConversationId = localStorage.getItem('dify_workflow_conversation_id');
+        const regularConversationId = localStorage.getItem('dify_conversation_id');
+        
+        // 优先使用工作流会话ID，因为它更具体
+        const restoredConversationId = workflowConversationId || regularConversationId;
+        
+        if (restoredConversationId && isValidUUID(restoredConversationId)) {
+          console.log('[Chat Debug] Restored conversation ID from localStorage:', restoredConversationId);
+          setConversationId(restoredConversationId);
+        } else {
+          console.log('[Chat Debug] No valid conversation ID found in localStorage');
+        }
+        
+        setIsUserIdReady(true);
+        return;
       }
       
       const newId = `user_${Math.random().toString(36).substring(2, 15)}`;
@@ -87,7 +107,7 @@ export function DifyChatInterface({
       }
     };
     
-    initUserId();
+    initUserIdAndSession();
   }, []);
 
   // 自动滚动到底部
@@ -161,6 +181,8 @@ export function DifyChatInterface({
         messageContent: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
         userId,
         conversationId,
+        workflowConversationId: localStorage.getItem('dify_workflow_conversation_id'),
+        regularConversationId: localStorage.getItem('dify_conversation_id'),
         showWorkflowProgress,
         timestamp: new Date().toISOString()
       });
@@ -246,11 +268,22 @@ export function DifyChatInterface({
           await handleWorkflowStream(response, messageContent);
         } catch (streamError) {
           console.warn('[Chat Debug] Stream processing failed, falling back to regular response:', streamError);
-          // Fallback to regular response processing
+          // 🔧 修复：保持会话连续性的回退机制
           try {
-            // Try to read response again if possible - create a new request
-            console.log('[Chat Debug] Attempting fallback request to regular endpoint');
-            const fallbackResponse = await fetch(endpoint, {
+            // 获取或恢复会话ID - 优先使用当前会话ID，其次从localStorage恢复，最后才创建新的
+            const fallbackConversationId = conversationId || 
+              localStorage.getItem('dify_workflow_conversation_id') || 
+              localStorage.getItem('dify_conversation_id') || 
+              null;
+            
+            console.log('[Chat Debug] Attempting fallback request with preserved conversation ID:', fallbackConversationId);
+            
+            // 使用保持会话连续性的endpoint
+            const fallbackEndpoint = fallbackConversationId && isValidUUID(fallbackConversationId)
+              ? `/api/dify/${fallbackConversationId}` 
+              : '/api/dify';
+            
+            const fallbackResponse = await fetch(fallbackEndpoint, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -259,7 +292,7 @@ export function DifyChatInterface({
                 query: messageContent,
                 message: messageContent,
                 user: userId || 'default-user',
-                conversation_id: conversationId,
+                conversation_id: fallbackConversationId, // 🔧 关键修复：传递会话ID保持连续性
                 response_mode: 'blocking', // Force blocking mode for fallback
                 stream: false,
                 inputs: {}
@@ -272,8 +305,16 @@ export function DifyChatInterface({
             }
 
             const data = await fallbackResponse.json();
+            // 🔧 修复：在fallback时保持会话ID连续性
+            if (data.conversation_id && data.conversation_id !== conversationId) {
+              console.log('[Chat Debug] Fallback response updated conversation ID from', conversationId, 'to', data.conversation_id);
+              setConversationId(data.conversation_id);
+              localStorage.setItem('dify_workflow_conversation_id', data.conversation_id);
+              localStorage.setItem('dify_conversation_id', data.conversation_id);
+            }
+            
             await handleRegularResponse(data, messageContent);
-            console.log('[Chat Debug] Fallback request succeeded');
+            console.log('[Chat Debug] Fallback request succeeded with preserved session');
           } catch (fallbackError) {
             console.error('[Chat Debug] Fallback processing also failed:', fallbackError);
             throw new Error('无法处理服务器响应，请重试');
@@ -338,7 +379,7 @@ export function DifyChatInterface({
     }
   };
 
-  // 处理工作流流式响应 - 修复无限循环问题
+  // 处理工作流流式响应 - 修复SSE解析和会话管理问题
   const handleWorkflowStream = async (response: Response, messageContent: string) => {
     console.log('[Chat Debug] Starting workflow stream processing');
     const reader = response.body?.getReader();
@@ -347,8 +388,9 @@ export function DifyChatInterface({
     const decoder = new TextDecoder();
     let buffer = '';
     let finalResponse = '';
+    let detectedConversationId = conversationId; // 保持会话ID连续性
     
-    // 🔧 修复：添加超时和循环控制机制
+    // 🔧 修复：优化SSE解析参数
     const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // 5分钟超时
     const MAX_ITERATIONS = 10000; // 最大迭代次数防止无限循环
     const STALL_TIMEOUT_MS = 30 * 1000; // 30秒无数据则认为停滞
@@ -356,6 +398,7 @@ export function DifyChatInterface({
     let iterationCount = 0;
     let lastProgressTime = Date.now();
     let hasReceivedData = false;
+    let processedDataCount = 0; // 跟踪处理的数据块数量
 
     try {
       // 创建超时控制器
@@ -422,19 +465,40 @@ export function DifyChatInterface({
           hasReceivedData = true;
           lastProgressTime = currentTime;
           
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // 保留未完成的行
+          // 🔧 修复：添加原始数据调试日志
+          const chunk = decoder.decode(value, { stream: true });
+          console.log('[Chat Debug] Raw chunk received:', {
+            length: chunk.length,
+            preview: chunk.substring(0, 200) + (chunk.length > 200 ? '...' : ''),
+            iteration: iterationCount
+          });
+          
+          buffer += chunk;
+          
+          // 🔧 修复：改进跨chunk数据分割处理
+          // 检查buffer中是否有完整的行
+          let lineEndIndex;
+          const processedLines: string[] = [];
+          
+          while ((lineEndIndex = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.substring(0, lineEndIndex).trim();
+            if (line) {
+              processedLines.push(line);
+            }
+            buffer = buffer.substring(lineEndIndex + 1);
+          }
 
-          console.log('[Chat Debug] Processing', lines.length, 'lines, iteration', iterationCount);
+          console.log('[Chat Debug] Processing', processedLines.length, 'complete lines, iteration', iterationCount, 'remaining buffer:', buffer.length);
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
+          for (const line of processedLines) {
+            // 🔧 修复：增强data:前缀识别和处理
+            if (line.startsWith('data:')) {
+              const data = line.substring(5).trim(); // 使用substring而不是slice，更明确
+              
               if (data === '[DONE]') {
                 console.log('[Chat Debug] Stream ended with [DONE], finalResponse length:', finalResponse.length);
                 clearTimeout(streamTimeoutId);
-                // 流结束，添加最终消息
+                // 流结束，添加最终消息 - 确保会话ID连续性
                 if (finalResponse.trim()) {
                   const assistantMessage: Message = {
                     id: `assistant_${Date.now()}`,
@@ -443,7 +507,13 @@ export function DifyChatInterface({
                     timestamp: new Date(),
                   };
                   setMessages(prev => [...prev, assistantMessage]);
-                  console.log('[Chat Debug] Added assistant message from stream');
+                  console.log('[Chat Debug] Added assistant message from stream with conversation ID:', detectedConversationId);
+                  
+                  // 保存工作流状态到localStorage
+                  if (detectedConversationId) {
+                    localStorage.setItem('dify_workflow_conversation_id', detectedConversationId);
+                    console.log('[Chat Debug] Saved workflow conversation ID to localStorage:', detectedConversationId);
+                  }
                 } else {
                   console.warn('[Chat Debug] Stream completed but no content accumulated, using fallback');
                   // 触发回退机制 - 抛出错误让外层 catch 处理
@@ -452,62 +522,76 @@ export function DifyChatInterface({
                 return;
               }
 
-              try {
-                const parsed = JSON.parse(data);
-                console.log('[Chat Debug] Parsed stream data:', {
-                  event: parsed.event,
-                  hasAnswer: !!parsed.answer,
-                  answerLength: parsed.answer?.length || 0,
-                  conversationId: parsed.conversation_id,
-                  messageId: parsed.message_id,
-                  iteration: iterationCount
-                });
-                
-                // 更新会话ID
-                if (parsed.conversation_id && parsed.conversation_id !== conversationId) {
-                  console.log('[Chat Debug] Updating conversation ID:', parsed.conversation_id);
-                  setConversationId(parsed.conversation_id);
-                }
-
-                // 处理工作流节点事件
-                if (parsed.event === 'node_started' && parsed.node_id) {
-                  console.log('[Chat Debug] Node started:', parsed.node_id, parsed.node_name);
-                  updateWorkflowProgress({
-                    nodeId: parsed.node_id,
-                    nodeName: parsed.node_name || parsed.node_id,
-                    nodeTitle: parsed.node_title,
-                    status: 'running',
-                    startTime: new Date()
+              if (data) {
+                processedDataCount++;
+                try {
+                  const parsed = JSON.parse(data);
+                  console.log('[Chat Debug] Parsed stream data:', {
+                    event: parsed.event,
+                    hasAnswer: !!parsed.answer,
+                    answerLength: parsed.answer?.length || 0,
+                    conversationId: parsed.conversation_id,
+                    messageId: parsed.message_id,
+                    iteration: iterationCount,
+                    dataBlockIndex: processedDataCount
                   });
-                } else if (parsed.event === 'node_finished' && parsed.node_id) {
-                  console.log('[Chat Debug] Node finished:', parsed.node_id);
-                  updateWorkflowProgress({
-                    nodeId: parsed.node_id,
-                    status: 'completed',
-                    endTime: new Date()
-                  });
-                } else if (parsed.event === 'node_failed' && parsed.node_id) {
-                  console.log('[Chat Debug] Node failed:', parsed.node_id, parsed.error);
-                  updateWorkflowProgress({
-                    nodeId: parsed.node_id,
-                    status: 'failed',
-                    endTime: new Date(),
-                    error: parsed.error || '节点执行失败'
+                  
+                  // 🔧 修复：保持会话连续性 - 只在第一次或明确不同时更新会话ID
+                  if (parsed.conversation_id && 
+                      (!detectedConversationId || parsed.conversation_id !== detectedConversationId)) {
+                    console.log('[Chat Debug] Updating conversation ID from', detectedConversationId, 'to', parsed.conversation_id);
+                    detectedConversationId = parsed.conversation_id;
+                    setConversationId(parsed.conversation_id);
+                  }
+
+                  // 处理工作流节点事件
+                  if (parsed.event === 'node_started' && parsed.node_id) {
+                    console.log('[Chat Debug] Node started:', parsed.node_id, parsed.node_name);
+                    updateWorkflowProgress({
+                      nodeId: parsed.node_id,
+                      nodeName: parsed.node_name || parsed.node_id,
+                      nodeTitle: parsed.node_title,
+                      status: 'running',
+                      startTime: new Date()
+                    });
+                  } else if (parsed.event === 'node_finished' && parsed.node_id) {
+                    console.log('[Chat Debug] Node finished:', parsed.node_id);
+                    updateWorkflowProgress({
+                      nodeId: parsed.node_id,
+                      status: 'completed',
+                      endTime: new Date()
+                    });
+                  } else if (parsed.event === 'node_failed' && parsed.node_id) {
+                    console.log('[Chat Debug] Node failed:', parsed.node_id, parsed.error);
+                    updateWorkflowProgress({
+                      nodeId: parsed.node_id,
+                      status: 'failed',
+                      endTime: new Date(),
+                      error: parsed.error || '节点执行失败'
+                    });
+                  }
+
+                  // 🔧 修复：正确解析和累积消息内容 - 处理更多格式
+                  if (parsed.event === 'message' && parsed.answer) {
+                    console.log('[Chat Debug] Accumulating message answer:', parsed.answer.length, 'chars');
+                    finalResponse += parsed.answer;
+                  } else if (parsed.answer && !parsed.event) {
+                    // 兼容性处理：如果没有event字段但有answer字段
+                    console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
+                    finalResponse += parsed.answer;
+                  } else if (parsed.event === 'message_end' && parsed.answer) {
+                    // 处理message_end事件中的answer
+                    console.log('[Chat Debug] Accumulating message_end answer:', parsed.answer.length, 'chars');
+                    finalResponse += parsed.answer;
+                  }
+
+                } catch (parseError) {
+                  console.warn('[Chat Debug] 解析流数据失败:', {
+                    data: data.substring(0, 200) + (data.length > 200 ? '...' : ''),
+                    error: parseError,
+                    line: line.substring(0, 100) + (line.length > 100 ? '...' : '')
                   });
                 }
-
-                // 修复：正确解析和累积消息内容
-                if (parsed.event === 'message' && parsed.answer) {
-                  console.log('[Chat Debug] Accumulating message answer:', parsed.answer.length, 'chars');
-                  finalResponse += parsed.answer;
-                } else if (parsed.answer && !parsed.event) {
-                  // 兼容性处理：如果没有event字段但有answer字段
-                  console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
-                  finalResponse += parsed.answer;
-                }
-
-              } catch (parseError) {
-                console.warn('[Chat Debug] 解析流数据失败:', data, parseError);
               }
             }
           }
@@ -538,6 +622,12 @@ export function DifyChatInterface({
         };
         setMessages(prev => [...prev, assistantMessage]);
         console.log('[Chat Debug] Added assistant message from incomplete stream');
+        
+        // 保存工作流状态到localStorage
+        if (detectedConversationId) {
+          localStorage.setItem('dify_workflow_conversation_id', detectedConversationId);
+          console.log('[Chat Debug] Saved workflow conversation ID to localStorage:', detectedConversationId);
+        }
       } else {
         console.warn('[Chat Debug] Stream ended without content, triggering fallback');
         throw new Error('流式响应处理完成但未获取到内容');
@@ -546,7 +636,7 @@ export function DifyChatInterface({
     } finally {
       try {
         reader.releaseLock();
-        console.log('[Chat Debug] Stream reader released after', iterationCount, 'iterations');
+        console.log('[Chat Debug] Stream reader released after', iterationCount, 'iterations with processed data blocks:', processedDataCount);
       } catch (releaseError) {
         console.warn('[Chat Debug] Error releasing stream reader:', releaseError);
       }
@@ -669,14 +759,18 @@ export function DifyChatInterface({
     }
   };
   
-  // 开始新对话
+  // 开始新对话 - 修复会话状态管理
   const handleNewConversation = () => {
+    console.log('[Chat Debug] Starting new conversation - clearing previous session state');
+    
     setMessages(welcomeMessage ? [{
       id: 'welcome',
       content: welcomeMessage,
       role: 'assistant',
       timestamp: new Date(),
     }] : []);
+    
+    // 🔧 修复：只有用户主动开始新对话时才清除会话ID
     setConversationId(null);
     setInput('');
     setError(null);
@@ -686,7 +780,16 @@ export function DifyChatInterface({
       nodes: [],
       completedNodes: 0
     });
-    console.log('[Chat] Started new conversation');
+    
+    // 🔧 修复：清除存储的会话状态，确保下次是全新开始
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('dify_conversation_id');
+      localStorage.removeItem('dify_workflow_conversation_id');
+      localStorage.removeItem('dify_workflow_state');
+      console.log('[Chat Debug] Cleared stored conversation and workflow state');
+    }
+    
+    console.log('[Chat Debug] Started new conversation - all session state cleared');
     inputRef.current?.focus();
   };
 
@@ -926,6 +1029,8 @@ export function DifyChatInterface({
           <div>User ID: {userId}</div>
           <div>User ID Ready: {isUserIdReady ? 'Yes' : 'No'}</div>
           <div>Conversation ID: {conversationId || 'None'}</div>
+          <div>Stored Workflow Conv ID: {typeof window !== 'undefined' ? localStorage.getItem('dify_workflow_conversation_id') || 'None' : 'N/A'}</div>
+          <div>Stored Regular Conv ID: {typeof window !== 'undefined' ? localStorage.getItem('dify_conversation_id') || 'None' : 'N/A'}</div>
           <div>Messages: {messages.length}</div>
           <div>Retry Count: {retryCount}</div>
           {workflowState.isWorkflow && (
