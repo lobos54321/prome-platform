@@ -71,6 +71,56 @@ const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 
 const STREAMING_TIMEOUT = parseInt(process.env.VITE_DIFY_STREAMING_TIMEOUT_MS) || 240000; // 4 minutes for streaming responses
 const MAX_RETRIES = parseInt(process.env.VITE_DIFY_MAX_RETRIES) || 3;
 
+// Database health check function
+async function checkDatabaseHealth(supabase) {
+  if (!supabase) {
+    console.log('⚠️ Database health check skipped (Supabase not configured)');
+    return false;
+  }
+
+  try {
+    // Check if required tables exist by attempting to query them
+    const tables = ['conversations', 'messages'];
+    const results = {};
+
+    for (const table of tables) {
+      try {
+        const { data, error } = await supabase
+          .from(table)
+          .select('id')
+          .limit(1);
+        
+        if (error) {
+          results[table] = { exists: false, error: error.message };
+        } else {
+          results[table] = { exists: true, error: null };
+        }
+      } catch (err) {
+        results[table] = { exists: false, error: err.message };
+      }
+    }
+
+    const allTablesExist = Object.values(results).every(result => result.exists);
+    
+    if (allTablesExist) {
+      console.log('✅ Database health check passed - all required tables exist');
+      return true;
+    } else {
+      console.error('❌ Database health check failed - missing tables:');
+      Object.entries(results).forEach(([table, result]) => {
+        if (!result.exists) {
+          console.error(`  - ${table}: ${result.error}`);
+        }
+      });
+      console.error('Please run database migrations to create missing tables');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Database health check failed with error:', error.message);
+    return false;
+  }
+}
+
 // Enhanced fetch with timeout and retry logic
 async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOUT, maxRetries = MAX_RETRIES) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -127,7 +177,63 @@ async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOU
   throw new Error('All retry attempts failed. Please check your connection and try again.');
 }
 
-// Utility function to save messages
+// Utility function to ensure conversation exists before saving messages
+async function ensureConversationExists(supabase, conversationId, difyConversationId = null, userId = null) {
+  if (!supabase) {
+    console.log('📝 Skipping conversation check (Supabase not configured)');
+    return;
+  }
+
+  try {
+    // Check if conversation already exists
+    const { data: existingConversation } = await supabase
+      .from('conversations')
+      .select('id, dify_conversation_id')
+      .eq('id', conversationId)
+      .single();
+
+    if (existingConversation) {
+      // Update dify_conversation_id if provided and not already set
+      if (difyConversationId && !existingConversation.dify_conversation_id) {
+        const { error: updateError } = await supabase
+          .from('conversations')
+          .update({ 
+            dify_conversation_id: difyConversationId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', conversationId);
+
+        if (updateError) {
+          console.error('Error updating conversation mapping:', updateError);
+        } else {
+          console.log('✅ Updated conversation mapping with Dify ID');
+        }
+      }
+      return;
+    }
+
+    // Create new conversation record
+    const { error: insertError } = await supabase
+      .from('conversations')
+      .insert({
+        id: conversationId,
+        dify_conversation_id: difyConversationId,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (insertError) {
+      console.error('Error creating conversation record:', insertError);
+    } else {
+      console.log('✅ Created new conversation record');
+    }
+  } catch (error) {
+    console.error('Error in ensureConversationExists:', error);
+  }
+}
+
+// Utility function to save messages (now expects conversation to already exist)
 async function saveMessages(supabase, conversationId, userMessage, difyResponse) {
   // Skip saving if Supabase is not configured
   if (!supabase) {
@@ -174,62 +280,30 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
   }
 }
 
-// Utility function to handle conversation mapping operations
-async function updateConversationMapping(supabase, conversationId, difyConversationId) {
-  if (!supabase || !difyConversationId) {
-    console.log('📝 Skipping conversation mapping (Supabase not configured or no dify conversation ID)');
-    return;
-  }
-
-  try {
-    const { error } = await supabase
-      .from('conversations')
-      .upsert({ 
-        id: conversationId,
-        dify_conversation_id: difyConversationId,
-        updated_at: new Date().toISOString()
-      });
-
-    if (error) {
-      console.error('Error updating conversation mapping:', error);
-    } else {
-      console.log('✅ Conversation mapping updated successfully');
-    }
-  } catch (error) {
-    console.error('Error in updateConversationMapping:', error);
-  }
-}
-
-// Utility function to get stored conversation ID
-async function getStoredConversationId(supabase, conversationId) {
-  if (!supabase || !conversationId) {
-    return null;
-  }
-
-  try {
-    const { data } = await supabase
-      .from('conversations')
-      .select('dify_conversation_id')
-      .eq('id', conversationId)
-      .single();
-
-    return data?.dify_conversation_id || null;
-  } catch (error) {
-    console.log('Could not retrieve stored conversation ID:', error.message);
-    return null;
-  }
-}
 
 
 
 // Configuration debug endpoint
-app.get('/api/config/status', (req, res) => {
+app.get('/api/config/status', async (req, res) => {
+  // Initialize Supabase for health check
+  let supabase = null;
+  let databaseHealthy = false;
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    databaseHealthy = await checkDatabaseHealth(supabase);
+  }
+
   res.json({
     environment_configured: {
       dify_api_url: !!(DIFY_API_URL),
       dify_api_key: !!(DIFY_API_KEY),
       supabase_url: !!(SUPABASE_URL),
       supabase_service_key: !!(SUPABASE_SERVICE_ROLE_KEY)
+    },
+    database_health: {
+      configured: !!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY),
+      healthy: databaseHealthy,
+      required_tables: ['conversations', 'messages']
     },
     api_endpoints: {
       chat: '/api/dify',
@@ -358,24 +432,12 @@ app.post('/api/dify', async (req, res) => {
       });
     }
 
-    // If this was a new conversation, save the mapping
-    if (!difyConversationId && data.conversation_id && supabase) {
-      // Create or update conversation mapping
-      const { error: upsertError } = await supabase
-        .from('conversations')
-        .upsert({ 
-          id: conversationId,
-          dify_conversation_id: data.conversation_id,
-          updated_at: new Date().toISOString()
-        });
-
-      if (upsertError) {
-        console.error('Error saving conversation mapping:', upsertError);
-      }
-    }
-
-    // Save messages
+    // Ensure conversation exists BEFORE saving messages
     if (supabase) {
+      // First ensure conversation record exists
+      await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
+      
+      // Then save messages
       await saveMessages(supabase, conversationId, actualMessage, data);
     }
 
@@ -512,18 +574,11 @@ app.post('/api/dify/workflow', async (req, res) => {
                   if (data === '[DONE]') {
                     // Save messages to database if we have final data
                     if (finalData && supabase) {
-                      await saveMessages(supabase, conversationId, actualMessage, finalData);
+                      // Ensure conversation exists first
+                      await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
                       
-                      // Update conversation mapping if needed
-                      if (!difyConversationId && finalData.conversation_id) {
-                        await supabase
-                          .from('conversations')
-                          .upsert({ 
-                            id: conversationId,
-                            dify_conversation_id: finalData.conversation_id,
-                            updated_at: new Date().toISOString()
-                          });
-                      }
+                      // Then save messages
+                      await saveMessages(supabase, conversationId, actualMessage, finalData);
                     }
                     
                     res.write('data: [DONE]\n\n');
@@ -632,19 +687,12 @@ app.post('/api/dify/workflow', async (req, res) => {
           });
         }
 
-        // If this was a new conversation, save the mapping
-        if (!difyConversationId && data.conversation_id && supabase) {
-          await supabase
-            .from('conversations')
-            .upsert({ 
-              id: conversationId,
-              dify_conversation_id: data.conversation_id,
-              updated_at: new Date().toISOString()
-            });
-        }
-
-        // Save messages
+        // Ensure conversation exists and save messages
         if (supabase) {
+          // First ensure conversation record exists
+          await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
+          
+          // Then save messages
           await saveMessages(supabase, conversationId, actualMessage, data);
         }
 
@@ -767,15 +815,11 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
             if (data === '[DONE]') {
               // Save messages to database
               if (finalData) {
-                await saveMessages(supabase, conversationId, message, finalData);
+                // Ensure conversation exists first
+                await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId());
                 
-                // Update conversation mapping if needed
-                if (!difyConversationId && finalData.conversation_id) {
-                  await supabase
-                    .from('conversations')
-                    .update({ dify_conversation_id: finalData.conversation_id })
-                    .eq('id', conversationId);
-                }
+                // Then save messages
+                await saveMessages(supabase, conversationId, message, finalData);
               }
               
               res.write(`data: [DONE]\n\n`);
@@ -927,16 +971,14 @@ app.post('/api/dify/:conversationId', async (req, res) => {
 
     const data = await response.json();
 
-    // 如果是新对话，保存 Dify 的 conversation_id
-    if (!difyConversationId && data.conversation_id) {
-      await supabase
-        .from('conversations')
-        .update({ dify_conversation_id: data.conversation_id })
-        .eq('id', conversationId);
+    // Ensure conversation exists and save messages
+    if (supabase) {
+      // First ensure conversation record exists
+      await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId());
+      
+      // Then save messages  
+      await saveMessages(supabase, conversationId, message, data);
     }
-
-    // 保存消息
-    await saveMessages(supabase, conversationId, message, data);
 
     res.json({
       answer: data.answer,
@@ -984,6 +1026,20 @@ app.get('*', (req, res) => {
  res.sendFile(path.join(dirname, 'dist', 'index.html'));
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Server is running on port ${port}`);
+  
+  // Perform database health check on startup
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    console.log('🔍 Performing database health check...');
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const isHealthy = await checkDatabaseHealth(supabase);
+    
+    if (!isHealthy) {
+      console.error('⚠️ WARNING: Database is not healthy. Workflows may fail.');
+      console.error('Please ensure database migrations have been run.');
+    }
+  } else {
+    console.log('⚠️ Supabase not configured - database features disabled');
+  }
 });
