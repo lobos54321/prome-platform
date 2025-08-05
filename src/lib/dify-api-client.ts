@@ -133,7 +133,7 @@ export class DifyAPIClient {
     timeoutMs?: number,
     maxRetries?: number
   ): Promise<Response> {
-    const timeout = timeoutMs || this.config.timeoutMs || 30000; // Default 30 seconds
+    const timeout = timeoutMs || this.config.timeoutMs || 120000; // Default 2 minutes (increased from 30s)
     const retries = maxRetries || this.config.maxRetries || 3;
     const retryDelay = this.config.retryDelayMs || 1000;
 
@@ -365,7 +365,7 @@ export class DifyAPIClient {
     
     // Call backend API with extended timeout for workflows
     const response = await this.fetchWithTimeoutAndRetry(
-      `/api/dify/${targetConversationId}/workflow`,
+      `/api/dify/workflow`,
       {
         method: 'POST',
         headers: {
@@ -374,10 +374,11 @@ export class DifyAPIClient {
         body: JSON.stringify({
           message,
           user: this.getValidUserId(user),
-          inputs: inputs || {}
+          inputs: inputs || {},
+          stream: false // For non-streaming workflow requests
         }),
       },
-      this.config.workflowTimeoutMs || 120000, // Use extended timeout for workflows
+      this.config.workflowTimeoutMs || 300000, // Use extended timeout for workflows (5 minutes)
       2 // Fewer retries for workflows since they're expensive
     );
 
@@ -387,6 +388,11 @@ export class DifyAPIClient {
       // Handle conversation not found errors
       if (response.status === 404 && errorData.error?.includes('Conversation')) {
         throw new Error('Conversation Not Exists. Starting new conversation.');
+      }
+      
+      // Handle timeout errors specifically for workflows
+      if (response.status === 408 || errorData.error?.includes('timeout')) {
+        throw new Error('复杂工作流执行超时，请尝试简化请求或稍后重试。如果问题持续，请联系管理员。');
       }
       
       throw new Error(`Workflow API error: ${response.status} - ${errorData.error || errorData.message || 'Unknown error'}`);
@@ -426,7 +432,7 @@ export class DifyAPIClient {
           inputs: inputs || {}
         }),
       },
-      this.config.workflowTimeoutMs || this.config.timeoutMs || 60000 // Use extended timeout for streaming
+      this.config.workflowTimeoutMs || this.config.timeoutMs || 240000 // Use extended timeout for streaming (4 minutes)
     );
 
     if (!response.ok) {
@@ -686,8 +692,8 @@ export function createDifyAPIClient(): DifyAPIClient {
     appId: import.meta.env.VITE_DIFY_APP_ID || '',
     apiKey: import.meta.env.VITE_DIFY_API_KEY || '',
     conversationExpiryHours: 24, // Default 24 hours expiry
-    timeoutMs: parseInt(import.meta.env.VITE_DIFY_TIMEOUT_MS) || 30000, // Default 30 seconds
-    workflowTimeoutMs: parseInt(import.meta.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 120000, // Default 2 minutes
+    timeoutMs: parseInt(import.meta.env.VITE_DIFY_TIMEOUT_MS) || 120000, // Default 2 minutes (increased from 30s)
+    workflowTimeoutMs: parseInt(import.meta.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 300000, // Default 5 minutes (increased from 2min)
     maxRetries: parseInt(import.meta.env.VITE_DIFY_MAX_RETRIES) || 3, // Default 3 retries
     retryDelayMs: 1000, // 1 second base delay between retries
   };

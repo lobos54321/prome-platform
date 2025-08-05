@@ -65,9 +65,10 @@ function getValidUserId(user) {
   return `anonymous-${generateUUID()}`;
 }
 
-// Timeout configurations
-const DEFAULT_TIMEOUT = parseInt(process.env.VITE_DIFY_TIMEOUT_MS) || 30000; // 30 seconds
-const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 120000; // 2 minutes
+// Timeout configurations - Optimized for complex workflows
+const DEFAULT_TIMEOUT = parseInt(process.env.VITE_DIFY_TIMEOUT_MS) || 120000; // 2 minutes (increased from 30s)
+const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 300000; // 5 minutes (increased from 2min)
+const STREAMING_TIMEOUT = parseInt(process.env.VITE_DIFY_STREAMING_TIMEOUT_MS) || 240000; // 4 minutes for streaming responses
 const MAX_RETRIES = parseInt(process.env.VITE_DIFY_MAX_RETRIES) || 3;
 
 // Enhanced fetch with timeout and retry logic
@@ -239,6 +240,7 @@ app.get('/api/config/status', (req, res) => {
     timeouts: {
       default_timeout_ms: DEFAULT_TIMEOUT,
       workflow_timeout_ms: WORKFLOW_TIMEOUT,
+      streaming_timeout_ms: STREAMING_TIMEOUT,
       max_retries: MAX_RETRIES
     }
   });
@@ -476,7 +478,7 @@ app.post('/api/dify/workflow', async (req, res) => {
               },
               body: JSON.stringify(requestBody),
             },
-            WORKFLOW_TIMEOUT,
+            STREAMING_TIMEOUT, // Use extended streaming timeout for complex workflows
             2 // Fewer retries for workflows since they're expensive
           );
 
@@ -711,15 +713,19 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       requestBody.conversation_id = difyConversationId;
     }
 
-    // 发送消息到 Dify
-    const response = await fetch(`${DIFY_API_URL}/chat-messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DIFY_API_KEY}`,
-        'Content-Type': 'application/json',
+    // 发送消息到 Dify with enhanced timeout and retry
+    const response = await fetchWithTimeoutAndRetry(
+      `${DIFY_API_URL}/chat-messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       },
-      body: JSON.stringify(requestBody),
-    });
+      STREAMING_TIMEOUT // Use streaming timeout for chat streams
+    );
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -867,15 +873,19 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       }
     }
 
-    // 发送消息到 Dify
-    let response = await fetch(`${DIFY_API_URL}/chat-messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DIFY_API_KEY}`,
-        'Content-Type': 'application/json',
+    // 发送消息到 Dify with enhanced timeout and retry
+    let response = await fetchWithTimeoutAndRetry(
+      `${DIFY_API_URL}/chat-messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       },
-      body: JSON.stringify(requestBody),
-    });
+      DEFAULT_TIMEOUT // Use default timeout for blocking chat
+    );
 
     // 如果是对话不存在的错误，尝试去掉 conversation_id 再试一次
     if (!response.ok) {
@@ -886,14 +896,18 @@ app.post('/api/dify/:conversationId', async (req, res) => {
         console.log('Retrying without conversation_id');
         delete requestBody.conversation_id;
 
-        response = await fetch(`${DIFY_API_URL}/chat-messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${DIFY_API_KEY}`,
-            'Content-Type': 'application/json',
+        response = await fetchWithTimeoutAndRetry(
+          `${DIFY_API_URL}/chat-messages`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
           },
-          body: JSON.stringify(requestBody),
-        });
+          DEFAULT_TIMEOUT
+        );
 
         // 如果重试依然失败，返回错误
         if (!response.ok) {
