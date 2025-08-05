@@ -241,13 +241,37 @@ export function DifyChatInterface({
         try {
           await handleWorkflowStream(response, messageContent);
         } catch (streamError) {
-          console.warn('[Chat] Stream processing failed, falling back to regular response:', streamError);
+          console.warn('[Chat Debug] Stream processing failed, falling back to regular response:', streamError);
           // Fallback to regular response processing
           try {
-            const data = await response.json();
+            // Try to read response again if possible - create a new request
+            console.log('[Chat Debug] Attempting fallback request to regular endpoint');
+            const fallbackResponse = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                query: messageContent,
+                message: messageContent,
+                user: userId || 'default-user',
+                conversation_id: conversationId,
+                response_mode: 'blocking', // Force blocking mode for fallback
+                stream: false,
+                inputs: {}
+              }),
+              signal: controller.signal
+            });
+
+            if (!fallbackResponse.ok) {
+              throw new Error(`Fallback request failed: ${fallbackResponse.status}`);
+            }
+
+            const data = await fallbackResponse.json();
             await handleRegularResponse(data, messageContent);
+            console.log('[Chat Debug] Fallback request succeeded');
           } catch (fallbackError) {
-            console.error('[Chat] Fallback processing also failed:', fallbackError);
+            console.error('[Chat Debug] Fallback processing also failed:', fallbackError);
             throw new Error('无法处理服务器响应，请重试');
           }
         }
@@ -312,6 +336,7 @@ export function DifyChatInterface({
 
   // 处理工作流流式响应
   const handleWorkflowStream = async (response: Response, messageContent: string) => {
+    console.log('[Chat Debug] Starting workflow stream processing');
     const reader = response.body?.getReader();
     if (!reader) throw new Error('无法获取响应流');
 
@@ -332,29 +357,44 @@ export function DifyChatInterface({
           if (line.startsWith('data: ')) {
             const data = line.slice(6).trim();
             if (data === '[DONE]') {
+              console.log('[Chat Debug] Stream ended, finalResponse length:', finalResponse.length);
               // 流结束，添加最终消息
-              if (finalResponse) {
+              if (finalResponse.trim()) {
                 const assistantMessage: Message = {
                   id: `assistant_${Date.now()}`,
-                  content: finalResponse,
+                  content: finalResponse.trim(),
                   role: 'assistant',
                   timestamp: new Date(),
                 };
                 setMessages(prev => [...prev, assistantMessage]);
+                console.log('[Chat Debug] Added assistant message from stream');
+              } else {
+                console.warn('[Chat Debug] Stream completed but no content accumulated, using fallback');
+                // 触发回退机制 - 抛出错误让外层 catch 处理
+                throw new Error('流式响应未获取到内容');
               }
               return;
             }
 
             try {
               const parsed = JSON.parse(data);
+              console.log('[Chat Debug] Parsed stream data:', {
+                event: parsed.event,
+                hasAnswer: !!parsed.answer,
+                answerLength: parsed.answer?.length || 0,
+                conversationId: parsed.conversation_id,
+                messageId: parsed.message_id
+              });
               
               // 更新会话ID
               if (parsed.conversation_id && parsed.conversation_id !== conversationId) {
+                console.log('[Chat Debug] Updating conversation ID:', parsed.conversation_id);
                 setConversationId(parsed.conversation_id);
               }
 
               // 处理工作流节点事件
               if (parsed.event === 'node_started' && parsed.node_id) {
+                console.log('[Chat Debug] Node started:', parsed.node_id, parsed.node_name);
                 updateWorkflowProgress({
                   nodeId: parsed.node_id,
                   nodeName: parsed.node_name || parsed.node_id,
@@ -363,12 +403,14 @@ export function DifyChatInterface({
                   startTime: new Date()
                 });
               } else if (parsed.event === 'node_finished' && parsed.node_id) {
+                console.log('[Chat Debug] Node finished:', parsed.node_id);
                 updateWorkflowProgress({
                   nodeId: parsed.node_id,
                   status: 'completed',
                   endTime: new Date()
                 });
               } else if (parsed.event === 'node_failed' && parsed.node_id) {
+                console.log('[Chat Debug] Node failed:', parsed.node_id, parsed.error);
                 updateWorkflowProgress({
                   nodeId: parsed.node_id,
                   status: 'failed',
@@ -377,13 +419,18 @@ export function DifyChatInterface({
                 });
               }
 
-              // 累积最终答案
-              if (parsed.answer) {
+              // 修复：正确解析和累积消息内容
+              if (parsed.event === 'message' && parsed.answer) {
+                console.log('[Chat Debug] Accumulating message answer:', parsed.answer.length, 'chars');
+                finalResponse += parsed.answer;
+              } else if (parsed.answer && !parsed.event) {
+                // 兼容性处理：如果没有event字段但有answer字段
+                console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
                 finalResponse += parsed.answer;
               }
 
             } catch (parseError) {
-              console.warn('解析流数据失败:', data, parseError);
+              console.warn('[Chat Debug] 解析流数据失败:', data, parseError);
             }
           }
         }
@@ -395,7 +442,15 @@ export function DifyChatInterface({
 
   // Fix 5: Enhanced regular response handling with validation
   const handleRegularResponse = async (data: Record<string, unknown>, messageContent: string) => {
-    console.log('[Chat] Received response:', data);
+    console.log('[Chat Debug] Received response:', {
+      hasAnswer: !!data.answer,
+      hasContent: !!data.content,
+      hasMessage: !!data.message,
+      hasResult: !!data.result,
+      conversationId: data.conversation_id,
+      messageId: data.message_id,
+      keys: Object.keys(data)
+    });
 
     // Fix 5: Add Response Validation
     if (!data || (typeof data !== 'object')) {
@@ -404,13 +459,14 @@ export function DifyChatInterface({
 
     // Validate response has some content
     if (!data.answer && !data.content && !data.message && !data.result) {
+      console.error('[Chat Debug] Empty response received:', data);
       throw new Error('服务器返回了空的响应内容');
     }
 
     // Fix 5: Update conversation ID if provided and different
     if (data.conversation_id && typeof data.conversation_id === 'string' && data.conversation_id !== conversationId) {
       setConversationId(data.conversation_id);
-      console.log('[Chat] Updated conversation ID:', data.conversation_id);
+      console.log('[Chat Debug] Updated conversation ID:', data.conversation_id);
     }
 
     // Fix 5: Better content extraction with multiple fallbacks
@@ -422,6 +478,11 @@ export function DifyChatInterface({
       '抱歉，我无法处理您的请求。'
     );
 
+    console.log('[Chat Debug] Extracted response content:', {
+      length: responseContent.length,
+      preview: responseContent.substring(0, 100) + (responseContent.length > 100 ? '...' : '')
+    });
+
     // 添加助手回复
     const assistantMessage: Message = {
       id: `assistant_${Date.now()}`,
@@ -432,6 +493,7 @@ export function DifyChatInterface({
     };
 
     setMessages(prev => [...prev, assistantMessage]);
+    console.log('[Chat Debug] Added assistant message from regular response');
   };
 
   // 主要的表单提交处理
