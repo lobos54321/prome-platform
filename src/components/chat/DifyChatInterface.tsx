@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock } from 'lucide-react';
-import { cn, isValidUUID } from '@/lib/utils';
+import { cn, isValidUUID, generateUUID } from '@/lib/utils';
 
 interface Message {
   id: string;
@@ -66,18 +66,97 @@ export function DifyChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 🔧 修复：在 useEffect 中安全初始化 userId 和恢复会话状态
+  // 🔧 新增：调试工具函数
+  const debugWorkflowStatus = () => {
+    if (typeof window !== 'undefined') {
+      const debug = {
+        currentConversationId: conversationId,
+        storedWorkflowId: localStorage.getItem('dify_workflow_conversation_id'),
+        storedRegularId: localStorage.getItem('dify_conversation_id'),
+        userId: userId,
+        isUserIdReady: isUserIdReady,
+        workflowState: workflowState,
+        messageCount: messages.length,
+        lastMessage: messages[messages.length - 1],
+        isLoading: isLoading,
+        error: error
+      };
+      
+      console.table(debug);
+      console.log('[Debug] Full workflow state:', workflowState);
+      console.log('[Debug] LocalStorage contents:', {
+        dify_user_id: localStorage.getItem('dify_user_id'),
+        dify_conversation_id: localStorage.getItem('dify_conversation_id'),
+        dify_workflow_conversation_id: localStorage.getItem('dify_workflow_conversation_id'),
+        dify_workflow_state: localStorage.getItem('dify_workflow_state')
+      });
+      
+      return debug;
+    }
+    return null;
+  };
+
+  // 🔧 新增：在开发环境下暴露调试函数到window对象
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      (window as any).debugChat = {
+        debugWorkflowStatus,
+        resetConversation: handleNewConversation,
+        getCurrentState: () => ({
+          conversationId,
+          userId,
+          workflowState,  
+          messages: messages.length,
+          isLoading,
+          error
+        }),
+        // 🔧 新增：强制重置所有状态的函数
+        hardReset: () => {
+          console.log('[Debug] Performing hard reset of all chat state...');
+          setMessages([]);
+          setConversationId(null);
+          setInput('');
+          setError(null);
+          setRetryCount(0);
+          setWorkflowState({
+            isWorkflow: false,
+            nodes: [],
+            completedNodes: 0
+          });
+          
+          // 清除所有localStorage数据
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('dify_')) {
+              localStorage.removeItem(key);
+            }
+          });
+          
+          // 重新初始化用户ID
+          const newUserId = generateUUID();
+          setUserId(newUserId);
+          localStorage.setItem('dify_user_id', newUserId);
+          
+          console.log('[Debug] Hard reset completed. New user ID:', newUserId);
+          return { success: true, newUserId };
+        }
+      };
+      
+      console.log('[Debug] Chat debugging utilities available at window.debugChat');
+    }
+  }, [conversationId, userId, workflowState, messages, isLoading, error]);
   useEffect(() => {
     const initUserIdAndSession = () => {
       if (typeof window !== 'undefined') {
         // 初始化用户ID
         const stored = localStorage.getItem('dify_user_id');
-        if (stored) {
+        if (stored && isValidUUID(stored)) {
           setUserId(stored);
         } else {
-          const newId = `user_${Math.random().toString(36).substring(2, 15)}`;
+          // 🔧 修复：生成有效的UUID而不是随机字符串
+          const newId = generateUUID();
           setUserId(newId);
           localStorage.setItem('dify_user_id', newId);
+          console.log('[Chat Debug] Generated new valid user UUID:', newId);
         }
         
         // 🔧 修复：恢复工作流会话状态 - 确保会话连续性
@@ -98,7 +177,8 @@ export function DifyChatInterface({
         return;
       }
       
-      const newId = `user_${Math.random().toString(36).substring(2, 15)}`;
+      // 🔧 修复：为非浏览器环境也生成有效的UUID
+      const newId = generateUUID();
       setUserId(newId);
       setIsUserIdReady(true);
       
@@ -171,7 +251,11 @@ export function DifyChatInterface({
     
     try {
       // Check if we have a valid conversation ID for targeted API calls
-      const endpoint = conversationId && isValidUUID(conversationId)
+      // 🔧 CRITICAL FIX: Only use conversation-specific endpoint if we have a VALID existing conversation
+      // For new conversations, always use the generic endpoint to let backend create new conversation
+      const endpoint = conversationId && isValidUUID(conversationId) && 
+                       (localStorage.getItem('dify_workflow_conversation_id') === conversationId || 
+                        localStorage.getItem('dify_conversation_id') === conversationId)
         ? `/api/dify/${conversationId}` 
         : '/api/dify';
       
@@ -215,7 +299,12 @@ export function DifyChatInterface({
           query: messageContent,        // Standard field expected by Dify API
           message: messageContent,      // Keep for backward compatibility
           user: userId || 'default-user',
-          conversation_id: conversationId,
+          // 🔧 CRITICAL FIX: Only pass conversation_id if it's from a stored session
+          // For new conversations, don't pass conversation_id so Dify creates a new one
+          conversation_id: (conversationId && 
+                            (localStorage.getItem('dify_workflow_conversation_id') === conversationId || 
+                             localStorage.getItem('dify_conversation_id') === conversationId)) 
+                           ? conversationId : undefined,
           response_mode: showWorkflowProgress ? 'streaming' : 'blocking',
           stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
           inputs: {}
@@ -292,7 +381,11 @@ export function DifyChatInterface({
                 query: messageContent,
                 message: messageContent,
                 user: userId || 'default-user',
-                conversation_id: fallbackConversationId, // 🔧 关键修复：传递会话ID保持连续性
+                // 🔧 关键修复：传递会话ID保持连续性 - 但只有在确实存在的情况下
+                conversation_id: (fallbackConversationId && 
+                                  (localStorage.getItem('dify_workflow_conversation_id') === fallbackConversationId || 
+                                   localStorage.getItem('dify_conversation_id') === fallbackConversationId)) 
+                                 ? fallbackConversationId : undefined,
                 response_mode: 'blocking', // Force blocking mode for fallback
                 stream: false,
                 inputs: {}
@@ -309,8 +402,13 @@ export function DifyChatInterface({
             if (data.conversation_id && data.conversation_id !== conversationId) {
               console.log('[Chat Debug] Fallback response updated conversation ID from', conversationId, 'to', data.conversation_id);
               setConversationId(data.conversation_id);
-              localStorage.setItem('dify_workflow_conversation_id', data.conversation_id);
-              localStorage.setItem('dify_conversation_id', data.conversation_id);
+              
+              // 🔧 CRITICAL FIX: Store the conversation ID for future requests
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('dify_workflow_conversation_id', data.conversation_id);
+                localStorage.setItem('dify_conversation_id', data.conversation_id);
+                console.log('[Chat Debug] Stored fallback conversation ID:', data.conversation_id);
+              }
             }
             
             await handleRegularResponse(data, messageContent);
@@ -542,6 +640,13 @@ export function DifyChatInterface({
                     console.log('[Chat Debug] Updating conversation ID from', detectedConversationId, 'to', parsed.conversation_id);
                     detectedConversationId = parsed.conversation_id;
                     setConversationId(parsed.conversation_id);
+                    
+                    // 🔧 CRITICAL FIX: Store conversation ID immediately for workflow continuity
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('dify_conversation_id', parsed.conversation_id);
+                      localStorage.setItem('dify_workflow_conversation_id', parsed.conversation_id);
+                      console.log('[Chat Debug] Stored streaming conversation ID:', parsed.conversation_id);
+                    }
                   }
 
                   // 处理工作流节点事件
@@ -668,8 +773,18 @@ export function DifyChatInterface({
 
     // Fix 5: Update conversation ID if provided and different
     if (data.conversation_id && typeof data.conversation_id === 'string' && data.conversation_id !== conversationId) {
+      console.log('[Chat Debug] Updated conversation ID from', conversationId, 'to', data.conversation_id);
       setConversationId(data.conversation_id);
-      console.log('[Chat Debug] Updated conversation ID:', data.conversation_id);
+      
+      // 🔧 CRITICAL FIX: Store the Dify conversation ID for future requests
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dify_conversation_id', data.conversation_id);
+        // Also store as workflow conversation ID if we're in workflow mode
+        if (showWorkflowProgress) {
+          localStorage.setItem('dify_workflow_conversation_id', data.conversation_id);
+        }
+        console.log('[Chat Debug] Stored conversation ID in localStorage:', data.conversation_id);
+      }
     }
 
     // Fix 5: Better content extraction with multiple fallbacks
@@ -759,7 +874,7 @@ export function DifyChatInterface({
     }
   };
   
-  // 开始新对话 - 修复会话状态管理
+  // 🔧 增强的新对话功能 - 修复会话状态管理
   const handleNewConversation = () => {
     console.log('[Chat Debug] Starting new conversation - clearing previous session state');
     
@@ -783,13 +898,54 @@ export function DifyChatInterface({
     
     // 🔧 修复：清除存储的会话状态，确保下次是全新开始
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('dify_conversation_id');
-      localStorage.removeItem('dify_workflow_conversation_id');
-      localStorage.removeItem('dify_workflow_state');
+      const keysToRemove = [
+        'dify_conversation_id',
+        'dify_workflow_conversation_id', 
+        'dify_workflow_state'
+      ];
+      
+      keysToRemove.forEach(key => {
+        if (localStorage.getItem(key)) {
+          localStorage.removeItem(key);
+          console.log('[Chat Debug] Removed', key, 'from localStorage');
+        }
+      });
+      
       console.log('[Chat Debug] Cleared stored conversation and workflow state');
     }
     
     console.log('[Chat Debug] Started new conversation - all session state cleared');
+    
+    // 🔧 新增：提供用户反馈
+    if (typeof window !== 'undefined') {
+      // 简单的临时通知，可以根据需要替换为更好的UI组件
+      const notification = document.createElement('div');
+      notification.textContent = '✅ 新对话已开始';
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: opacity 0.3s ease;
+      `;
+      
+      document.body.appendChild(notification);
+      
+      // 3秒后自动移除通知
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          document.body.removeChild(notification);
+        }, 300);
+      }, 3000);
+    }
+    
     inputRef.current?.focus();
   };
 
@@ -965,19 +1121,59 @@ export function DifyChatInterface({
           </div>
         )}
         
-        {/* Error Message */}
+        {/* Enhanced Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            <p className="text-sm mb-2">{error}</p>
-            {enableRetry && (
+            <div className="flex items-start gap-2 mb-3">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">发生错误</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+            
+            {/* Action buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {enableRetry && (
+                <button
+                  onClick={handleRetry}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded transition-all disabled:opacity-50"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  重试发送
+                </button>
+              )}
+              
               <button
-                onClick={handleRetry}
+                onClick={handleNewConversation}
                 disabled={isLoading}
-                className="text-xs bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded transition-all disabled:opacity-50"
               >
-                重试发送
+                <RotateCcw className="w-3 h-3" />
+                新对话
               </button>
-            )}
+              
+              {process.env.NODE_ENV === 'development' && (
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).debugChat) {
+                      (window as any).debugChat.debugWorkflowStatus();
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
+                >
+                  🔧 调试信息
+                </button>
+              )}
+              
+              <button
+                onClick={() => setError(null)}
+                className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
+              >
+                ✕ 关闭
+              </button>
+            </div>
           </div>
         )}
         

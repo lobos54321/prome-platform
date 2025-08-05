@@ -70,8 +70,11 @@ function getValidUserId(user) {
     }
   }
   
-  // For anonymous users, return null instead of generating invalid UUID strings
-  return null;
+  // FIXED: Generate a valid UUID for anonymous users instead of returning null
+  // This ensures Dify API always receives a valid user parameter
+  const anonymousUserId = generateUUID();
+  console.log('🔧 Generated anonymous user ID:', anonymousUserId);
+  return anonymousUserId;
 }
 
 // Timeout configurations - Optimized for complex workflows
@@ -774,7 +777,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       inputs: inputs,
       query: message,
       response_mode: 'streaming',
-      user: getValidUserId()
+      user: getValidUserId(req.body.user) // FIXED: Pass user from request body
     };
 
     // 只有在 dify_conversation_id 存在且有效时才添加
@@ -837,7 +840,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
               // Save messages to database
               if (finalData) {
                 // Ensure conversation exists first
-                await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId());
+                await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
                 
                 // Then save messages
                 await saveMessages(supabase, conversationId, message, finalData);
@@ -912,7 +915,7 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       inputs: inputs,
       query: message,
       response_mode: 'blocking',
-      user: getValidUserId()
+      user: getValidUserId(req.body.user) // FIXED: Pass user from request body
     };
 
     // 只有在 dify_conversation_id 存在且有效时才添加
@@ -995,7 +998,7 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     // Ensure conversation exists and save messages
     if (supabase) {
       // First ensure conversation record exists
-      await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId());
+      await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(req.body.user));
       
       // Then save messages  
       await saveMessages(supabase, conversationId, message, data);
