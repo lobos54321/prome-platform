@@ -133,6 +133,9 @@ async function checkDatabaseHealth(supabase) {
   }
 }
 
+// 存储对话状态（生产环境应使用 Redis 或数据库）
+const conversationStore = new Map();
+
 // Enhanced fetch with timeout and retry logic
 async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOUT, maxRetries = MAX_RETRIES) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -304,8 +307,119 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
   }
 }
 
+// NEW SIMPLIFIED DIFY CHAT ENDPOINT - Memory-based conversation management
+app.post('/api/dify/chat', async (req, res) => {
+  const { message, conversationId: clientConvId, userId } = req.body;
 
+  // Generate or get user ID
+  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
+  
+  // Get or create conversation ID
+  let conversationId = clientConvId;
+  let isNewConversation = false;
+  
+  if (!conversationId) {
+    conversationId = generateUUID();
+    isNewConversation = true;
+  }
 
+  // Get conversation state from memory store
+  const conversationState = conversationStore.get(conversationId) || {
+    conversationId,
+    userId: userIdentifier,
+  };
+
+  try {
+    // Call Dify API
+    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {}, // workflow input parameters
+        query: message,
+        user: userIdentifier, // ✅ Required user parameter
+        conversation_id: isNewConversation ? '' : conversationId, // Empty string for new conversations
+        response_mode: 'blocking',
+        files: [] // For file uploads if needed
+      }),
+    });
+
+    if (!difyResponse.ok) {
+      const error = await difyResponse.json();
+      console.error('Dify API error:', error);
+      return res.status(difyResponse.status).json(error);
+    }
+
+    const data = await difyResponse.json();
+    
+    // Update conversation state in memory store
+    conversationStore.set(data.conversation_id || conversationId, {
+      ...conversationState,
+      conversationId: data.conversation_id || conversationId,
+      nodeStatus: data.metadata?.node_status, // Save node status
+    });
+
+    // Return response
+    return res.status(200).json({
+      ...data,
+      conversationId: data.conversation_id || conversationId,
+      userId: userIdentifier,
+    });
+
+  } catch (error) {
+    console.error('API error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// MOCK ENDPOINT FOR TESTING - When Dify API is not accessible
+app.post('/api/dify/chat/mock', (req, res) => {
+  const { message, conversationId: clientConvId, userId } = req.body;
+  
+  // Generate or get user ID
+  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
+  
+  // Get or create conversation ID
+  let conversationId = clientConvId;
+  if (!conversationId) {
+    conversationId = generateUUID();
+  }
+
+  // Mock response that demonstrates the fixed structure
+  const mockResponse = {
+    conversation_id: conversationId,
+    message_id: `msg-${generateUUID()}`,
+    answer: `Mock response to: "${message}". This demonstrates that the user parameter issue is fixed and memory-based conversation management is working.`,
+    metadata: {
+      usage: {
+        prompt_tokens: 20,
+        completion_tokens: 30,
+        total_tokens: 50
+      },
+      node_status: 'completed'
+    },
+    conversationId: conversationId,
+    userId: userIdentifier,
+    created_at: Date.now()
+  };
+
+  // Store in memory (simulate the real endpoint behavior)
+  conversationStore.set(conversationId, {
+    conversationId,
+    userId: userIdentifier,
+    nodeStatus: 'completed'
+  });
+
+  console.log(`✅ Mock response generated for user ${userIdentifier}, conversation ${conversationId}`);
+  
+  res.json(mockResponse);
+});
 
 // Configuration debug endpoint
 app.get('/api/config/status', async (req, res) => {

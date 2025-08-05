@@ -23,6 +23,7 @@ import Settings from './pages/Settings';
 import AIContentGeneration from './pages/AIContentGeneration';
 
 import DifyChat from './pages/DifyChat';
+import DifyChatTest from './pages/DifyChatTest';
 
 import SystemDiagnostics from './pages/SystemDiagnostics';
 import SessionIdTest from './pages/SessionIdTest';
@@ -142,6 +143,7 @@ const App = () => {
               <Route path="/session-id-test" element={<SessionIdTest />} />
               <Route path="/system-diagnostics" element={<SystemDiagnostics />} />
               <Route path="/test-workflow-progress" element={<TestWorkflowProgress />} />
+              <Route path="/dify-chat-test" element={<DifyChatTest />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
