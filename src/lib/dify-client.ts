@@ -5,8 +5,8 @@ export class DifyClient {
   private apiKey: string;
   private baseUrl: string;
   private conversationStore: Map<string, string> = new Map(); // 添加会话存储
-  private timeoutMs: number = 30000; // Default 30 seconds
-  private workflowTimeoutMs: number = 120000; // Default 2 minutes for workflows
+  private timeoutMs: number = 120000; // Default 2 minutes (increased from 30s)
+  private workflowTimeoutMs: number = 300000; // Default 5 minutes (increased from 2min)
 
   constructor(apiKey: string, baseUrl: string = 'https://api.dify.ai/v1', timeoutMs?: number, workflowTimeoutMs?: number) {
     this.apiKey = apiKey;
@@ -198,6 +198,6 @@ export class DifyClient {
 export const difyClient = new DifyClient(
   process.env.NEXT_PUBLIC_DIFY_API_KEY || '',
   process.env.NEXT_PUBLIC_DIFY_API_URL,
-  parseInt(process.env.NEXT_PUBLIC_DIFY_TIMEOUT_MS || '') || 30000, // 30 seconds for regular chat
-  parseInt(process.env.NEXT_PUBLIC_DIFY_WORKFLOW_TIMEOUT_MS || '') || 120000 // 2 minutes for workflows
+  parseInt(process.env.NEXT_PUBLIC_DIFY_TIMEOUT_MS || '') || 120000, // 2 minutes for regular chat
+  parseInt(process.env.NEXT_PUBLIC_DIFY_WORKFLOW_TIMEOUT_MS || '') || 300000 // 5 minutes for workflows
 );

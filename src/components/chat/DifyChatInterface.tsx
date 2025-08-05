@@ -174,7 +174,7 @@ export function DifyChatInterface({
         });
       }
 
-      const timeoutMs = showWorkflowProgress ? 120000 : 30000; // 显示工作流进度时使用更长的超时
+      const timeoutMs = showWorkflowProgress ? 300000 : 120000; // 5min for workflows, 2min for regular chat
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -291,7 +291,7 @@ export function DifyChatInterface({
       // 处理取消请求
       if (error instanceof Error && error.name === 'AbortError') {
         const timeoutError = showWorkflowProgress 
-          ? '工作流执行超时，请稍后重试或联系管理员'
+          ? '复杂工作流执行超时。如果您的工作流包含20+个节点，这可能需要更多时间。请尝试简化请求或稍后重试。'
           : '请求超时，请稍后重试';
         throw new Error(timeoutError);
       }
@@ -664,7 +664,7 @@ export function DifyChatInterface({
               <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
                 <span className="text-gray-600">
-                  {showWorkflowProgress ? '执行工作流中...' : 'AI思考中...'}
+                  {showWorkflowProgress ? '处理复杂工作流中，请耐心等待...' : 'AI思考中...'}
                 </span>
                 {retryCount > 0 && (
                   <span className="text-xs text-orange-600">
