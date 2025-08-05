@@ -127,6 +127,40 @@ async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOU
   throw new Error('All retry attempts failed. Please check your connection and try again.');
 }
 
+// Utility function to ensure conversation exists
+async function ensureConversationExists(supabase, conversationId, difyConversationId = null) {
+  try {
+    // Check if conversation exists
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('id', conversationId)
+      .single();
+
+    if (!existing) {
+      // Create conversation record
+      const { error: conversationError } = await supabase
+        .from('conversations')
+        .insert({
+          id: conversationId,
+          dify_conversation_id: difyConversationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (conversationError) {
+        console.error('Error creating conversation:', conversationError);
+        throw new Error(`Failed to create conversation: ${conversationError.message}`);
+      }
+      
+      console.log('✅ Conversation created successfully:', conversationId);
+    }
+  } catch (error) {
+    console.error('Error ensuring conversation exists:', error);
+    throw error;
+  }
+}
+
 // Utility function to save messages
 async function saveMessages(supabase, conversationId, userMessage, difyResponse) {
   // Skip saving if Supabase is not configured
@@ -136,6 +170,9 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
   }
 
   try {
+    // First, ensure the conversation exists
+    await ensureConversationExists(supabase, conversationId, difyResponse.conversation_id);
+
     // Save user message
     const { error: userError } = await supabase
       .from('messages')
@@ -148,7 +185,7 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
 
     if (userError) {
       console.error('Error saving user message:', userError);
-      return;
+      throw new Error(`Failed to save user message: ${userError.message}`);
     }
 
     // Save assistant message
@@ -165,12 +202,14 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
 
     if (assistantError) {
       console.error('Error saving assistant message:', assistantError);
-      return;
+      throw new Error(`Failed to save assistant message: ${assistantError.message}`);
     }
 
     console.log('✅ Messages saved successfully');
   } catch (error) {
     console.error('Error in saveMessages:', error);
+    // Don't throw the error to avoid breaking the API response
+    // But log it for debugging
   }
 }
 
@@ -182,13 +221,17 @@ async function updateConversationMapping(supabase, conversationId, difyConversat
   }
 
   try {
+    // First ensure conversation exists, then update the mapping
+    await ensureConversationExists(supabase, conversationId, difyConversationId);
+    
+    // Update the dify_conversation_id if it's different
     const { error } = await supabase
       .from('conversations')
-      .upsert({ 
-        id: conversationId,
+      .update({ 
         dify_conversation_id: difyConversationId,
         updated_at: new Date().toISOString()
-      });
+      })
+      .eq('id', conversationId);
 
     if (error) {
       console.error('Error updating conversation mapping:', error);
