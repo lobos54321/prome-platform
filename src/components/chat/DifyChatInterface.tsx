@@ -174,10 +174,14 @@ export function DifyChatInterface({
         });
       }
 
-      const timeoutMs = showWorkflowProgress ? 300000 : 120000; // 5min for workflows, 2min for regular chat
+      // 🔧 修复：改进超时机制 - 为工作流提供更长的超时时间
+      const timeoutMs = showWorkflowProgress ? 5 * 60 * 1000 : 2 * 60 * 1000; // 5min for workflows, 2min for regular chat
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const timeoutId = setTimeout(() => {
+        console.warn('[Chat Debug] Request timeout after', timeoutMs / 1000, 'seconds');
+        controller.abort();
+      }, timeoutMs);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -291,8 +295,8 @@ export function DifyChatInterface({
       // 处理取消请求
       if (error instanceof Error && error.name === 'AbortError') {
         const timeoutError = showWorkflowProgress 
-          ? '复杂工作流执行超时。如果您的工作流包含20+个节点，这可能需要更多时间。请尝试简化请求或稍后重试。'
-          : '请求超时，请稍后重试';
+          ? '复杂工作流执行超时（5分钟）。如果您的工作流包含20+个节点，这可能需要更多时间。请尝试简化请求或稍后重试。'
+          : '请求超时（2分钟），请稍后重试';
         throw new Error(timeoutError);
       }
       
@@ -334,7 +338,7 @@ export function DifyChatInterface({
     }
   };
 
-  // 处理工作流流式响应
+  // 处理工作流流式响应 - 修复无限循环问题
   const handleWorkflowStream = async (response: Response, messageContent: string) => {
     console.log('[Chat Debug] Starting workflow stream processing');
     const reader = response.body?.getReader();
@@ -343,100 +347,209 @@ export function DifyChatInterface({
     const decoder = new TextDecoder();
     let buffer = '';
     let finalResponse = '';
+    
+    // 🔧 修复：添加超时和循环控制机制
+    const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // 5分钟超时
+    const MAX_ITERATIONS = 10000; // 最大迭代次数防止无限循环
+    const STALL_TIMEOUT_MS = 30 * 1000; // 30秒无数据则认为停滞
+    
+    let iterationCount = 0;
+    let lastProgressTime = Date.now();
+    let hasReceivedData = false;
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      // 创建超时控制器
+      const streamController = new AbortController();
+      const streamTimeoutId = setTimeout(() => {
+        console.warn('[Chat Debug] Stream timeout after 5 minutes');
+        streamController.abort();
+      }, STREAM_TIMEOUT_MS);
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 保留未完成的行
+      // 包装流读取以支持超时
+      const readWithTimeout = async () => {
+        return new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error('Stream read timeout'));
+          }, STALL_TIMEOUT_MS);
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') {
-              console.log('[Chat Debug] Stream ended, finalResponse length:', finalResponse.length);
-              // 流结束，添加最终消息
-              if (finalResponse.trim()) {
-                const assistantMessage: Message = {
-                  id: `assistant_${Date.now()}`,
-                  content: finalResponse.trim(),
-                  role: 'assistant',
-                  timestamp: new Date(),
-                };
-                setMessages(prev => [...prev, assistantMessage]);
-                console.log('[Chat Debug] Added assistant message from stream');
-              } else {
-                console.warn('[Chat Debug] Stream completed but no content accumulated, using fallback');
-                // 触发回退机制 - 抛出错误让外层 catch 处理
-                throw new Error('流式响应未获取到内容');
+          reader.read().then((result) => {
+            clearTimeout(timeoutId);
+            resolve(result);
+          }).catch((error) => {
+            clearTimeout(timeoutId);
+            reject(error);
+          });
+        });
+      };
+
+      while (iterationCount < MAX_ITERATIONS) {
+        iterationCount++;
+        
+        // 检查是否被中止
+        if (streamController.signal.aborted) {
+          console.warn('[Chat Debug] Stream processing aborted due to timeout');
+          throw new Error('流处理超时（5分钟）');
+        }
+
+        // 检查停滞时间
+        const currentTime = Date.now();
+        if (hasReceivedData && (currentTime - lastProgressTime) > STALL_TIMEOUT_MS) {
+          console.warn('[Chat Debug] Stream stalled for 30 seconds, breaking loop');
+          throw new Error('流式响应停滞，可能服务器连接异常');
+        }
+
+        let result;
+        try {
+          result = await readWithTimeout();
+        } catch (readError) {
+          console.error('[Chat Debug] Stream read error:', readError);
+          if (hasReceivedData && finalResponse.trim()) {
+            // 如果已有数据，尝试优雅降级
+            console.log('[Chat Debug] Graceful degradation with existing data');
+            break;
+          }
+          throw new Error('流读取失败：' + (readError instanceof Error ? readError.message : '未知错误'));
+        }
+
+        const { done, value } = result;
+        
+        if (done) {
+          console.log('[Chat Debug] Stream naturally ended after', iterationCount, 'iterations');
+          break;
+        }
+
+        if (value && value.length > 0) {
+          hasReceivedData = true;
+          lastProgressTime = currentTime;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // 保留未完成的行
+
+          console.log('[Chat Debug] Processing', lines.length, 'lines, iteration', iterationCount);
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') {
+                console.log('[Chat Debug] Stream ended with [DONE], finalResponse length:', finalResponse.length);
+                clearTimeout(streamTimeoutId);
+                // 流结束，添加最终消息
+                if (finalResponse.trim()) {
+                  const assistantMessage: Message = {
+                    id: `assistant_${Date.now()}`,
+                    content: finalResponse.trim(),
+                    role: 'assistant',
+                    timestamp: new Date(),
+                  };
+                  setMessages(prev => [...prev, assistantMessage]);
+                  console.log('[Chat Debug] Added assistant message from stream');
+                } else {
+                  console.warn('[Chat Debug] Stream completed but no content accumulated, using fallback');
+                  // 触发回退机制 - 抛出错误让外层 catch 处理
+                  throw new Error('流式响应未获取到内容');
+                }
+                return;
               }
-              return;
-            }
 
-            try {
-              const parsed = JSON.parse(data);
-              console.log('[Chat Debug] Parsed stream data:', {
-                event: parsed.event,
-                hasAnswer: !!parsed.answer,
-                answerLength: parsed.answer?.length || 0,
-                conversationId: parsed.conversation_id,
-                messageId: parsed.message_id
-              });
-              
-              // 更新会话ID
-              if (parsed.conversation_id && parsed.conversation_id !== conversationId) {
-                console.log('[Chat Debug] Updating conversation ID:', parsed.conversation_id);
-                setConversationId(parsed.conversation_id);
-              }
-
-              // 处理工作流节点事件
-              if (parsed.event === 'node_started' && parsed.node_id) {
-                console.log('[Chat Debug] Node started:', parsed.node_id, parsed.node_name);
-                updateWorkflowProgress({
-                  nodeId: parsed.node_id,
-                  nodeName: parsed.node_name || parsed.node_id,
-                  nodeTitle: parsed.node_title,
-                  status: 'running',
-                  startTime: new Date()
+              try {
+                const parsed = JSON.parse(data);
+                console.log('[Chat Debug] Parsed stream data:', {
+                  event: parsed.event,
+                  hasAnswer: !!parsed.answer,
+                  answerLength: parsed.answer?.length || 0,
+                  conversationId: parsed.conversation_id,
+                  messageId: parsed.message_id,
+                  iteration: iterationCount
                 });
-              } else if (parsed.event === 'node_finished' && parsed.node_id) {
-                console.log('[Chat Debug] Node finished:', parsed.node_id);
-                updateWorkflowProgress({
-                  nodeId: parsed.node_id,
-                  status: 'completed',
-                  endTime: new Date()
-                });
-              } else if (parsed.event === 'node_failed' && parsed.node_id) {
-                console.log('[Chat Debug] Node failed:', parsed.node_id, parsed.error);
-                updateWorkflowProgress({
-                  nodeId: parsed.node_id,
-                  status: 'failed',
-                  endTime: new Date(),
-                  error: parsed.error || '节点执行失败'
-                });
-              }
+                
+                // 更新会话ID
+                if (parsed.conversation_id && parsed.conversation_id !== conversationId) {
+                  console.log('[Chat Debug] Updating conversation ID:', parsed.conversation_id);
+                  setConversationId(parsed.conversation_id);
+                }
 
-              // 修复：正确解析和累积消息内容
-              if (parsed.event === 'message' && parsed.answer) {
-                console.log('[Chat Debug] Accumulating message answer:', parsed.answer.length, 'chars');
-                finalResponse += parsed.answer;
-              } else if (parsed.answer && !parsed.event) {
-                // 兼容性处理：如果没有event字段但有answer字段
-                console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
-                finalResponse += parsed.answer;
-              }
+                // 处理工作流节点事件
+                if (parsed.event === 'node_started' && parsed.node_id) {
+                  console.log('[Chat Debug] Node started:', parsed.node_id, parsed.node_name);
+                  updateWorkflowProgress({
+                    nodeId: parsed.node_id,
+                    nodeName: parsed.node_name || parsed.node_id,
+                    nodeTitle: parsed.node_title,
+                    status: 'running',
+                    startTime: new Date()
+                  });
+                } else if (parsed.event === 'node_finished' && parsed.node_id) {
+                  console.log('[Chat Debug] Node finished:', parsed.node_id);
+                  updateWorkflowProgress({
+                    nodeId: parsed.node_id,
+                    status: 'completed',
+                    endTime: new Date()
+                  });
+                } else if (parsed.event === 'node_failed' && parsed.node_id) {
+                  console.log('[Chat Debug] Node failed:', parsed.node_id, parsed.error);
+                  updateWorkflowProgress({
+                    nodeId: parsed.node_id,
+                    status: 'failed',
+                    endTime: new Date(),
+                    error: parsed.error || '节点执行失败'
+                  });
+                }
 
-            } catch (parseError) {
-              console.warn('[Chat Debug] 解析流数据失败:', data, parseError);
+                // 修复：正确解析和累积消息内容
+                if (parsed.event === 'message' && parsed.answer) {
+                  console.log('[Chat Debug] Accumulating message answer:', parsed.answer.length, 'chars');
+                  finalResponse += parsed.answer;
+                } else if (parsed.answer && !parsed.event) {
+                  // 兼容性处理：如果没有event字段但有answer字段
+                  console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
+                  finalResponse += parsed.answer;
+                }
+
+              } catch (parseError) {
+                console.warn('[Chat Debug] 解析流数据失败:', data, parseError);
+              }
             }
           }
         }
       }
+
+      // 如果达到最大迭代次数
+      if (iterationCount >= MAX_ITERATIONS) {
+        console.warn('[Chat Debug] Reached maximum iterations, breaking loop');
+        if (finalResponse.trim()) {
+          console.log('[Chat Debug] Using accumulated response despite reaching max iterations');
+        } else {
+          throw new Error('流处理达到最大迭代次数限制，可能存在无限循环');
+        }
+      }
+
+      // 清理超时
+      clearTimeout(streamTimeoutId);
+
+      // 如果循环正常结束但没有收到 [DONE] 信号，处理已收集的数据
+      if (finalResponse.trim()) {
+        console.log('[Chat Debug] Stream ended without [DONE], using accumulated response');
+        const assistantMessage: Message = {
+          id: `assistant_${Date.now()}`,
+          content: finalResponse.trim(),
+          role: 'assistant',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        console.log('[Chat Debug] Added assistant message from incomplete stream');
+      } else {
+        console.warn('[Chat Debug] Stream ended without content, triggering fallback');
+        throw new Error('流式响应处理完成但未获取到内容');
+      }
+
     } finally {
-      reader.releaseLock();
+      try {
+        reader.releaseLock();
+        console.log('[Chat Debug] Stream reader released after', iterationCount, 'iterations');
+      } catch (releaseError) {
+        console.warn('[Chat Debug] Error releasing stream reader:', releaseError);
+      }
     }
   };
 
