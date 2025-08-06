@@ -240,11 +240,32 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
       updated_at: new Date().toISOString()
     };
 
-    // Only add user_id if it's a valid UUID
+    // Verify user exists in database before using userId
+    let validUserId = null;
     if (userId && isValidUUID(userId)) {
-      insertData.user_id = userId;
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!userError && userData) {
+          validUserId = userId;
+          console.log('✅ Verified user exists in database:', userId);
+        } else {
+          console.warn('⚠️ User not found in database, creating conversation without user_id:', userId);
+        }
+      } catch (userCheckError) {
+        console.warn('⚠️ Error checking user existence, creating conversation without user_id:', userCheckError.message);
+      }
     }
-    // If userId is null or invalid, user_id will be null (allowed by schema)
+
+    // Only add user_id if user exists in database
+    if (validUserId) {
+      insertData.user_id = validUserId;
+    }
+    // If userId is null or user doesn't exist, user_id will be null (allowed by schema)
 
     const { error: insertError } = await supabase
       .from('conversations')
@@ -252,6 +273,22 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
 
     if (insertError) {
       console.error('Error creating conversation record:', insertError);
+      
+      // If it still fails due to user constraint, retry without user_id
+      if (insertError.code === '23503' && insertError.message.includes('user_id')) {
+        console.log('Retrying conversation creation without user_id...');
+        delete insertData.user_id;
+        
+        const { error: retryError } = await supabase
+          .from('conversations')
+          .insert(insertData);
+          
+        if (retryError) {
+          console.error('Error creating conversation record (retry):', retryError);
+        } else {
+          console.log('✅ Created new conversation record (without user_id)');
+        }
+      }
     } else {
       console.log('✅ Created new conversation record');
     }
