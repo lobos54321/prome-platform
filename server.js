@@ -344,6 +344,87 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
   }
 }
 
+// 🔧 新增：纯聊天模式端点 - 专门处理简单对话而非工作流
+app.post('/api/dify/chat/simple', async (req, res) => {
+  const { message, conversationId: clientConvId, userId } = req.body;
+
+  console.log('[Simple Chat] Processing chat request:', {
+    messagePreview: message?.substring(0, 50) + '...',
+    conversationId: clientConvId,
+    userId: userId
+  });
+
+  if (!DIFY_API_URL || !DIFY_API_KEY) {
+    return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
+  }
+
+  // Generate or get user ID
+  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
+  
+  // Get or create conversation ID
+  let conversationId = clientConvId;
+  if (!conversationId || !isValidUUID(conversationId)) {
+    conversationId = generateUUID();
+    console.log('[Simple Chat] Generated new conversation ID:', conversationId);
+  }
+
+  try {
+    // 🔧 关键修复：使用chat-messages端点而不是workflows/run
+    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {}, // 简单聊天不需要复杂输入
+        query: message,
+        user: userIdentifier,
+        conversation_id: clientConvId || '', // 空字符串让Dify创建新对话
+        response_mode: 'blocking' // 使用阻塞模式获得简单响应
+      }),
+    });
+
+    if (!difyResponse.ok) {
+      const error = await difyResponse.json();
+      console.error('[Simple Chat] Dify API error:', error);
+      return res.status(difyResponse.status).json({
+        error: error.message || 'Dify API error',
+        type: 'dify_api_error'
+      });
+    }
+
+    const data = await difyResponse.json();
+    
+    console.log('[Simple Chat] Success:', {
+      conversationId: data.conversation_id,
+      answerLength: data.answer?.length || 0,
+      messageId: data.message_id
+    });
+
+    // 返回简化的响应格式
+    return res.status(200).json({
+      answer: data.answer || '抱歉，我无法理解您的问题。',
+      conversation_id: data.conversation_id,
+      message_id: data.message_id,
+      conversationId: data.conversation_id, // 兼容前端
+      userId: userIdentifier,
+      metadata: {
+        usage: data.metadata?.usage,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('[Simple Chat] API error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      type: 'server_error'
+    });
+  }
+});
+
 // NEW SIMPLIFIED DIFY CHAT ENDPOINT - Memory-based conversation management
 app.post('/api/dify/chat', async (req, res) => {
   const { message, conversationId: clientConvId, userId } = req.body;
@@ -691,9 +772,12 @@ app.post('/api/dify/workflow', async (req, res) => {
       user: getValidUserId(user)
     };
 
-    // Only add conversation_id if it exists and is valid
-    if (difyConversationId && supabase) {
+    // 🔧 修复工作流对话连续性：正确处理conversation_id
+    if (difyConversationId) {
       requestBody.conversation_id = difyConversationId;
+      console.log('🔗 Using existing Dify conversation ID for workflow:', difyConversationId);
+    } else {
+      console.log('🆕 Starting new workflow conversation');
     }
 
     if (stream) {
@@ -952,16 +1036,51 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       requestBody.conversation_id = difyConversationId;
     }
 
+    // 检查DIFY应用类型并使用正确的API端点
+    let apiEndpoint;
+    let apiRequestBody;
+    
+    // 如果有APP_ID，说明这是一个聊天应用
+    const DIFY_APP_ID = process.env.VITE_DIFY_APP_ID;
+    if (DIFY_APP_ID) {
+      // 聊天应用 - 使用chat-messages API
+      apiEndpoint = `${DIFY_API_URL}/chat-messages`;
+      apiRequestBody = requestBody;
+      console.log('Using chat-messages API for chat application');
+    } else {
+      // 工作流应用 - 使用workflows API  
+      apiEndpoint = `${DIFY_API_URL}/workflows/run`;
+      apiRequestBody = {
+        inputs: inputs,
+        response_mode: 'streaming',
+        user: getValidUserId(req.body.user)
+      };
+      console.log('Using workflows API for workflow application');
+    }
+    
+    console.log('🔍 API Debug Info:');
+    console.log('   Endpoint:', apiEndpoint);
+    console.log('   Local conversation ID:', conversationId);
+    console.log('   DIFY conversation ID:', difyConversationId);
+    console.log('   Request body:', JSON.stringify(apiRequestBody, null, 2));
+    
+    // 特别检查conversation_id是否在请求体中
+    if (apiRequestBody.conversation_id) {
+      console.log('✅ Conversation ID will be sent to DIFY:', apiRequestBody.conversation_id);
+    } else {
+      console.log('⚠️ No conversation ID in request - will create new conversation');
+    }
+
     // 发送消息到 Dify with enhanced timeout and retry
     const response = await fetchWithTimeoutAndRetry(
-      `${DIFY_API_URL}/chat-messages`,
+      apiEndpoint,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${DIFY_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(apiRequestBody),
       },
       STREAMING_TIMEOUT // Use streaming timeout for chat streams
     );
@@ -1102,38 +1221,59 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     };
 
     // 只有在 dify_conversation_id 存在且有效时才添加
-    if (difyConversationId && supabase) {
-      // 先验证对话是否仍然存在
-      const checkResponse = await fetch(`${DIFY_API_URL}/conversations/${difyConversationId}`, {
-        headers: {
-          'Authorization': `Bearer ${DIFY_API_KEY}`,
-        },
-      });
+    if (difyConversationId) {
+      console.log('🔍 Found existing DIFY conversation ID:', difyConversationId);
+      requestBody.conversation_id = difyConversationId;
+      console.log('✅ Added conversation_id to request body');
+    } else {
+      console.log('⚠️ No existing DIFY conversation ID found, will create new conversation');
+    }
 
-      if (checkResponse.ok) {
-        requestBody.conversation_id = difyConversationId;
-      } else {
-        // 对话不存在，清除无效的 ID
-        console.log('Dify conversation not found, creating new one');
-        difyConversationId = null;
-        await supabase
-          .from('conversations')
-          .update({ dify_conversation_id: null })
-          .eq('id', conversationId);
-        // 不直接 return，继续往下走，让 chat-messages 创建新对话
-      }
+    // 检查DIFY应用类型并使用正确的API端点
+    let apiEndpoint;
+    let apiRequestBody;
+    
+    // 如果有APP_ID，说明这是一个聊天应用
+    const DIFY_APP_ID = process.env.VITE_DIFY_APP_ID;
+    if (DIFY_APP_ID) {
+      // 聊天应用 - 使用chat-messages API
+      apiEndpoint = `${DIFY_API_URL}/chat-messages`;
+      apiRequestBody = requestBody;
+      console.log('Using chat-messages API for chat application');
+    } else {
+      // 工作流应用 - 使用workflows API  
+      apiEndpoint = `${DIFY_API_URL}/workflows/run`;
+      apiRequestBody = {
+        inputs: inputs,
+        response_mode: 'blocking',
+        user: getValidUserId(req.body.user)
+      };
+      console.log('Using workflows API for workflow application');
+    }
+    
+    console.log('🔍 API Debug Info:');
+    console.log('   Endpoint:', apiEndpoint);
+    console.log('   Local conversation ID:', conversationId);
+    console.log('   DIFY conversation ID:', difyConversationId);
+    console.log('   Request body:', JSON.stringify(apiRequestBody, null, 2));
+    
+    // 特别检查conversation_id是否在请求体中
+    if (apiRequestBody.conversation_id) {
+      console.log('✅ Conversation ID will be sent to DIFY:', apiRequestBody.conversation_id);
+    } else {
+      console.log('⚠️ No conversation ID in request - will create new conversation');
     }
 
     // 发送消息到 Dify with enhanced timeout and retry
     let response = await fetchWithTimeoutAndRetry(
-      `${DIFY_API_URL}/chat-messages`,
+      apiEndpoint,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${DIFY_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(apiRequestBody),
       },
       DEFAULT_TIMEOUT // Use default timeout for blocking chat
     );
@@ -1145,17 +1285,17 @@ app.post('/api/dify/:conversationId', async (req, res) => {
 
       if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
         console.log('Retrying without conversation_id');
-        delete requestBody.conversation_id;
+        delete apiRequestBody.conversation_id;
 
         response = await fetchWithTimeoutAndRetry(
-          `${DIFY_API_URL}/chat-messages`,
+          apiEndpoint,
           {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${DIFY_API_KEY}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(apiRequestBody),
           },
           DEFAULT_TIMEOUT
         );
