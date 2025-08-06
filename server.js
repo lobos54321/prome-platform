@@ -816,6 +816,7 @@ app.post('/api/dify/workflow', async (req, res) => {
           let buffer = '';
           let fullAnswer = '';
           let finalData = null;
+          let currentConversationId = null; // 🔧 Track conversation_id from DIFY response
 
           try {
             while (true) {
@@ -847,6 +848,11 @@ app.post('/api/dify/workflow', async (req, res) => {
 
                   try {
                     const parsed = JSON.parse(data);
+                    
+                    // 🔧 CRITICAL FIX: Capture conversation_id from any DIFY event
+                    if (parsed.conversation_id) {
+                      currentConversationId = parsed.conversation_id;
+                    }
                     
                     // Log workflow events for debugging
                     if (parsed.event && parsed.event.startsWith('node_')) {
@@ -882,6 +888,21 @@ app.post('/api/dify/workflow', async (req, res) => {
             }
           } finally {
             reader.releaseLock();
+          }
+
+          // 🔧 CRITICAL FIX: Save conversation_id even if no [DONE] event was received
+          if (currentConversationId && supabase && !finalData) {
+            console.log('[Workflow API] Saving conversation_id after stream completion:', currentConversationId);
+            finalData = {
+              answer: fullAnswer || 'Workflow completed',
+              conversation_id: currentConversationId,
+              message_id: generateUUID(),
+              metadata: {}
+            };
+            
+            // Save to database
+            await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
+            await saveMessages(supabase, conversationId, actualMessage, finalData);
           }
 
         } catch (apiError) {
@@ -1109,6 +1130,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     const decoder = new TextDecoder();
     let fullAnswer = '';
     let finalData = null;
+    let currentConversationId = null; // 🔧 Track conversation_id from DIFY response
 
     try {
       while (true) {
@@ -1140,6 +1162,11 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
             try {
               const parsed = JSON.parse(data);
               
+              // 🔧 CRITICAL FIX: Capture conversation_id from any DIFY event
+              if (parsed.conversation_id) {
+                currentConversationId = parsed.conversation_id;
+              }
+              
               // Collect answer content and final data
               if (parsed.event === 'message' && parsed.answer) {
                 fullAnswer += parsed.answer;
@@ -1163,6 +1190,25 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     } finally {
       reader.releaseLock();
       res.end();
+    }
+
+    // 🔧 CRITICAL FIX: Save conversation_id even if no [DONE] event was received  
+    if (currentConversationId && supabase && !finalData) {
+      console.log('[Stream API] Saving conversation_id after stream completion:', currentConversationId);
+      finalData = {
+        answer: fullAnswer || 'Chat completed',
+        conversation_id: currentConversationId,
+        message_id: generateUUID(),
+        metadata: {}
+      };
+      
+      // Save to database
+      try {
+        await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
+        await saveMessages(supabase, conversationId, message, finalData);
+      } catch (dbError) {
+        console.error('[Stream API] Failed to save conversation after stream:', dbError);
+      }
     }
   } catch (error) {
     console.error('Stream API error:', error);
