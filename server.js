@@ -915,14 +915,30 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 查找当前会话的 dify_conversation_id
-    const { data: conversationRow } = await supabase
+    // 查找或创建当前会话的 dify_conversation_id
+    let { data: conversationRow } = await supabase
       .from('conversations')
       .select('dify_conversation_id')
       .eq('id', conversationId)
-      .single();
+      .maybeSingle();
 
     let difyConversationId = conversationRow?.dify_conversation_id || null;
+    
+    // 如果数据库中没有这个对话记录，先创建一个
+    if (!conversationRow) {
+      console.log(`🆕 Creating conversation record for: ${conversationId}`);
+      await ensureConversationExists(supabase, conversationId, null, getValidUserId(req.body.user));
+      
+      // 重新查询以获取创建的记录
+      const { data: newConversationRow } = await supabase
+        .from('conversations')
+        .select('dify_conversation_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      
+      conversationRow = newConversationRow;
+      difyConversationId = conversationRow?.dify_conversation_id || null;
+    }
 
     const requestBody = {
       inputs: inputs,
@@ -1053,14 +1069,30 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 查找当前会话的 dify_conversation_id
-    const { data: conversationRow } = await supabase
+    // 查找或创建当前会话的 dify_conversation_id
+    let { data: conversationRow } = await supabase
       .from('conversations')
       .select('dify_conversation_id')
       .eq('id', conversationId)
-      .single();
+      .maybeSingle();
 
     let difyConversationId = conversationRow?.dify_conversation_id || null;
+    
+    // 如果数据库中没有这个对话记录，先创建一个
+    if (!conversationRow) {
+      console.log(`🆕 Creating conversation record for: ${conversationId}`);
+      await ensureConversationExists(supabase, conversationId, null, getValidUserId(req.body.user));
+      
+      // 重新查询以获取创建的记录
+      const { data: newConversationRow } = await supabase
+        .from('conversations')
+        .select('dify_conversation_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      
+      conversationRow = newConversationRow;
+      difyConversationId = conversationRow?.dify_conversation_id || null;
+    }
 
     const requestBody = {
       inputs: inputs,
