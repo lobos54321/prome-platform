@@ -497,6 +497,7 @@ export function DifyChatInterface({
     let lastProgressTime = Date.now();
     let hasReceivedData = false;
     let processedDataCount = 0; // 跟踪处理的数据块数量
+    let messageEndReceived = false; // 标记是否收到message_end事件
 
     try {
       // 创建超时控制器
@@ -676,17 +677,22 @@ export function DifyChatInterface({
                     });
                   }
 
-                  // 🔧 修复：正确解析和累积消息内容 - 处理更多格式
+                  // 🔧 修复：正确解析和累积消息内容 - 处理DIFY流格式
                   if (parsed.event === 'message' && parsed.answer) {
                     console.log('[Chat Debug] Accumulating message answer:', parsed.answer.length, 'chars');
                     finalResponse += parsed.answer;
+                  } else if (parsed.event === 'message_end') {
+                    // message_end事件表示消息完成，检查是否有完整答案
+                    if (parsed.answer) {
+                      console.log('[Chat Debug] Accumulating message_end answer:', parsed.answer.length, 'chars');
+                      finalResponse = parsed.answer; // 使用完整答案替换累积内容
+                    }
+                    // 标记消息结束
+                    messageEndReceived = true;
+                    console.log('[Chat Debug] Message end received, total content length:', finalResponse.length);
                   } else if (parsed.answer && !parsed.event) {
                     // 兼容性处理：如果没有event字段但有answer字段
                     console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
-                    finalResponse += parsed.answer;
-                  } else if (parsed.event === 'message_end' && parsed.answer) {
-                    // 处理message_end事件中的answer
-                    console.log('[Chat Debug] Accumulating message_end answer:', parsed.answer.length, 'chars');
                     finalResponse += parsed.answer;
                   }
 
@@ -734,8 +740,21 @@ export function DifyChatInterface({
           console.log('[Chat Debug] Saved workflow conversation ID to localStorage:', detectedConversationId);
         }
       } else {
-        console.warn('[Chat Debug] Stream ended without content, triggering fallback');
-        throw new Error('流式响应处理完成但未获取到内容');
+        // 检查是否至少收到了message_end事件
+        if (messageEndReceived) {
+          console.log('[Chat Debug] Message end received but no content accumulated, this might be a workflow response');
+          // 对于工作流，即使没有最终文本回答也可能是正常的
+          const assistantMessage: Message = {
+            id: `assistant_${Date.now()}`,
+            content: '工作流执行完成',
+            role: 'assistant',
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        } else {
+          console.warn('[Chat Debug] Stream ended without content and no message_end event, triggering fallback');
+          throw new Error('流式响应处理完成但未获取到内容');
+        }
       }
 
     } finally {
