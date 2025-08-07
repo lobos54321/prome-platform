@@ -205,6 +205,16 @@ export function DifyChatInterface({
     }
   }, [welcomeMessage, isUserIdReady]);
 
+  // 重置工作流状态
+  const resetWorkflowState = () => {
+    setWorkflowState({
+      isWorkflow: false,
+      nodes: [],
+      completedNodes: 0,
+      totalNodes: 0
+    });
+  };
+
   // 工作流进度更新处理
   const updateWorkflowProgress = (nodeUpdate: Partial<WorkflowProgress> & { nodeId: string }) => {
     setWorkflowState(prev => {
@@ -232,9 +242,11 @@ export function DifyChatInterface({
       
       return {
         ...prev,
+        isWorkflow: true, // 自动启用工作流状态当检测到节点事件时
         nodes: newNodes,
         currentNodeId: nodeUpdate.status === 'running' ? nodeUpdate.nodeId : prev.currentNodeId,
-        completedNodes
+        completedNodes,
+        totalNodes: Math.max(prev.totalNodes || 0, newNodes.length) // 动态更新总节点数
       };
     });
   };
@@ -242,6 +254,11 @@ export function DifyChatInterface({
   // 发送消息（支持重试）
   const sendMessageWithRetry = async (messageContent: string, currentRetry = 0): Promise<void> => {
     const maxRetries = enableRetry ? 3 : 0;
+    
+    // 重置工作流状态以准备新的可能的工作流执行
+    if (currentRetry === 0) {
+      resetWorkflowState();
+    }
     
     try {
       // Check if we have a valid conversation ID for targeted API calls
@@ -1097,8 +1114,11 @@ export function DifyChatInterface({
               {/* 工作流进度显示 */}
               {showWorkflowProgress && workflowState.isWorkflow && (
                 <div className="mt-3 space-y-2">
-                  <div className="text-xs text-gray-500 mb-2">
-                    工作流进度: {workflowState.completedNodes}/{workflowState.nodes.length} 个节点已完成
+                  <div className="text-xs text-gray-500 mb-2 flex justify-between items-center">
+                    <span>工作流执行进度</span>
+                    <span className="font-medium">
+                      {workflowState.completedNodes}/{workflowState.totalNodes || workflowState.nodes.length} 个节点已完成
+                    </span>
                   </div>
                   
                   {/* 进度条 */}
@@ -1107,7 +1127,9 @@ export function DifyChatInterface({
                       <div 
                         className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                         style={{ 
-                          width: `${(workflowState.completedNodes / workflowState.nodes.length) * 100}%` 
+                          width: `${((workflowState.totalNodes || workflowState.nodes.length) > 0) 
+                            ? (workflowState.completedNodes / (workflowState.totalNodes || workflowState.nodes.length)) * 100 
+                            : 0}%` 
                         }}
                       />
                     </div>

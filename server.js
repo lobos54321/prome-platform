@@ -622,7 +622,7 @@ app.get('/api/config/status', async (req, res) => {
 app.post('/api/dify', async (req, res) => {
   console.log('🗣️ GENERIC /api/dify ENDPOINT CALLED');
   try {
-    const { message, query, user, conversation_id, inputs = {} } = req.body;
+    const { message, query, user, conversation_id, inputs = {}, stream = false } = req.body;
     const actualMessage = message || query; // Support both message and query fields
     
     if (!actualMessage) {
