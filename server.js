@@ -213,12 +213,27 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
   }
 
   try {
-    // First check if conversation already exists
-    const { data: existingConversation, error: checkError } = await supabase
+    // Use difyConversationId as primary identifier if available
+    const primaryId = difyConversationId || conversationId;
+    
+    // First check if conversation already exists by dify_conversation_id
+    let { data: existingConversation, error: checkError } = await supabase
       .from('conversations')
       .select('id, dify_conversation_id')
-      .eq('id', conversationId)
+      .eq('dify_conversation_id', primaryId)
       .maybeSingle();
+    
+    // If not found by dify_conversation_id, try by internal id (for backward compatibility)
+    if (!existingConversation && !checkError) {
+      const { data: fallbackConversation, error: fallbackError } = await supabase
+        .from('conversations')
+        .select('id, dify_conversation_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+        
+      existingConversation = fallbackConversation;
+      checkError = fallbackError;
+    }
 
     if (checkError) {
       console.error('Error checking existing conversation:', checkError);
@@ -245,9 +260,9 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
       return;
     }
 
-    // Create new conversation record with proper user_id handling
+    // Create new conversation record with dify_conversation_id as primary identifier
     const insertData = {
-      id: conversationId,
+      id: primaryId, // Use dify ID as internal ID if available
       dify_conversation_id: difyConversationId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -712,11 +727,14 @@ app.post('/api/dify', async (req, res) => {
 
     // Ensure conversation exists BEFORE saving messages
     if (supabase) {
-      // First ensure conversation record exists
-      await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
+      // Use Dify's conversation_id as the authoritative source
+      const effectiveConversationId = data.conversation_id || conversationId;
       
-      // Then save messages
-      await saveMessages(supabase, conversationId, actualMessage, data);
+      // First ensure conversation record exists with Dify's ID as primary
+      await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
+      
+      // Then save messages using Dify's conversation_id
+      await saveMessages(supabase, effectiveConversationId, actualMessage, data);
     }
 
     const responseData = {

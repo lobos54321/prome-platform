@@ -1,0 +1,440 @@
+data: {"event": "node_started", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "workflow_run_id": "5cd6f411-ac1c-473e-a60f-df80cba87f57", "data": {"id": "b247f094-4ec1-4082-9665-2878960b5d9f", "node_id": "1738052599424", "node_type": "start", "title": "\u5f00\u59cb", "index": 1, "predecessor_node_id": null, "inputs": null, "created_at": 1754487050, "extras": {}, "parallel_id": null, "parallel_start_node_id": null, "parent_parallel_id": null, "parent_parallel_start_node_id": null, "iteration_id": null, "loop_id": null, "parallel_run_id": null, "agent_strategy": null}}
+
+data: {"event": "node_started", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "workflow_run_id": "5cd6f411-ac1c-473e-a60f-df80cba87f57", "data": {"id": "ba8371ca-8711-48ac-a110-7bb808df5ad1", "node_id": "1738168561064", "node_type": "document-extractor", "title": "\u6587\u6863\u63d0\u53d6\u5668", "index": 2, "predecessor_node_id": "1738052599424", "inputs": null, "created_at": 1754487050, "extras": {}, "parallel_id": null, "parallel_start_node_id": null, "parent_parallel_id": null, "parent_parallel_start_node_id": null, "iteration_id": null, "loop_id": null, "parallel_run_id": null, "agent_strategy": null}}
+
+data: {"event": "node_finished", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "workflow_run_id": "5cd6f411-ac1c-473e-a60f-df80cba87f57", "data": {"id": "ba8371ca-8711-48ac-a110-7bb808df5ad1", "node_id": "1738168561064", "node_type": "document-extractor", "title": "\u6587\u6863\u63d0\u53d6\u5668", "index": 2, "predecessor_node_id": "1738052599424", "inputs": {"variable_selector": ["sys", "files"]}, "process_data": {"documents": []}, "outputs": {"text": []}, "status": "succeeded", "error": null, "elapsed_time": 0.261679, "execution_metadata": {}, "created_at": 1754487050, "finished_at": 1754487050, "files": [], "parallel_id": null, "parallel_start_node_id": null, "parent_parallel_id": null, "parent_parallel_start_node_id": null, "iteration_id": null, "loop_id": null}}
+
+data: {"event": "node_started", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "workflow_run_id": "5cd6f411-ac1c-473e-a60f-df80cba87f57", "data": {"id": "6d1f8675-1aba-43dd-a0c1-ab2a3d1455b0", "node_id": "1752203307415", "node_type": "if-else", "title": "\u6761\u4ef6\u5206\u652f 0", "index": 3, "predecessor_node_id": "1738168561064", "inputs": null, "created_at": 1754487050, "extras": {}, "parallel_id": null, "parallel_start_node_id": null, "parent_parallel_id": null, "parent_parallel_start_node_id": null, "iteration_id": null, "loop_id": null, "parallel_run_id": null, "agent_strategy": null}}
+
+data: {"event": "node_started", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "workflow_run_id": "5cd6f411-ac1c-473e-a60f-df80cba87f57", "data": {"id": "e6fc938a-43e1-402f-a27c-f0f54822f7bc", "node_id": "1752216736460", "node_type": "llm", "title": "LLM 0", "index": 4, "predecessor_node_id": "1752203307415", "inputs": null, "created_at": 1754487050, "extras": {}, "parallel_id": null, "parallel_start_node_id": null, "parent_parallel_id": null, "parent_parallel_start_node_id": null, "iteration_id": null, "loop_id": null, "parallel_run_id": null, "agent_strategy": null}}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "{\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "identified", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_ant", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "ith", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "esis", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " {\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"name", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5272", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u88c2", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u60c5", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u611f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u8054", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7ed3", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\",\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"description", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5728", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u60c5", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u611f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u548c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5fc3\u7406", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5c42", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u9762", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e0a", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\uff0c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7528\u6237", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5728", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u590d\u6742", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684\u4fe1\u606f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u73af\u5883", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e2d", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u611f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u53d7\u5230", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6301\u7eed", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5b64", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u72ec", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3001", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u88ab", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5ffd", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u89c6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6216\u8005", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4ea4\u6d41", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u65e0", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u529b", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3002\u8fd9", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u79cd", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u2018", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5047", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u60f3", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u654c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u2019", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4ee3\u8868", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7740", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7f3a", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e4f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5171", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u9e23", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3001", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7f3a", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e4f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7406\u89e3", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3001", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4eba\u4e0e", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4eba", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5f7c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6b64", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u9694", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u9602", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u65e7", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e16\u754c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3002", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "},\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "target", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_words", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " [],\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "generated", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_constraints", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " {\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "unique", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "ingerprint", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "267", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "4", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\",\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "dimension", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3010", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5bb6\u5ead", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u77db", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u76fe", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3011", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5bb6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u957f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e0e", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5b69\u5b50", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u51b2", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7a81", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\uff08", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5982", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "'", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4f5c\u54c1", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u8bc4\u4ef7", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5206", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6b67", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "'", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\uff09", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\",\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "scene", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3010", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5bb6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u957f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4f1a\u4e0a", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\uff0c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u8001\u5e08", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5c55\u793a", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u201c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5b8c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7f8e", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u201d", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4f5c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e1a", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u65f6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3011", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\",\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "focus", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_person", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3010", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e00", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4f4d", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5bf9", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4f20\u7edf", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u753b", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5ba4", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6559\u5b66", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6548\u679c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4ea7\u751f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6000", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7591", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3001", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u67d0", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7c7b", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5bb6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u957f", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3011", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\",\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "unique", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_element", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3010", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5fc5\u987b", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6d89\u53ca", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u4e0e", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5176\u4ed6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u753b", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5ba4", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u7684", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u201c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u540c", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u8d28", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5316", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u201d", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5bf9", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u6bd4", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u3011", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "},\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "pers", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "pective", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_used", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\":", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " \"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "psych", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "ologist", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": " (", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5fc3\u7406", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5b66", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u5bb6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u89c6", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\u89d2", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": ")\",\n", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "\"", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "top", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "3", "from_variable_selector": ["1752216736460", "text"]}
+
+data: {"event": "message", "conversation_id": "473984ca-f1f1-4c15-b2ff-192be45bf028", "message_id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "created_at": 1754487050, "task_id": "5363570a-2ed1-47af-b47d-a45289a464c2", "id": "f142ab2a-57a1-4c84-932c-26a3e817f8a4", "answer": "_pro", "from_variable_selector": ["1752216736460", "text"]}
+

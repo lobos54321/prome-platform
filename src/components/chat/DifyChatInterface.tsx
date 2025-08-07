@@ -71,7 +71,6 @@ export function DifyChatInterface({
     if (typeof window !== 'undefined') {
       const debug = {
         currentConversationId: conversationId,
-        storedWorkflowId: localStorage.getItem('dify_workflow_conversation_id'),
         storedRegularId: localStorage.getItem('dify_conversation_id'),
         userId: userId,
         isUserIdReady: isUserIdReady,
@@ -87,7 +86,6 @@ export function DifyChatInterface({
       console.log('[Debug] LocalStorage contents:', {
         dify_user_id: localStorage.getItem('dify_user_id'),
         dify_conversation_id: localStorage.getItem('dify_conversation_id'),
-        dify_workflow_conversation_id: localStorage.getItem('dify_workflow_conversation_id'),
         dify_workflow_state: localStorage.getItem('dify_workflow_state')
       });
       
@@ -159,12 +157,8 @@ export function DifyChatInterface({
           console.log('[Chat Debug] Generated new valid user UUID:', newId);
         }
         
-        // 🔧 修复：恢复工作流会话状态 - 确保会话连续性
-        const workflowConversationId = localStorage.getItem('dify_workflow_conversation_id');
-        const regularConversationId = localStorage.getItem('dify_conversation_id');
-        
-        // 优先使用工作流会话ID，因为它更具体
-        const restoredConversationId = workflowConversationId || regularConversationId;
+        // 恢复会话状态 - 确保会话连续性
+        const restoredConversationId = localStorage.getItem('dify_conversation_id');
         
         if (restoredConversationId && isValidUUID(restoredConversationId)) {
           console.log('[Chat Debug] Restored conversation ID from localStorage:', restoredConversationId);
@@ -251,13 +245,8 @@ export function DifyChatInterface({
     
     try {
       // Check if we have a valid conversation ID for targeted API calls
-      // 🔧 CRITICAL FIX: Only use conversation-specific endpoint if we have a VALID existing conversation
-      // For new conversations, always use the generic endpoint to let backend create new conversation
-      const endpoint = conversationId && isValidUUID(conversationId) && 
-                       (localStorage.getItem('dify_workflow_conversation_id') === conversationId || 
-                        localStorage.getItem('dify_conversation_id') === conversationId)
-        ? `/api/dify/${conversationId}` 
-        : '/api/dify';
+      // Always use generic endpoint - let backend handle conversation ID consistency
+      const endpoint = '/api/dify';
       
       // Fix 3: Enhanced Error Handling and Debugging - Add comprehensive logging
       console.log('[Chat Debug] Sending request:', {
@@ -265,7 +254,6 @@ export function DifyChatInterface({
         messageContent: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
         userId,
         conversationId,
-        workflowConversationId: localStorage.getItem('dify_workflow_conversation_id'),
         regularConversationId: localStorage.getItem('dify_conversation_id'),
         showWorkflowProgress,
         timestamp: new Date().toISOString()
@@ -299,12 +287,8 @@ export function DifyChatInterface({
           query: messageContent,        // Standard field expected by Dify API
           message: messageContent,      // Keep for backward compatibility
           user: userId || 'default-user',
-          // 🔧 CRITICAL FIX: Only pass conversation_id if it's from a stored session
-          // For new conversations, don't pass conversation_id so Dify creates a new one
-          conversation_id: (conversationId && 
-                            (localStorage.getItem('dify_workflow_conversation_id') === conversationId || 
-                             localStorage.getItem('dify_conversation_id') === conversationId)) 
-                           ? conversationId : undefined,
+          // Always pass conversation_id if we have one - let backend handle validation
+          conversation_id: conversationId || undefined,
           response_mode: showWorkflowProgress ? 'streaming' : 'blocking',
           stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
           inputs: {}
@@ -359,9 +343,8 @@ export function DifyChatInterface({
           console.warn('[Chat Debug] Stream processing failed, falling back to regular response:', streamError);
           // 🔧 修复：保持会话连续性的回退机制
           try {
-            // 获取或恢复会话ID - 优先使用当前会话ID，其次从localStorage恢复，最后才创建新的
+            // 获取或恢复会话ID
             const fallbackConversationId = conversationId || 
-              localStorage.getItem('dify_workflow_conversation_id') || 
               localStorage.getItem('dify_conversation_id') || 
               null;
             
@@ -381,11 +364,8 @@ export function DifyChatInterface({
                 query: messageContent,
                 message: messageContent,
                 user: userId || 'default-user',
-                // 🔧 关键修复：传递会话ID保持连续性 - 但只有在确实存在的情况下
-                conversation_id: (fallbackConversationId && 
-                                  (localStorage.getItem('dify_workflow_conversation_id') === fallbackConversationId || 
-                                   localStorage.getItem('dify_conversation_id') === fallbackConversationId)) 
-                                 ? fallbackConversationId : undefined,
+                // 传递会话ID保持连续性
+                conversation_id: fallbackConversationId,
                 response_mode: 'blocking', // Force blocking mode for fallback
                 stream: false,
                 inputs: {}
@@ -403,9 +383,8 @@ export function DifyChatInterface({
               console.log('[Chat Debug] Fallback response updated conversation ID from', conversationId, 'to', data.conversation_id);
               setConversationId(data.conversation_id);
               
-              // 🔧 CRITICAL FIX: Store the conversation ID for future requests
+              // Store the conversation ID for future requests
               if (typeof window !== 'undefined') {
-                localStorage.setItem('dify_workflow_conversation_id', data.conversation_id);
                 localStorage.setItem('dify_conversation_id', data.conversation_id);
                 console.log('[Chat Debug] Stored fallback conversation ID:', data.conversation_id);
               }
@@ -608,10 +587,10 @@ export function DifyChatInterface({
                   setMessages(prev => [...prev, assistantMessage]);
                   console.log('[Chat Debug] Added assistant message from stream with conversation ID:', detectedConversationId);
                   
-                  // 保存工作流状态到localStorage
+                  // 保存会话ID到localStorage
                   if (detectedConversationId) {
-                    localStorage.setItem('dify_workflow_conversation_id', detectedConversationId);
-                    console.log('[Chat Debug] Saved workflow conversation ID to localStorage:', detectedConversationId);
+                    localStorage.setItem('dify_conversation_id', detectedConversationId);
+                    console.log('[Chat Debug] Saved conversation ID to localStorage:', detectedConversationId);
                   }
                 } else {
                   console.warn('[Chat Debug] Stream completed but no content accumulated, using fallback');
@@ -642,10 +621,9 @@ export function DifyChatInterface({
                     detectedConversationId = parsed.conversation_id;
                     setConversationId(parsed.conversation_id);
                     
-                    // 🔧 CRITICAL FIX: Store conversation ID immediately for workflow continuity
+                    // Store conversation ID for continuity
                     if (typeof window !== 'undefined') {
                       localStorage.setItem('dify_conversation_id', parsed.conversation_id);
-                      localStorage.setItem('dify_workflow_conversation_id', parsed.conversation_id);
                       console.log('[Chat Debug] Stored streaming conversation ID:', parsed.conversation_id);
                     }
                   }
@@ -734,10 +712,10 @@ export function DifyChatInterface({
         setMessages(prev => [...prev, assistantMessage]);
         console.log('[Chat Debug] Added assistant message from incomplete stream');
         
-        // 保存工作流状态到localStorage
+        // 保存会话ID到localStorage
         if (detectedConversationId) {
-          localStorage.setItem('dify_workflow_conversation_id', detectedConversationId);
-          console.log('[Chat Debug] Saved workflow conversation ID to localStorage:', detectedConversationId);
+          localStorage.setItem('dify_conversation_id', detectedConversationId);
+          console.log('[Chat Debug] Saved conversation ID to localStorage:', detectedConversationId);
         }
       } else {
         // 检查是否至少收到了message_end事件
@@ -798,10 +776,6 @@ export function DifyChatInterface({
       // 🔧 CRITICAL FIX: Store the Dify conversation ID for future requests
       if (typeof window !== 'undefined') {
         localStorage.setItem('dify_conversation_id', data.conversation_id);
-        // Also store as workflow conversation ID if we're in workflow mode
-        if (showWorkflowProgress) {
-          localStorage.setItem('dify_workflow_conversation_id', data.conversation_id);
-        }
         console.log('[Chat Debug] Stored conversation ID in localStorage:', data.conversation_id);
       }
     }
@@ -919,7 +893,6 @@ export function DifyChatInterface({
     if (typeof window !== 'undefined') {
       const keysToRemove = [
         'dify_conversation_id',
-        'dify_workflow_conversation_id', 
         'dify_workflow_state'
       ];
       
@@ -1244,7 +1217,6 @@ export function DifyChatInterface({
           <div>User ID: {userId}</div>
           <div>User ID Ready: {isUserIdReady ? 'Yes' : 'No'}</div>
           <div>Conversation ID: {conversationId || 'None'}</div>
-          <div>Stored Workflow Conv ID: {typeof window !== 'undefined' ? localStorage.getItem('dify_workflow_conversation_id') || 'None' : 'N/A'}</div>
           <div>Stored Regular Conv ID: {typeof window !== 'undefined' ? localStorage.getItem('dify_conversation_id') || 'None' : 'N/A'}</div>
           <div>Messages: {messages.length}</div>
           <div>Retry Count: {retryCount}</div>
