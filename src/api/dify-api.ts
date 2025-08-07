@@ -50,6 +50,9 @@ export interface DifyUsageStats {
   totalMessages: number
   totalTokens: number
   totalConversations: number
+  totalRequests: number
+  promptTokens: number
+  completionTokens: number
   lastUpdated: string
 }
 
@@ -135,56 +138,81 @@ export class DifyAPIClient {
   
   /**
    * 发送聊天消息
-   * 核心方法：使用 /v1/chat-messages 多轮对话接口
    */
   async sendChatMessage(params: SendChatMessageParams): Promise<DifyChatResponse> {
-    const { conversationId, query, userId, inputs = {}, files = [] } = params
+    const body = {
+      inputs: params.inputs || {},
+      query: params.query,
+      response_mode: 'blocking',
+      conversation_id: params.conversationId || '',
+      user: params.userId,
+      files: params.files || [],
+    }
     
     return this.request<DifyChatResponse>('/v1/chat-messages', {
       method: 'POST',
-      body: JSON.stringify({
-        conversation_id: conversationId || '',
-        query,
-        user: userId,
-        response_mode: 'blocking',
-        inputs,
-        files,
-      }),
+      body: JSON.stringify(body),
     })
   }
   
   /**
-   * 获取会话历史消息
+   * 发送聊天消息（流式）
    */
-  async getConversationMessages(params: GetMessagesParams): Promise<DifyMessageHistory> {
-    const { conversationId, userId, limit = 20, firstId } = params
-    
-    const queryParams = new URLSearchParams({
-      conversation_id: conversationId,
-      user: userId,
-      limit: limit.toString(),
-    })
-    
-    if (firstId) {
-      queryParams.append('first_id', firstId)
+  async sendChatMessageStream(params: SendChatMessageParams): Promise<Response> {
+    const body = {
+      inputs: params.inputs || {},
+      query: params.query,
+      response_mode: 'streaming',
+      conversation_id: params.conversationId || '',
+      user: params.userId,
+      files: params.files || [],
     }
     
-    return this.request<DifyMessageHistory>(`/v1/messages?${queryParams}`, {
-      method: 'GET',
+    const url = `${this.baseURL}/v1/chat-messages`
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify(body),
     })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || `Stream API Error: ${response.status}`)
+    }
+    
+    return response
+  }
+  
+  /**
+   * 获取会话消息列表
+   */
+  async getConversationMessages(params: GetMessagesParams): Promise<DifyMessageHistory> {
+    const queryParams = new URLSearchParams({
+      user: params.userId,
+      limit: String(params.limit || 20),
+      ...(params.firstId && { first_id: params.firstId }),
+    })
+    
+    return this.request<DifyMessageHistory>(
+      `/v1/messages?${queryParams}`,
+      { method: 'GET' }
+    )
   }
   
   /**
    * 提交消息反馈
    */
-  async submitMessageFeedback(params: SubmitFeedbackParams): Promise<{ result: string }> {
-    const { messageId, rating, userId } = params
-    
-    return this.request(`/v1/messages/${messageId}/feedbacks`, {
+  async submitMessageFeedback(params: SubmitFeedbackParams): Promise<void> {
+    await this.request(`/v1/messages/${params.messageId}/feedbacks`, {
       method: 'POST',
       body: JSON.stringify({
-        rating,
-        user: userId,
+        rating: params.rating,
+        user: params.userId,
       }),
     })
   }
@@ -254,7 +282,17 @@ export class DifyAPIClient {
       // 或者从本地存储获取统计信息
       const stats = localStorage.getItem('dify_usage_stats')
       if (stats) {
-        return JSON.parse(stats)
+        const parsedStats = JSON.parse(stats)
+        // 确保返回的数据包含所有必需的属性
+        return {
+          totalMessages: parsedStats.totalMessages || 0,
+          totalTokens: parsedStats.totalTokens || 0,
+          totalConversations: parsedStats.totalConversations || 0,
+          totalRequests: parsedStats.totalRequests || 0,
+          promptTokens: parsedStats.promptTokens || 0,
+          completionTokens: parsedStats.completionTokens || 0,
+          lastUpdated: parsedStats.lastUpdated || new Date().toISOString(),
+        }
       }
       
       // 返回默认值
@@ -262,6 +300,9 @@ export class DifyAPIClient {
         totalMessages: 0,
         totalTokens: 0,
         totalConversations: 0,
+        totalRequests: 0,
+        promptTokens: 0,
+        completionTokens: 0,
         lastUpdated: new Date().toISOString(),
       }
     } catch (error) {
@@ -270,6 +311,9 @@ export class DifyAPIClient {
         totalMessages: 0,
         totalTokens: 0,
         totalConversations: 0,
+        totalRequests: 0,
+        promptTokens: 0,
+        completionTokens: 0,
         lastUpdated: new Date().toISOString(),
       }
     }
