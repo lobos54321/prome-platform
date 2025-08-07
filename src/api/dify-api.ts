@@ -46,6 +46,13 @@ export interface DifyMessageHistory {
   limit: number
 }
 
+export interface DifyUsageStats {
+  totalMessages: number
+  totalTokens: number
+  totalConversations: number
+  lastUpdated: string
+}
+
 // 请求参数类型定义
 export interface SendChatMessageParams {
   conversationId?: string
@@ -237,6 +244,36 @@ export class DifyAPIClient {
       method: 'GET',
     })
   }
+  
+  /**
+   * 获取使用统计信息
+   */
+  async getUsageStats(userId: string): Promise<DifyUsageStats> {
+    try {
+      // 这里可以调用 Dify 的统计 API（如果有的话）
+      // 或者从本地存储获取统计信息
+      const stats = localStorage.getItem('dify_usage_stats')
+      if (stats) {
+        return JSON.parse(stats)
+      }
+      
+      // 返回默认值
+      return {
+        totalMessages: 0,
+        totalTokens: 0,
+        totalConversations: 0,
+        lastUpdated: new Date().toISOString(),
+      }
+    } catch (error) {
+      console.error('[getUsageStats] Error:', error)
+      return {
+        totalMessages: 0,
+        totalTokens: 0,
+        totalConversations: 0,
+        lastUpdated: new Date().toISOString(),
+      }
+    }
+  }
 }
 
 // 创建默认实例
@@ -254,6 +291,26 @@ export const submitMessageFeedback = (params: SubmitFeedbackParams) =>
 
 export const uploadFile = (file: File, userId: string) => 
   difyAPI.uploadFile(file, userId)
+
+/**
+ * 检查 Dify 是否启用
+ * @returns boolean
+ */
+export const isDifyEnabled = (): boolean => {
+  const apiKey = import.meta.env.VITE_DIFY_API_KEY
+  const apiUrl = import.meta.env.VITE_DIFY_API_URL
+  
+  return !!(apiKey && apiUrl && apiKey !== '' && apiUrl !== '')
+}
+
+/**
+ * 获取 Dify 使用统计
+ * @param userId 用户ID
+ * @returns Promise<DifyUsageStats>
+ */
+export const getDifyUsageStats = async (userId: string = 'default-user'): Promise<DifyUsageStats> => {
+  return difyAPI.getUsageStats(userId)
+}
 
 // 默认导出
 export default difyAPI
