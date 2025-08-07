@@ -693,7 +693,6 @@ app.post('/api/dify', async (req, res) => {
           }
           
           console.log('✅ Successfully retried without breaking conversation continuity');
-        }
         } else {
           throw new Error(`Dify API error: ${errorData.message || 'Unknown error'}`);
         }
