@@ -1225,10 +1225,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
         }
         
         // Try to detect if this is standard SSE format or direct JSON response
-        console.log('📝 Processing chunk, includes data:', chunk.includes('data: '), 'chunk preview:', chunk.substring(0, 100));
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📝 Processing chunk, includes data:', chunk.includes('data: '), 'chunk preview:', chunk.substring(0, 100));
+        }
         
         // Send debug message to confirm we're processing chunks
-        if (allChunks.length < 500) { // Only for first few chunks to avoid spam
+        if (allChunks.length < 500 && process.env.NODE_ENV !== 'production') {
           res.write(`data: {"event": "debug", "message": "Processing chunk ${allChunks.length} chars"}\n\n`);
         }
         if (chunk.includes('data: ')) {
@@ -1270,10 +1272,10 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
                 // 🔧 CRITICAL FIX: Capture conversation_id from any DIFY event
                 if (parsed.conversation_id) {
                   currentConversationId = parsed.conversation_id;
-                  console.log('🆔 Captured conversation_id from stream:', currentConversationId);
-                  
-                  // Send debug message to client to confirm this code path is executed
-                  res.write(`data: {"event": "debug", "message": "Captured conversation_id: ${currentConversationId}"}\n\n`);
+                  if (process.env.NODE_ENV !== 'production') {
+                    console.log('🆔 Captured conversation_id from stream:', currentConversationId);
+                    res.write(`data: {"event": "debug", "message": "Captured conversation_id: ${currentConversationId}"}\n\n`);
+                  }
                   
                   // 🔥 AGGRESSIVE FIX: Save immediately upon receiving first conversation_id
                   if (!finalData) {
@@ -1333,17 +1335,37 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           const completeResponse = JSON.parse(allChunks);
           
           if (completeResponse.answer) {
-            fullAnswer = completeResponse.answer;
+            // DIFY's answer might be a JSON string that needs parsing
+            let actualAnswer = completeResponse.answer;
+            try {
+              const parsedAnswer = JSON.parse(completeResponse.answer);
+              if (parsedAnswer.revised_pain_point) {
+                actualAnswer = parsedAnswer.revised_pain_point;
+              } else if (parsedAnswer.generated_content) {
+                actualAnswer = parsedAnswer.generated_content;
+              } else {
+                // Use the first string value found in the parsed object
+                const firstStringValue = Object.values(parsedAnswer).find(value => typeof value === 'string');
+                if (firstStringValue) {
+                  actualAnswer = firstStringValue;
+                }
+              }
+            } catch (e) {
+              // If parsing fails, use the original answer as is
+              console.log('📝 Using original answer as is (not JSON)');
+            }
+            
+            fullAnswer = actualAnswer;
             finalData = {
-              answer: completeResponse.answer,
+              answer: actualAnswer,
               conversation_id: completeResponse.conversation_id,
               message_id: completeResponse.message_id,
               metadata: completeResponse.metadata
             };
             
             // Convert to proper streaming format for frontend
-            // Send message chunks
-            const chunks = completeResponse.answer.match(/.{1,50}/g) || [completeResponse.answer];
+            // Send message chunks using the parsed answer
+            const chunks = actualAnswer.match(/.{1,50}/g) || [actualAnswer];
             for (const chunk of chunks) {
               res.write(`data: ${JSON.stringify({
                 event: 'message',
