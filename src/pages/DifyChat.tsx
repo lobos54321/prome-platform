@@ -64,9 +64,9 @@ export default function DifyChat() {
   }, [serviceId, navigate]);
 
   // Check if Dify is configured
+  // For workflow apps, APP_ID is optional (workflows use different API endpoint)
   const isDifyConfigured = !!(
     import.meta.env.VITE_DIFY_API_URL &&
-    import.meta.env.VITE_DIFY_APP_ID &&
     import.meta.env.VITE_DIFY_API_KEY
   );
 
@@ -100,9 +100,12 @@ export default function DifyChat() {
                 Dify API未配置。请联系管理员设置以下环境变量：
                 <ul className="mt-2 list-disc list-inside text-sm">
                   <li>VITE_DIFY_API_URL</li>
-                  <li>VITE_DIFY_APP_ID</li>
                   <li>VITE_DIFY_API_KEY</li>
+                  <li>VITE_DIFY_APP_ID (仅聊天应用需要，工作流应用可选)</li>
                 </ul>
+                <div className="mt-2 text-xs text-gray-500">
+                  💡 当前系统支持工作流模式，无需APP_ID即可使用
+                </div>
               </AlertDescription>
             </Alert>
           </CardContent>
