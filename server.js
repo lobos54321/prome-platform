@@ -19,6 +19,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 app.use(express.json());
 
+// 🔍 DEBUG: Log all incoming requests to identify routing
+app.use((req, res, next) => {
+  if (req.path.includes('/api/dify')) {
+    console.log(`🔍 INCOMING REQUEST: ${req.method} ${req.path}`);
+  }
+  next();
+});
+
 // Configuration from environment variables
 const DIFY_API_URL = process.env.VITE_DIFY_API_URL || process.env.DIFY_API_URL || '';
 const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.DIFY_API_KEY || '';
@@ -194,6 +202,29 @@ async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOU
 
 // Utility function to ensure conversation exists before saving messages
 async function ensureConversationExists(supabase, conversationId, difyConversationId = null, userId = null) {
+  console.log('🔍 ensureConversationExists called with:', { conversationId, difyConversationId, userId, hasSupabase: !!supabase });
+  
+  // 🚨 FORCE TEST SAVE - Always save a record with timestamp to prove this function is called
+  const testId = 'forced-test-' + Date.now();
+  try {
+    const { error: forceError } = await supabase
+      .from('conversations')
+      .insert({
+        id: testId,
+        dify_conversation_id: 'FORCE_TEST_SAVE_PROOF_' + Date.now(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    
+    if (forceError) {
+      console.error('❌ FORCE TEST SAVE failed:', forceError);
+    } else {
+      console.log('✅ FORCE TEST SAVE successful with ID:', testId);
+    }
+  } catch (forceTestError) {
+    console.error('❌ FORCE TEST SAVE exception:', forceTestError);
+  }
+  
   if (!supabase) {
     console.log('📝 Skipping conversation check (Supabase not configured)');
     return;
@@ -578,6 +609,7 @@ app.get('/api/config/status', async (req, res) => {
 
 // Dify chat proxy API (generic endpoint without conversationId - for backward compatibility)
 app.post('/api/dify', async (req, res) => {
+  console.log('🗣️ GENERIC /api/dify ENDPOINT CALLED');
   try {
     const { message, query, user, conversation_id, inputs = {} } = req.body;
     const actualMessage = message || query; // Support both message and query fields
@@ -716,6 +748,7 @@ app.post('/api/dify', async (req, res) => {
 
 // Enhanced Dify workflow API with progress indicators
 app.post('/api/dify/workflow', async (req, res) => {
+  console.log('🗣️ WORKFLOW ENDPOINT CALLED');
   try {
     const { message, query, user, conversation_id, inputs = {}, stream = true } = req.body;
     const actualMessage = message || query; // Support both message and query fields
@@ -816,6 +849,7 @@ app.post('/api/dify/workflow', async (req, res) => {
           let buffer = '';
           let fullAnswer = '';
           let finalData = null;
+          let currentConversationId = null; // Track conversation_id from DIFY response
 
           try {
             while (true) {
@@ -823,6 +857,24 @@ app.post('/api/dify/workflow', async (req, res) => {
               if (done) break;
 
               buffer += decoder.decode(value, { stream: true });
+              
+              // 🚨 WORKFLOW LOOP DEBUG: Prove this loop executes
+              if (buffer.length === decoder.decode(value, { stream: true }).length) { // First chunk
+                console.log('🚨 WORKFLOW LOOP - FIRST CHUNK PROCESSED');
+                const workflowTestId = 'workflow-proof-' + Date.now();
+                try {
+                  const supabaseWorkflow = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+                  await supabaseWorkflow.from('conversations').insert({
+                    id: workflowTestId,
+                    dify_conversation_id: 'WORKFLOW_LOOP_PROOF_' + Date.now(),
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  });
+                  console.log('✅ WORKFLOW LOOP PROOF SAVED:', workflowTestId);
+                } catch (workflowProofError) {
+                  console.error('❌ WORKFLOW LOOP PROOF FAILED:', workflowProofError);
+                }
+              }
               const lines = buffer.split('\n');
               buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
@@ -831,6 +883,17 @@ app.post('/api/dify/workflow', async (req, res) => {
                   const data = line.slice(6).trim();
                   
                   if (data === '[DONE]') {
+                    // 🔧 CRITICAL FIX: Even without message_end event, we need to save conversation_id
+                    if (!finalData && currentConversationId) {
+                      // Create finalData if it doesn't exist but we have conversation info
+                      finalData = {
+                        answer: fullAnswer || 'Completed',
+                        conversation_id: currentConversationId,
+                        message_id: generateUUID(),
+                        metadata: {}
+                      };
+                    }
+                    
                     // Save messages to database if we have final data
                     if (finalData && supabase) {
                       // Ensure conversation exists first
@@ -847,6 +910,11 @@ app.post('/api/dify/workflow', async (req, res) => {
 
                   try {
                     const parsed = JSON.parse(data);
+                    
+                    // 🔧 CRITICAL FIX: Capture conversation_id from any DIFY event
+                    if (parsed.conversation_id) {
+                      currentConversationId = parsed.conversation_id;
+                    }
                     
                     // Log workflow events for debugging
                     if (parsed.event && parsed.event.startsWith('node_')) {
@@ -981,8 +1049,38 @@ app.post('/api/dify/workflow', async (req, res) => {
   }
 });
 
+
 // Dify chat proxy API (streaming)
 app.post('/api/dify/:conversationId/stream', async (req, res) => {
+  console.log('🗣️ STREAM ENDPOINT CALLED with conversation ID:', req.params.conversationId);
+  
+  // 🚀 ENDPOINT CALLED CONFIRMATION - Log only, don't send response yet
+  console.log('✅ STREAM ENDPOINT CONFIRMED - Processing request');
+  
+  // 🚨 FORCE STREAM ENDPOINT TEST WITH DETAILED ERROR HANDLING
+  const streamEndpointTestId = 'stream-endpoint-' + Date.now();
+  console.log('🚨 ATTEMPTING STREAM ENDPOINT PROOF INSERT with ID:', streamEndpointTestId);
+  console.log('🚨 SUPABASE_URL:', SUPABASE_URL);
+  console.log('🚨 HAS SUPABASE_SERVICE_ROLE_KEY:', !!SUPABASE_SERVICE_ROLE_KEY);
+  
+  try {
+    const supabaseStream = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    console.log('🚨 Supabase client created');
+    
+    const insertResult = await supabaseStream.from('conversations').insert({
+      id: streamEndpointTestId,
+      dify_conversation_id: 'STREAM_ENDPOINT_PROOF_' + Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    
+    console.log('🚨 Insert result:', insertResult);
+    console.log('✅ STREAM ENDPOINT PROOF SAVED:', streamEndpointTestId);
+  } catch (streamEndpointError) {
+    console.error('❌ STREAM ENDPOINT PROOF FAILED with error:', streamEndpointError);
+    console.error('❌ Error details:', JSON.stringify(streamEndpointError, null, 2));
+  }
+  
   try {
     const { message, inputs = {} } = req.body;
     const { conversationId: rawConversationId } = req.params;
@@ -1109,60 +1207,237 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     const decoder = new TextDecoder();
     let fullAnswer = '';
     let finalData = null;
+    let currentConversationId = null; // Track conversation_id from DIFY response
 
     try {
+      let allChunks = '';
       while (true) {
         const { done, value } = await reader.read();
         
         if (done) break;
         
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        allChunks += chunk;
         
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              // Save messages to database
-              if (finalData) {
-                // Ensure conversation exists first
-                await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
-                
-                // Then save messages
-                await saveMessages(supabase, conversationId, message, finalData);
-              }
-              
-              res.write(`data: [DONE]\n\n`);
-              res.end();
-              return;
-            }
+        // 🚨 FORCE DEBUG: Always execute on first chunk to prove this loop runs
+        if (allChunks.length === chunk.length) { // First chunk
+          console.log('🚨 FIRST CHUNK PROCESSED - LOOP IS EXECUTING');
+          const testSaveId = 'loop-proof-' + Date.now();
+          try {
+            const supabaseForce = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+            await supabaseForce.from('conversations').insert({
+              id: testSaveId,
+              dify_conversation_id: 'LOOP_EXECUTION_PROOF_' + Date.now(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            console.log('✅ LOOP EXECUTION PROOF SAVED:', testSaveId);
+          } catch (loopProofError) {
+            console.error('❌ LOOP EXECUTION PROOF FAILED:', loopProofError);
+          }
+        }
+        
+        // 🔥 IMMEDIATE SAVE: Extract and save conversation_id as soon as we see it
+        if (chunk.includes('conversation_id') && !finalData) {
+          const match = chunk.match(/"conversation_id"\s*:\s*"([^"]+)"/);
+          if (match) {
+            const foundConversationId = match[1];
+            console.log('🔥 IMMEDIATE: Found conversation_id in chunk:', foundConversationId);
             
             try {
-              const parsed = JSON.parse(data);
+              await ensureConversationExists(supabase, conversationId, foundConversationId, getValidUserId(req.body.user));
+              console.log('✅ IMMEDIATE SAVE successful for:', foundConversationId);
               
-              // Collect answer content and final data
-              if (parsed.event === 'message' && parsed.answer) {
-                fullAnswer += parsed.answer;
-              } else if (parsed.event === 'message_end') {
-                finalData = {
-                  answer: fullAnswer,
-                  conversation_id: parsed.conversation_id,
-                  message_id: parsed.message_id,
-                  metadata: parsed.metadata
-                };
+              // Mark as saved to prevent duplicate saves
+              finalData = {
+                answer: 'Processing...',
+                conversation_id: foundConversationId,
+                message_id: 'temp-' + Date.now(),
+                metadata: {}
+              };
+            } catch (immediateError) {
+              console.error('❌ IMMEDIATE SAVE failed:', immediateError);
+            }
+          }
+        }
+        
+        // Try to detect if this is standard SSE format or direct JSON response
+        console.log('📝 Processing chunk, includes data:', chunk.includes('data: '), 'chunk preview:', chunk.substring(0, 100));
+        
+        // Send debug message to confirm we're processing chunks
+        if (allChunks.length < 500) { // Only for first few chunks to avoid spam
+          res.write(`data: {"event": "debug", "message": "Processing chunk ${allChunks.length} chars"}\n\n`);
+        }
+        if (chunk.includes('data: ')) {
+          // Standard SSE format - process line by line
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                // 🔧 CRITICAL FIX: Even without message_end event, we need to save conversation_id
+                if (!finalData && currentConversationId) {
+                  // Create finalData if it doesn't exist but we have conversation info
+                  finalData = {
+                    answer: fullAnswer || 'Completed',
+                    conversation_id: currentConversationId,
+                    message_id: generateUUID(),
+                    metadata: {}
+                  };
+                }
+                
+                // Save messages to database
+                if (finalData) {
+                  // Ensure conversation exists first
+                  await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
+                  
+                  // Then save messages
+                  await saveMessages(supabase, conversationId, message, finalData);
+                }
+                
+                res.write(`data: [DONE]\n\n`);
+                res.end();
+                return;
               }
               
-              // Forward the chunk to client
-              res.write(`data: ${data}\n\n`);
-            } catch (e) {
-              console.warn('Failed to parse stream chunk:', data);
+              try {
+                const parsed = JSON.parse(data);
+                
+                // 🔧 CRITICAL FIX: Capture conversation_id from any DIFY event
+                if (parsed.conversation_id) {
+                  currentConversationId = parsed.conversation_id;
+                  console.log('🆔 Captured conversation_id from stream:', currentConversationId);
+                  
+                  // Send debug message to client to confirm this code path is executed
+                  res.write(`data: {"event": "debug", "message": "Captured conversation_id: ${currentConversationId}"}\n\n`);
+                  
+                  // 🔥 AGGRESSIVE FIX: Save immediately upon receiving first conversation_id
+                  if (!finalData) {
+                    console.log('🔥 Attempting immediate save of conversation_id');
+                    try {
+                      await ensureConversationExists(supabase, conversationId, currentConversationId, getValidUserId(req.body.user));
+                      console.log('✅ Immediate save successful');
+                    } catch (immediateError) {
+                      console.error('❌ Immediate save failed:', immediateError);
+                    }
+                  }
+                }
+                
+                // Collect answer content and final data
+                if (parsed.event === 'message' && parsed.answer) {
+                  fullAnswer += parsed.answer;
+                } else if (parsed.event === 'message_end') {
+                  finalData = {
+                    answer: fullAnswer,
+                    conversation_id: parsed.conversation_id,
+                    message_id: parsed.message_id,
+                    metadata: parsed.metadata
+                  };
+                }
+                
+                // Forward the chunk to client
+                res.write(`data: ${data}\n\n`);
+              } catch (e) {
+                console.warn('Failed to parse stream chunk:', data);
+              }
             }
           }
         }
       }
+      
+      // 🔧 CRITICAL FIX: If we have conversation_id but no finalData, save it now
+      console.log('🔍 Checking save conditions - finalData:', !!finalData, 'currentConversationId:', currentConversationId, 'message:', !!message);
+      if (!finalData && currentConversationId && message) {
+        console.log('🔧 Stream ended naturally without [DONE], saving conversation_id:', currentConversationId);
+        finalData = {
+          answer: fullAnswer || 'Stream completed',
+          conversation_id: currentConversationId,
+          message_id: generateUUID(),
+          metadata: {}
+        };
+        
+        // Save to database immediately
+        await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
+        await saveMessages(supabase, conversationId, message, finalData);
+        console.log('✅ Successfully saved conversation_id after stream end');
+      }
+      
+      // Handle case where DIFY returns complete JSON response instead of streaming
+      if (allChunks && !finalData) {
+        try {
+          console.log('🔍 Received complete JSON response from DIFY, converting to stream format');
+          const completeResponse = JSON.parse(allChunks);
+          
+          if (completeResponse.answer) {
+            fullAnswer = completeResponse.answer;
+            finalData = {
+              answer: completeResponse.answer,
+              conversation_id: completeResponse.conversation_id,
+              message_id: completeResponse.message_id,
+              metadata: completeResponse.metadata
+            };
+            
+            // Convert to proper streaming format for frontend
+            // Send message chunks
+            const chunks = completeResponse.answer.match(/.{1,50}/g) || [completeResponse.answer];
+            for (const chunk of chunks) {
+              res.write(`data: ${JSON.stringify({
+                event: 'message',
+                answer: chunk,
+                conversation_id: completeResponse.conversation_id
+              })}\n\n`);
+              
+              // Small delay to simulate streaming
+              await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            // Send message end event
+            res.write(`data: ${JSON.stringify({
+              event: 'message_end',
+              conversation_id: completeResponse.conversation_id,
+              message_id: completeResponse.message_id,
+              metadata: completeResponse.metadata
+            })}\n\n`);
+            
+            // Save messages to database
+            await ensureConversationExists(supabase, conversationId, completeResponse.conversation_id, getValidUserId(req.body.user));
+            await saveMessages(supabase, conversationId, message, finalData);
+            
+            res.write(`data: [DONE]\n\n`);
+            res.end();
+            return;
+          }
+        } catch (parseError) {
+          console.error('Failed to parse complete JSON response:', parseError);
+          console.error('Raw response:', allChunks.substring(0, 500));
+        }
+      }
     } finally {
+      // 🔧 CRITICAL FIX: Save conversation_id even if stream ends without proper events
+      if (!finalData && currentConversationId && message) {
+        console.log('🔧 Stream ended without finalData, saving conversation_id from stream:', currentConversationId);
+        finalData = {
+          answer: fullAnswer || 'Completed',
+          conversation_id: currentConversationId,
+          message_id: generateUUID(),
+          metadata: {}
+        };
+        
+        // Save to database
+        try {
+          await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
+          await saveMessages(supabase, conversationId, message, finalData);
+          console.log('✅ Successfully saved conversation_id in finally block');
+        } catch (saveError) {
+          console.error('❌ Error saving in finally block:', saveError);
+        }
+      }
+      
       reader.releaseLock();
-      res.end();
+      if (!res.headersSent) {
+        res.end();
+      }
     }
   } catch (error) {
     console.error('Stream API error:', error);
@@ -1172,6 +1447,23 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
 
 // Dify chat proxy API (blocking)
 app.post('/api/dify/:conversationId', async (req, res) => {
+  console.log('🗣️ NON-STREAM /:conversationId ENDPOINT CALLED with:', req.params.conversationId);
+  
+  // 🚨 FORCE NON-STREAM ENDPOINT TEST
+  const nonStreamTestId = 'non-stream-' + Date.now();
+  try {
+    const supabaseNonStream = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    await supabaseNonStream.from('conversations').insert({
+      id: nonStreamTestId,
+      dify_conversation_id: 'NON_STREAM_PROOF_' + Date.now() + '_' + req.params.conversationId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    console.log('✅ NON-STREAM ENDPOINT PROOF SAVED:', nonStreamTestId);
+  } catch (nonStreamError) {
+    console.error('❌ NON-STREAM ENDPOINT PROOF FAILED:', nonStreamError);
+  }
+  
   try {
     const { message, inputs = {} } = req.body;
     const { conversationId: rawConversationId } = req.params;
@@ -1371,6 +1663,30 @@ app.use(express.static(path.join(dirname, 'dist')));
 // SPA 路由
 app.get('*', (req, res) => {
  res.sendFile(path.join(dirname, 'dist', 'index.html'));
+});
+
+// Test endpoint to debug conversation saving
+app.post('/api/test-save-conversation', async (req, res) => {
+  const { conversationId, difyId } = req.body;
+  
+  console.log('🧪 TEST SAVE CONVERSATION called with:', { conversationId, difyId });
+  
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    await ensureConversationExists(supabase, conversationId, difyId, null);
+    
+    // Verify it was saved
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id, dify_conversation_id')
+      .eq('id', conversationId)
+      .single();
+    
+    res.json({ success: true, saved: data, error });
+  } catch (error) {
+    console.error('❌ TEST SAVE failed:', error);
+    res.json({ success: false, error: error.message });
+  }
 });
 
 app.listen(port, async () => {
