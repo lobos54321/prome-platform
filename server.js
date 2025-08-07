@@ -295,9 +295,14 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
     }
     // If userId is null or user doesn't exist, user_id will be null (allowed by schema)
 
-    const { error: insertError } = await supabase
+    // Use upsert to handle potential race conditions and ensure record exists
+    const { data: insertResult, error: insertError } = await supabase
       .from('conversations')
-      .insert(insertData);
+      .upsert(insertData, { 
+        onConflict: 'id',
+        ignoreDuplicates: false 
+      })
+      .select('id');
 
     if (insertError) {
       console.error('Error creating conversation record:', insertError);
@@ -307,18 +312,27 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
         console.log('Retrying conversation creation without user_id...');
         delete insertData.user_id;
         
-        const { error: retryError } = await supabase
+        const { data: retryResult, error: retryError } = await supabase
           .from('conversations')
-          .insert(insertData);
-          
+          .upsert(insertData, { 
+            onConflict: 'id',
+            ignoreDuplicates: false 
+          })
+          .select('id');
+
         if (retryError) {
-          console.error('Error creating conversation record (retry):', retryError);
+          console.error('Failed to create conversation record even without user_id:', retryError);
+          return false; // Indicate failure
         } else {
-          console.log('✅ Created new conversation record (without user_id)');
+          console.log('✅ Created new conversation record without user_id');
+          return true;
         }
+      } else {
+        return false; // Indicate failure
       }
     } else {
       console.log('✅ Created new conversation record');
+      return true;
     }
   } catch (error) {
     console.error('Error in ensureConversationExists:', error);
@@ -653,7 +667,8 @@ app.post('/api/dify', async (req, res) => {
     const requestBody = {
       inputs: inputs,
       query: actualMessage,
-      response_mode: 'blocking',
+      response_mode: stream ? 'streaming' : 'blocking',
+      stream: stream,
       user: getValidUserId(user)
     };
 
@@ -713,8 +728,104 @@ app.post('/api/dify', async (req, res) => {
         }
       }
 
-      data = await response.json();
-      console.log('✅ Successfully received response from Dify API');
+      // Handle streaming vs blocking response
+      if (stream && requestBody.response_mode === 'streaming') {
+        console.log('🔄 Handling streaming response from Dify API');
+        
+        // Set up streaming response headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        
+        // Get streaming reader
+        const reader = response.body?.getReader();
+        if (!reader) {
+          return res.status(500).json({ error: 'No response body reader available' });
+        }
+        
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData = null;
+        
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+            
+            // Process complete lines from buffer
+            let lineEndIndex;
+            while ((lineEndIndex = buffer.indexOf('\n')) !== -1) {
+              const line = buffer.substring(0, lineEndIndex).trim();
+              buffer = buffer.substring(lineEndIndex + 1);
+              
+              if (line.startsWith('data: ')) {
+                const data = line.substring(6).trim();
+                
+                if (data === '[DONE]') {
+                  console.log('🔚 Streaming ended with [DONE]');
+                  break;
+                }
+                
+                try {
+                  const parsed = JSON.parse(data);
+                  
+                  // Store final data for database saving
+                  if (parsed.conversation_id) {
+                    finalData = parsed;
+                  }
+                  
+                  // Forward the streaming data to client
+                  res.write(`data: ${data}\n\n`);
+                  
+                  console.log('📤 Forwarded streaming data:', {
+                    event: parsed.event,
+                    hasAnswer: !!parsed.answer,
+                    conversationId: parsed.conversation_id
+                  });
+                  
+                } catch (parseError) {
+                  console.warn('⚠️ Failed to parse streaming data:', parseError);
+                  // Forward as-is if we can't parse
+                  res.write(`data: ${data}\n\n`);
+                }
+              }
+            }
+          }
+          
+          // End the stream
+          res.write('data: [DONE]\n\n');
+          
+          // Save to database if we have final data
+          if (finalData && supabase) {
+            const effectiveConversationId = finalData.conversation_id || conversationId;
+            const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, finalData.conversation_id, getValidUserId(user));
+            
+            if (conversationCreated !== false) {
+              await saveMessages(supabase, effectiveConversationId, actualMessage, finalData);
+              console.log('✅ Saved streaming conversation to database');
+            }
+          }
+          
+          res.end();
+          return;
+          
+        } catch (streamError) {
+          console.error('❌ Streaming error:', streamError);
+          res.write(`data: {"error": "Streaming failed: ${streamError.message}"}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+        
+      } else {
+        // Handle blocking response
+        data = await response.json();
+        console.log('✅ Successfully received response from Dify API');
+      }
       
     } catch (error) {
       console.error('⚠️ Dify API request failed:', error.message);
@@ -725,16 +836,20 @@ app.post('/api/dify', async (req, res) => {
       });
     }
 
-    // Ensure conversation exists BEFORE saving messages
-    if (supabase) {
+    // Ensure conversation exists BEFORE saving messages (only for blocking mode)
+    if (supabase && data) {
       // Use Dify's conversation_id as the authoritative source
       const effectiveConversationId = data.conversation_id || conversationId;
       
       // First ensure conversation record exists with Dify's ID as primary
-      await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
+      const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
       
-      // Then save messages using Dify's conversation_id
-      await saveMessages(supabase, effectiveConversationId, actualMessage, data);
+      // Then save messages using Dify's conversation_id only if conversation was successfully created/exists
+      if (conversationCreated !== false) {
+        await saveMessages(supabase, effectiveConversationId, actualMessage, data);
+      } else {
+        console.error('⚠️ Skipping message save due to conversation creation failure');
+      }
     }
 
     const responseData = {

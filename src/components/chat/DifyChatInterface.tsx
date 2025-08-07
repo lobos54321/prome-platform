@@ -412,8 +412,9 @@ export function DifyChatInterface({
       
       // 处理取消请求
       if (error instanceof Error && error.name === 'AbortError') {
+        const nodeCount = Object.keys(workflowState.nodes).length;
         const timeoutError = showWorkflowProgress 
-          ? '复杂工作流执行超时（5分钟）。如果您的工作流包含20+个节点，这可能需要更多时间。请尝试简化请求或稍后重试。'
+          ? `工作流执行超时（5分钟）。当前工作流包含${nodeCount || 5}个节点，复杂工作流可能需要更多时间。请尝试简化请求或稍后重试。`
           : '请求超时（2分钟），请稍后重试';
         throw new Error(timeoutError);
       }
@@ -553,11 +554,67 @@ export function DifyChatInterface({
           
           buffer += chunk;
           
-          // 🔧 修复：改进跨chunk数据分割处理
-          // 检查buffer中是否有完整的行
-          let lineEndIndex;
-          const processedLines: string[] = [];
+          // 🔧 修复：检测响应格式 - SSE还是普通JSON
+          let processedLines: string[] = [];
           
+          // 如果chunk看起来是完整的JSON而不是SSE格式
+          if (chunk.trim().startsWith('{') && !chunk.includes('data:')) {
+            console.log('[Chat Debug] Detected JSON response format, processing as single block');
+            try {
+              const parsed = JSON.parse(chunk.trim());
+              // 直接处理JSON响应
+              if (parsed.answer) {
+                finalResponse += parsed.answer;
+                console.log('[Chat Debug] Added JSON answer to final response:', parsed.answer.substring(0, 100) + '...');
+                
+                // 标记为已收到内容
+                hasReceivedData = true;
+              }
+              
+              // 检查conversation_id
+              if (parsed.conversation_id && 
+                  (!detectedConversationId || parsed.conversation_id !== detectedConversationId)) {
+                console.log('[Chat Debug] Updating conversation ID from', detectedConversationId, 'to', parsed.conversation_id);
+                detectedConversationId = parsed.conversation_id;
+                setConversationId(parsed.conversation_id);
+                
+                // Store conversation ID for continuity
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('dify_conversation_id', parsed.conversation_id);
+                  console.log('[Chat Debug] Stored JSON conversation ID:', parsed.conversation_id);
+                }
+              }
+              
+              // 处理工作流事件
+              if (parsed.event === 'node_started' && parsed.node_id) {
+                console.log('[Chat Debug] Workflow node started:', parsed.node_id, parsed.node_name);
+                updateWorkflowProgress({
+                  nodeId: parsed.node_id,
+                  nodeName: parsed.node_name || parsed.node_id,
+                  nodeTitle: parsed.node_title,
+                  status: 'running'
+                });
+              }
+              
+              if (parsed.event === 'node_finished' && parsed.node_id) {
+                console.log('[Chat Debug] Workflow node finished:', parsed.node_id);
+                updateWorkflowProgress({
+                  nodeId: parsed.node_id,
+                  nodeName: parsed.node_name || parsed.node_id,
+                  nodeTitle: parsed.node_title,
+                  status: 'completed'
+                });
+              }
+              
+              // 继续处理下一个chunk
+              continue;
+            } catch (jsonError) {
+              console.warn('[Chat Debug] Failed to parse as JSON, falling back to SSE processing:', jsonError);
+            }
+          }
+          
+          // 传统SSE格式处理
+          let lineEndIndex;
           while ((lineEndIndex = buffer.indexOf('\n')) !== -1) {
             const line = buffer.substring(0, lineEndIndex).trim();
             if (line) {
