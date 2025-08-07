@@ -1299,10 +1299,52 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Dify API error:', errorData);
-      return res.status(response.status).json({
-        error: errorData.message || 'Dify API error',
-        detail: errorData
-      });
+
+      // Handle Dify conversation expiry while maintaining dialogue continuity
+      if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
+        console.log('🔄 Stream: Conversation not found in DIFY, but maintaining dialogue continuity for ChatFlow');
+        console.log('📝 Stream: Keeping original conversation_id to preserve dialogue_count progression');
+        
+        // Create a new request without conversation_id for DIFY, but maintain our internal tracking
+        const retryApiRequestBody = {
+          ...apiRequestBody
+        };
+        delete retryApiRequestBody.conversation_id;
+
+        console.log('🔄 Stream: Retrying request without conversation_id');
+        
+        // Retry the request
+        const retryResponse = await fetchWithTimeoutAndRetry(
+          apiEndpoint,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(retryApiRequestBody),
+          },
+          STREAMING_TIMEOUT
+        );
+
+        if (!retryResponse.ok) {
+          const retryErrorData = await retryResponse.json();
+          console.error('Dify API retry error:', retryErrorData);
+          return res.status(retryResponse.status).json({
+            error: retryErrorData.message || 'Dify API retry error',
+            detail: retryErrorData
+          });
+        }
+
+        // Use the retry response for streaming
+        response = retryResponse;
+        console.log('✅ Stream: Successfully retried without breaking conversation continuity');
+      } else {
+        return res.status(response.status).json({
+          error: errorData.message || 'Dify API error',
+          detail: errorData
+        });
+      }
     }
 
     // Set headers for streaming
