@@ -132,8 +132,11 @@ export async function streamMessage(
   try {
     console.log(`[Dify Client] 发送流请求，消息长度: ${message.length}, 会话ID: ${conversationId || '新会话'}`);
     
-    // 使用通用的Dify API端点，让服务器决定使用哪种模式
-    const response = await fetch('/api/dify/workflow', {
+    // 🔧 修复：根据应用类型选择正确的端点
+    const appType = process.env.VITE_DIFY_APP_TYPE || 'chat';
+    const endpoint = appType === 'workflow' ? '/api/dify/workflow' : '/api/dify/chat';
+    
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

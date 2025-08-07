@@ -670,8 +670,14 @@ app.post('/api/dify', async (req, res) => {
         console.error('Dify API error:', errorData);
 
         if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-          console.log('Retrying without conversation_id');
-          delete requestBody.conversation_id;
+          console.log('🔄 Conversation not found in DIFY, but maintaining dialogue continuity for ChatFlow');
+          console.log('📝 Keeping original conversation_id to preserve dialogue_count progression');
+          
+          // Create a new request without conversation_id for DIFY, but maintain our internal tracking
+          const retryRequestBody = {
+            ...requestBody
+          };
+          delete retryRequestBody.conversation_id;
 
           response = await fetch(`${DIFY_API_URL}/chat-messages`, {
             method: 'POST',
@@ -679,12 +685,15 @@ app.post('/api/dify', async (req, res) => {
               'Authorization': `Bearer ${DIFY_API_KEY}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(retryRequestBody),
           });
 
           if (!response.ok) {
             throw new Error('Dify API request failed after retry');
           }
+          
+          console.log('✅ Successfully retried without breaking conversation continuity');
+        }
         } else {
           throw new Error(`Dify API error: ${errorData.message || 'Unknown error'}`);
         }
@@ -1112,10 +1121,19 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       // 工作流应用 - 使用workflows API  
       apiEndpoint = `${DIFY_API_URL}/workflows/run`;
       apiRequestBody = {
-        inputs: inputs,
+        inputs: {
+          ...inputs,
+          query: message // WorkFlow需要在inputs中传递query
+        },
         response_mode: 'streaming',
         user: getValidUserId(req.body.user)
       };
+      
+      // 如果有已存在的conversation_id，添加到请求中
+      if (difyConversationId) {
+        apiRequestBody.conversation_id = difyConversationId;
+      }
+      
       console.log('Using workflows API for workflow application');
     }
     
@@ -1511,10 +1529,19 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       // 工作流应用 - 使用workflows API  
       apiEndpoint = `${DIFY_API_URL}/workflows/run`;
       apiRequestBody = {
-        inputs: inputs,
+        inputs: {
+          ...inputs,
+          query: message // WorkFlow需要在inputs中传递query
+        },
         response_mode: 'blocking',
         user: getValidUserId(req.body.user)
       };
+      
+      // 如果有已存在的conversation_id，添加到请求中
+      if (difyConversationId) {
+        apiRequestBody.conversation_id = difyConversationId;
+      }
+      
       console.log('Using workflows API for workflow application');
     }
     
@@ -1551,8 +1578,14 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       console.error('Dify API error:', errorData);
 
       if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-        console.log('Retrying without conversation_id');
-        delete apiRequestBody.conversation_id;
+        console.log('🔄 Conversation not found in DIFY, but maintaining dialogue continuity for ChatFlow');
+        console.log('📝 Keeping original conversation_id to preserve dialogue_count progression');
+        
+        // Create a new request without conversation_id for DIFY, but maintain our internal tracking
+        const retryApiRequestBody = {
+          ...apiRequestBody
+        };
+        delete retryApiRequestBody.conversation_id;
 
         response = await fetchWithTimeoutAndRetry(
           apiEndpoint,
@@ -1562,7 +1595,7 @@ app.post('/api/dify/:conversationId', async (req, res) => {
               'Authorization': `Bearer ${DIFY_API_KEY}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(apiRequestBody),
+            body: JSON.stringify(retryApiRequestBody),
           },
           DEFAULT_TIMEOUT
         );
