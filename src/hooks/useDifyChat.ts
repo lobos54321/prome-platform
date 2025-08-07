@@ -50,18 +50,32 @@ const MESSAGES_CACHE_KEY = 'dify_messages_cache'
 export function useDifyChat(
   userId: string = 'default-user'
 ): UseDifyChatReturn {
-  // 状态管理
+  // 状态管理 - 修复：确保 timestamp 始终有值
   const [messages, setMessages] = useState<DifyMessage[]>(() => {
     try {
       const cached = localStorage.getItem(MESSAGES_CACHE_KEY)
-      return cached ? JSON.parse(cached) : []
-    } catch {
+      if (cached) {
+        const parsedMessages = JSON.parse(cached)
+        // 确保每个消息都有有效的 timestamp
+        return parsedMessages.map((msg: any) => ({
+          ...msg,
+          timestamp: msg.timestamp || Date.now()
+        }))
+      }
+      return []
+    } catch (error) {
+      console.error('Failed to parse cached messages:', error)
       return []
     }
   })
   
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
-    return localStorage.getItem(CONVERSATION_KEY) || undefined
+    const stored = localStorage.getItem(CONVERSATION_KEY)
+    if (stored && stored !== 'undefined' && stored !== 'null') {
+      console.log('[Chat Debug] Restored conversation ID from localStorage:', stored)
+      return stored
+    }
+    return undefined
   })
   
   const [isLoading, setIsLoading] = useState(false)
@@ -69,19 +83,31 @@ export function useDifyChat(
   const lastUserMessageRef = useRef<string>('')
   const abortControllerRef = useRef<AbortController | null>(null)
   
-  // 持久化会话ID
+  // 持久化会话ID - 修复：避免存储 undefined
   useEffect(() => {
-    if (conversationId) {
+    if (conversationId && conversationId !== 'undefined') {
       localStorage.setItem(CONVERSATION_KEY, conversationId)
     } else {
       localStorage.removeItem(CONVERSATION_KEY)
     }
   }, [conversationId])
   
-  // 持久化消息
+  // 持久化消息 - 修复：确保数据完整性
   useEffect(() => {
     if (messages.length > 0) {
-      localStorage.setItem(MESSAGES_CACHE_KEY, JSON.stringify(messages))
+      try {
+        // 确保所有消息都有必要的字段
+        const validMessages = messages.map(msg => ({
+          id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+          role: msg.role || 'user',
+          content: msg.content || '',
+          timestamp: msg.timestamp || Date.now(),
+          metadata: msg.metadata || {}
+        }))
+        localStorage.setItem(MESSAGES_CACHE_KEY, JSON.stringify(validMessages))
+      } catch (error) {
+        console.error('Failed to save messages to cache:', error)
+      }
     } else {
       localStorage.removeItem(MESSAGES_CACHE_KEY)
     }
@@ -97,28 +123,41 @@ export function useDifyChat(
   ): Promise<DifyChatResponse> => {
     abortControllerRef.current = new AbortController()
     
-    const response = await fetch(`${DIFY_API_URL}/v1/chat-messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DIFY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        conversation_id: convId || '',
-        query: query,
-        user: userId,
-        response_mode: 'blocking',
-        inputs: {}, // 额外输入参数（如果需要）
-      }),
-      signal: abortControllerRef.current.signal,
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || `API Error: ${response.status}`)
+    try {
+      const response = await fetch(`${DIFY_API_URL}/v1/chat-messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversation_id: convId || '',
+          query: query,
+          user: userId,
+          response_mode: 'blocking',
+          inputs: {}, // 额外输入参数（如果需要）
+        }),
+        signal: abortControllerRef.current.signal,
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `API Error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      // 确保返回的数据有必要的字段
+      return {
+        conversation_id: data.conversation_id || '',
+        message_id: data.message_id || '',
+        answer: data.answer || '',
+        created_at: data.created_at || Date.now() / 1000,
+        metadata: data.metadata || {}
+      }
+    } catch (error) {
+      console.error('[callDifyAPI] Error:', error)
+      throw error
     }
-    
-    return await response.json()
   }
   
   /**
@@ -126,7 +165,8 @@ export function useDifyChat(
    * 核心改动：移除所有本地条件判断，完全交给 Dify Chatflow
    */
   const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) {
+    if (!content || !content.trim() || isLoading) {
+      console.warn('[sendMessage] Invalid input or already loading')
       return
     }
     
@@ -136,12 +176,12 @@ export function useDifyChat(
     setIsLoading(true)
     setError(null)
     
-    // 生成用户消息
+    // 生成用户消息 - 确保有有效的 timestamp
     const userMessage: DifyMessage = {
       id: `user-${Date.now()}-${Math.random()}`,
       role: 'user',
       content: content.trim(),
-      timestamp: Date.now(),
+      timestamp: Date.now(), // 确保这里是数字
     }
     
     // 立即显示用户消息
@@ -152,7 +192,7 @@ export function useDifyChat(
       id: `loading-${Date.now()}`,
       role: 'assistant',
       content: '正在思考中...',
-      timestamp: Date.now(),
+      timestamp: Date.now(), // 确保这里是数字
       metadata: { loading: true },
     }
     setMessages(prev => [...prev, loadingMessage])
@@ -170,17 +210,19 @@ export function useDifyChat(
       console.log('[useDifyChat] Received response:', response)
       
       // 更新会话ID（首次对话时会返回新ID）
-      if (response.conversation_id && response.conversation_id !== conversationId) {
+      if (response.conversation_id && 
+          response.conversation_id !== 'undefined' && 
+          response.conversation_id !== conversationId) {
         setConversationId(response.conversation_id)
         console.log('[useDifyChat] New conversation ID:', response.conversation_id)
       }
       
-      // 创建助手消息
+      // 创建助手消息 - 确保有有效的 timestamp
       const assistantMessage: DifyMessage = {
         id: `assistant-${Date.now()}-${Math.random()}`,
         role: 'assistant',
         content: response.answer || '抱歉，我没有理解您的意思。',
-        timestamp: Date.now(),
+        timestamp: response.created_at ? response.created_at * 1000 : Date.now(), // 转换为毫秒
         metadata: {
           messageId: response.message_id,
         },
@@ -208,7 +250,7 @@ export function useDifyChat(
         id: `error-${Date.now()}`,
         role: 'assistant',
         content: `抱歉，遇到了错误：${errorMessage}\n\n请点击重试或开始新对话。`,
-        timestamp: Date.now(),
+        timestamp: Date.now(), // 确保这里是数字
         metadata: { error: true },
       }
       
