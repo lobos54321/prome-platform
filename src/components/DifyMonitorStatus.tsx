@@ -3,12 +3,20 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Activity, CircleCheck, CircleX, Zap } from 'lucide-react';
-import { isDifyEnabled, getDifyUsageStats } from '@/api/dify-api';
+import { isDifyEnabled, getDifyUsageStats, DifyUsageStats } from '@/api/dify-api';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function DifyMonitorStatus() {
   const [status, setStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
-  const [usageStats, setUsageStats] = useState(getDifyUsageStats());
+  const [usageStats, setUsageStats] = useState<DifyUsageStats>({
+    totalMessages: 0,
+    totalTokens: 0,
+    totalConversations: 0,
+    totalRequests: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    lastUpdated: new Date().toISOString(),
+  });
   
   useEffect(() => {
     // 检查Dify状态
@@ -18,6 +26,9 @@ export function DifyMonitorStatus() {
         
         if (enabled) {
           setStatus('connected');
+          // 获取使用统计
+          const stats = await getDifyUsageStats();
+          setUsageStats(stats);
         } else {
           setStatus('disconnected');
         }
@@ -30,8 +41,15 @@ export function DifyMonitorStatus() {
     checkDifyStatus();
     
     // 定期更新使用统计
-    const intervalId = setInterval(() => {
-      setUsageStats(getDifyUsageStats());
+    const intervalId = setInterval(async () => {
+      if (isDifyEnabled()) {
+        try {
+          const stats = await getDifyUsageStats();
+          setUsageStats(stats);
+        } catch (error) {
+          console.error('Error updating usage stats:', error);
+        }
+      }
     }, 30000); // 每30秒更新一次
     
     return () => clearInterval(intervalId);
@@ -65,7 +83,7 @@ export function DifyMonitorStatus() {
             </TooltipTrigger>
             <TooltipContent>
               <div className="text-xs">
-                <p>总请求数: {usageStats.totalRequests}</p>
+                <p>总请求数: {usageStats.totalRequests.toLocaleString()}</p>
                 <p>提示词tokens: {usageStats.promptTokens.toLocaleString()}</p>
                 <p>补全tokens: {usageStats.completionTokens.toLocaleString()}</p>
                 <p>总tokens: {usageStats.totalTokens.toLocaleString()}</p>
