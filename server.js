@@ -202,27 +202,9 @@ async function fetchWithTimeoutAndRetry(url, options, timeoutMs = DEFAULT_TIMEOU
 
 // Utility function to ensure conversation exists before saving messages
 async function ensureConversationExists(supabase, conversationId, difyConversationId = null, userId = null) {
-  console.log('🔍 ensureConversationExists called with:', { conversationId, difyConversationId, userId, hasSupabase: !!supabase });
-  
-  // 🚨 FORCE TEST SAVE - Always save a record with timestamp to prove this function is called
-  const testId = 'forced-test-' + Date.now();
-  try {
-    const { error: forceError } = await supabase
-      .from('conversations')
-      .insert({
-        id: testId,
-        dify_conversation_id: 'FORCE_TEST_SAVE_PROOF_' + Date.now(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    
-    if (forceError) {
-      console.error('❌ FORCE TEST SAVE failed:', forceError);
-    } else {
-      console.log('✅ FORCE TEST SAVE successful with ID:', testId);
-    }
-  } catch (forceTestError) {
-    console.error('❌ FORCE TEST SAVE exception:', forceTestError);
+  // Debug logging for conversation management
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('🔍 ensureConversationExists called with:', { conversationId, difyConversationId, userId, hasSupabase: !!supabase });
   }
   
   if (!supabase) {
@@ -1057,28 +1039,9 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
   // 🚀 ENDPOINT CALLED CONFIRMATION - Log only, don't send response yet
   console.log('✅ STREAM ENDPOINT CONFIRMED - Processing request');
   
-  // 🚨 FORCE STREAM ENDPOINT TEST WITH DETAILED ERROR HANDLING
-  const streamEndpointTestId = 'stream-endpoint-' + Date.now();
-  console.log('🚨 ATTEMPTING STREAM ENDPOINT PROOF INSERT with ID:', streamEndpointTestId);
-  console.log('🚨 SUPABASE_URL:', SUPABASE_URL);
-  console.log('🚨 HAS SUPABASE_SERVICE_ROLE_KEY:', !!SUPABASE_SERVICE_ROLE_KEY);
-  
-  try {
-    const supabaseStream = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    console.log('🚨 Supabase client created');
-    
-    const insertResult = await supabaseStream.from('conversations').insert({
-      id: streamEndpointTestId,
-      dify_conversation_id: 'STREAM_ENDPOINT_PROOF_' + Date.now(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
-    
-    console.log('🚨 Insert result:', insertResult);
-    console.log('✅ STREAM ENDPOINT PROOF SAVED:', streamEndpointTestId);
-  } catch (streamEndpointError) {
-    console.error('❌ STREAM ENDPOINT PROOF FAILED with error:', streamEndpointError);
-    console.error('❌ Error details:', JSON.stringify(streamEndpointError, null, 2));
+  // Endpoint debugging for development
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('🔍 Stream endpoint processing conversation:', req.params.conversationId);
   }
   
   try {
@@ -1449,19 +1412,9 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
 app.post('/api/dify/:conversationId', async (req, res) => {
   console.log('🗣️ NON-STREAM /:conversationId ENDPOINT CALLED with:', req.params.conversationId);
   
-  // 🚨 FORCE NON-STREAM ENDPOINT TEST
-  const nonStreamTestId = 'non-stream-' + Date.now();
-  try {
-    const supabaseNonStream = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    await supabaseNonStream.from('conversations').insert({
-      id: nonStreamTestId,
-      dify_conversation_id: 'NON_STREAM_PROOF_' + Date.now() + '_' + req.params.conversationId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
-    console.log('✅ NON-STREAM ENDPOINT PROOF SAVED:', nonStreamTestId);
-  } catch (nonStreamError) {
-    console.error('❌ NON-STREAM ENDPOINT PROOF FAILED:', nonStreamError);
+  // Endpoint debugging for development
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('🔍 Non-stream endpoint processing conversation:', req.params.conversationId);
   }
   
   try {
