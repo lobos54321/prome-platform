@@ -64,10 +64,11 @@ export default function DifyChat() {
   }, [serviceId, navigate]);
 
   // Check if Dify is configured
-  // For workflow apps, APP_ID is optional (workflows use different API endpoint)
+  // Support both chat apps (need APP_ID) and workflow apps (optional APP_ID)
   const isDifyConfigured = !!(
     import.meta.env.VITE_DIFY_API_URL &&
-    import.meta.env.VITE_DIFY_API_KEY
+    import.meta.env.VITE_DIFY_API_KEY &&
+    (import.meta.env.VITE_DIFY_APP_ID || true) // APP_ID optional for workflows
   );
 
   if (isLoading) {
