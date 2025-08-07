@@ -1,12 +1,9 @@
 /**
- * Dify API 集成层
- * 提供与 Dify 平台交互的所有 API 方法
+ * Dify API 集成层 - 使用原生 fetch，不依赖 axios
  */
 
-import axios, { AxiosInstance, AxiosError } from 'axios'
-
 // 从环境变量读取配置
-const DIFY_BASE_URL = import.meta.env.VITE_DIFY_BASE_URL || 'https://api.dify.ai'
+const DIFY_BASE_URL = import.meta.env.VITE_DIFY_API_URL || 'https://api.dify.ai'
 const DIFY_API_KEY = import.meta.env.VITE_DIFY_API_KEY || ''
 
 // API 响应类型定义
@@ -49,17 +46,6 @@ export interface DifyMessageHistory {
   limit: number
 }
 
-export interface DifyFeedbackResponse {
-  result: string
-}
-
-// 错误类型定义
-export interface DifyError {
-  code: string
-  message: string
-  status: number
-}
-
 // 请求参数类型定义
 export interface SendChatMessageParams {
   conversationId?: string
@@ -88,58 +74,55 @@ export interface SubmitFeedbackParams {
 }
 
 /**
- * Dify API 客户端类
+ * Dify API 客户端类 - 使用原生 fetch
  */
 export class DifyAPIClient {
-  private client: AxiosInstance
+  private baseURL: string
+  private apiKey: string
   
   constructor(baseURL?: string, apiKey?: string) {
-    this.client = axios.create({
-      baseURL: baseURL || DIFY_BASE_URL,
-      headers: {
-        'Authorization': `Bearer ${apiKey || DIFY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000, // 30秒超时
-    })
-    
-    // 请求拦截器
-    this.client.interceptors.request.use(
-      (config) => {
-        console.log(`[Dify API] ${config.method?.toUpperCase()} ${config.url}`, config.data)
-        return config
-      },
-      (error) => {
-        console.error('[Dify API] Request error:', error)
-        return Promise.reject(error)
-      }
-    )
-    
-    // 响应拦截器
-    this.client.interceptors.response.use(
-      (response) => {
-        console.log(`[Dify API] Response:`, response.data)
-        return response
-      },
-      (error: AxiosError) => {
-        const errorMessage = this.handleError(error)
-        console.error('[Dify API] Response error:', errorMessage)
-        return Promise.reject(new Error(errorMessage))
-      }
-    )
+    this.baseURL = baseURL || DIFY_BASE_URL
+    this.apiKey = apiKey || DIFY_API_KEY
   }
   
   /**
-   * 错误处理
+   * 基础请求方法
    */
-  private handleError(error: AxiosError): string {
-    if (error.response) {
-      const data = error.response.data as any
-      return data?.message || `API Error: ${error.response.status}`
-    } else if (error.request) {
-      return '网络连接失败，请检查网络设置'
-    } else {
-      return error.message || '未知错误'
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`
+    
+    const defaultHeaders = {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    }
+    
+    const config: RequestInit = {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    }
+    
+    console.log(`[Dify API] ${config.method || 'GET'} ${url}`)
+    
+    try {
+      const response = await fetch(url, config)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `API Error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log(`[Dify API] Response:`, data)
+      return data as T
+    } catch (error: any) {
+      console.error('[Dify API] Request error:', error)
+      throw error
     }
   }
   
@@ -150,24 +133,17 @@ export class DifyAPIClient {
   async sendChatMessage(params: SendChatMessageParams): Promise<DifyChatResponse> {
     const { conversationId, query, userId, inputs = {}, files = [] } = params
     
-    try {
-      const { data } = await this.client.post<DifyChatResponse>(
-        '/v1/chat-messages',
-        {
-          conversation_id: conversationId || '',
-          query,
-          user: userId,
-          response_mode: 'blocking',
-          inputs,
-          files,
-        }
-      )
-      
-      return data
-    } catch (error) {
-      console.error('[sendChatMessage] Error:', error)
-      throw error
-    }
+    return this.request<DifyChatResponse>('/v1/chat-messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        conversation_id: conversationId || '',
+        query,
+        user: userId,
+        response_mode: 'blocking',
+        inputs,
+        files,
+      }),
+    })
   }
   
   /**
@@ -176,46 +152,34 @@ export class DifyAPIClient {
   async getConversationMessages(params: GetMessagesParams): Promise<DifyMessageHistory> {
     const { conversationId, userId, limit = 20, firstId } = params
     
-    try {
-      const { data } = await this.client.get<DifyMessageHistory>(
-        '/v1/messages',
-        {
-          params: {
-            conversation_id: conversationId,
-            user: userId,
-            limit,
-            first_id: firstId,
-          },
-        }
-      )
-      
-      return data
-    } catch (error) {
-      console.error('[getConversationMessages] Error:', error)
-      throw error
+    const queryParams = new URLSearchParams({
+      conversation_id: conversationId,
+      user: userId,
+      limit: limit.toString(),
+    })
+    
+    if (firstId) {
+      queryParams.append('first_id', firstId)
     }
+    
+    return this.request<DifyMessageHistory>(`/v1/messages?${queryParams}`, {
+      method: 'GET',
+    })
   }
   
   /**
    * 提交消息反馈
    */
-  async submitMessageFeedback(params: SubmitFeedbackParams): Promise<DifyFeedbackResponse> {
+  async submitMessageFeedback(params: SubmitFeedbackParams): Promise<{ result: string }> {
     const { messageId, rating, userId } = params
     
-    try {
-      const { data } = await this.client.post<DifyFeedbackResponse>(
-        `/v1/messages/${messageId}/feedbacks`,
-        {
-          rating,
-          user: userId,
-        }
-      )
-      
-      return data
-    } catch (error) {
-      console.error('[submitMessageFeedback] Error:', error)
-      throw error
-    }
+    return this.request(`/v1/messages/${messageId}/feedbacks`, {
+      method: 'POST',
+      body: JSON.stringify({
+        rating,
+        user: userId,
+      }),
+    })
   }
   
   /**
@@ -226,66 +190,52 @@ export class DifyAPIClient {
     formData.append('file', file)
     formData.append('user', userId)
     
-    try {
-      const { data } = await this.client.post<DifyFileUploadResponse>(
-        '/v1/files/upload',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      )
-      
-      return data
-    } catch (error) {
-      console.error('[uploadFile] Error:', error)
-      throw error
+    const response = await fetch(`${this.baseURL}/v1/files/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: formData,
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || `Upload failed: ${response.status}`)
     }
+    
+    return response.json()
   }
   
   /**
    * 停止消息生成（用于流式响应）
    */
   async stopChatMessage(taskId: string, userId: string): Promise<void> {
-    try {
-      await this.client.post(`/v1/chat-messages/${taskId}/stop`, {
+    await this.request(`/v1/chat-messages/${taskId}/stop`, {
+      method: 'POST',
+      body: JSON.stringify({
         user: userId,
-      })
-    } catch (error) {
-      console.error('[stopChatMessage] Error:', error)
-      throw error
-    }
+      }),
+    })
   }
   
   /**
    * 获取应用参数（用于初始化）
    */
   async getApplicationParameters(userId: string): Promise<any> {
-    try {
-      const { data } = await this.client.get('/v1/parameters', {
-        params: { user: userId },
-      })
-      return data
-    } catch (error) {
-      console.error('[getApplicationParameters] Error:', error)
-      throw error
-    }
+    const queryParams = new URLSearchParams({ user: userId })
+    return this.request(`/v1/parameters?${queryParams}`, {
+      method: 'GET',
+    })
   }
   
   /**
    * 获取应用元信息
    */
   async getApplicationMeta(userId: string): Promise<any> {
-    try {
-      const { data } = await this.client.get('/v1/meta', {
-        params: { user: userId },
-      })
-      return data
-    } catch (error) {
-      console.error('[getApplicationMeta] Error:', error)
-      throw error
-    }
+    const queryParams = new URLSearchParams({ user: userId })
+    return this.request(`/v1/meta?${queryParams}`, {
+      method: 'GET',
+    })
   }
 }
 
