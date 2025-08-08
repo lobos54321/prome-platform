@@ -1345,30 +1345,55 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     console.log('   🔍 Detected Intents:', stateAnalysis.detected_intents);
     console.log('   🧮 Logical Count:', dialogueCountAnalysis.recommended_count);
     
-    // 更新inputs with intelligent state variables
-    const enhancedInputs = {
-      ...inputs,
-      // 🌟 PRIMARY STATE VARIABLES - 替代dialogue_count依赖
-      conversation_stage: stateAnalysis.stage,           // 'initial', 'select', 'confirm'
-      stage_confidence: stateAnalysis.confidence,        // 0.0-1.0
-      logical_dialogue_count: dialogueCountAnalysis.recommended_count,
+    // 🔧 CRITICAL: 预热消息机制 - 解决开场白导致的dialogue_count偏移
+    if (!difyConversationId) {
+      console.log('🔄 新对话检测到，发送预热消息消耗开场白的dialogue_count=0');
       
-      // 🔍 DETAILED INTENT ANALYSIS
-      has_initial_intent: stateAnalysis.detected_intents.initial,
-      has_selection_intent: stateAnalysis.detected_intents.selection,
-      has_confirmation_intent: stateAnalysis.detected_intents.confirmation,
-      
-      // 📊 FALLBACK COMPATIBILITY
-      user_message_number: stateAnalysis.user_message_count,
-      original_dialogue_count_offset: dialogueCountAnalysis.actual_count,
-      
-      // 🎯 BUSINESS CONTEXT
-      message_content_summary: message.substring(0, 100), // 前100字符用于上下文
-      is_new_conversation: !difyConversationId
-    };
+      try {
+        const warmupResponse = await fetchWithTimeoutAndRetry(
+          apiEndpoint,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              inputs: inputs,
+              query: '',  // 空查询消耗开场白
+              response_mode: 'blocking',
+              user: getValidUserId(req.body.user)
+            }),
+          },
+          STANDARD_TIMEOUT
+        );
+        
+        if (warmupResponse.ok) {
+          const warmupData = await warmupResponse.json();
+          if (warmupData.conversation_id) {
+            difyConversationId = warmupData.conversation_id;
+            apiRequestBody.conversation_id = difyConversationId;
+            console.log('✅ 预热成功，获得conversation_id:', difyConversationId);
+            console.log('🎯 现在用户消息将是dialogue_count=1 (逻辑上等同于0)');
+            
+            // 立即保存会话映射
+            try {
+              await ensureConversationExists(supabase, conversationId, difyConversationId, getValidUserId(req.body.user));
+            } catch (saveError) {
+              console.error('⚠️ 保存会话映射失败:', saveError);
+            }
+          }
+        }
+      } catch (warmupError) {
+        console.warn('⚠️ 预热消息失败，继续原请求:', warmupError);
+      }
+    }
     
-    // 更新请求体
-    apiRequestBody.inputs = enhancedInputs;
+    // 💡 智能分析结果 (仅用于日志)
+    console.log('   🧠 Detected Stage:', stateAnalysis.stage, '(Confidence:', stateAnalysis.confidence + ')');
+    console.log('   🔍 Intents:', stateAnalysis.detected_intents);
+    
+    // ✅ 保持原有inputs完全不变，让Dify ChatFlow按原有逻辑工作
     
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
@@ -1822,30 +1847,55 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     console.log('   🔍 Detected Intents:', stateAnalysis.detected_intents);
     console.log('   🧮 Logical Count:', dialogueCountAnalysis.recommended_count);
     
-    // 更新inputs with intelligent state variables
-    const enhancedInputs = {
-      ...inputs,
-      // 🌟 PRIMARY STATE VARIABLES - 替代dialogue_count依赖
-      conversation_stage: stateAnalysis.stage,           // 'initial', 'select', 'confirm'
-      stage_confidence: stateAnalysis.confidence,        // 0.0-1.0
-      logical_dialogue_count: dialogueCountAnalysis.recommended_count,
+    // 🔧 CRITICAL: 预热消息机制 - 解决开场白导致的dialogue_count偏移
+    if (!difyConversationId) {
+      console.log('🔄 新对话检测到，发送预热消息消耗开场白的dialogue_count=0');
       
-      // 🔍 DETAILED INTENT ANALYSIS
-      has_initial_intent: stateAnalysis.detected_intents.initial,
-      has_selection_intent: stateAnalysis.detected_intents.selection,
-      has_confirmation_intent: stateAnalysis.detected_intents.confirmation,
-      
-      // 📊 FALLBACK COMPATIBILITY
-      user_message_number: stateAnalysis.user_message_count,
-      original_dialogue_count_offset: dialogueCountAnalysis.actual_count,
-      
-      // 🎯 BUSINESS CONTEXT
-      message_content_summary: message.substring(0, 100), // 前100字符用于上下文
-      is_new_conversation: !difyConversationId
-    };
+      try {
+        const warmupResponse = await fetchWithTimeoutAndRetry(
+          apiEndpoint,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              inputs: inputs,
+              query: '',  // 空查询消耗开场白
+              response_mode: 'blocking',
+              user: getValidUserId(req.body.user)
+            }),
+          },
+          STANDARD_TIMEOUT
+        );
+        
+        if (warmupResponse.ok) {
+          const warmupData = await warmupResponse.json();
+          if (warmupData.conversation_id) {
+            difyConversationId = warmupData.conversation_id;
+            apiRequestBody.conversation_id = difyConversationId;
+            console.log('✅ 预热成功，获得conversation_id:', difyConversationId);
+            console.log('🎯 现在用户消息将是dialogue_count=1 (逻辑上等同于0)');
+            
+            // 立即保存会话映射
+            try {
+              await ensureConversationExists(supabase, conversationId, difyConversationId, getValidUserId(req.body.user));
+            } catch (saveError) {
+              console.error('⚠️ 保存会话映射失败:', saveError);
+            }
+          }
+        }
+      } catch (warmupError) {
+        console.warn('⚠️ 预热消息失败，继续原请求:', warmupError);
+      }
+    }
     
-    // 更新请求体
-    apiRequestBody.inputs = enhancedInputs;
+    // 💡 智能分析结果 (仅用于日志)
+    console.log('   🧠 Detected Stage:', stateAnalysis.stage, '(Confidence:', stateAnalysis.confidence + ')');
+    console.log('   🔍 Intents:', stateAnalysis.detected_intents);
+    
+    // ✅ 保持原有inputs完全不变，让Dify ChatFlow按原有逻辑工作
     
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
