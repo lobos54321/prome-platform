@@ -946,7 +946,7 @@ app.post('/api/dify/workflow', async (req, res) => {
       try {
         try {
           const response = await fetchWithTimeoutAndRetry(
-            `${DIFY_API_URL}/workflows/run`,
+            `${DIFY_API_URL}/chat-messages`,
             {
               method: 'POST',
               headers: {
@@ -1109,7 +1109,7 @@ app.post('/api/dify/workflow', async (req, res) => {
         
         try {
           const response = await fetchWithTimeoutAndRetry(
-            `${DIFY_API_URL}/workflows/run`,
+            `${DIFY_API_URL}/chat-messages`,
             {
               method: 'POST',
               headers: {
@@ -1238,36 +1238,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       requestBody.conversation_id = difyConversationId;
     }
 
-    // 检查DIFY应用类型并使用正确的API端点
-    let apiEndpoint;
-    let apiRequestBody;
+    // 🔥 CRITICAL FIX: 强制使用chat-messages API维护dialogue_count
+    // ChatFlow需要对话状态来正确执行条件分支（dialogue_count=0,1,2...）
+    let apiEndpoint = `${DIFY_API_URL}/chat-messages`;
+    let apiRequestBody = requestBody;
     
-    // 如果有APP_ID，说明这是一个聊天应用
-    const DIFY_APP_ID = process.env.VITE_DIFY_APP_ID;
-    if (DIFY_APP_ID) {
-      // 聊天应用 - 使用chat-messages API
-      apiEndpoint = `${DIFY_API_URL}/chat-messages`;
-      apiRequestBody = requestBody;
-      console.log('Using chat-messages API for chat application');
-    } else {
-      // 工作流应用 - 使用workflows API  
-      apiEndpoint = `${DIFY_API_URL}/workflows/run`;
-      apiRequestBody = {
-        inputs: {
-          ...inputs,
-          query: message // WorkFlow需要在inputs中传递query
-        },
-        response_mode: 'streaming',
-        user: getValidUserId(req.body.user)
-      };
-      
-      // 如果有已存在的conversation_id，添加到请求中
-      if (difyConversationId) {
-        apiRequestBody.conversation_id = difyConversationId;
-      }
-      
-      console.log('Using workflows API for workflow application');
-    }
+    console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
     
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
@@ -1688,36 +1664,12 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       console.log('⚠️ No existing DIFY conversation ID found, will create new conversation');
     }
 
-    // 检查DIFY应用类型并使用正确的API端点
-    let apiEndpoint;
-    let apiRequestBody;
+    // 🔥 CRITICAL FIX: 强制使用chat-messages API维护dialogue_count
+    // ChatFlow需要对话状态来正确执行条件分支（dialogue_count=0,1,2...）
+    let apiEndpoint = `${DIFY_API_URL}/chat-messages`;
+    let apiRequestBody = requestBody;
     
-    // 如果有APP_ID，说明这是一个聊天应用
-    const DIFY_APP_ID = process.env.VITE_DIFY_APP_ID;
-    if (DIFY_APP_ID) {
-      // 聊天应用 - 使用chat-messages API
-      apiEndpoint = `${DIFY_API_URL}/chat-messages`;
-      apiRequestBody = requestBody;
-      console.log('Using chat-messages API for chat application');
-    } else {
-      // 工作流应用 - 使用workflows API  
-      apiEndpoint = `${DIFY_API_URL}/workflows/run`;
-      apiRequestBody = {
-        inputs: {
-          ...inputs,
-          query: message // WorkFlow需要在inputs中传递query
-        },
-        response_mode: 'blocking',
-        user: getValidUserId(req.body.user)
-      };
-      
-      // 如果有已存在的conversation_id，添加到请求中
-      if (difyConversationId) {
-        apiRequestBody.conversation_id = difyConversationId;
-      }
-      
-      console.log('Using workflows API for workflow application');
-    }
+    console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
     
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
