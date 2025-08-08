@@ -1252,6 +1252,58 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     console.log('   🔵 User Message:', message);
     console.log('   🔵 Expected dialogue_count for first message: 0');
     
+    // 🔧 DIALOGUE_COUNT FIX: Send warmup message for new conversations to consume opening statement
+    if (!difyConversationId) {
+      console.log('🔧 DIALOGUE_COUNT FIX: New conversation detected, sending warmup message first');
+      
+      const warmupRequestBody = {
+        inputs: inputs,
+        query: '',  // Empty query to consume opening statement (dialogue_count=0)
+        response_mode: 'blocking',
+        user: getValidUserId(req.body.user)
+      };
+      
+      try {
+        console.log('🔄 Sending warmup message to consume opening statement...');
+        const warmupResponse = await fetchWithTimeoutAndRetry(
+          apiEndpoint,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json',
+              'Accept': '*/*',
+              'User-Agent': 'ProMe-Platform/1.0'
+            },
+            body: JSON.stringify(warmupRequestBody),
+          },
+          STANDARD_TIMEOUT
+        );
+        
+        if (warmupResponse.ok) {
+          const warmupData = await warmupResponse.json();
+          if (warmupData.conversation_id) {
+            difyConversationId = warmupData.conversation_id;
+            apiRequestBody.conversation_id = difyConversationId;
+            console.log('✅ Warmup successful, got conversation ID:', difyConversationId);
+            console.log('🎯 Now user message will be dialogue_count=1 (equivalent to ChatFlow dialogue_count=0)');
+            
+            // Save the conversation ID immediately
+            try {
+              await ensureConversationExists(supabase, conversationId, difyConversationId, getValidUserId(req.body.user));
+              console.log('💾 Conversation mapping saved after warmup');
+            } catch (saveError) {
+              console.error('⚠️ Failed to save conversation after warmup:', saveError);
+            }
+          }
+        } else {
+          console.warn('⚠️ Warmup message failed, proceeding with original request');
+        }
+      } catch (warmupError) {
+        console.warn('⚠️ Warmup message error, proceeding with original request:', warmupError);
+      }
+    }
+    
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
     console.log('   Local conversation ID:', conversationId);
@@ -1694,6 +1746,58 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     console.log('   🔵 Is First Message:', !difyConversationId ? 'YES' : 'NO');
     console.log('   🔵 User Message:', message);
     console.log('   🔵 Expected dialogue_count for first message: 0');
+    
+    // 🔧 DIALOGUE_COUNT FIX: Send warmup message for new conversations to consume opening statement
+    if (!difyConversationId) {
+      console.log('🔧 DIALOGUE_COUNT FIX: New conversation detected, sending warmup message first (REGULAR)');
+      
+      const warmupRequestBody = {
+        inputs: inputs,
+        query: '',  // Empty query to consume opening statement (dialogue_count=0)
+        response_mode: 'blocking',
+        user: getValidUserId(req.body.user)
+      };
+      
+      try {
+        console.log('🔄 Sending warmup message to consume opening statement (REGULAR)...');
+        const warmupResponse = await fetchWithTimeoutAndRetry(
+          apiEndpoint,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${DIFY_API_KEY}`,
+              'Content-Type': 'application/json',
+              'Accept': '*/*',
+              'User-Agent': 'ProMe-Platform/1.0'
+            },
+            body: JSON.stringify(warmupRequestBody),
+          },
+          STANDARD_TIMEOUT
+        );
+        
+        if (warmupResponse.ok) {
+          const warmupData = await warmupResponse.json();
+          if (warmupData.conversation_id) {
+            difyConversationId = warmupData.conversation_id;
+            apiRequestBody.conversation_id = difyConversationId;
+            console.log('✅ Warmup successful (REGULAR), got conversation ID:', difyConversationId);
+            console.log('🎯 Now user message will be dialogue_count=1 (equivalent to ChatFlow dialogue_count=0)');
+            
+            // Save the conversation ID immediately
+            try {
+              await ensureConversationExists(supabase, conversationId, difyConversationId, getValidUserId(req.body.user));
+              console.log('💾 Conversation mapping saved after warmup (REGULAR)');
+            } catch (saveError) {
+              console.error('⚠️ Failed to save conversation after warmup (REGULAR):', saveError);
+            }
+          }
+        } else {
+          console.warn('⚠️ Warmup message failed (REGULAR), proceeding with original request');
+        }
+      } catch (warmupError) {
+        console.warn('⚠️ Warmup message error (REGULAR), proceeding with original request:', warmupError);
+      }
+    }
     
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
