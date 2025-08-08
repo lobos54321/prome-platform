@@ -1245,6 +1245,13 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     
     console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
     
+    // 🚨 DIALOGUE_COUNT DEBUG: Special logging to track dialogue_count issue
+    console.log('🚨 DIALOGUE_COUNT DEBUG - REQUEST BEING SENT:');
+    console.log('   🔵 Conversation ID:', difyConversationId || 'NEW_CONVERSATION');
+    console.log('   🔵 Is First Message:', !difyConversationId ? 'YES' : 'NO');
+    console.log('   🔵 User Message:', message);
+    console.log('   🔵 Expected dialogue_count for first message: 0');
+    
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
     console.log('   Local conversation ID:', conversationId);
@@ -1349,6 +1356,16 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
         
         const chunk = decoder.decode(value, { stream: true });
         allChunks += chunk;
+        
+        // 🚨 DIALOGUE_COUNT DEBUG: Look for dialogue_count in every chunk
+        if (chunk.includes('dialogue_count')) {
+          const dialogueMatch = chunk.match(/"dialogue_count"\s*:\s*(\d+)/);
+          if (dialogueMatch) {
+            const dialogueCount = parseInt(dialogueMatch[1]);
+            console.log('🚨 DIALOGUE_COUNT FOUND IN STREAM:', dialogueCount);
+            console.log('🚨 Full chunk with dialogue_count:', chunk.substring(0, 500) + '...');
+          }
+        }
         
         // 🚨 FORCE DEBUG: Always execute on first chunk to prove this loop runs
         if (allChunks.length === chunk.length) { // First chunk
@@ -1670,6 +1687,13 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     let apiRequestBody = requestBody;
     
     console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
+    
+    // 🚨 DIALOGUE_COUNT DEBUG: Special logging to track dialogue_count issue
+    console.log('🚨 DIALOGUE_COUNT DEBUG - REQUEST BEING SENT:');
+    console.log('   🔵 Conversation ID:', difyConversationId || 'NEW_CONVERSATION');
+    console.log('   🔵 Is First Message:', !difyConversationId ? 'YES' : 'NO');
+    console.log('   🔵 User Message:', message);
+    console.log('   🔵 Expected dialogue_count for first message: 0');
     
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
