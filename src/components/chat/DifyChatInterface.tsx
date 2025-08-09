@@ -606,23 +606,25 @@ export function DifyChatInterface({
                 }
               }
               
-              // 处理工作流事件
-              if (parsed.event === 'node_started' && parsed.node_id) {
-                console.log('[Chat Debug] Workflow node started:', parsed.node_id, parsed.node_name);
+              // 处理工作流事件 - 修复事件数据结构
+              if (parsed.event === 'node_started' && parsed.data?.node_id) {
+                console.log('[Chat Debug] Workflow node started:', parsed.data.node_id, parsed.data.title);
                 updateWorkflowProgress({
-                  nodeId: parsed.node_id,
-                  nodeName: parsed.node_name || parsed.node_id,
-                  nodeTitle: parsed.node_title,
+                  nodeId: parsed.data.node_id,
+                  nodeName: parsed.data.title || parsed.data.node_id,
+                  nodeTitle: parsed.data.title,
+                  nodeType: parsed.data.node_type,
                   status: 'running'
                 });
               }
               
-              if (parsed.event === 'node_finished' && parsed.node_id) {
-                console.log('[Chat Debug] Workflow node finished:', parsed.node_id);
+              if (parsed.event === 'node_finished' && parsed.data?.node_id) {
+                console.log('[Chat Debug] Workflow node finished:', parsed.data.node_id, parsed.data.status);
                 updateWorkflowProgress({
-                  nodeId: parsed.node_id,
-                  nodeName: parsed.node_name || parsed.node_id,
-                  nodeTitle: parsed.node_title,
+                  nodeId: parsed.data.node_id,
+                  nodeName: parsed.data.title || parsed.data.node_id,
+                  nodeTitle: parsed.data.title,
+                  nodeType: parsed.data.node_type,
                   status: 'completed'
                 });
               }
@@ -706,21 +708,25 @@ export function DifyChatInterface({
                     }
                   }
 
-                  // 处理工作流节点事件
-                  if (parsed.event === 'node_started' && parsed.node_id) {
-                    console.log('[Chat Debug] Node started:', parsed.node_id, parsed.node_name);
+                  // 处理工作流节点事件 - 修复事件数据结构
+                  if (parsed.event === 'node_started' && parsed.data?.node_id) {
+                    console.log('[Chat Debug] Node started:', parsed.data.node_id, parsed.data.title);
                     updateWorkflowProgress({
-                      nodeId: parsed.node_id,
-                      nodeName: parsed.node_name || parsed.node_id,
-                      nodeTitle: parsed.node_title,
+                      nodeId: parsed.data.node_id,
+                      nodeName: parsed.data.title || parsed.data.node_id,
+                      nodeTitle: parsed.data.title,
+                      nodeType: parsed.data.node_type,
                       status: 'running',
                       startTime: new Date()
                     });
-                  } else if (parsed.event === 'node_finished' && parsed.node_id) {
-                    console.log('[Chat Debug] Node finished:', parsed.node_id);
+                  } else if (parsed.event === 'node_finished' && parsed.data?.node_id) {
+                    console.log('[Chat Debug] Node finished:', parsed.data.node_id, parsed.data.status);
                     updateWorkflowProgress({
-                      nodeId: parsed.node_id,
-                      status: 'completed',
+                      nodeId: parsed.data.node_id,
+                      nodeName: parsed.data.title || parsed.data.node_id,
+                      nodeTitle: parsed.data.title,
+                      nodeType: parsed.data.node_type,
+                      status: parsed.data.status === 'succeeded' ? 'completed' : 'failed',
                       endTime: new Date()
                     });
                   } else if (parsed.event === 'node_failed' && parsed.node_id) {
