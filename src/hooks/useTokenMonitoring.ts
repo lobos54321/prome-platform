@@ -82,10 +82,13 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       let outputCost = 0;
       let totalCost = 0;
 
-      if (usage.prompt_price && usage.completion_price) {
-        inputCost = parseFloat(usage.prompt_price) || 0;
-        outputCost = parseFloat(usage.completion_price) || 0;
-        totalCost = parseFloat(usage.total_price || '') || (inputCost + outputCost);
+      // 优先使用Dify提供的价格信息（支持字符串或数字格式）
+      if (usage.total_price || usage.prompt_price || usage.completion_price) {
+        inputCost = parseFloat(usage.prompt_price?.toString() || '0') || 0;
+        outputCost = parseFloat(usage.completion_price?.toString() || '0') || 0;
+        totalCost = parseFloat(usage.total_price?.toString() || '0') || (inputCost + outputCost);
+        
+        console.log('[Token] Using Dify-provided pricing:', { inputCost, outputCost, totalCost });
       } else {
         // Fallback to model-based pricing
         const modelConfigs = await db.getModelConfigs();
@@ -112,7 +115,12 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
             );
           } catch (error) {
             console.error('Failed to auto-create model config:', error);
-            // Use fallback pricing
+            // 继续处理，但不阻塞token计费
+          }
+          
+          // 如果数据库创建失败，使用fallback config确保token处理继续
+          if (!modelConfig) {
+            console.log('Using fallback model config for token processing');
             modelConfig = {
               id: `fallback-${modelName}`,
               modelName: modelName,
