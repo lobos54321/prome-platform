@@ -97,11 +97,15 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           // Auto-create model config if not found
           console.log(`Auto-creating model config for: ${modelName}`);
           try {
+            // 使用当前用户ID，如果没有用户则使用null UUID
+            const currentUser = await authService.getCurrentUser();
+            const systemUserId = currentUser?.id || '00000000-0000-0000-0000-000000000000';
+            
             modelConfig = await db.addModelConfig(
               modelName,
               0.002, // Default input price per 1000 tokens
               0.006, // Default output price per 1000 tokens
-              'system',
+              systemUserId, // 使用有效的UUID
               'ai_model',
               undefined,
               true // auto-created
