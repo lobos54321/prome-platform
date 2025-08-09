@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
-// API 配置
-const DIFY_API_URL = import.meta.env.VITE_DIFY_API_URL || 'https://api.dify.ai'
-const DIFY_API_KEY = import.meta.env.VITE_DIFY_API_KEY || ''
+// API 配置 - 通过后端server.js代理，包含预热机制
+// 不再直接调用 Dify API，而是使用后端endpoints
 
 // 消息类型定义
 export interface DifyMessage {
@@ -44,8 +43,9 @@ const CONVERSATION_KEY = 'dify_conversation_id'
 const MESSAGES_CACHE_KEY = 'dify_messages_cache'
 
 /**
- * useDifyChat Hook - 管理与 Dify API 的对话
- * 核心改动：使用 /v1/chat-messages 多轮对话接口，而不是 /workflows/run
+ * useDifyChat Hook - 管理与后端 Dify 代理的对话
+ * 🔧 核心修复：通过后端server.js预热机制，解决dialogue_count偏移问题
+ * 不再直接调用 Dify API，而是使用包含warmup机制的后端endpoints
  */
 export function useDifyChat(
   userId: string = 'default-user'
@@ -114,8 +114,8 @@ export function useDifyChat(
   }, [messages])
   
   /**
-   * 调用 Dify Chat API
-   * 关键：使用 /v1/chat-messages 而不是 /workflows/run
+   * 调用后端 Dify Chat API
+   * 🔧 关键修复：使用后端server.js的预热机制，而不是直接调用Dify API
    */
   const callDifyAPI = async (
     query: string,
@@ -124,18 +124,22 @@ export function useDifyChat(
     abortControllerRef.current = new AbortController()
     
     try {
-      const response = await fetch(`${DIFY_API_URL}/v1/chat-messages`, {
+      // 🎯 使用后端server.js接口，包含预热机制
+      const backendEndpoint = convId 
+        ? `/api/dify/${convId}` // 使用现有会话的blocking endpoint
+        : '/api/dify' // 新会话使用generic endpoint
+        
+      const response = await fetch(backendEndpoint, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${DIFY_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          conversation_id: convId || '',
-          query: query,
+          message: query, // 后端使用message字段
           user: userId,
-          response_mode: 'blocking',
-          inputs: {}, // 额外输入参数（如果需要）
+          conversation_id: convId || '', // 后端server.js需要的字段
+          inputs: {}, // 额外输入参数
+          stream: false // 使用blocking模式
         }),
         signal: abortControllerRef.current.signal,
       })
@@ -146,11 +150,11 @@ export function useDifyChat(
       }
       
       const data = await response.json()
-      // 确保返回的数据有必要的字段
+      // 确保返回的数据有必要的字段 - 适配后端响应格式
       return {
         conversation_id: data.conversation_id || '',
         message_id: data.message_id || '',
-        answer: data.answer || '',
+        answer: data.answer || data.response || '', // 后端可能使用response字段
         created_at: data.created_at || Date.now() / 1000,
         metadata: data.metadata || {}
       }

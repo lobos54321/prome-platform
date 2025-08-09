@@ -63,89 +63,7 @@ function isValidUUID(str) {
   return uuidRegex.test(str);
 }
 
-/**
- * 🎯 INTELLIGENT STATE DETECTION - 基于内容的状态检测，解决dialogue_count脆弱性
- * 不再依赖系统计数，而是分析用户意图和内容特征
- */
-function detectConversationState(message, conversationHistory = []) {
-  const msg = message.toLowerCase().trim();
-  
-  // 第一阶段：初始痛点分析请求
-  const initialKeywords = [
-    '痛点', '问题', '分析', '帮助', '业务', '困难', '挑战', 
-    '瓶颈', '难题', '改进', '优化', '提升', '解决'
-  ];
-  const hasInitialIntent = initialKeywords.some(keyword => msg.includes(keyword));
-  
-  // 第二阶段：选择执行某个痛点
-  const selectionKeywords = [
-    '执行', '选择', '第一个', '第二个', '第三个', '第1个', '第2个', '第3个',
-    '这个', '那个', '开始', '进行', '处理', '解决这个'
-  ];
-  const hasSelectionIntent = selectionKeywords.some(keyword => msg.includes(keyword));
-  
-  // 第三阶段：最终确认
-  const confirmationKeywords = [
-    '确认', '好的', '是的', '对', '正确', '没问题', '可以', 
-    '同意', '继续', '开始执行', '就这样'
-  ];
-  const hasConfirmationIntent = confirmationKeywords.some(keyword => msg.includes(keyword));
-  
-  // 分析对话历史长度（作为辅助判断）
-  const userMessageCount = conversationHistory.filter(msg => msg && msg.role === 'user').length + 1;
-  
-  // 智能状态判断
-  let stage = 'initial';
-  let confidence = 0.6;
-  
-  if (hasConfirmationIntent && userMessageCount >= 2) {
-    stage = 'confirm';
-    confidence = 0.9;
-  } else if (hasSelectionIntent && userMessageCount >= 2) {
-    stage = 'select';  
-    confidence = 0.85;
-  } else if (hasInitialIntent || userMessageCount === 1) {
-    stage = 'initial';
-    confidence = hasInitialIntent ? 0.9 : 0.7;
-  } else {
-    // 基于对话轮次的fallback逻辑
-    if (userMessageCount >= 3) stage = 'confirm';
-    else if (userMessageCount === 2) stage = 'select';
-    else stage = 'initial';
-    confidence = 0.6;
-  }
-  
-  return {
-    stage,
-    confidence,
-    user_message_count: userMessageCount,
-    detected_intents: {
-      initial: hasInitialIntent,
-      selection: hasSelectionIntent,
-      confirmation: hasConfirmationIntent
-    }
-  };
-}
-
-/**
- * 🧮 LOGICAL DIALOGUE COUNT - 修正dialogue_count偏移，提供备选状态
- */
-function getLogicalDialogueCount(actualCount, conversationHistory = []) {
-  // 考虑开场白偏移：实际对话轮次 - 1 (开场白消耗了第0轮)
-  const logicalCount = Math.max(0, actualCount - 1);
-  
-  // 基于对话历史验证
-  const userMessages = conversationHistory.filter(msg => msg && msg.role === 'user');
-  const historyBasedCount = userMessages.length;
-  
-  return {
-    actual_count: actualCount,
-    logical_count: logicalCount, 
-    history_based_count: historyBasedCount,
-    // 提供最可靠的计数
-    recommended_count: historyBasedCount || logicalCount
-  };
-}
+// Removed complex warmup and state detection functions - now handled by Dify opening statement
 
 // Helper function to get a valid user ID
 function getValidUserId(user) {
@@ -1329,69 +1247,8 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     
     console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
     
-    // 🎯 INTELLIGENT STATE ANALYSIS - 替代脆弱的dialogue_count依赖
-    console.log('🎯 INTELLIGENT STATE ANALYSIS - STREAMING:');
+    // Direct API call to Dify - opening statement handled in Dify backend
     
-    // 构建对话历史 (简化版，主要基于当前消息分析)
-    const conversationHistory = []; // TODO: 可以从数据库加载历史消息
-    
-    // 智能状态检测
-    const stateAnalysis = detectConversationState(message, conversationHistory);
-    const dialogueCountAnalysis = getLogicalDialogueCount(1, conversationHistory); // 假设是用户第一条消息
-    
-    console.log('   🧠 Detected Stage:', stateAnalysis.stage);
-    console.log('   🎯 Confidence:', stateAnalysis.confidence);
-    console.log('   📊 User Message Count:', stateAnalysis.user_message_count);
-    console.log('   🔍 Detected Intents:', stateAnalysis.detected_intents);
-    console.log('   🧮 Logical Count:', dialogueCountAnalysis.recommended_count);
-    
-    // 🔧 CRITICAL: 预热消息机制 - 解决开场白导致的dialogue_count偏移
-    if (!difyConversationId) {
-      console.log('🔄 新对话检测到，发送预热消息消耗开场白的dialogue_count=0');
-      
-      try {
-        const warmupResponse = await fetchWithTimeoutAndRetry(
-          apiEndpoint,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${DIFY_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              inputs: inputs,
-              query: '',  // 空查询消耗开场白
-              response_mode: 'blocking',
-              user: getValidUserId(req.body.user)
-            }),
-          },
-          STANDARD_TIMEOUT
-        );
-        
-        if (warmupResponse.ok) {
-          const warmupData = await warmupResponse.json();
-          if (warmupData.conversation_id) {
-            difyConversationId = warmupData.conversation_id;
-            apiRequestBody.conversation_id = difyConversationId;
-            console.log('✅ 预热成功，获得conversation_id:', difyConversationId);
-            console.log('🎯 现在用户消息将是dialogue_count=1 (逻辑上等同于0)');
-            
-            // 立即保存会话映射
-            try {
-              await ensureConversationExists(supabase, conversationId, difyConversationId, getValidUserId(req.body.user));
-            } catch (saveError) {
-              console.error('⚠️ 保存会话映射失败:', saveError);
-            }
-          }
-        }
-      } catch (warmupError) {
-        console.warn('⚠️ 预热消息失败，继续原请求:', warmupError);
-      }
-    }
-    
-    // 💡 智能分析结果 (仅用于日志)
-    console.log('   🧠 Detected Stage:', stateAnalysis.stage, '(Confidence:', stateAnalysis.confidence + ')');
-    console.log('   🔍 Intents:', stateAnalysis.detected_intents);
     
     // ✅ 保持原有inputs完全不变，让Dify ChatFlow按原有逻辑工作
     
@@ -1831,69 +1688,8 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     
     console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
     
-    // 🎯 INTELLIGENT STATE ANALYSIS - 替代脆弱的dialogue_count依赖
-    console.log('🎯 INTELLIGENT STATE ANALYSIS - REGULAR:');
+    // Direct API call to Dify - opening statement handled in Dify backend
     
-    // 构建对话历史 (简化版，主要基于当前消息分析)
-    const conversationHistory = []; // TODO: 可以从数据库加载历史消息
-    
-    // 智能状态检测
-    const stateAnalysis = detectConversationState(message, conversationHistory);
-    const dialogueCountAnalysis = getLogicalDialogueCount(1, conversationHistory); // 假设是用户第一条消息
-    
-    console.log('   🧠 Detected Stage:', stateAnalysis.stage);
-    console.log('   🎯 Confidence:', stateAnalysis.confidence);
-    console.log('   📊 User Message Count:', stateAnalysis.user_message_count);
-    console.log('   🔍 Detected Intents:', stateAnalysis.detected_intents);
-    console.log('   🧮 Logical Count:', dialogueCountAnalysis.recommended_count);
-    
-    // 🔧 CRITICAL: 预热消息机制 - 解决开场白导致的dialogue_count偏移
-    if (!difyConversationId) {
-      console.log('🔄 新对话检测到，发送预热消息消耗开场白的dialogue_count=0');
-      
-      try {
-        const warmupResponse = await fetchWithTimeoutAndRetry(
-          apiEndpoint,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${DIFY_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              inputs: inputs,
-              query: '',  // 空查询消耗开场白
-              response_mode: 'blocking',
-              user: getValidUserId(req.body.user)
-            }),
-          },
-          STANDARD_TIMEOUT
-        );
-        
-        if (warmupResponse.ok) {
-          const warmupData = await warmupResponse.json();
-          if (warmupData.conversation_id) {
-            difyConversationId = warmupData.conversation_id;
-            apiRequestBody.conversation_id = difyConversationId;
-            console.log('✅ 预热成功，获得conversation_id:', difyConversationId);
-            console.log('🎯 现在用户消息将是dialogue_count=1 (逻辑上等同于0)');
-            
-            // 立即保存会话映射
-            try {
-              await ensureConversationExists(supabase, conversationId, difyConversationId, getValidUserId(req.body.user));
-            } catch (saveError) {
-              console.error('⚠️ 保存会话映射失败:', saveError);
-            }
-          }
-        }
-      } catch (warmupError) {
-        console.warn('⚠️ 预热消息失败，继续原请求:', warmupError);
-      }
-    }
-    
-    // 💡 智能分析结果 (仅用于日志)
-    console.log('   🧠 Detected Stage:', stateAnalysis.stage, '(Confidence:', stateAnalysis.confidence + ')');
-    console.log('   🔍 Intents:', stateAnalysis.detected_intents);
     
     // ✅ 保持原有inputs完全不变，让Dify ChatFlow按原有逻辑工作
     
