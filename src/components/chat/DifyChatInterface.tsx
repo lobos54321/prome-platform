@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { cn, isValidUUID, generateUUID } from '@/lib/utils';
+import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
 
 interface Message {
   id: string;
@@ -58,6 +59,9 @@ export function DifyChatInterface({
     nodes: [],
     completedNodes: 0
   });
+  
+  // Token monitoring for balance deduction
+  const { processTokenUsage } = useTokenMonitoring();
   
   // 🔧 修复：安全的用户ID初始化
   const [userId, setUserId] = useState<string>('');
@@ -748,6 +752,47 @@ export function DifyChatInterface({
                       console.log('[Chat Debug] Workflow finished with answer:', parsed.data.outputs.answer.length, 'chars');
                       finalResponse = parsed.data.outputs.answer; // ChatFlow的答案在data.outputs.answer中
                       messageEndReceived = true; // 标记消息完成
+                      
+                      // 💰 处理token使用和积分扣减
+                      if (parsed.data.total_tokens || (parsed.data.status === 'succeeded' && parsed.data.elapsed_time)) {
+                        console.log('[Token] Processing workflow token usage:', {
+                          total_tokens: parsed.data.total_tokens,
+                          status: parsed.data.status,
+                          conversation_id: parsed.conversation_id,
+                          message_id: parsed.message_id
+                        });
+                        
+                        try {
+                          // 构造token使用数据 - 兼容Dify ChatFlow格式
+                          const tokenUsage = {
+                            prompt_tokens: Math.floor(parsed.data.total_tokens * 0.7) || 100, // 估算输入token
+                            completion_tokens: Math.ceil(parsed.data.total_tokens * 0.3) || 50, // 估算输出token
+                            total_tokens: parsed.data.total_tokens || 150,
+                            // Dify通常不提供具体价格，使用默认值
+                            prompt_price: undefined,
+                            completion_price: undefined,
+                            total_price: undefined
+                          };
+                          
+                          // 异步处理token使用，不阻塞UI
+                          processTokenUsage(
+                            tokenUsage,
+                            parsed.conversation_id,
+                            parsed.message_id,
+                            'dify-chatflow'
+                          ).then(result => {
+                            if (result.success) {
+                              console.log('[Token] Successfully processed token usage:', result.newBalance);
+                            } else {
+                              console.warn('[Token] Failed to process token usage:', result.error);
+                            }
+                          }).catch(error => {
+                            console.error('[Token] Error processing token usage:', error);
+                          });
+                        } catch (tokenError) {
+                          console.error('[Token] Error preparing token usage:', tokenError);
+                        }
+                      }
                     }
                   } else if (parsed.answer && !parsed.event) {
                     // 兼容性处理：如果没有event字段但有answer字段
@@ -886,6 +931,30 @@ export function DifyChatInterface({
 
     setMessages(prev => [...prev, assistantMessage]);
     console.log('[Chat Debug] Added assistant message from regular response');
+    
+    // 💰 处理blocking API的token使用
+    if (data.metadata?.usage) {
+      console.log('[Token] Processing blocking API token usage:', data.metadata.usage);
+      try {
+        // 异步处理token使用，不阻塞UI
+        processTokenUsage(
+          data.metadata.usage,
+          data.conversation_id as string,
+          data.message_id as string,
+          'dify-blocking'
+        ).then(result => {
+          if (result.success) {
+            console.log('[Token] Successfully processed blocking API token usage:', result.newBalance);
+          } else {
+            console.warn('[Token] Failed to process blocking API token usage:', result.error);
+          }
+        }).catch(error => {
+          console.error('[Token] Error processing blocking API token usage:', error);
+        });
+      } catch (tokenError) {
+        console.error('[Token] Error preparing blocking API token usage:', tokenError);
+      }
+    }
   };
 
   // 主要的表单提交处理
