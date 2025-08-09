@@ -746,6 +746,30 @@ export function DifyChatInterface({
                     // 标记消息结束
                     messageEndReceived = true;
                     console.log('[Chat Debug] Message end received, total content length:', finalResponse.length);
+                    
+                    // 💰 处理message_end事件中的token使用和积分扣减
+                    if (parsed.metadata && parsed.metadata.usage) {
+                      console.log('[Token] Processing message_end token usage:', parsed.metadata.usage);
+                      try {
+                        // 异步处理token使用，不阻塞UI
+                        processTokenUsage(
+                          parsed.metadata.usage,
+                          parsed.conversation_id,
+                          parsed.id || parsed.message_id,
+                          'dify-chatflow'
+                        ).then(result => {
+                          if (result.success) {
+                            console.log('[Token] Successfully processed message_end token usage:', result.newBalance);
+                          } else {
+                            console.warn('[Token] Failed to process message_end token usage:', result.error);
+                          }
+                        }).catch(error => {
+                          console.error('[Token] Error processing message_end token usage:', error);
+                        });
+                      } catch (tokenError) {
+                        console.error('[Token] Error preparing message_end token usage:', tokenError);
+                      }
+                    }
                   } else if (parsed.event === 'workflow_finished') {
                     // 🎯 关键修复：处理ChatFlow的workflow_finished事件
                     if (parsed.data && parsed.data.outputs && parsed.data.outputs.answer) {
