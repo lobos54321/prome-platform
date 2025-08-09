@@ -742,6 +742,13 @@ export function DifyChatInterface({
                     // 标记消息结束
                     messageEndReceived = true;
                     console.log('[Chat Debug] Message end received, total content length:', finalResponse.length);
+                  } else if (parsed.event === 'workflow_finished') {
+                    // 🎯 关键修复：处理ChatFlow的workflow_finished事件
+                    if (parsed.data && parsed.data.outputs && parsed.data.outputs.answer) {
+                      console.log('[Chat Debug] Workflow finished with answer:', parsed.data.outputs.answer.length, 'chars');
+                      finalResponse = parsed.data.outputs.answer; // ChatFlow的答案在data.outputs.answer中
+                      messageEndReceived = true; // 标记消息完成
+                    }
                   } else if (parsed.answer && !parsed.event) {
                     // 兼容性处理：如果没有event字段但有answer字段
                     console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
