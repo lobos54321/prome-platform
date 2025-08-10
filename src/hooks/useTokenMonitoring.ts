@@ -97,26 +97,10 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         );
 
         if (!modelConfig) {
-          // Auto-create model config if not found
-          console.log(`Auto-creating model config for: ${modelName}`);
-          try {
-            // 使用当前用户ID，如果没有用户则使用null UUID
-            const currentUser = await authService.getCurrentUser();
-            const systemUserId = currentUser?.id || '00000000-0000-0000-0000-000000000000';
-            
-            modelConfig = await db.addModelConfig(
-              modelName,
-              0.002, // Default input price per 1000 tokens
-              0.006, // Default output price per 1000 tokens
-              systemUserId, // 使用有效的UUID
-              'ai_model',
-              undefined,
-              true // auto-created
-            );
-          } catch (error) {
-            console.error('Failed to auto-create model config:', error);
-            // 继续处理，但不阻塞token计费
-          }
+          // Skip auto-creation to avoid RLS policy violations
+          // Use fallback config directly
+          console.log(`Model config not found for: ${modelName}, using fallback`);
+        }
           
           // 如果数据库创建失败，使用fallback config确保token处理继续
           if (!modelConfig) {
