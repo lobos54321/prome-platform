@@ -101,23 +101,22 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           // Use fallback config directly
           console.log(`Model config not found for: ${modelName}, using fallback`);
         }
-          
-          // 如果数据库创建失败，使用fallback config确保token处理继续
-          if (!modelConfig) {
-            console.log('Using fallback model config for token processing');
-            modelConfig = {
-              id: `fallback-${modelName}`,
-              modelName: modelName,
-              inputTokenPrice: 0.002,
-              outputTokenPrice: 0.006,
-              serviceType: 'ai_model' as const,
-              isActive: true,
-              autoCreated: true,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              createdBy: 'system'
-            };
-          }
+        
+        // 如果数据库创建失败，使用fallback config确保token处理继续
+        if (!modelConfig) {
+          console.log('Using fallback model config for token processing');
+          modelConfig = {
+            id: `fallback-${modelName}`,
+            modelName: modelName,
+            inputTokenPrice: 0.002,
+            outputTokenPrice: 0.006,
+            serviceType: 'ai_model' as const,
+            isActive: true,
+            autoCreated: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            createdBy: 'system'
+          };
         }
 
         // Calculate costs based on model pricing
