@@ -729,13 +729,13 @@ export function DifyChatInterface({
                       status: parsed.data.status === 'succeeded' ? 'completed' : 'failed',
                       endTime: new Date()
                     });
-                  } else if (parsed.event === 'node_failed' && parsed.node_id) {
-                    console.log('[Chat Debug] Node failed:', parsed.node_id, parsed.error);
+                  } else if (parsed.event === 'node_failed' && parsed.data?.node_id) {
+                    console.log('[Chat Debug] Node failed:', parsed.data.node_id, parsed.data.error);
                     updateWorkflowProgress({
-                      nodeId: parsed.node_id,
+                      nodeId: parsed.data.node_id,
                       status: 'failed',
                       endTime: new Date(),
-                      error: parsed.error || '节点执行失败'
+                      error: parsed.data.error || '节点执行失败'
                     });
                   }
 
