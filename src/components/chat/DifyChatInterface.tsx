@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock, MessageSquare, X, Trash2 } from 'lucide-react';
 import { cn, isValidUUID, generateUUID } from '@/lib/utils';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
 
@@ -29,6 +29,21 @@ interface WorkflowState {
   currentNodeId?: string;
   totalNodes?: number;
   completedNodes: number;
+}
+
+interface ConversationHistoryItem {
+  id: string;
+  title: string;
+  lastMessage: string;
+  lastMessageTime: Date;
+  messageCount: number;
+  messages: Message[];
+  workflowState?: WorkflowState;
+}
+
+interface ChatHistoryState {
+  conversations: ConversationHistoryItem[];
+  currentConversationId: string | null;
 }
 
 interface DifyChatInterfaceProps {
@@ -66,6 +81,13 @@ export function DifyChatInterface({
   // 🔧 修复：安全的用户ID初始化
   const [userId, setUserId] = useState<string>('');
   const [isUserIdReady, setIsUserIdReady] = useState(false);
+  
+  // 🆕 对话历史管理
+  const [chatHistory, setChatHistory] = useState<ChatHistoryState>({
+    conversations: [],
+    currentConversationId: null
+  });
+  const [showHistory, setShowHistory] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -189,6 +211,160 @@ export function DifyChatInterface({
       console.log('[Debug] Chat debugging utilities available at window.debugChat');
     }
   }, [conversationId, userId, workflowState, messages, isLoading, error]);
+
+  // 🆕 对话历史管理函数
+  const generateConversationTitle = (messages: Message[]): string => {
+    const firstUserMessage = messages.find(m => m.role === 'user');
+    if (firstUserMessage) {
+      // 取前30个字符作为标题
+      const title = firstUserMessage.content.substring(0, 30);
+      return title.length === 30 ? title + '...' : title;
+    }
+    return `新对话 ${new Date().toLocaleTimeString()}`;
+  };
+
+  const saveConversationToHistory = () => {
+    if (messages.length === 0) return;
+    
+    const conversationItem: ConversationHistoryItem = {
+      id: conversationId || generateUUID(),
+      title: generateConversationTitle(messages),
+      lastMessage: messages[messages.length - 1]?.content || '',
+      lastMessageTime: new Date(),
+      messageCount: messages.length,
+      messages: [...messages],
+      workflowState: { ...workflowState }
+    };
+
+    setChatHistory(prev => {
+      const existingIndex = prev.conversations.findIndex(c => c.id === conversationItem.id);
+      let newConversations;
+      
+      if (existingIndex >= 0) {
+        // 更新现有对话
+        newConversations = [...prev.conversations];
+        newConversations[existingIndex] = conversationItem;
+      } else {
+        // 添加新对话到顶部
+        newConversations = [conversationItem, ...prev.conversations];
+      }
+      
+      const newState = {
+        conversations: newConversations,
+        currentConversationId: conversationItem.id
+      };
+      
+      // 保存到 localStorage
+      try {
+        localStorage.setItem('dify_chat_history', JSON.stringify(newState));
+      } catch (error) {
+        console.warn('Failed to save chat history to localStorage:', error);
+      }
+      
+      return newState;
+    });
+  };
+
+  const loadConversationFromHistory = (conversationId: string) => {
+    const conversation = chatHistory.conversations.find(c => c.id === conversationId);
+    if (!conversation) return;
+
+    // 恢复对话状态
+    setMessages(conversation.messages);
+    setConversationId(conversation.id);
+    setWorkflowState(conversation.workflowState || {
+      isWorkflow: false,
+      nodes: [],
+      completedNodes: 0
+    });
+    setError(null);
+    setIsLoading(false);
+
+    // 更新当前对话ID
+    setChatHistory(prev => ({
+      ...prev,
+      currentConversationId: conversationId
+    }));
+
+    // 更新 localStorage
+    localStorage.setItem('dify_conversation_id', conversation.id);
+  };
+
+  const createNewConversation = () => {
+    // 先保存当前对话
+    if (messages.length > 0) {
+      saveConversationToHistory();
+    }
+
+    // 重置状态创建新对话
+    setMessages([]);
+    setConversationId(null);
+    setInput('');
+    setError(null);
+    setRetryCount(0);
+    setWorkflowState({
+      isWorkflow: false,
+      nodes: [],
+      completedNodes: 0
+    });
+
+    // 清除localStorage中的对话数据
+    localStorage.removeItem('dify_conversation_id');
+    localStorage.removeItem('dify_conversation_id_streaming');
+    
+    // 更新历史状态
+    setChatHistory(prev => ({
+      ...prev,
+      currentConversationId: null
+    }));
+  };
+
+  const deleteConversation = (conversationId: string) => {
+    setChatHistory(prev => {
+      const newConversations = prev.conversations.filter(c => c.id !== conversationId);
+      const newState = {
+        conversations: newConversations,
+        currentConversationId: prev.currentConversationId === conversationId ? null : prev.currentConversationId
+      };
+
+      // 更新 localStorage
+      try {
+        localStorage.setItem('dify_chat_history', JSON.stringify(newState));
+      } catch (error) {
+        console.warn('Failed to update chat history in localStorage:', error);
+      }
+
+      return newState;
+    });
+
+    // 如果删除的是当前对话，清空当前状态
+    if (conversationId === chatHistory.currentConversationId) {
+      createNewConversation();
+    }
+  };
+
+  // 🆕 初始化对话历史
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedHistory = localStorage.getItem('dify_chat_history');
+        if (savedHistory) {
+          const parsedHistory: ChatHistoryState = JSON.parse(savedHistory);
+          // 转换日期字符串回Date对象
+          parsedHistory.conversations.forEach(conv => {
+            conv.lastMessageTime = new Date(conv.lastMessageTime);
+            conv.messages.forEach(msg => {
+              msg.timestamp = new Date(msg.timestamp);
+            });
+          });
+          setChatHistory(parsedHistory);
+        }
+      } catch (error) {
+        console.warn('Failed to load chat history from localStorage:', error);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const initUserIdAndSession = () => {
       if (typeof window !== 'undefined') {
@@ -1133,6 +1309,12 @@ export function DifyChatInterface({
     } finally {
       setIsLoading(false);
       setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
+      
+      // 🆕 自动保存对话历史（不影响现有功能）
+      setTimeout(() => {
+        saveConversationToHistory();
+      }, 100); // 延迟确保状态更新完成
+      
       // 聚焦输入框
       inputRef.current?.focus();
     }
@@ -1158,62 +1340,35 @@ export function DifyChatInterface({
     }
   };
   
-  // 🔧 增强的新对话功能 - 修复会话状态管理
+  // 🔧 增强的新对话功能 - 集成对话历史管理
   const handleNewConversation = () => {
-    console.log('[Chat Debug] Starting new conversation - clearing previous session state');
+    console.log('[Chat Debug] Starting new conversation with history management');
     
-    setMessages(welcomeMessage ? [{
-      id: 'welcome',
-      content: welcomeMessage,
-      role: 'assistant',
-      timestamp: new Date(),
-    }] : []);
+    // 使用新的对话历史管理函数
+    createNewConversation();
     
-    // 🔧 修复：只有用户主动开始新对话时才清除会话ID
-    setConversationId(null);
-    setInput('');
-    setError(null);
-    setRetryCount(0);
-    setWorkflowState({
-      isWorkflow: false,
-      nodes: [],
-      completedNodes: 0
-    });
+    // 添加欢迎消息
+    if (welcomeMessage) {
+      setMessages([{
+        id: 'welcome',
+        content: welcomeMessage,
+        role: 'assistant',
+        timestamp: new Date(),
+      }]);
+    }
     
-    // 🔧 关键修复：清除所有会话状态，包括用户ID，确保完全新的对话
+    // 生成新的用户ID，确保后端认为这是全新用户
     if (typeof window !== 'undefined') {
-      const keysToRemove = [
-        'dify_conversation_id',
-        'dify_conversation_id_streaming', 
-        'dify_user_id', // 🔥 关键：也清除用户ID
-        'dify_workflow_state',
-        'dify_session_timestamp'
-      ];
-      
-      keysToRemove.forEach(key => {
-        if (localStorage.getItem(key)) {
-          localStorage.removeItem(key);
-          sessionStorage.removeItem(key); // 同时清除sessionStorage
-          console.log('[Chat Debug] Removed', key, 'from localStorage and sessionStorage');
-        }
-      });
-      
-      // 🔥 关键：生成新的用户ID，确保后端认为这是全新用户
       const newUserId = generateUUID();
       setUserId(newUserId);
       localStorage.setItem('dify_user_id', newUserId);
       localStorage.setItem('dify_session_timestamp', Date.now().toString());
       
       console.log('[Chat Debug] 🔥 GENERATED NEW USER ID for fresh conversation:', newUserId);
-      console.log('[Chat Debug] Set new session timestamp for fresh conversation');
-      console.log('[Chat Debug] Cleared stored conversation and workflow state');
     }
     
-    console.log('[Chat Debug] Started new conversation - all session state cleared');
-    
-    // 🔧 新增：提供用户反馈
+    // 🔧 提供用户反馈
     if (typeof window !== 'undefined') {
-      // 简单的临时通知，可以根据需要替换为更好的UI组件
       const notification = document.createElement('div');
       notification.textContent = '✅ 新对话已开始';
       notification.style.cssText = `
@@ -1241,6 +1396,7 @@ export function DifyChatInterface({
       }, 3000);
     }
     
+    console.log('[Chat Debug] New conversation initialized with history support');
     inputRef.current?.focus();
   };
 
@@ -1270,15 +1426,92 @@ export function DifyChatInterface({
             </span>
           )}
         </div>
-        <button
-          onClick={handleNewConversation}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm hover:shadow-md"
-          title="Start New Conversation (Ctrl+N or Cmd+N)"
-        >
-          <RotateCcw className="w-4 h-4" />
-          New Chat
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all"
+            title="Chat History"
+          >
+            <MessageSquare className="w-4 h-4" />
+            History ({chatHistory.conversations.length})
+          </button>
+          <button
+            onClick={handleNewConversation}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm hover:shadow-md"
+            title="Start New Conversation (Ctrl+N or Cmd+N)"
+          >
+            <RotateCcw className="w-4 h-4" />
+            New Chat
+          </button>
+        </div>
       </div>
+
+      {/* 🆕 历史对话面板 */}
+      {showHistory && (
+        <div className="border-b border-gray-200 bg-gray-50 max-h-64 overflow-y-auto">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">对话历史</h3>
+              <button
+                onClick={() => setShowHistory(false)}
+                className="p-1 hover:bg-gray-200 rounded"
+                title="关闭历史"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {chatHistory.conversations.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4">暂无历史对话</p>
+            ) : (
+              <div className="space-y-2">
+                {chatHistory.conversations.map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all",
+                      conversation.id === chatHistory.currentConversationId
+                        ? "bg-blue-100 border border-blue-200"
+                        : "bg-white hover:bg-gray-100 border border-gray-200"
+                    )}
+                    onClick={() => loadConversationFromHistory(conversation.id)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-medium text-gray-900 truncate">
+                          {conversation.title}
+                        </h4>
+                        {conversation.id === chatHistory.currentConversationId && (
+                          <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded">
+                            当前
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">
+                        {conversation.lastMessage}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                        <span>{conversation.messageCount} 条消息</span>
+                        <span>{conversation.lastMessageTime.toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteConversation(conversation.id);
+                      }}
+                      className="ml-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
+                      title="删除对话"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
