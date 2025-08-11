@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock, MessageSquare, X, Trash2 } from 'lucide-react';
+import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock, MessageSquare, X, Trash2, Cloud, Wifi, WifiOff } from 'lucide-react';
 import { cn, isValidUUID, generateUUID } from '@/lib/utils';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
+import { cloudChatHistory, ChatConversation } from '@/lib/cloudChatHistory';
+import { chatHistoryMigration } from '@/lib/chatHistoryMigration';
 
 interface Message {
   id: string;
@@ -44,6 +46,9 @@ interface ConversationHistoryItem {
 interface ChatHistoryState {
   conversations: ConversationHistoryItem[];
   currentConversationId: string | null;
+  isCloudSyncEnabled: boolean;
+  syncStatus: 'idle' | 'syncing' | 'error' | 'offline';
+  lastSyncTime?: Date;
 }
 
 interface DifyChatInterfaceProps {
@@ -82,12 +87,23 @@ export function DifyChatInterface({
   const [userId, setUserId] = useState<string>('');
   const [isUserIdReady, setIsUserIdReady] = useState(false);
   
-  // 🆕 对话历史管理
+  // 🆕 对话历史管理 (云端版本)
   const [chatHistory, setChatHistory] = useState<ChatHistoryState>({
     conversations: [],
-    currentConversationId: null
+    currentConversationId: null,
+    isCloudSyncEnabled: true,
+    syncStatus: 'idle'
   });
   const [showHistory, setShowHistory] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<{
+    needsMigration: boolean;
+    isChecking: boolean;
+    isMigrating: boolean;
+  }>({
+    needsMigration: false,
+    isChecking: true,
+    isMigrating: false
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -212,6 +228,63 @@ export function DifyChatInterface({
     }
   }, [conversationId, userId, workflowState, messages, isLoading, error]);
 
+  // 🆕 云端对话历史管理函数
+  const loadCloudConversations = async () => {
+    try {
+      setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
+      
+      const cloudConversations = await cloudChatHistory.getConversations();
+      const convertedConversations: ConversationHistoryItem[] = cloudConversations.map(conv => ({
+        id: conv.id,
+        title: conv.title,
+        lastMessage: conv.last_message || '',
+        lastMessageTime: new Date(conv.last_message_time),
+        messageCount: conv.message_count,
+        messages: [], // 延迟加载消息
+        workflowState: conv.workflow_state as WorkflowState
+      }));
+
+      setChatHistory(prev => ({
+        ...prev,
+        conversations: convertedConversations,
+        syncStatus: 'idle',
+        lastSyncTime: new Date()
+      }));
+
+      console.log(`📁 加载了 ${convertedConversations.length} 个云端对话`);
+    } catch (error) {
+      console.error('Failed to load cloud conversations:', error);
+      setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
+    }
+  };
+
+  const performMigration = async () => {
+    try {
+      setMigrationStatus(prev => ({ ...prev, isMigrating: true }));
+      setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
+
+      const migrationResult = await chatHistoryMigration.migrateToCloud();
+      
+      if (migrationResult.success) {
+        console.log(`✅ 迁移完成: ${migrationResult.migratedConversations} 个对话`);
+        await chatHistoryMigration.cleanupLocalData();
+        await loadCloudConversations();
+        
+        setMigrationStatus({
+          needsMigration: false,
+          isChecking: false,
+          isMigrating: false
+        });
+      } else {
+        throw new Error(`Migration failed: ${migrationResult.errors.join(', ')}`);
+      }
+    } catch (error) {
+      console.error('Migration failed:', error);
+      setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
+      setMigrationStatus(prev => ({ ...prev, isMigrating: false }));
+    }
+  };
+
   // 🆕 对话历史管理函数
   const generateConversationTitle = (messages: Message[]): string => {
     const firstUserMessage = messages.find(m => m.role === 'user');
@@ -223,71 +296,116 @@ export function DifyChatInterface({
     return `新对话 ${new Date().toLocaleTimeString()}`;
   };
 
-  const saveConversationToHistory = () => {
+  const saveConversationToHistory = async () => {
     if (messages.length === 0) return;
     
-    const conversationItem: ConversationHistoryItem = {
-      id: conversationId || generateUUID(),
-      title: generateConversationTitle(messages),
-      lastMessage: messages[messages.length - 1]?.content || '',
-      lastMessageTime: new Date(),
-      messageCount: messages.length,
-      messages: [...messages],
-      workflowState: { ...workflowState }
-    };
+    try {
+      setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
+      
+      const title = generateConversationTitle(messages);
+      const cloudConversationId = await cloudChatHistory.saveConversation(
+        title,
+        messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role,
+          timestamp: msg.timestamp,
+          metadata: msg.metadata
+        })),
+        workflowState,
+        conversationId || undefined
+      );
 
-    setChatHistory(prev => {
-      const existingIndex = prev.conversations.findIndex(c => c.id === conversationItem.id);
-      let newConversations;
-      
-      if (existingIndex >= 0) {
-        // 更新现有对话
-        newConversations = [...prev.conversations];
-        newConversations[existingIndex] = conversationItem;
-      } else {
-        // 添加新对话到顶部
-        newConversations = [conversationItem, ...prev.conversations];
-      }
-      
-      const newState = {
-        conversations: newConversations,
-        currentConversationId: conversationItem.id
+      // 更新本地状态
+      const conversationItem: ConversationHistoryItem = {
+        id: cloudConversationId,
+        title,
+        lastMessage: messages[messages.length - 1]?.content || '',
+        lastMessageTime: new Date(),
+        messageCount: messages.length,
+        messages: [...messages],
+        workflowState: { ...workflowState }
       };
-      
-      // 保存到 localStorage
-      try {
-        localStorage.setItem('dify_chat_history', JSON.stringify(newState));
-      } catch (error) {
-        console.warn('Failed to save chat history to localStorage:', error);
-      }
-      
-      return newState;
-    });
+
+      setChatHistory(prev => {
+        const existingIndex = prev.conversations.findIndex(c => c.id === conversationItem.id);
+        let newConversations;
+        
+        if (existingIndex >= 0) {
+          // 更新现有对话
+          newConversations = [...prev.conversations];
+          newConversations[existingIndex] = conversationItem;
+        } else {
+          // 添加新对话到顶部
+          newConversations = [conversationItem, ...prev.conversations];
+        }
+        
+        return {
+          ...prev,
+          conversations: newConversations,
+          currentConversationId: conversationItem.id,
+          syncStatus: 'idle',
+          lastSyncTime: new Date()
+        };
+      });
+
+      console.log(`💾 已保存对话到云端: ${title}`);
+    } catch (error) {
+      console.error('Failed to save conversation to cloud:', error);
+      setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
+    }
   };
 
-  const loadConversationFromHistory = (conversationId: string) => {
-    const conversation = chatHistory.conversations.find(c => c.id === conversationId);
-    if (!conversation) return;
+  const loadConversationFromHistory = async (conversationId: string) => {
+    try {
+      setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
+      
+      // 从云端加载完整的对话数据
+      const conversationWithMessages = await cloudChatHistory.getConversationWithMessages(conversationId);
+      
+      if (!conversationWithMessages) {
+        console.warn('Conversation not found in cloud:', conversationId);
+        setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
+        return;
+      }
 
-    // 恢复对话状态
-    setMessages(conversation.messages);
-    setConversationId(conversation.id);
-    setWorkflowState(conversation.workflowState || {
-      isWorkflow: false,
-      nodes: [],
-      completedNodes: 0
-    });
-    setError(null);
-    setIsLoading(false);
+      // 转换消息格式
+      const convertedMessages: Message[] = conversationWithMessages.messages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role as 'user' | 'assistant',
+        timestamp: new Date(msg.created_at),
+        metadata: msg.metadata
+      }));
 
-    // 更新当前对话ID
-    setChatHistory(prev => ({
-      ...prev,
-      currentConversationId: conversationId
-    }));
+      // 恢复对话状态
+      setMessages(convertedMessages);
+      setConversationId(conversationWithMessages.dify_conversation_id || conversationWithMessages.id);
+      setWorkflowState(conversationWithMessages.workflow_state as WorkflowState || {
+        isWorkflow: false,
+        nodes: [],
+        completedNodes: 0
+      });
+      setError(null);
+      setIsLoading(false);
 
-    // 更新 localStorage
-    localStorage.setItem('dify_conversation_id', conversation.id);
+      // 更新当前对话ID和状态
+      setChatHistory(prev => ({
+        ...prev,
+        currentConversationId: conversationId,
+        syncStatus: 'idle'
+      }));
+
+      // 更新 localStorage 中的 Dify 对话ID
+      if (conversationWithMessages.dify_conversation_id) {
+        localStorage.setItem('dify_conversation_id', conversationWithMessages.dify_conversation_id);
+      }
+
+      console.log(`📖 已从云端加载对话: ${conversationWithMessages.title} (${convertedMessages.length} 条消息)`);
+    } catch (error) {
+      console.error('Failed to load conversation from cloud:', error);
+      setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
+    }
   };
 
   const createNewConversation = () => {
@@ -319,50 +437,66 @@ export function DifyChatInterface({
     }));
   };
 
-  const deleteConversation = (conversationId: string) => {
-    setChatHistory(prev => {
-      const newConversations = prev.conversations.filter(c => c.id !== conversationId);
-      const newState = {
-        conversations: newConversations,
-        currentConversationId: prev.currentConversationId === conversationId ? null : prev.currentConversationId
-      };
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
+      
+      // 从云端删除对话
+      await cloudChatHistory.deleteConversation(conversationId);
+      
+      // 更新本地状态
+      setChatHistory(prev => {
+        const newConversations = prev.conversations.filter(c => c.id !== conversationId);
+        return {
+          ...prev,
+          conversations: newConversations,
+          currentConversationId: prev.currentConversationId === conversationId ? null : prev.currentConversationId,
+          syncStatus: 'idle',
+          lastSyncTime: new Date()
+        };
+      });
 
-      // 更新 localStorage
-      try {
-        localStorage.setItem('dify_chat_history', JSON.stringify(newState));
-      } catch (error) {
-        console.warn('Failed to update chat history in localStorage:', error);
+      // 如果删除的是当前对话，清空当前状态
+      if (conversationId === chatHistory.currentConversationId) {
+        createNewConversation();
       }
 
-      return newState;
-    });
-
-    // 如果删除的是当前对话，清空当前状态
-    if (conversationId === chatHistory.currentConversationId) {
-      createNewConversation();
+      console.log(`🗑️ 已从云端删除对话: ${conversationId}`);
+    } catch (error) {
+      console.error('Failed to delete conversation from cloud:', error);
+      setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
     }
   };
 
-  // 🆕 初始化对话历史
+  // 🆕 初始化云端对话历史
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const initializeCloudHistory = async () => {
+      if (typeof window === 'undefined') return;
+
       try {
-        const savedHistory = localStorage.getItem('dify_chat_history');
-        if (savedHistory) {
-          const parsedHistory: ChatHistoryState = JSON.parse(savedHistory);
-          // 转换日期字符串回Date对象
-          parsedHistory.conversations.forEach(conv => {
-            conv.lastMessageTime = new Date(conv.lastMessageTime);
-            conv.messages.forEach(msg => {
-              msg.timestamp = new Date(msg.timestamp);
-            });
-          });
-          setChatHistory(parsedHistory);
+        // 检查是否需要迁移
+        const migrationInfo = await chatHistoryMigration.getMigrationStatus();
+        
+        setMigrationStatus({
+          needsMigration: migrationInfo.hasLocalData && !migrationInfo.hasMigrated,
+          isChecking: false,
+          isMigrating: false
+        });
+
+        // 如果已经迁移过或没有本地数据，直接加载云端数据
+        if (!migrationInfo.hasLocalData || migrationInfo.hasMigrated) {
+          await loadCloudConversations();
         }
+        
+        console.log('📊 聊天历史初始化状态:', migrationInfo);
       } catch (error) {
-        console.warn('Failed to load chat history from localStorage:', error);
+        console.error('Failed to initialize cloud chat history:', error);
+        setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
+        setMigrationStatus(prev => ({ ...prev, isChecking: false }));
       }
-    }
+    };
+
+    initializeCloudHistory();
   }, []);
 
   useEffect(() => {
@@ -1311,8 +1445,8 @@ export function DifyChatInterface({
       setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
       
       // 🆕 自动保存对话历史（不影响现有功能）
-      setTimeout(() => {
-        saveConversationToHistory();
+      setTimeout(async () => {
+        await saveConversationToHistory();
       }, 100); // 延迟确保状态更新完成
       
       // 聚焦输入框
@@ -1430,9 +1564,14 @@ export function DifyChatInterface({
           <button
             onClick={() => setShowHistory(!showHistory)}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all"
-            title="Chat History"
+            title="Chat History (Cloud Sync)"
           >
-            <MessageSquare className="w-4 h-4" />
+            <div className="flex items-center gap-1">
+              <MessageSquare className="w-4 h-4" />
+              {chatHistory.syncStatus === 'syncing' && <Loader2 className="w-3 h-3 animate-spin" />}
+              {chatHistory.syncStatus === 'error' && <WifiOff className="w-3 h-3 text-red-500" />}
+              {chatHistory.syncStatus === 'idle' && <Cloud className="w-3 h-3 text-green-500" />}
+            </div>
             History ({chatHistory.conversations.length})
           </button>
           <button
@@ -1460,9 +1599,53 @@ export function DifyChatInterface({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* 🆕 数据迁移提示 */}
+            {migrationStatus.needsMigration && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Cloud className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900">发现本地聊天历史</span>
+                  </div>
+                  <button
+                    onClick={performMigration}
+                    disabled={migrationStatus.isMigrating}
+                    className="flex items-center gap-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {migrationStatus.isMigrating ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        迁移中...
+                      </>
+                    ) : (
+                      <>
+                        <Cloud className="w-3 h-3" />
+                        迁移到云端
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-blue-700 mt-1">
+                  将本地聊天历史上传到云端，实现跨设备同步
+                </p>
+              </div>
+            )}
+
+            {/* 🆕 同步状态指示器 */}
+            {chatHistory.lastSyncTime && (
+              <div className="mb-3 text-xs text-gray-500 flex items-center gap-1">
+                <Wifi className="w-3 h-3" />
+                最后同步: {chatHistory.lastSyncTime.toLocaleString()}
+              </div>
+            )}
             
             {chatHistory.conversations.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">暂无历史对话</p>
+              <div className="text-center py-8">
+                <Cloud className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">暂无云端对话历史</p>
+                <p className="text-xs text-gray-400 mt-1">新的对话会自动同步到云端</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {chatHistory.conversations.map((conversation) => (
@@ -1474,7 +1657,7 @@ export function DifyChatInterface({
                         ? "bg-blue-100 border border-blue-200"
                         : "bg-white hover:bg-gray-100 border border-gray-200"
                     )}
-                    onClick={() => loadConversationFromHistory(conversation.id)}
+                    onClick={async () => await loadConversationFromHistory(conversation.id)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -1496,9 +1679,9 @@ export function DifyChatInterface({
                       </div>
                     </div>
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        deleteConversation(conversation.id);
+                        await deleteConversation(conversation.id);
                       }}
                       className="ml-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
                       title="删除对话"
