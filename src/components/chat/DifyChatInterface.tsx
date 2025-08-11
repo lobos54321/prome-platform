@@ -592,7 +592,7 @@ export function DifyChatInterface({
     // 🔧 修复：优化SSE解析参数
     const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // 5分钟超时
     const MAX_ITERATIONS = 10000; // 最大迭代次数防止无限循环
-    const STALL_TIMEOUT_MS = 30 * 1000; // 30秒无数据则认为停滞
+    const STALL_TIMEOUT_MS = 90 * 1000; // 90秒无数据则认为停滞 (增加到90秒适应复杂工作流)
     
     let iterationCount = 0;
     let lastProgressTime = Date.now();
@@ -637,7 +637,7 @@ export function DifyChatInterface({
         // 检查停滞时间
         const currentTime = Date.now();
         if (hasReceivedData && (currentTime - lastProgressTime) > STALL_TIMEOUT_MS) {
-          console.warn('[Chat Debug] Stream stalled for 30 seconds, breaking loop');
+          console.warn('[Chat Debug] Stream stalled for 90 seconds, breaking loop');
           throw new Error('流式响应停滞，可能服务器连接异常');
         }
 
@@ -938,6 +938,13 @@ export function DifyChatInterface({
               }
             }
           }
+        }
+        
+        // 🚨 关键修复：检查是否应该退出循环
+        if (messageEndReceived && finalResponse.trim()) {
+          console.log('[Chat Debug] ✅ Workflow completed successfully, breaking loop');
+          console.log('[Chat Debug] Final response length:', finalResponse.length);
+          break;
         }
       }
 
