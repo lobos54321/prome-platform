@@ -221,6 +221,7 @@ export function DifyChatInterface({
 
   // 工作流进度更新处理
   const updateWorkflowProgress = (nodeUpdate: Partial<WorkflowProgress> & { nodeId: string }) => {
+    console.log('[Chat Debug] Updating workflow progress:', nodeUpdate);
     setWorkflowState(prev => {
       const existingNodeIndex = prev.nodes.findIndex(n => n.nodeId === nodeUpdate.nodeId);
       const newNodes = [...prev.nodes];
@@ -228,9 +229,10 @@ export function DifyChatInterface({
       if (existingNodeIndex >= 0) {
         // 更新现有节点
         newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], ...nodeUpdate };
+        console.log('[Chat Debug] Updated existing node:', newNodes[existingNodeIndex]);
       } else {
         // 添加新节点
-        newNodes.push({
+        const newNode = {
           nodeId: nodeUpdate.nodeId,
           nodeName: nodeUpdate.nodeName || nodeUpdate.nodeId,
           nodeTitle: nodeUpdate.nodeTitle,
@@ -238,13 +240,15 @@ export function DifyChatInterface({
           startTime: nodeUpdate.startTime,
           endTime: nodeUpdate.endTime,
           error: nodeUpdate.error
-        });
+        };
+        newNodes.push(newNode);
+        console.log('[Chat Debug] Added new node:', newNode);
       }
 
       // 计算完成的节点数
       const completedNodes = newNodes.filter(n => n.status === 'completed').length;
       
-      return {
+      const newState = {
         ...prev,
         isWorkflow: true, // 自动启用工作流状态当检测到节点事件时
         nodes: newNodes,
@@ -252,6 +256,9 @@ export function DifyChatInterface({
         completedNodes,
         totalNodes: Math.max(prev.totalNodes || 0, newNodes.length) // 动态更新总节点数
       };
+      
+      console.log('[Chat Debug] New workflow state:', newState);
+      return newState;
     });
   };
 
@@ -600,8 +607,10 @@ export function DifyChatInterface({
                   nodeName: parsed.data.title || parsed.data.node_id,
                   nodeTitle: parsed.data.title,
                   nodeType: parsed.data.node_type,
-                  status: 'running'
+                  status: 'running',
+                  startTime: new Date()
                 });
+                console.log('[Chat Debug] Updated workflow progress for node start');
               }
               
               if (parsed.event === 'node_finished' && parsed.data?.node_id) {
@@ -611,7 +620,16 @@ export function DifyChatInterface({
                   nodeName: parsed.data.title || parsed.data.node_id,
                   nodeTitle: parsed.data.title,
                   nodeType: parsed.data.node_type,
-                  status: 'completed'
+                  status: parsed.data.status === 'succeeded' ? 'completed' : 'failed',
+                  endTime: new Date()
+                });
+              } else if (parsed.event === 'node_failed' && parsed.data?.node_id) {
+                console.log('[Chat Debug] Node failed:', parsed.data.node_id, parsed.data.error);
+                updateWorkflowProgress({
+                  nodeId: parsed.data.node_id,
+                  status: 'failed',
+                  endTime: new Date(),
+                  error: parsed.data.error || '节点执行失败'
                 });
               }
               
