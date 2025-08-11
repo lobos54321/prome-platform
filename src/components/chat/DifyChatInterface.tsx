@@ -712,6 +712,37 @@ export function DifyChatInterface({
                     }
                   }
 
+                  // 处理工作流节点事件 - 在第二个处理路径中也需要
+                  if (parsed.event === 'node_started' && parsed.data?.node_id) {
+                    console.log('[Chat Debug] Workflow node started (path 2):', parsed.data.node_id, parsed.data.title);
+                    updateWorkflowProgress({
+                      nodeId: parsed.data.node_id,
+                      nodeName: parsed.data.title || parsed.data.node_id,
+                      nodeTitle: parsed.data.title,
+                      nodeType: parsed.data.node_type,
+                      status: 'running',
+                      startTime: new Date()
+                    });
+                    console.log('[Chat Debug] Updated workflow progress for node start (path 2)');
+                  } else if (parsed.event === 'node_finished' && parsed.data?.node_id) {
+                    console.log('[Chat Debug] Workflow node finished (path 2):', parsed.data.node_id, parsed.data.status);
+                    updateWorkflowProgress({
+                      nodeId: parsed.data.node_id,
+                      nodeName: parsed.data.title || parsed.data.node_id,
+                      nodeTitle: parsed.data.title,
+                      nodeType: parsed.data.node_type,
+                      status: parsed.data.status === 'succeeded' ? 'completed' : 'failed',
+                      endTime: new Date()
+                    });
+                  } else if (parsed.event === 'node_failed' && parsed.data?.node_id) {
+                    console.log('[Chat Debug] Node failed (path 2):', parsed.data.node_id, parsed.data.error);
+                    updateWorkflowProgress({
+                      nodeId: parsed.data.node_id,
+                      status: 'failed',
+                      endTime: new Date(),
+                      error: parsed.data.error || '节点执行失败'
+                    });
+                  }
 
                   // 🔧 修复：正确解析和累积消息内容 - 处理DIFY流格式
                   if (parsed.event === 'message' && parsed.answer) {
