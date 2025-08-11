@@ -366,12 +366,19 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
     }
 
     // Save assistant message
+    // 改进空内容处理，防止数据库约束错误
+    const assistantContent = difyResponse.answer || '系统处理中，请稍后重试';
+    
+    if (!assistantContent.trim()) {
+      console.warn('⚠️  Assistant response is empty, using fallback message');
+    }
+    
     const { error: assistantError } = await supabase
       .from('messages')
       .insert({
         conversation_id: conversationId,
         role: 'assistant',
-        content: difyResponse.answer,
+        content: assistantContent,
         dify_message_id: difyResponse.message_id,
         token_usage: difyResponse.metadata?.usage || null,
         created_at: new Date().toISOString()
@@ -379,7 +386,7 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
 
     if (assistantError) {
       console.error('Error saving assistant message:', assistantError);
-      return;
+      // 不要return，继续执行
     }
 
     console.log('✅ Messages saved successfully');
