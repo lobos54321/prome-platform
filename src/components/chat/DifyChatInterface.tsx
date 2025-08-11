@@ -360,8 +360,8 @@ export function DifyChatInterface({
     try {
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
       
-      // 从云端加载完整的对话数据
-      const conversationWithMessages = await cloudChatHistory.getConversationWithMessages(conversationId);
+      // 使用云端服务的专用函数加载历史对话（包含Dify状态恢复）
+      const conversationWithMessages = await cloudChatHistory.loadConversationFromHistory(conversationId);
       
       if (!conversationWithMessages) {
         console.warn('Conversation not found in cloud:', conversationId);
@@ -396,10 +396,7 @@ export function DifyChatInterface({
         syncStatus: 'idle'
       }));
 
-      // 更新 localStorage 中的 Dify 对话ID
-      if (conversationWithMessages.dify_conversation_id) {
-        localStorage.setItem('dify_conversation_id', conversationWithMessages.dify_conversation_id);
-      }
+      // Dify对话ID和工作流状态恢复已在cloudChatHistory.loadConversationFromHistory中处理
 
       console.log(`📖 已从云端加载对话: ${conversationWithMessages.title} (${convertedMessages.length} 条消息)`);
     } catch (error) {

@@ -154,7 +154,7 @@ class CloudChatHistoryService {
       metadata?: Record<string, any>;
     }>,
     workflowState?: Record<string, any>,
-    difyCOnversationId?: string
+    difyConversationId?: string
   ): Promise<string> {
     await this.setCurrentDeviceId();
     
@@ -165,7 +165,7 @@ class CloudChatHistoryService {
     const conversationData = {
       device_id: this.deviceId,
       title,
-      dify_conversation_id: difyCOnversationId,
+      dify_conversation_id: difyConversationId,
       message_count: messages.length,
       last_message: lastMessage?.content || '',
       last_message_time: lastMessage?.timestamp.toISOString() || new Date().toISOString(),
@@ -379,6 +379,37 @@ class CloudChatHistoryService {
     if (error) {
       console.warn('Failed to update device activity:', error);
     }
+  }
+
+  /**
+   * 加载历史对话并恢复Dify对话状态
+   */
+  async loadConversationFromHistory(conversationId: string): Promise<ConversationWithMessages | null> {
+    console.log('[Chat Debug] 🔄 开始加载历史对话:', conversationId);
+    
+    const conversationWithMessages = await this.getConversationWithMessages(conversationId);
+    if (!conversationWithMessages) {
+      console.log('[Chat Debug] ❌ 历史对话未找到');
+      return null;
+    }
+
+    // 🚨 关键修复：正确恢复Dify对话ID以保持对话连续性
+    if (conversationWithMessages.dify_conversation_id) {
+      localStorage.setItem('dify_conversation_id', conversationWithMessages.dify_conversation_id);
+      localStorage.setItem('dify_conversation_id_streaming', conversationWithMessages.dify_conversation_id);
+      console.log('[Chat Debug] ✅ 恢复Dify对话ID:', conversationWithMessages.dify_conversation_id);
+    } else {
+      console.log('[Chat Debug] ⚠️ 历史对话没有Dify对话ID，可能会从头开始');
+    }
+
+    // 恢复工作流状态
+    if (conversationWithMessages.workflow_state) {
+      localStorage.setItem('dify_workflow_state', JSON.stringify(conversationWithMessages.workflow_state));
+      console.log('[Chat Debug] ✅ 恢复工作流状态:', conversationWithMessages.workflow_state);
+    }
+
+    console.log(`[Chat Debug] ✅ 历史对话加载完成: ${conversationWithMessages.title} (${conversationWithMessages.messages.length} 条消息)`);
+    return conversationWithMessages;
   }
 
   /**
