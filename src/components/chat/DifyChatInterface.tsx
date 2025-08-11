@@ -592,20 +592,6 @@ export function DifyChatInterface({
                 hasReceivedData = true;
               }
               
-              // 检查conversation_id
-              if (parsed.conversation_id && 
-                  (!detectedConversationId || parsed.conversation_id !== detectedConversationId)) {
-                console.log('[Chat Debug] Updating conversation ID from', detectedConversationId, 'to', parsed.conversation_id);
-                detectedConversationId = parsed.conversation_id;
-                setConversationId(parsed.conversation_id);
-                
-                // Store conversation ID for continuity
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('dify_conversation_id', parsed.conversation_id);
-                  console.log('[Chat Debug] Stored JSON conversation ID:', parsed.conversation_id);
-                }
-              }
-              
               // 处理工作流事件 - 修复事件数据结构
               if (parsed.event === 'node_started' && parsed.data?.node_id) {
                 console.log('[Chat Debug] Workflow node started:', parsed.data.node_id, parsed.data.title);
@@ -708,36 +694,6 @@ export function DifyChatInterface({
                     }
                   }
 
-                  // 处理工作流节点事件 - 修复事件数据结构
-                  if (parsed.event === 'node_started' && parsed.data?.node_id) {
-                    console.log('[Chat Debug] Node started:', parsed.data.node_id, parsed.data.title);
-                    updateWorkflowProgress({
-                      nodeId: parsed.data.node_id,
-                      nodeName: parsed.data.title || parsed.data.node_id,
-                      nodeTitle: parsed.data.title,
-                      nodeType: parsed.data.node_type,
-                      status: 'running',
-                      startTime: new Date()
-                    });
-                  } else if (parsed.event === 'node_finished' && parsed.data?.node_id) {
-                    console.log('[Chat Debug] Node finished:', parsed.data.node_id, parsed.data.status);
-                    updateWorkflowProgress({
-                      nodeId: parsed.data.node_id,
-                      nodeName: parsed.data.title || parsed.data.node_id,
-                      nodeTitle: parsed.data.title,
-                      nodeType: parsed.data.node_type,
-                      status: parsed.data.status === 'succeeded' ? 'completed' : 'failed',
-                      endTime: new Date()
-                    });
-                  } else if (parsed.event === 'node_failed' && parsed.data?.node_id) {
-                    console.log('[Chat Debug] Node failed:', parsed.data.node_id, parsed.data.error);
-                    updateWorkflowProgress({
-                      nodeId: parsed.data.node_id,
-                      status: 'failed',
-                      endTime: new Date(),
-                      error: parsed.data.error || '节点执行失败'
-                    });
-                  }
 
                   // 🔧 修复：正确解析和累积消息内容 - 处理DIFY流格式
                   if (parsed.event === 'message' && parsed.answer) {
