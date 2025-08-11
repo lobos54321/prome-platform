@@ -112,6 +112,49 @@ export function DifyChatInterface({
           isLoading,
           error
         }),
+        // 🔧 新增：测试对话流程的工具
+        testWorkflowPath: async (message = '你好') => {
+          const userId = 'workflow-test-' + Date.now();
+          console.log('🧪 测试工作流路径，用户ID:', userId);
+          
+          const response = await fetch('/api/dify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              message: message,
+              user: userId,
+              conversation_id: null,
+              stream: false
+            })
+          });
+          
+          const data = await response.json();
+          console.log('🧪 工作流测试结果:');
+          console.log('- 回答:', data.answer?.substring(0, 200));
+          console.log('- 对话ID:', data.conversation_id);
+          console.log('- 元数据:', data.metadata);
+          
+          return data;
+        },
+        
+        // 🔧 新增：检查用户是否真正进行过有意义对话
+        checkRealConversation: () => {
+          const hasRealMessages = messages.length > 1 && 
+            messages.some(m => m.role === 'user' && 
+              m.content.length > 2 && 
+              !['你好', 'hello', 'hi'].includes(m.content.toLowerCase()));
+          
+          const lastActivity = localStorage.getItem('dify_last_real_activity');
+          const now = Date.now();
+          const hasRecentActivity = lastActivity && (now - parseInt(lastActivity)) < 30 * 60 * 1000; // 30分钟
+          
+          return {
+            hasRealMessages,
+            hasRecentActivity,
+            shouldReset: !hasRealMessages && !hasRecentActivity
+          };
+        },
+        
         // 🔧 新增：强制重置所有状态的函数
         hardReset: () => {
           console.log('[Debug] Performing hard reset of all chat state...');
@@ -126,17 +169,17 @@ export function DifyChatInterface({
             completedNodes: 0
           });
           
-          // 清除所有localStorage数据
-          Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('dify_')) {
-              localStorage.removeItem(key);
-            }
+          // 清除所有localStorage和sessionStorage数据
+          ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_workflow_state', 'dify_session_timestamp'].forEach(key => {
+            localStorage.removeItem(key);
+            sessionStorage.removeItem(key);
           });
           
           // 重新初始化用户ID
           const newUserId = generateUUID();
           setUserId(newUserId);
           localStorage.setItem('dify_user_id', newUserId);
+          localStorage.setItem('dify_session_timestamp', Date.now().toString());
           
           console.log('[Debug] Hard reset completed. New user ID:', newUserId);
           return { success: true, newUserId };
@@ -149,27 +192,27 @@ export function DifyChatInterface({
   useEffect(() => {
     const initUserIdAndSession = () => {
       if (typeof window !== 'undefined') {
-        // 初始化用户ID
-        const stored = localStorage.getItem('dify_user_id');
-        if (stored && isValidUUID(stored)) {
-          setUserId(stored);
-        } else {
-          // 🔧 修复：生成有效的UUID而不是随机字符串
-          const newId = generateUUID();
-          setUserId(newId);
-          localStorage.setItem('dify_user_id', newId);
-          console.log('[Chat Debug] Generated new valid user UUID:', newId);
-        }
         
-        // 恢复会话状态 - 确保会话连续性
-        const restoredConversationId = localStorage.getItem('dify_conversation_id');
+        // 🚨 最激进的修复：页面加载时立即强制重置所有状态
+        console.log('[Chat Debug] 🚨 页面初始化 - 强制清理所有Dify状态');
         
-        if (restoredConversationId && isValidUUID(restoredConversationId)) {
-          console.log('[Chat Debug] Restored conversation ID from localStorage:', restoredConversationId);
-          setConversationId(restoredConversationId);
-        } else {
-          console.log('[Chat Debug] No valid conversation ID found in localStorage');
-        }
+        // 激进清理：无条件删除所有dify相关数据
+        ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_session_timestamp', 'dify_workflow_state', 'dify_last_real_activity', 'dify_last_visit'].forEach(key => {
+          if (localStorage.getItem(key)) {
+            console.log(`[Chat Debug] 清除 ${key}:`, localStorage.getItem(key));
+            localStorage.removeItem(key);
+          }
+          sessionStorage.removeItem(key);
+        });
+        
+        // 生成全新用户ID
+        const freshUserId = 'auto-reset-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+        setUserId(freshUserId);
+        localStorage.setItem('dify_user_id', freshUserId);
+        localStorage.setItem('dify_last_visit', Date.now().toString());
+        localStorage.setItem('dify_session_timestamp', Date.now().toString());
+        
+        console.log('[Chat Debug] 🔥 强制重置完成，新用户ID:', freshUserId);
         
         setIsUserIdReady(true);
         return;
@@ -187,6 +230,7 @@ export function DifyChatInterface({
     
     initUserIdAndSession();
   }, []);
+  
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -196,6 +240,25 @@ export function DifyChatInterface({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // 🔧 新增：快捷键支持 Ctrl+N 或 Cmd+N 开始新对话
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+N (Windows/Linux) 或 Cmd+N (Mac) 开始新对话
+      if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
+        event.preventDefault();
+        handleNewConversation();
+        console.log('[Chat Debug] New conversation started via keyboard shortcut');
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, []);
 
   // 添加欢迎消息 - 等待 userId 准备完成
   useEffect(() => {
@@ -272,6 +335,35 @@ export function DifyChatInterface({
     }
     
     try {
+      // 🔧 关键修复：检查是否应该强制开始新对话
+      // 如果messages为空（除了欢迎消息），且没有有效的conversationId，确保真正开始新对话
+      const hasRealMessages = messages.length > 0 && messages.some(m => m.id !== 'welcome');
+      const shouldForceNewConversation = !hasRealMessages && !conversationId;
+      
+      if (shouldForceNewConversation) {
+        console.log('[Chat Debug] 🔥 FORCING NEW CONVERSATION - clearing any existing state');
+        
+        // 强制清除所有可能干扰的状态，包括用户ID
+        ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_session_timestamp', 'dify_workflow_state'].forEach(key => {
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        });
+        
+        // 🔥 关键：生成新的用户ID，确保后端认为这是全新用户  
+        const newUserId = generateUUID();
+        setUserId(newUserId);
+        localStorage.setItem('dify_user_id', newUserId);
+        
+        // 重置conversation ID状态
+        setConversationId(null);
+        
+        // 设置新的session时间戳
+        localStorage.setItem('dify_session_timestamp', Date.now().toString());
+        
+        console.log('[Chat Debug] 🔥 GENERATED NEW USER ID for forced fresh conversation:', newUserId);
+        console.log('[Chat Debug] ✅ All state cleared for fresh conversation');
+      }
+      
       // Check if we have a valid conversation ID for targeted API calls
       // Always use generic endpoint - let backend handle conversation ID consistency
       const endpoint = '/api/dify';
@@ -414,6 +506,7 @@ export function DifyChatInterface({
               // Store the conversation ID for future requests
               if (typeof window !== 'undefined') {
                 localStorage.setItem('dify_conversation_id', data.conversation_id);
+                localStorage.setItem('dify_session_timestamp', Date.now().toString());
                 console.log('[Chat Debug] Stored fallback conversation ID:', data.conversation_id);
               }
             }
@@ -1009,6 +1102,12 @@ export function DifyChatInterface({
     setIsLoading(true);
     setError(null);
     setRetryCount(0);
+    
+    // 🔥 记录真实的用户活动时间戳（不是"你好"这种测试消息）
+    if (input.length > 2 && !['你好', 'hello', 'hi', 'test'].includes(input.toLowerCase().trim())) {
+      localStorage.setItem('dify_last_real_activity', Date.now().toString());
+      console.log('[Chat Debug] 记录真实用户活动:', input.substring(0, 20));
+    }
 
     try {
       await sendMessageWithRetry(userMessage.content);
@@ -1074,20 +1173,32 @@ export function DifyChatInterface({
       completedNodes: 0
     });
     
-    // 🔧 修复：清除存储的会话状态，确保下次是全新开始
+    // 🔧 关键修复：清除所有会话状态，包括用户ID，确保完全新的对话
     if (typeof window !== 'undefined') {
       const keysToRemove = [
         'dify_conversation_id',
-        'dify_workflow_state'
+        'dify_conversation_id_streaming', 
+        'dify_user_id', // 🔥 关键：也清除用户ID
+        'dify_workflow_state',
+        'dify_session_timestamp'
       ];
       
       keysToRemove.forEach(key => {
         if (localStorage.getItem(key)) {
           localStorage.removeItem(key);
-          console.log('[Chat Debug] Removed', key, 'from localStorage');
+          sessionStorage.removeItem(key); // 同时清除sessionStorage
+          console.log('[Chat Debug] Removed', key, 'from localStorage and sessionStorage');
         }
       });
       
+      // 🔥 关键：生成新的用户ID，确保后端认为这是全新用户
+      const newUserId = generateUUID();
+      setUserId(newUserId);
+      localStorage.setItem('dify_user_id', newUserId);
+      localStorage.setItem('dify_session_timestamp', Date.now().toString());
+      
+      console.log('[Chat Debug] 🔥 GENERATED NEW USER ID for fresh conversation:', newUserId);
+      console.log('[Chat Debug] Set new session timestamp for fresh conversation');
       console.log('[Chat Debug] Cleared stored conversation and workflow state');
     }
     
@@ -1154,8 +1265,8 @@ export function DifyChatInterface({
         </div>
         <button
           onClick={handleNewConversation}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all"
-          title="Start New Conversation"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm hover:shadow-md"
+          title="Start New Conversation (Ctrl+N or Cmd+N)"
         >
           <RotateCcw className="w-4 h-4" />
           New Chat
@@ -1330,9 +1441,9 @@ export function DifyChatInterface({
               <button
                 onClick={handleNewConversation}
                 disabled={isLoading}
-                className="inline-flex items-center gap-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all disabled:opacity-50 shadow-sm hover:shadow-md"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-4 h-4" />
                 新对话
               </button>
               
