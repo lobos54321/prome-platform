@@ -93,6 +93,183 @@ const WORKFLOW_TIMEOUT = parseInt(process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS) || 
 const STREAMING_TIMEOUT = parseInt(process.env.VITE_DIFY_STREAMING_TIMEOUT_MS) || 240000; // 4 minutes for streaming responses
 const MAX_RETRIES = parseInt(process.env.VITE_DIFY_MAX_RETRIES) || 3;
 
+// Context length management - Prevent token overflow
+const MAX_CONTEXT_TOKENS = parseInt(process.env.VITE_MAX_CONTEXT_TOKENS) || 6000; // 保留安全边界
+const TOKEN_ESTIMATION_RATIO = 0.75; // 1个token约等于0.75个字符（中文）
+
+// 估算文本的token数量
+function estimateTokens(text) {
+  if (!text) return 0;
+  // 对于中文，大约1个字符 = 1.3个token
+  // 对于英文，大约1个字符 = 0.25个token  
+  // 使用混合估算：假设50%中文，50%英文
+  const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const otherChars = text.length - chineseChars;
+  return Math.ceil(chineseChars * 1.3 + otherChars * 0.25);
+}
+
+// 智能截断对话历史，保持上下文连贯性
+async function manageConversationContext(conversationId, newMessage) {
+  // Initialize Supabase if configured
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.log('⚠️  Context management skipped (Supabase not configured)');
+    return null;
+  }
+  
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  try {
+    // 获取对话历史（按时间倒序）
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('id, role, content, created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(50); // 最多检查最近50条消息
+
+    if (error) {
+      console.warn('⚠️  Failed to fetch conversation history for context management:', error);
+      return null;
+    }
+
+    if (!messages || messages.length === 0) {
+      console.log('📊 New conversation, no context management needed');
+      return null;
+    }
+
+    // 估算当前对话的总token数
+    let totalTokens = estimateTokens(newMessage);
+    let messagesToKeep = [];
+    let truncatedCount = 0;
+    let incompleteAnswerFound = false;
+
+    // 从最新消息开始，累加token直到达到限制
+    for (const message of messages) {
+      const messageTokens = estimateTokens(message.content);
+      
+      // 检查是否有未完整的回答（答案突然截断的特征）
+      if (message.role === 'assistant' && message.content) {
+        const content = message.content.trim();
+        // 检查答案是否可能被截断：没有适当的结尾标点、突然中断的句子等
+        if (content.length > 100 && 
+            !content.match(/[。！？\.\!\?]$/) && 
+            !content.includes('完成') && 
+            !content.includes('结束')) {
+          incompleteAnswerFound = true;
+          console.log('🚨 检测到可能未完整的回答，将优先保留');
+        }
+      }
+      
+      if (totalTokens + messageTokens > MAX_CONTEXT_TOKENS) {
+        // 如果发现未完整的回答，调整策略
+        if (incompleteAnswerFound && messagesToKeep.length > 0) {
+          // 优先保留最近的完整对话对（用户问题+AI回答）
+          console.log('🔄 调整上下文策略：优先保留未完整的回答');
+          // 保留最后3轮对话以确保上下文连贯性
+          const recentPairs = Math.min(6, messagesToKeep.length); // 3轮=6条消息
+          messagesToKeep = messagesToKeep.slice(0, recentPairs);
+          totalTokens = estimateTokens(newMessage) + messagesToKeep.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
+        }
+        
+        truncatedCount = messages.length - messagesToKeep.length;
+        break;
+      }
+      
+      totalTokens += messageTokens;
+      messagesToKeep.unshift(message); // 添加到开头，保持时间顺序
+    }
+
+    if (truncatedCount > 0) {
+      console.log(`🔄 Context management: keeping ${messagesToKeep.length} messages, truncating ${truncatedCount} older messages`);
+      console.log(`📊 Estimated total tokens: ${totalTokens}/${MAX_CONTEXT_TOKENS}`);
+      
+      // 根据是否有未完整回答调整提示信息  
+      let truncationNote;
+      if (incompleteAnswerFound) {
+        truncationNote = `[系统提示：检测到之前的回答可能因上下文限制被截断，已优先保留最近的对话。如需获得完整回答，建议开始新对话重新提问]`;
+      } else {
+        truncationNote = `[系统提示：为避免上下文溢出，已自动整理了前面的 ${truncatedCount} 条历史消息。如需完整对话历史，建议开始新对话]`;
+      }
+      
+      return {
+        truncated: true,
+        truncatedCount,
+        totalTokens,
+        messagesToKeep,
+        truncationNote,
+        incompleteAnswerDetected: incompleteAnswerFound
+      };
+    }
+
+    console.log(`📊 Context check: ${totalTokens} tokens, within limit`);
+    return {
+      truncated: false,
+      totalTokens,
+      messagesToKeep: messages.reverse(), // 恢复时间顺序
+      truncationNote: null,
+      incompleteAnswerDetected: incompleteAnswerFound
+    };
+
+  } catch (error) {
+    console.error('❌ Context management error:', error);
+    return null;
+  }
+}
+
+// 检测并警告上下文溢出风险
+async function detectContextOverflowRisk(conversationId, newMessage) {
+  // Initialize Supabase if configured
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+  
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  try {
+    // 获取对话历史总token数
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('content')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error || !messages) {
+      return null;
+    }
+
+    // 计算总token数
+    let totalTokens = estimateTokens(newMessage);
+    messages.forEach(msg => {
+      totalTokens += estimateTokens(msg.content || '');
+    });
+
+    // 检查是否接近Dify的token限制（通常是8192）
+    const DIFY_TOKEN_LIMIT = 8192;
+    const riskThreshold = DIFY_TOKEN_LIMIT * 0.8; // 80%阈值
+
+    if (totalTokens > riskThreshold) {
+      console.log(`⚠️ Context overflow risk detected: ${totalTokens}/${DIFY_TOKEN_LIMIT} tokens`);
+      
+      return {
+        isAtRisk: true,
+        currentTokens: totalTokens,
+        limit: DIFY_TOKEN_LIMIT,
+        riskLevel: totalTokens > DIFY_TOKEN_LIMIT * 0.9 ? 'high' : 'medium',
+        suggestion: totalTokens > DIFY_TOKEN_LIMIT * 0.9 
+          ? '建议开始新对话以避免输出被截断'
+          : '即将达到上下文限制，复杂回答可能被截断'
+      };
+    }
+
+    return { isAtRisk: false, currentTokens: totalTokens };
+
+  } catch (error) {
+    console.error('❌ Error detecting context overflow risk:', error);
+    return null;
+  }
+}
+
 // Database health check function
 async function checkDatabaseHealth(supabase) {
   if (!supabase) {
@@ -590,6 +767,74 @@ app.post('/api/dify/chat/mock', (req, res) => {
   res.json(mockResponse);
 });
 
+// Context status endpoint - 让前端可以检查对话的token状态
+app.get('/api/dify/:conversationId/context-status', async (req, res) => {
+  const { conversationId } = req.params;
+  
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.json({ 
+        error: 'Database not configured',
+        hasContext: false 
+      });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // 获取对话历史
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('content, created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch conversation history' });
+    }
+
+    if (!messages || messages.length === 0) {
+      return res.json({
+        hasContext: false,
+        totalTokens: 0,
+        messageCount: 0,
+        riskLevel: 'none'
+      });
+    }
+
+    // 计算总token数
+    let totalTokens = 0;
+    messages.forEach(msg => {
+      totalTokens += estimateTokens(msg.content || '');
+    });
+
+    const DIFY_TOKEN_LIMIT = 8192;
+    const riskLevel = totalTokens > DIFY_TOKEN_LIMIT * 0.9 ? 'high' : 
+                     totalTokens > DIFY_TOKEN_LIMIT * 0.7 ? 'medium' : 'low';
+
+    let suggestion = null;
+    if (riskLevel === 'high') {
+      suggestion = '建议开始新对话以避免输出被截断';
+    } else if (riskLevel === 'medium') {
+      suggestion = '即将达到上下文限制，复杂回答可能被截断';
+    }
+
+    res.json({
+      hasContext: true,
+      totalTokens,
+      messageCount: messages.length,
+      riskLevel,
+      suggestion,
+      tokenLimit: DIFY_TOKEN_LIMIT,
+      utilizationPercent: Math.round((totalTokens / DIFY_TOKEN_LIMIT) * 100)
+    });
+
+  } catch (error) {
+    console.error('Context status check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Configuration debug endpoint
 app.get('/api/config/status', async (req, res) => {
   // Initialize Supabase for health check
@@ -680,6 +925,36 @@ app.post('/api/dify', async (req, res) => {
       stream: stream,
       user: getValidUserId(user)
     };
+
+    // Detect context overflow risk before processing
+    let overflowRisk = await detectContextOverflowRisk(conversationId, actualMessage);
+    if (overflowRisk && overflowRisk.isAtRisk) {
+      console.log(`⚠️ ${overflowRisk.suggestion} (${overflowRisk.currentTokens}/${overflowRisk.limit} tokens)`);
+    }
+
+    // Context length management - Check and manage conversation history before API call
+    let contextManagementResult = null;
+    if (supabase && actualMessage) {
+      contextManagementResult = await manageConversationContext(conversationId, actualMessage);
+      
+      if (contextManagementResult && contextManagementResult.truncated) {
+        console.log(`📊 Context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
+      }
+    }
+    
+    // 🚨 EMERGENCY FALLBACK: If context management failed and we're at high risk, force new conversation
+    if (!contextManagementResult && overflowRisk && overflowRisk.isAtRisk && overflowRisk.currentTokens > 8000) {
+      console.log(`🚨 EMERGENCY: Context management failed and tokens (${overflowRisk.currentTokens}) exceed safe limit`);
+      console.log('🔄 Forcing new conversation to prevent API failure');
+      
+      // Clear the conversation_id to force a new conversation
+      delete requestBody.conversation_id;
+      difyConversationId = null;
+      
+      // Generate a new conversation ID for our records
+      conversationId = generateUUID();
+      console.log(`🆕 Emergency new conversation ID: ${conversationId}`);
+    }
 
     // Only add conversation_id if it exists and is valid
     if (difyConversationId && supabase) {
@@ -855,6 +1130,11 @@ app.post('/api/dify', async (req, res) => {
       
       // Then save messages using Dify's conversation_id only if conversation was successfully created/exists
       if (conversationCreated !== false) {
+        // Add context truncation note if context was managed
+        if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+          data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
+        }
+        
         await saveMessages(supabase, effectiveConversationId, actualMessage, data);
       } else {
         console.error('⚠️ Skipping message save due to conversation creation failure');
@@ -936,6 +1216,16 @@ app.post('/api/dify/workflow', async (req, res) => {
       response_mode: stream ? 'streaming' : 'blocking',
       user: getValidUserId(user)
     };
+
+    // Context length management - Check and manage conversation history before API call
+    let contextManagementResult = null;
+    if (supabase && actualMessage) {
+      contextManagementResult = await manageConversationContext(conversationId, actualMessage);
+      
+      if (contextManagementResult && contextManagementResult.truncated) {
+        console.log(`📊 Workflow context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
+      }
+    }
 
     // 🔧 修复工作流对话连续性：正确处理conversation_id
     if (difyConversationId) {
@@ -1030,6 +1320,11 @@ app.post('/api/dify/workflow', async (req, res) => {
                     if (finalData && supabase) {
                       // Ensure conversation exists first
                       await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
+                      
+                      // Add context truncation note if context was managed
+                      if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+                        finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+                      }
                       
                       // Then save messages
                       await saveMessages(supabase, conversationId, actualMessage, finalData);
@@ -1151,6 +1446,11 @@ app.post('/api/dify/workflow', async (req, res) => {
           // First ensure conversation record exists
           await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
           
+          // Add context truncation note if context was managed
+          if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+            data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || data.data?.outputs?.answer || 'Workflow completed');
+          }
+          
           // Then save messages
           await saveMessages(supabase, conversationId, actualMessage, data);
         }
@@ -1233,6 +1533,35 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       
       conversationRow = newConversationRow;
       difyConversationId = conversationRow?.dify_conversation_id || null;
+    }
+
+    // Detect context overflow risk before processing
+    let overflowRisk = await detectContextOverflowRisk(conversationId, message);
+    if (overflowRisk && overflowRisk.isAtRisk) {
+      console.log(`⚠️ ${overflowRisk.suggestion} (${overflowRisk.currentTokens}/${overflowRisk.limit} tokens)`);
+    }
+
+    // Context length management - Check and manage conversation history before API call
+    let contextManagementResult = null;
+    if (supabase && message) {
+      contextManagementResult = await manageConversationContext(conversationId, message);
+      
+      if (contextManagementResult && contextManagementResult.truncated) {
+        console.log(`📊 Context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
+      }
+    }
+    
+    // 🚨 EMERGENCY FALLBACK for streaming: If context management failed and we're at high risk, force new conversation
+    if (!contextManagementResult && overflowRisk && overflowRisk.isAtRisk && overflowRisk.currentTokens > 8000) {
+      console.log(`🚨 STREAM EMERGENCY: Context management failed and tokens (${overflowRisk.currentTokens}) exceed safe limit`);
+      console.log('🔄 Forcing new conversation to prevent streaming API failure');
+      
+      // Clear the conversation_id to force a new conversation
+      difyConversationId = null;
+      
+      // Generate a new conversation ID for our records
+      conversationId = generateUUID();
+      console.log(`🆕 Stream emergency new conversation ID: ${conversationId}`);
     }
 
     const requestBody = {
@@ -1449,7 +1778,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
                   // Ensure conversation exists first
                   await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
                   
-                  // Then save messages
+                  // Add context truncation note if context was managed
+                  if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+                    finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+                  }
+                  
+                  // Then save messages (use original message, not modified continue prompt)
                   await saveMessages(supabase, conversationId, message, finalData);
                 }
                 
@@ -1579,6 +1913,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
             
             // Save messages to database
             await ensureConversationExists(supabase, conversationId, completeResponse.conversation_id, getValidUserId(req.body.user));
+            
+            // Add context truncation note if context was managed
+            if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+              finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+            }
+            
             await saveMessages(supabase, conversationId, message, finalData);
             
             res.write(`data: [DONE]\n\n`);
@@ -1604,6 +1944,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
         // Save to database
         try {
           await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
+          
+          // Add context truncation note if context was managed
+          if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+            finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+          }
+          
           await saveMessages(supabase, conversationId, message, finalData);
           console.log('✅ Successfully saved conversation_id in finally block');
         } catch (saveError) {
@@ -1670,6 +2016,35 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       
       conversationRow = newConversationRow;
       difyConversationId = conversationRow?.dify_conversation_id || null;
+    }
+
+    // Detect context overflow risk before processing
+    let overflowRisk = await detectContextOverflowRisk(conversationId, message);
+    if (overflowRisk && overflowRisk.isAtRisk) {
+      console.log(`⚠️ ${overflowRisk.suggestion} (${overflowRisk.currentTokens}/${overflowRisk.limit} tokens)`);
+    }
+
+    // Context length management - Check and manage conversation history before API call
+    let contextManagementResult = null;
+    if (supabase && message) {
+      contextManagementResult = await manageConversationContext(conversationId, message);
+      
+      if (contextManagementResult && contextManagementResult.truncated) {
+        console.log(`📊 Context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
+      }
+    }
+    
+    // 🚨 EMERGENCY FALLBACK for chat: If context management failed and we're at high risk, force new conversation
+    if (!contextManagementResult && overflowRisk && overflowRisk.isAtRisk && overflowRisk.currentTokens > 8000) {
+      console.log(`🚨 CHAT EMERGENCY: Context management failed and tokens (${overflowRisk.currentTokens}) exceed safe limit`);
+      console.log('🔄 Forcing new conversation to prevent chat API failure');
+      
+      // Clear the conversation_id to force a new conversation  
+      difyConversationId = null;
+      
+      // Generate a new conversation ID for our records
+      conversationId = generateUUID();
+      console.log(`🆕 Chat emergency new conversation ID: ${conversationId}`);
     }
 
     const requestBody = {
@@ -1777,6 +2152,11 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     if (supabase) {
       // First ensure conversation record exists
       await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(req.body.user));
+      
+      // Add context truncation note if context was managed
+      if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+        data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
+      }
       
       // Then save messages  
       await saveMessages(supabase, conversationId, message, data);
