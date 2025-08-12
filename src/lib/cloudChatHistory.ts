@@ -131,23 +131,21 @@ class CloudChatHistoryService {
    * 设置当前设备ID到Supabase会话
    */
   private async setCurrentDeviceId(): Promise<void> {
-    try {
-      const { error } = await this.supabase.rpc('set_config', {
-        setting_name: 'app.current_device_id',
-        setting_value: this.deviceId
-      });
-      
-      if (error) {
-        // 如果函数不存在，静默处理（数据库过滤仍然基于device_id字段）
-        if (error.code === 'PGRST202') {
-          console.log('[Chat Debug] set_config函数未找到，使用直接过滤方式');
-          return;
-        }
-        console.warn('Failed to set device ID in session:', error);
-      }
-    } catch (error) {
-      console.warn('Error setting device ID in session:', error);
-    }
+    // 暂时禁用会话设置，直接使用device_id字段过滤
+    // 用户可稍后执行database/chat-history-schema.sql中的SQL来启用会话功能
+    console.log('[Chat Debug] 使用device_id直接过滤，跳过会话设置');
+    return;
+    
+    /* 如果需要启用会话功能，请在数据库中执行以下SQL：
+    CREATE OR REPLACE FUNCTION set_config(setting_name text, setting_value text)
+    RETURNS void AS $$
+    BEGIN
+        PERFORM set_config(setting_name, setting_value, false);
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+    
+    GRANT EXECUTE ON FUNCTION set_config(text, text) TO anon, authenticated;
+    */
   }
 
   /**
