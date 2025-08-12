@@ -746,7 +746,14 @@ class DatabaseService {
       if (error) {
         console.warn('Error getting model configs from database:', error);
         console.log('Falling back to mock model configs');
-        emitDatabaseError('获取模型配置', error);
+        
+        // 特别处理权限错误，不要触发数据库错误事件
+        if (error.code === '42501' || error.code === 'PGRST301') {
+          console.log('Database RLS policy blocking access, using mock data only');
+        } else {
+          emitDatabaseError('获取模型配置', error);
+        }
+        
         return await mockDb.getModelConfigs();
       }
 
@@ -857,6 +864,16 @@ class DatabaseService {
       };
     } catch (error) {
       console.error('Error adding model config:', error);
+      // 如果是权限错误，回退到mock数据库
+      if (error && typeof error === 'object' && 'code' in error) {
+        const dbError = error as { code: string };
+        if (dbError.code === '42501' || dbError.code === 'PGRST301' || dbError.code === '42P01') {
+          console.log('Database permission error, falling back to mock database for model config');
+          return await mockDb.addModelConfig(
+            modelName, inputTokenPrice, outputTokenPrice, adminId, serviceType, workflowCost, autoCreated
+          );
+        }
+      }
       return null;
     }
   }
