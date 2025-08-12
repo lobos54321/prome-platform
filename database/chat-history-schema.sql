@@ -66,22 +66,25 @@ ALTER TABLE chat_devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
--- 允许用户访问自己设备的数据
-CREATE POLICY "Users can access their own device data" ON chat_devices
-    FOR ALL USING (device_id = current_setting('app.current_device_id', true));
+-- 删除旧的RLS策略
+DROP POLICY IF EXISTS "Users can access their own device data" ON chat_devices;
+DROP POLICY IF EXISTS "Users can access their own conversations" ON chat_conversations;
+DROP POLICY IF EXISTS "Users can access their own messages" ON chat_messages;
 
--- 允许用户访问自己的对话
-CREATE POLICY "Users can access their own conversations" ON chat_conversations
-    FOR ALL USING (device_id = current_setting('app.current_device_id', true));
+-- 临时策略：允许匿名用户访问所有数据（基于应用层device_id过滤）
+-- 注意：这要求应用层确保正确的device_id过滤
+CREATE POLICY "Allow anonymous access" ON chat_devices
+    FOR ALL TO anon USING (true);
 
--- 允许用户访问自己对话的消息
-CREATE POLICY "Users can access their own messages" ON chat_messages
-    FOR ALL USING (
-        conversation_id IN (
-            SELECT id FROM chat_conversations 
-            WHERE device_id = current_setting('app.current_device_id', true)
-        )
-    );
+CREATE POLICY "Allow anonymous conversations" ON chat_conversations  
+    FOR ALL TO anon USING (true);
+
+CREATE POLICY "Allow anonymous messages" ON chat_messages
+    FOR ALL TO anon USING (true);
+
+-- 如果启用了认证用户，可以添加更严格的策略
+-- CREATE POLICY "Authenticated users access own data" ON chat_devices
+--     FOR ALL TO authenticated USING (device_id = current_setting('app.current_device_id', true));
 
 -- 8. 创建用于会话管理的辅助函数
 CREATE OR REPLACE FUNCTION set_config(setting_name text, setting_value text)
