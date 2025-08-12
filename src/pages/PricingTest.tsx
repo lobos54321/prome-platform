@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Calculator, TrendingUp, AlertTriangle } from 'lucide-react';
-import { db } from '@/lib/db';
+import { db } from '@/lib/supabase';
 
 interface PriceComparison {
   modelName: string;
@@ -37,6 +37,7 @@ export default function PricingTest() {
   const [outputTokens, setOutputTokens] = useState(2000);
   const [comparisons, setComparisons] = useState<PriceComparison[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 模拟Dify原价 (实际情况下这些数据来自Dify API)
   const difyPricing: Record<string, { input: number; output: number }> = {
@@ -48,6 +49,7 @@ export default function PricingTest() {
 
   const calculateComparison = async () => {
     setLoading(true);
+    setError(null);
     try {
       const modelConfigs = await db.getModelConfigs();
       const exchangeRate = 10000;
@@ -93,6 +95,7 @@ export default function PricingTest() {
       setComparisons(results);
     } catch (error) {
       console.error('Failed to calculate price comparison:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load model configurations');
     } finally {
       setLoading(false);
     }
@@ -147,7 +150,28 @@ export default function PricingTest() {
           </CardContent>
         </Card>
 
+        {/* 错误显示 */}
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-2" />
+                <h3 className="text-lg font-bold text-red-800 mb-2">
+                  测试工具暂不可用
+                </h3>
+                <p className="text-red-700 mb-4">
+                  {error}
+                </p>
+                <p className="text-sm text-red-600">
+                  功能仍然正常工作，只是无法显示对比数据。请检查数据库连接或联系管理员。
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* 对比结果 */}
+        {!error && (
         <div className="grid gap-6">
           {comparisons.map((comparison, index) => (
             <Card key={index} className="overflow-hidden">
@@ -251,6 +275,7 @@ export default function PricingTest() {
               </div>
             </CardContent>
           </Card>
+        )}
         )}
       </div>
     </div>
