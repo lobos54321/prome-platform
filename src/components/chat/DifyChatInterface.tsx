@@ -418,11 +418,26 @@ export function DifyChatInterface({
         console.log('[Chat Debug] ⚠️ 使用本地对话ID（无Dify ID）:', conversationWithMessages.id);
       }
       
-      setWorkflowState(conversationWithMessages.workflow_state as WorkflowState || {
-        isWorkflow: false,
-        nodes: [],
-        completedNodes: 0
-      });
+      // 🔧 修复：正确恢复工作流状态，保持节点进度
+      const restoredWorkflowState = conversationWithMessages.workflow_state;
+      if (restoredWorkflowState && typeof restoredWorkflowState === 'object') {
+        const workflowState: WorkflowState = {
+          isWorkflow: restoredWorkflowState.isWorkflow || false,
+          nodes: Array.isArray(restoredWorkflowState.nodes) ? restoredWorkflowState.nodes : [],
+          completedNodes: typeof restoredWorkflowState.completedNodes === 'number' ? restoredWorkflowState.completedNodes : 0,
+          totalNodes: typeof restoredWorkflowState.totalNodes === 'number' ? restoredWorkflowState.totalNodes : undefined,
+          currentNodeId: restoredWorkflowState.currentNodeId || undefined
+        };
+        setWorkflowState(workflowState);
+        console.log('[Chat Debug] ✅ 已恢复工作流状态:', workflowState);
+      } else {
+        setWorkflowState({
+          isWorkflow: false,
+          nodes: [],
+          completedNodes: 0
+        });
+        console.log('[Chat Debug] 📝 初始化新工作流状态');
+      }
       
       // 🚨 关键：防止后续的强制新对话逻辑清除我们刚恢复的状态
       console.log('[Chat Debug] 📋 已恢复历史对话，消息数:', convertedMessages.length);
@@ -683,9 +698,19 @@ export function DifyChatInterface({
   const sendMessageWithRetry = async (messageContent: string, currentRetry = 0): Promise<void> => {
     const maxRetries = enableRetry ? 3 : 0;
     
-    // 重置工作流状态以准备新的可能的工作流执行
-    if (currentRetry === 0) {
+    // 🔧 修复：只在真正开始新对话时重置工作流状态，不要破坏历史对话恢复的状态
+    const hasExistingWorkflow = workflowState.isWorkflow && workflowState.nodes.length > 0;
+    const isHistoryConversation = messages.length > 0 && conversationId;
+    
+    if (currentRetry === 0 && !hasExistingWorkflow && !isHistoryConversation) {
+      console.log('[Chat Debug] 🔄 重置工作流状态（新对话）');
       resetWorkflowState();
+    } else if (hasExistingWorkflow) {
+      console.log('[Chat Debug] 🔄 保持现有工作流状态（继续对话）', {
+        nodes: workflowState.nodes.length,
+        completedNodes: workflowState.completedNodes,
+        currentNode: workflowState.currentNodeId
+      });
     }
     
     try {
@@ -1801,7 +1826,7 @@ export function DifyChatInterface({
                         {conversation.lastMessage}
                       </p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                        <span>{conversation.messageCount} 条消息</span>
+                        <span>{Math.ceil(conversation.messageCount / 2)} 轮对话</span>
                         <span>{conversation.lastMessageTime.toLocaleDateString()}</span>
                       </div>
                     </div>
