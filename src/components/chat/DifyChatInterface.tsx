@@ -401,6 +401,13 @@ export function DifyChatInterface({
       
       // 🚨 关键：防止后续的强制新对话逻辑清除我们刚恢复的状态
       console.log('[Chat Debug] 📋 已恢复历史对话，消息数:', convertedMessages.length);
+      
+      // 🧪 测试：如果是工作流对话，添加额外信息
+      if (conversationWithMessages.workflow_state && conversationWithMessages.workflow_state.isWorkflow) {
+        console.log('[Chat Debug] 🔄 这是一个工作流对话，工作流状态:', conversationWithMessages.workflow_state);
+        console.log('[Chat Debug] 🔍 Dify对话ID:', difyConvId);
+        console.log('[Chat Debug] ⚡ 发送消息时将尝试继续此工作流...');
+      }
       setError(null);
       setIsLoading(false);
 
@@ -692,12 +699,17 @@ export function DifyChatInterface({
       const endpoint = '/api/dify';
       
       // Fix 3: Enhanced Error Handling and Debugging - Add comprehensive logging
+      const storedConversationId = localStorage.getItem('dify_conversation_id');
+      const storedWorkflowState = localStorage.getItem('dify_workflow_state');
+      
       console.log('[Chat Debug] Sending request:', {
         endpoint,
         messageContent: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
         userId,
         conversationId,
-        regularConversationId: localStorage.getItem('dify_conversation_id'),
+        storedConversationId,
+        hasStoredWorkflow: !!storedWorkflowState,
+        storedWorkflowState: storedWorkflowState ? JSON.parse(storedWorkflowState) : null,
         showWorkflowProgress,
         timestamp: new Date().toISOString()
       });
@@ -730,8 +742,8 @@ export function DifyChatInterface({
           query: messageContent,        // Standard field expected by Dify API
           message: messageContent,      // Keep for backward compatibility
           user: userId || 'default-user',
-          // Always pass conversation_id if we have one - let backend handle validation
-          conversation_id: conversationId || undefined,
+          // 🔧 关键修复：优先使用localStorage中的dify_conversation_id以确保对话连续性
+          conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
           response_mode: showWorkflowProgress ? 'streaming' : 'blocking',
           stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
           inputs: {}
