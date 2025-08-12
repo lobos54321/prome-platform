@@ -128,6 +128,33 @@ class CloudChatHistoryService {
   }
 
   /**
+   * 确保设备已注册到数据库
+   */
+  private async ensureDeviceRegistered(): Promise<void> {
+    try {
+      const { data: existingDevice } = await this.supabase
+        .from('chat_devices')
+        .select('device_id')
+        .eq('device_id', this.deviceId)
+        .single();
+
+      if (!existingDevice) {
+        // 设备不存在，注册新设备
+        const navigator_info = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        await this.registerDevice(this.deviceId, navigator_info);
+        console.log('[Chat Debug] ✅ 设备已注册:', this.deviceId);
+      } else {
+        console.log('[Chat Debug] ✅ 设备已存在:', this.deviceId);
+      }
+    } catch (error) {
+      // 如果查询失败，尝试注册设备（可能是首次注册）
+      const navigator_info = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      await this.registerDevice(this.deviceId, navigator_info);
+      console.log('[Chat Debug] ✅ 设备注册完成（fallback）:', this.deviceId);
+    }
+  }
+
+  /**
    * 设置当前设备ID到Supabase会话
    */
   private async setCurrentDeviceId(): Promise<void> {
@@ -163,6 +190,8 @@ class CloudChatHistoryService {
     workflowState?: Record<string, any>,
     difyConversationId?: string
   ): Promise<string> {
+    // 确保设备已注册
+    await this.ensureDeviceRegistered();
     await this.setCurrentDeviceId();
     
     const lastUserMessage = messages.filter(m => m.role === 'user').pop();
