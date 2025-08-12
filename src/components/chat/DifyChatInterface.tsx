@@ -701,6 +701,7 @@ export function DifyChatInterface({
       // Fix 3: Enhanced Error Handling and Debugging - Add comprehensive logging
       const storedConversationId = localStorage.getItem('dify_conversation_id');
       const storedWorkflowState = localStorage.getItem('dify_workflow_state');
+      const hasExistingConversation = storedConversationId || conversationId;
       
       console.log('[Chat Debug] Sending request:', {
         endpoint,
@@ -708,8 +709,10 @@ export function DifyChatInterface({
         userId,
         conversationId,
         storedConversationId,
+        hasExistingConversation: !!hasExistingConversation,
         hasStoredWorkflow: !!storedWorkflowState,
         storedWorkflowState: storedWorkflowState ? JSON.parse(storedWorkflowState) : null,
+        willProvideInputs: !!hasExistingConversation, // 🚨 新增：是否会提供inputs
         showWorkflowProgress,
         timestamp: new Date().toISOString()
       });
@@ -746,7 +749,20 @@ export function DifyChatInterface({
           conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
           response_mode: showWorkflowProgress ? 'streaming' : 'blocking',
           stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
-          inputs: {}
+          // 🚨 关键修复：为工作流用户交互节点提供inputs
+          inputs: (() => {
+            // 如果有现存的对话ID，这意味着是继续对话，需要提供inputs给用户交互节点
+            const hasExistingConversation = localStorage.getItem('dify_conversation_id') || conversationId;
+            if (hasExistingConversation) {
+              return {
+                user_input: messageContent,
+                query: messageContent,
+                text: messageContent
+              };
+            }
+            // 新对话时使用空inputs让Dify工作流正常启动
+            return {};
+          })()
         }),
         signal: controller.signal
       });
