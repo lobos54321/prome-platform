@@ -257,36 +257,23 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           timestamp: new Date().toISOString()
         });
         
-        // 🚨 临时措施：对于异常高的Token使用量，使用合理的上限
-        if (totalTokens > 50000) {
-          console.warn('⚠️ 应用Token使用量上限，从', totalTokens, '调整到 20000');
-          // 临时限制，避免巨额扣费
-          const adjustedTokens = 20000;
-          const ratio = adjustedTokens / totalTokens;
-          
-          // 按比例调整Token数量
-          const adjustedInputTokens = Math.round(inputTokens * ratio);
-          const adjustedOutputTokens = Math.round(outputTokens * ratio);
-          
-          console.log('📊 Token调整详情:', {
-            原始: { inputTokens, outputTokens, totalTokens },
-            调整后: { inputTokens: adjustedInputTokens, outputTokens: adjustedOutputTokens, total: adjustedTokens },
-            调整比例: ratio
-          });
-          
-          // 使用调整后的值
-          Object.assign(usage, {
-            prompt_tokens: adjustedInputTokens,
-            completion_tokens: adjustedOutputTokens,
-            total_tokens: adjustedTokens
-          });
-        }
+        // ✅ 不再人为限制Token数量 - 如果真实使用了这么多Token，就应该正确计费
+        console.log('📝 Token使用量分析:', {
+          是否为工作流: modelName.includes('workflow') || modelName.includes('chatflow'),
+          可能的原因: [
+            '长对话上下文',
+            '复杂工作流处理', 
+            '大量数据分析',
+            'Dify API返回累积用量'
+          ],
+          建议: '检查Dify API响应格式和工作流配置'
+        });
       }
 
-      // 🔄 重新解析可能已调整的Token数量
-      const finalInputTokens = usage.prompt_tokens;
-      const finalOutputTokens = usage.completion_tokens;
-      const finalTotalTokens = usage.total_tokens;
+      // ✅ 使用原始真实的Token数量（不做人为调整）
+      const finalInputTokens = inputTokens;
+      const finalOutputTokens = outputTokens;
+      const finalTotalTokens = totalTokens;
 
       // Parse costs - try to use Dify-provided pricing first
       let inputCost = 0;
@@ -433,28 +420,40 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         return { success: false, error: 'Invalid cost calculation' };
       }
 
-      // Safety check to prevent excessive deduction - 临时提高阈值用于调试
-      if (pointsToDeduct > 500000) { // 临时从10万提高到50万积分
-        console.error('🚨 Token成本异常高，详细信息:', {
+      // ✅ 高成本警告但允许正常计费 - 真实使用就应该正确收费
+      if (pointsToDeduct > 200000) { // 20万积分 ≈ $20 USD
+        console.warn('💰 高Token成本详细分析:', {
           modelName,
-          inputTokens,
-          outputTokens,
-          finalTotalTokens,
-          inputCost,
-          outputCost,
-          totalCost,
-          pointsToDeduct,
-          exchangeRate,
-          modelConfigUsed: modelConfig ? {
+          token_usage: {
+            input: finalInputTokens,
+            output: finalOutputTokens,
+            total: finalTotalTokens
+          },
+          cost_breakdown: {
+            inputCost: `$${inputCost.toFixed(4)}`,
+            outputCost: `$${outputCost.toFixed(4)}`,
+            totalCost: `$${totalCost.toFixed(4)}`,
+            pointsToDeduct,
+            exchangeRate
+          },
+          model_info: modelConfig ? {
             name: modelConfig.modelName,
-            inputPrice: modelConfig.inputTokenPrice,
-            outputPrice: modelConfig.outputTokenPrice,
-            autoCreated: modelConfig.autoCreated
-          } : 'none',
+            inputPrice: `$${modelConfig.inputTokenPrice}/1K`,
+            outputPrice: `$${modelConfig.outputTokenPrice}/1K`,
+            source: modelConfig.autoCreated ? 'auto_created' : 'manual_config'
+          } : 'default_pricing',
+          analysis: {
+            avg_cost_per_token: `$${(totalCost / finalTotalTokens).toFixed(6)}`,
+            is_workflow: modelName.includes('workflow') || modelName.includes('chatflow'),
+            suggestion: finalTotalTokens > 50000 ? '检查工作流设置和上下文管理' : '正常高使用量'
+          },
           conversationId,
+          messageId,
           timestamp: new Date().toISOString()
         });
-        return { success: false, error: `Token成本异常高 (${totalTokens} tokens, ${pointsToDeduct} 积分) - 请联系管理员检查` };
+        
+        // 💡 只记录警告，但允许继续正常扣费
+        console.log('✅ 继续正常Token计费 - 真实使用量应当正确收费');
       }
       
       // 警告：高Token使用量
