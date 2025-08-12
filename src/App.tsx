@@ -27,7 +27,7 @@ import DifyChatTest from './pages/DifyChatTest';
 import SystemDiagnostics from './pages/SystemDiagnostics';
 import SessionIdTest from './pages/SessionIdTest';
 import TestWorkflowProgress from './pages/TestWorkflowProgress';
-import PricingTest from './pages/PricingTest';
+// import PricingTest from './pages/PricingTest';
 
 import NotFound from './pages/NotFound';
 
@@ -142,7 +142,7 @@ const App = () => {
               <Route path="/session-id-test" element={<SessionIdTest />} />
               <Route path="/system-diagnostics" element={<SystemDiagnostics />} />
               <Route path="/test-workflow-progress" element={<TestWorkflowProgress />} />
-              <Route path="/pricing-test" element={<PricingTest />} />
+              {/* <Route path="/pricing-test" element={<PricingTest />} /> */}
               <Route path="/dify-chat-test" element={<DifyChatTest />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
