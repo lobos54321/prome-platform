@@ -109,6 +109,58 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
     return null;
   }, []);
 
+  // 🚀 自动创建模型配置函数 - 从Dify价格自动生成25%利润配置
+  const autoCreateModelConfig = useCallback(async (
+    modelName: string,
+    difyInputPrice: number, // Dify原价 per 1K tokens
+    difyOutputPrice: number // Dify原价 per 1K tokens
+  ) => {
+    try {
+      // 计算25%利润的价格
+      const profitInputPrice = difyInputPrice * 1.25;
+      const profitOutputPrice = difyOutputPrice * 1.25;
+
+      const newModelConfig = {
+        modelName: modelName,
+        inputTokenPrice: profitInputPrice,
+        outputTokenPrice: profitOutputPrice,
+        serviceType: 'dify',
+        isActive: true,
+        autoCreated: true, // 标记为自动创建
+        createdBy: 'system-auto-extraction'
+      };
+
+      console.log('[Auto Model] Creating new model config:', newModelConfig);
+
+      // 尝试添加到数据库
+      await db.addModelConfig(newModelConfig);
+      
+      console.log('✅ [Auto Model] Successfully auto-created model config:', {
+        model: modelName,
+        difyInput: difyInputPrice,
+        difyOutput: difyOutputPrice,
+        profitInput: profitInputPrice,
+        profitOutput: profitOutputPrice,
+        profitMargin: '25%'
+      });
+
+      // 通知用户新模型已自动添加
+      toast.success(`新模型已自动添加`, {
+        description: `${modelName} 已添加到管理页面，包含25%利润空间`,
+        duration: 5000,
+      });
+
+      return newModelConfig;
+    } catch (error) {
+      console.error('[Auto Model] Failed to auto-create model config:', error);
+      
+      // 如果数据库添加失败，至少记录信息供后续手动处理
+      console.warn('[Auto Model] Model will be processed with calculated profit pricing despite DB error');
+      
+      return null;
+    }
+  }, []);
+
   const processTokenUsage = useCallback(async (
     usage: DifyUsage,
     conversationId?: string,
@@ -133,17 +185,57 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       let outputCost = 0;
       let totalCost = 0;
 
-      // 优先使用Dify提供的价格信息（支持字符串或数字格式）
-      if (usage.total_price || usage.prompt_price || usage.completion_price) {
-        inputCost = parseFloat(usage.prompt_price?.toString() || '0') || 0;
-        outputCost = parseFloat(usage.completion_price?.toString() || '0') || 0;
-        totalCost = parseFloat(usage.total_price?.toString() || '0') || (inputCost + outputCost);
+      // 🎯 优先使用平台配置的价格（确保利润空间）
+      const modelConfigs = await db.getModelConfigs();
+      let modelConfig = findBestModelMatch(modelConfigs, modelName);
+      
+      if (modelConfig) {
+        // 使用平台配置的价格 - 包含利润空间
+        inputCost = (inputTokens / 1000) * modelConfig.inputTokenPrice;
+        outputCost = (outputTokens / 1000) * modelConfig.outputTokenPrice;
+        totalCost = inputCost + outputCost;
         
-        console.log('[Token] Using Dify-provided pricing:', { inputCost, outputCost, totalCost });
+        console.log('[Token] Using platform pricing with profit margin:', { 
+          model: modelConfig.modelName,
+          inputCost, 
+          outputCost, 
+          totalCost,
+          inputPrice: modelConfig.inputTokenPrice,
+          outputPrice: modelConfig.outputTokenPrice
+        });
+      } else if (usage.total_price || usage.prompt_price || usage.completion_price) {
+        // 🚀 自动提取Dify价格并创建新模型配置（加25%利润）
+        const difyInputPrice = parseFloat(usage.prompt_price?.toString() || '0') || 0;
+        const difyOutputPrice = parseFloat(usage.completion_price?.toString() || '0') || 0;
+        
+        console.log('[Auto Model] Detected new model from Dify:', {
+          modelName,
+          difyInputPrice: difyInputPrice * 1000, // per 1K tokens
+          difyOutputPrice: difyOutputPrice * 1000
+        });
+        
+        // 自动创建包含25%利润的模型配置
+        await autoCreateModelConfig(modelName, difyInputPrice * 1000, difyOutputPrice * 1000);
+        
+        // 使用带利润的价格计算成本
+        const profitInputPrice = difyInputPrice * 1000 * 1.25; // 25%利润
+        const profitOutputPrice = difyOutputPrice * 1000 * 1.25; // 25%利润
+        
+        inputCost = (inputTokens / 1000) * profitInputPrice;
+        outputCost = (outputTokens / 1000) * profitOutputPrice;
+        totalCost = inputCost + outputCost;
+        
+        console.log('[Auto Model] Using auto-created pricing with 25% profit:', { 
+          difyInputPrice: difyInputPrice * 1000,
+          difyOutputPrice: difyOutputPrice * 1000,
+          profitInputPrice,
+          profitOutputPrice,
+          inputCost, 
+          outputCost, 
+          totalCost 
+        });
       } else {
-        // Fallback to model-based pricing with improved matching
-        const modelConfigs = await db.getModelConfigs();
-        let modelConfig = findBestModelMatch(modelConfigs, modelName);
+        // 最后的fallback
 
         if (!modelConfig) {
           console.log(`Model config not found for: ${modelName}, using fallback`);

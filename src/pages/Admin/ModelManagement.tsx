@@ -302,6 +302,22 @@ export default function ModelManagement() {
         <div>
           <h2 className="text-2xl font-bold">模型管理</h2>
           <p className="text-gray-500">管理AI模型配置和定价</p>
+          
+          {/* 自动模型统计 */}
+          <div className="flex items-center gap-4 mt-2 text-sm">
+            <div className="flex items-center gap-1">
+              <Bot className="h-4 w-4 text-blue-500" />
+              <span>总模型: {models.length}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Sparkles className="h-4 w-4 text-green-500" />
+              <span>自动识别: {models.filter(m => m.autoCreated).length}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Activity className="h-4 w-4 text-orange-500" />
+              <span>已启用: {models.filter(m => m.isActive).length}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -462,15 +478,35 @@ export default function ModelManagement() {
           </CardContent>
         </Card>
 
+        {/* 自动模型功能说明 */}
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-700">
+              <Sparkles className="h-5 w-5" />
+              🚀 自动模型识别
+            </CardTitle>
+            <CardDescription className="text-green-600">
+              系统会自动识别Dify工作流中使用的新模型，并自动添加25%利润空间
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-green-700 space-y-1">
+              <p>• 当Dify返回新模型价格时，系统自动提取并计算25%利润</p>
+              <p>• 自动创建的模型会标记为"自动识别"</p>
+              <p>• 您无需手动添加，系统确保所有模型都有利润空间</p>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <PlusCircle className="h-5 w-5" />
-                添加新模型
+                手动添加模型
               </CardTitle>
               <CardDescription>
-                配置新的AI模型和定价 (价格单位: USD/1000 tokens)
+                手动配置新的AI模型和定价 (价格单位: USD/1000 tokens)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
