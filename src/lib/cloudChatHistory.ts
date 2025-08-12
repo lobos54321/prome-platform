@@ -131,13 +131,22 @@ class CloudChatHistoryService {
    * 设置当前设备ID到Supabase会话
    */
   private async setCurrentDeviceId(): Promise<void> {
-    const { error } = await this.supabase.rpc('set_config', {
-      setting_name: 'app.current_device_id',
-      setting_value: this.deviceId
-    });
-    
-    if (error) {
-      console.warn('Failed to set device ID in session:', error);
+    try {
+      const { error } = await this.supabase.rpc('set_config', {
+        setting_name: 'app.current_device_id',
+        setting_value: this.deviceId
+      });
+      
+      if (error) {
+        // 如果函数不存在，静默处理（数据库过滤仍然基于device_id字段）
+        if (error.code === 'PGRST202') {
+          console.log('[Chat Debug] set_config函数未找到，使用直接过滤方式');
+          return;
+        }
+        console.warn('Failed to set device ID in session:', error);
+      }
+    } catch (error) {
+      console.warn('Error setting device ID in session:', error);
     }
   }
 
