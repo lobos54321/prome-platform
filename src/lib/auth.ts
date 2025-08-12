@@ -321,8 +321,6 @@ class AuthService {
 
       // Production mode: attempt real authentication with enhanced session recovery
       await this.attemptSessionRecovery();
-      // Production mode: attempt real authentication with enhanced session recovery
-      await this.attemptSessionRecovery();
       
       this.isInitialized = true;
       return this.currentUser;

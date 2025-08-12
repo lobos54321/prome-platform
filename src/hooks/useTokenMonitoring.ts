@@ -8,6 +8,7 @@
 import { useState, useCallback } from 'react';
 import { DifyUsage } from '@/lib/dify-api-client';
 import { db } from '@/lib/supabase';
+import { ModelConfig } from '@/types';
 import { authService } from '@/lib/auth';
 import { toast } from 'sonner';
 
@@ -142,7 +143,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       } else {
         // Fallback to model-based pricing with improved matching
         const modelConfigs = await db.getModelConfigs();
-        let modelConfig = this.findBestModelMatch(modelConfigs, modelName);
+        let modelConfig = findBestModelMatch(modelConfigs, modelName);
 
         if (!modelConfig) {
           console.log(`Model config not found for: ${modelName}, using fallback`);
