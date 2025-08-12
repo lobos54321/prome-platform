@@ -197,7 +197,19 @@ class CloudChatHistoryService {
     const lastUserMessage = messages.filter(m => m.role === 'user').pop();
     const lastMessage = messages[messages.length - 1];
     
-    // 插入或更新对话记录
+    // 🔄 检查是否已存在相同difyConversationId的对话记录
+    let existingConversation = null;
+    if (difyConversationId) {
+      const { data } = await this.supabase
+        .from('chat_conversations')
+        .select('id, message_count')
+        .eq('device_id', this.deviceId)
+        .eq('dify_conversation_id', difyConversationId)
+        .single();
+      
+      existingConversation = data;
+    }
+    
     const conversationData = {
       device_id: this.deviceId,
       title,
@@ -212,34 +224,81 @@ class CloudChatHistoryService {
       }
     };
 
-    const { data: conversation, error: conversationError } = await this.supabase
-      .from('chat_conversations')
-      .insert(conversationData)
-      .select('id')
-      .single();
+    let conversationId: string;
+    
+    if (existingConversation) {
+      // 📝 更新现有对话记录
+      const { data: updatedConversation, error: updateError } = await this.supabase
+        .from('chat_conversations')
+        .update(conversationData)
+        .eq('id', existingConversation.id)
+        .select('id')
+        .single();
 
-    if (conversationError) {
-      throw new Error(`Failed to save conversation: ${conversationError.message}`);
+      if (updateError) {
+        throw new Error(`Failed to update conversation: ${updateError.message}`);
+      }
+      
+      conversationId = updatedConversation.id;
+      console.log(`[ConversationHistory] Updated existing conversation ${conversationId} (${messages.length} messages)`);
+      
+      // 📨 只插入新消息 - 从上次保存后的新消息
+      const previousMessageCount = existingConversation.message_count || 0;
+      const newMessages = messages.slice(previousMessageCount);
+      
+      if (newMessages.length > 0) {
+        const messagesToInsert = newMessages.map(msg => ({
+          conversation_id: conversationId,
+          content: msg.content,
+          role: msg.role,
+          created_at: msg.timestamp.toISOString(),
+          metadata: msg.metadata || {}
+        }));
+
+        const { error: messagesError } = await this.supabase
+          .from('chat_messages')
+          .insert(messagesToInsert);
+
+        if (messagesError) {
+          console.warn('Some new messages failed to save:', messagesError);
+        } else {
+          console.log(`[ConversationHistory] Added ${newMessages.length} new messages to conversation`);
+        }
+      }
+    } else {
+      // 🆕 创建新对话记录 (首次)
+      const { data: conversation, error: conversationError } = await this.supabase
+        .from('chat_conversations')
+        .insert(conversationData)
+        .select('id')
+        .single();
+
+      if (conversationError) {
+        throw new Error(`Failed to save conversation: ${conversationError.message}`);
+      }
+
+      conversationId = conversation.id;
+      console.log(`[ConversationHistory] Created new conversation ${conversationId} (${messages.length} messages)`);
+      
+      // 📨 插入所有消息
+      const messagesToInsert = messages.map(msg => ({
+        conversation_id: conversationId,
+        content: msg.content,
+        role: msg.role,
+        created_at: msg.timestamp.toISOString(),
+        metadata: msg.metadata || {}
+      }));
+
+      const { error: messagesError } = await this.supabase
+        .from('chat_messages')
+        .insert(messagesToInsert);
+
+      if (messagesError) {
+        console.warn('Some messages failed to save:', messagesError);
+      }
     }
 
-    // 批量插入消息
-    const messagesToInsert = messages.map(msg => ({
-      conversation_id: conversation.id,
-      content: msg.content,
-      role: msg.role,
-      created_at: msg.timestamp.toISOString(),
-      metadata: msg.metadata || {}
-    }));
-
-    const { error: messagesError } = await this.supabase
-      .from('chat_messages')
-      .insert(messagesToInsert);
-
-    if (messagesError) {
-      console.warn('Some messages failed to save:', messagesError);
-    }
-
-    return conversation.id;
+    return conversationId;
   }
 
   /**
