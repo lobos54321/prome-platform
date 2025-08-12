@@ -740,6 +740,14 @@ export default function ModelManagement() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditingModel(model)}
+                          title="编辑模型配置"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                         <Badge variant={model.isActive ? "default" : "secondary"}>
                           {model.isActive ? '已启用' : '已禁用'}
                         </Badge>
