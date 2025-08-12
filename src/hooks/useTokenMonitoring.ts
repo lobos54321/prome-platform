@@ -58,6 +58,56 @@ const INITIAL_STATE: TokenMonitoringState = {
 export function useTokenMonitoring(): UseTokenMonitoringReturn {
   const [state, setState] = useState<TokenMonitoringState>(INITIAL_STATE);
 
+  // 智能模型匹配函数 - 支持模糊匹配和别名
+  const findBestModelMatch = useCallback((modelConfigs: ModelConfig[], targetModelName: string): ModelConfig | null => {
+    const target = targetModelName.toLowerCase().trim();
+    
+    // 1. 精确匹配
+    let match = modelConfigs.find(config => 
+      config.isActive && config.modelName.toLowerCase() === target
+    );
+    if (match) {
+      console.log(`[Model Match] Exact match found: ${target} -> ${match.modelName}`);
+      return match;
+    }
+
+    // 2. 部分匹配 - 检查包含关系
+    match = modelConfigs.find(config => 
+      config.isActive && (
+        config.modelName.toLowerCase().includes(target) ||
+        target.includes(config.modelName.toLowerCase())
+      )
+    );
+    if (match) {
+      console.log(`[Model Match] Partial match found: ${target} -> ${match.modelName}`);
+      return match;
+    }
+
+    // 3. 模型系列匹配
+    const modelFamilies = {
+      'gpt-4': ['gpt4', 'gpt-4-turbo', 'gpt-4-preview', 'gpt-4o'],
+      'gpt-3.5-turbo': ['gpt35', 'gpt-3.5', 'gpt35turbo', 'chatgpt'],
+      'claude-3-sonnet': ['claude-sonnet', 'claude3-sonnet', 'claude3sonnet', 'sonnet'],
+      'claude-3-haiku': ['claude-haiku', 'claude3-haiku', 'claude3haiku', 'haiku'],
+      'gemini-pro': ['gemini', 'bard', 'palm']
+    };
+
+    for (const [baseModel, aliases] of Object.entries(modelFamilies)) {
+      if (aliases.some(alias => target.includes(alias) || alias.includes(target))) {
+        match = modelConfigs.find(config => 
+          config.isActive && config.modelName.toLowerCase().includes(baseModel)
+        );
+        if (match) {
+          console.log(`[Model Match] Family match found: ${target} -> ${match.modelName} (via ${baseModel})`);
+          return match;
+        }
+      }
+    }
+
+    console.log(`[Model Match] No match found for: ${target}`);
+    return null;
+  }, []);
+
   const processTokenUsage = useCallback(async (
     usage: DifyUsage,
     conversationId?: string,
@@ -90,15 +140,11 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         
         console.log('[Token] Using Dify-provided pricing:', { inputCost, outputCost, totalCost });
       } else {
-        // Fallback to model-based pricing
+        // Fallback to model-based pricing with improved matching
         const modelConfigs = await db.getModelConfigs();
-        let modelConfig = modelConfigs.find(
-          config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
-        );
+        let modelConfig = this.findBestModelMatch(modelConfigs, modelName);
 
         if (!modelConfig) {
-          // Skip auto-creation to avoid RLS policy violations
-          // Use fallback config directly
           console.log(`Model config not found for: ${modelName}, using fallback`);
         }
         
@@ -264,11 +310,9 @@ export function useTokenCostEstimation() {
     currentBalance: number;
   }> => {
     try {
-      // Get model configuration
+      // Get model configuration with improved matching
       const modelConfigs = await db.getModelConfigs();
-      let modelConfig = modelConfigs.find(
-        config => config.modelName.toLowerCase() === modelName.toLowerCase() && config.isActive
-      );
+      let modelConfig = findBestModelMatch(modelConfigs, modelName);
 
       if (!modelConfig) {
         // Use default pricing

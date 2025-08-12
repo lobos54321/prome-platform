@@ -31,10 +31,58 @@ const mockModelConfigs: ModelConfig[] = [
     createdBy: 'system'
   },
   {
+    id: 'mock-gpt4-turbo',
+    modelName: 'gpt-4-turbo',
+    inputTokenPrice: 0.01,
+    outputTokenPrice: 0.03,
+    serviceType: 'ai_model',
+    isActive: true,
+    autoCreated: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'system'
+  },
+  {
     id: 'mock-gpt35',
     modelName: 'gpt-3.5-turbo',
     inputTokenPrice: 0.001,
     outputTokenPrice: 0.002,
+    serviceType: 'ai_model',
+    isActive: true,
+    autoCreated: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'system'
+  },
+  {
+    id: 'mock-claude-3-sonnet',
+    modelName: 'claude-3-sonnet-20240229',
+    inputTokenPrice: 0.003,
+    outputTokenPrice: 0.015,
+    serviceType: 'ai_model',
+    isActive: true,
+    autoCreated: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'system'
+  },
+  {
+    id: 'mock-claude-3-haiku',
+    modelName: 'claude-3-haiku-20240307',
+    inputTokenPrice: 0.00025,
+    outputTokenPrice: 0.00125,
+    serviceType: 'ai_model',
+    isActive: true,
+    autoCreated: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: 'system'
+  },
+  {
+    id: 'mock-gemini-pro',
+    modelName: 'gemini-pro',
+    inputTokenPrice: 0.0005,
+    outputTokenPrice: 0.0015,
     serviceType: 'ai_model',
     isActive: true,
     autoCreated: false,

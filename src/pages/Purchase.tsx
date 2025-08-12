@@ -8,6 +8,7 @@ import { authService } from '@/lib/auth';
 import { adminServicesAPI } from '@/lib/admin-services';
 import { Check, CreditCard, ArrowLeft } from 'lucide-react';
 import { RechargePackage, CustomRecharge } from '@/types';
+import StripePaymentForm from '@/components/payments/StripePaymentForm';
 
 export default function Purchase() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function Purchase() {
   const [exchangeRate, setExchangeRate] = useState<number>(10000);
   const [customAmountInput, setCustomAmountInput] = useState<string>(customAmount || '');
   const [isLoading, setIsLoading] = useState(true);
+  const [showPayment, setShowPayment] = useState(false);
 
   const minimumUSD = 5;
 
@@ -94,11 +96,27 @@ export default function Purchase() {
   };
 
   const handlePurchase = () => {
-    // TODO: Implement actual payment flow
     const purchaseData = selectedPackage || customRecharge;
-    console.log('Processing credit purchase:', purchaseData);
-    // Here you can integrate Stripe or other payment services
-    alert('积分充值功能正在开发中，请联系客服完成充值。');
+    if (!purchaseData) {
+      console.error('No purchase data available');
+      return;
+    }
+    
+    console.log('Initiating purchase:', purchaseData);
+    setShowPayment(true);
+  };
+
+  const handlePaymentSuccess = (result: { paymentIntentId: string; creditsAdded: number }) => {
+    console.log('Payment successful:', result);
+    
+    // 刷新用户余额
+    authService.refreshBalance().then(() => {
+      navigate('/dashboard?purchase=success');
+    });
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPayment(false);
   };
 
   if (isLoading) {
@@ -127,6 +145,38 @@ export default function Purchase() {
 
   const purchaseInfo = selectedPackage || customRecharge;
   const isPackagePurchase = !!selectedPackage;
+
+  // 显示支付表单
+  if (showPayment && purchaseInfo) {
+    const amountInCents = Math.round(purchaseInfo.usdAmount * 100); // Convert to cents
+    
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-lg mx-auto">
+          <div className="text-center mb-6">
+            <Button 
+              variant="ghost" 
+              onClick={handlePaymentCancel}
+              className="mb-4"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              返回确认页面
+            </Button>
+            <h1 className="text-2xl font-bold mb-2">支付 {purchaseInfo.creditsAmount.toLocaleString()} 积分</h1>
+            <p className="text-gray-600">金额: ${purchaseInfo.usdAmount} USD</p>
+          </div>
+          
+          <StripePaymentForm
+            amount={amountInCents}
+            creditsAmount={purchaseInfo.creditsAmount}
+            packageId={selectedPackage?.id}
+            onSuccess={handlePaymentSuccess}
+            onCancel={handlePaymentCancel}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
