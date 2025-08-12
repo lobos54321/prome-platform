@@ -336,7 +336,13 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         });
         
         // 自动创建包含25%利润的模型配置
-        await autoCreateModelConfig(modelName, difyInputPrice * 1000, difyOutputPrice * 1000);
+        const newDifyConfig = await autoCreateModelConfig(modelName, difyInputPrice * 1000, difyOutputPrice * 1000);
+        
+        // 🔄 将新创建的配置设置为当前使用的modelConfig
+        if (newDifyConfig) {
+          modelConfig = newDifyConfig;
+          console.log(`[Auto Model] ✅ Using newly created Dify-based config for pricing`);
+        }
         
         // 使用带利润的价格计算成本
         const profitInputPrice = difyInputPrice * 1000 * 1.25; // 25%利润
@@ -367,6 +373,12 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         // 自动创建包含25%利润的配置
         const newConfig = await autoCreateModelConfig(modelName, defaultPricing.input, defaultPricing.output);
         console.log(`[Auto Model] Auto-creation result:`, newConfig ? 'SUCCESS' : 'FAILED');
+        
+        // 🔄 将新创建的配置设置为当前使用的modelConfig
+        if (newConfig) {
+          modelConfig = newConfig;
+          console.log(`[Auto Model] ✅ Using newly created config for pricing`);
+        }
         
         // 使用带利润的价格计算成本
         const profitInputPrice = defaultPricing.input * 1.25;

@@ -683,79 +683,158 @@ export default function ModelManagement() {
                   </div>
                 ) : (
                   models.map((model) => (
-                    <div key={model.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          {getServiceTypeIcon(model.serviceType)}
-                          <div>
-                            <div className="font-medium flex items-center gap-2">
-                              {model.modelName}
-                              {model.autoCreated ? (
-                                <Badge variant="outline" className="text-xs text-green-600 border-green-200">
-                                  🤖 自动识别
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
-                                  🥇 手动设置
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                              <Badge className={`text-xs ${getServiceTypeBadgeColor(model.serviceType)}`}>
-                                {getServiceTypeLabel(model.serviceType)}
+                    <div key={model.id} className="border rounded-lg">
+                      {editingModel === model.id ? (
+                        // 编辑模式
+                        <div className="p-4 bg-blue-50">
+                          <div className="flex items-center gap-2 mb-4">
+                            {getServiceTypeIcon(model.serviceType)}
+                            <h4 className="font-medium">编辑模型: {model.modelName}</h4>
+                            {model.autoCreated ? (
+                              <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                                🤖 自动识别
                               </Badge>
-                            </div>
-                            {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
-                              <div className="text-sm text-gray-500">
-                                输入: ${model.inputTokenPrice}/1K • 输出: ${model.outputTokenPrice}/1K
-                              </div>
                             ) : (
-                              <div className="text-sm text-gray-500">
-                                固定费用: ${model.workflowCost || 0}/次
-                              </div>
+                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                                🥇 手动设置
+                              </Badge>
                             )}
-                            <div className="text-xs text-gray-400">
-                              {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
-                                <>
-                                  <span>积分转换: </span>
-                                  <span className="text-blue-600">
-                                    {Math.round(model.inputTokenPrice * exchangeRate)} / {Math.round(model.outputTokenPrice * exchangeRate)} 积分/1K tokens
-                                  </span>
-                                  <br />
-                                  <span>平均1K tokens ≈ </span>
-                                  <span className="font-medium text-green-600">
-                                    {Math.round(((model.inputTokenPrice + model.outputTokenPrice) / 2) * exchangeRate)} 积分
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>积分转换: </span>
-                                  <span className="text-blue-600">
-                                    {Math.round((model.workflowCost || 0) * exchangeRate)} 积分/次
-                                  </span>
-                                </>
-                              )}
+                          </div>
+                          
+                          {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                              <div>
+                                <Label htmlFor={`edit-input-${model.id}`}>输入价格 (USD/1000 tokens)</Label>
+                                <Input
+                                  id={`edit-input-${model.id}`}
+                                  type="number"
+                                  step="0.001"
+                                  min="0"
+                                  value={editingData.inputPrice}
+                                  onChange={(e) => setEditingData(prev => ({...prev, inputPrice: Number(e.target.value)}))}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor={`edit-output-${model.id}`}>输出价格 (USD/1000 tokens)</Label>
+                                <Input
+                                  id={`edit-output-${model.id}`}
+                                  type="number"
+                                  step="0.001"
+                                  min="0"
+                                  value={editingData.outputPrice}
+                                  onChange={(e) => setEditingData(prev => ({...prev, outputPrice: Number(e.target.value)}))}
+                                />
+                              </div>
                             </div>
+                          ) : (
+                            <div className="mb-4">
+                              <Label htmlFor={`edit-workflow-${model.id}`}>固定费用 (USD/次执行)</Label>
+                              <Input
+                                id={`edit-workflow-${model.id}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editingData.workflowCost || 0}
+                                onChange={(e) => setEditingData(prev => ({...prev, workflowCost: Number(e.target.value)}))}
+                              />
+                            </div>
+                          )}
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => saveModelEdit(model.id)}
+                              className="bg-blue-600 hover:bg-blue-700"
+                            >
+                              <Save className="h-4 w-4 mr-1" />
+                              保存
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={cancelEditing}
+                            >
+                              取消
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEditingModel(model)}
-                          title="编辑模型配置"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Badge variant={model.isActive ? "default" : "secondary"}>
-                          {model.isActive ? '已启用' : '已禁用'}
-                        </Badge>
-                        <Switch
-                          checked={model.isActive}
-                          onCheckedChange={() => toggleModel(model.id)}
-                        />
-                      </div>
+                      ) : (
+                        // 显示模式
+                        <div className="flex items-center justify-between p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              {getServiceTypeIcon(model.serviceType)}
+                              <div>
+                                <div className="font-medium flex items-center gap-2">
+                                  {model.modelName}
+                                  {model.autoCreated ? (
+                                    <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                                      🤖 自动识别
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                                      🥇 手动设置
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Badge className={`text-xs ${getServiceTypeBadgeColor(model.serviceType)}`}>
+                                    {getServiceTypeLabel(model.serviceType)}
+                                  </Badge>
+                                </div>
+                                {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
+                                  <div className="text-sm text-gray-500">
+                                    输入: ${model.inputTokenPrice}/1K • 输出: ${model.outputTokenPrice}/1K
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-gray-500">
+                                    固定费用: ${model.workflowCost || 0}/次
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-400">
+                                  {(model.serviceType === 'ai_model' || model.serviceType === 'custom') ? (
+                                    <>
+                                      <span>积分转换: </span>
+                                      <span className="text-blue-600">
+                                        {Math.round(model.inputTokenPrice * exchangeRate)} / {Math.round(model.outputTokenPrice * exchangeRate)} 积分/1K tokens
+                                      </span>
+                                      <br />
+                                      <span>平均1K tokens ≈ </span>
+                                      <span className="font-medium text-green-600">
+                                        {Math.round(((model.inputTokenPrice + model.outputTokenPrice) / 2) * exchangeRate)} 积分
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>积分转换: </span>
+                                      <span className="text-blue-600">
+                                        {Math.round((model.workflowCost || 0) * exchangeRate)} 积分/次
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditingModel(model)}
+                              title="编辑模型配置"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Badge variant={model.isActive ? "default" : "secondary"}>
+                              {model.isActive ? '已启用' : '已禁用'}
+                            </Badge>
+                            <Switch
+                              checked={model.isActive}
+                              onCheckedChange={() => toggleModel(model.id)}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
