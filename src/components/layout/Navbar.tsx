@@ -86,12 +86,11 @@ export function Navbar() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-6">
-          <Link to="/services" className="text-gray-600 hover:text-gray-900">服务目录</Link>
           <Link to="/pricing" className="text-gray-600 hover:text-gray-900">价格</Link>
           {user && (
             <>
               <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">控制台</Link>
-              <Link to="/chat/dify" className="text-gray-600 hover:text-gray-900">Dify AI聊天</Link>
+              <Link to="/chat/dify" className="text-gray-600 hover:text-gray-900">Prome AI</Link>
             </>
           )}
           {user && isAdmin(user) && (
@@ -126,7 +125,7 @@ export function Navbar() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/chat/dify')}>
                   <MessageSquare className="mr-2 h-4 w-4" />
-                  Dify AI聊天
+                  Prome AI
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/token-dashboard')}>
                   <Activity className="mr-2 h-4 w-4" />
@@ -180,13 +179,6 @@ export function Navbar() {
         <div className="md:hidden border-t bg-white">
           <div className="container mx-auto p-4 space-y-2">
             <Link 
-              to="/services" 
-              className="block py-2 text-gray-600 hover:text-gray-900"
-              onClick={() => setIsOpen(false)}
-            >
-              服务目录
-            </Link>
-            <Link 
               to="/pricing" 
               className="block py-2 text-gray-600 hover:text-gray-900"
               onClick={() => setIsOpen(false)}
@@ -207,7 +199,7 @@ export function Navbar() {
                   className="block py-2 text-gray-600 hover:text-gray-900"
                   onClick={() => setIsOpen(false)}
                 >
-                  Dify AI聊天
+                  Prome AI
                 </Link>
                 <Link 
                   to="/token-dashboard" 

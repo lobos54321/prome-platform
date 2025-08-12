@@ -13,7 +13,6 @@ import { User } from './types';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Services from './pages/Services';
 import Dashboard from './pages/Dashboard';
 import TokenDashboard from './pages/TokenDashboard';
 import Admin from './pages/Admin';
@@ -129,7 +128,6 @@ const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/services" element={<Services />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/purchase" element={<Purchase />} />
               <Route path="/dashboard" element={<Dashboard />} />
