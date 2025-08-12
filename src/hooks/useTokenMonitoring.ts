@@ -177,12 +177,16 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
 
       console.log('[Auto Model] Creating new model config with 25% profit margin');
 
+      // 获取当前用户作为创建者
+      const currentUser = await authService.getCurrentUser();
+      const adminId = currentUser?.id || 'system'; // 使用当前用户ID或fallback
+      
       // 尝试添加到数据库 - 使用正确的参数
       const newModelConfig = await db.addModelConfig(
         modelName,                    // modelName
         profitInputPrice,            // inputTokenPrice  
         profitOutputPrice,           // outputTokenPrice
-        'system-auto-extraction',    // adminId
+        adminId,                     // adminId (使用真实用户ID)
         'ai_model',                  // serviceType
         undefined,                   // workflowCost
         true                         // autoCreated
