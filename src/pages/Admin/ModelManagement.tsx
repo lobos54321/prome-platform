@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, InfoIcon, Loader2, Save, DollarSign, Bot, User, Workflow, Sparkles, Calculator, Activity } from 'lucide-react';
+import { PlusCircle, InfoIcon, Loader2, Save, DollarSign, Bot, User, Workflow, Sparkles, Calculator, Activity, Edit, Trash2 } from 'lucide-react';
 import { isDifyEnabled } from '@/api/dify-api';
 import { authService } from '@/lib/auth';
 import { db } from '@/lib/supabase';
@@ -26,6 +26,13 @@ export default function ModelManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [isUpdatingRate, setIsUpdatingRate] = useState(false);
+  // 编辑状态
+  const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [editingData, setEditingData] = useState<{
+    inputPrice: number;
+    outputPrice: number;
+    workflowCost?: number;
+  }>({ inputPrice: 0, outputPrice: 0 });
   // Token consumption calculator states
   const [calculatorTokens, setCalculatorTokens] = useState(1000);
   const [calculatorModel, setCalculatorModel] = useState<string>('');
@@ -176,6 +183,54 @@ export default function ModelManagement() {
       toast.error('更新汇率失败');
     } finally {
       setIsUpdatingRate(false);
+    }
+  };
+
+  // 开始编辑模型
+  const startEditingModel = (model: ModelConfig) => {
+    setEditingModel(model.id);
+    setEditingData({
+      inputPrice: model.inputTokenPrice,
+      outputPrice: model.outputTokenPrice,
+      workflowCost: model.workflowCost
+    });
+  };
+
+  // 取消编辑
+  const cancelEditing = () => {
+    setEditingModel(null);
+    setEditingData({ inputPrice: 0, outputPrice: 0 });
+  };
+
+  // 保存编辑
+  const saveModelEdit = async (modelId: string) => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user) {
+        toast.error('用户认证失败');
+        return;
+      }
+
+      const updatedModel = await db.updateModelConfig(
+        modelId,
+        {
+          inputTokenPrice: editingData.inputPrice,
+          outputTokenPrice: editingData.outputPrice,
+          workflowCost: editingData.workflowCost
+        },
+        user.id
+      );
+
+      if (updatedModel) {
+        setModels(prev => prev.map(model => 
+          model.id === modelId ? updatedModel : model
+        ));
+        setEditingModel(null);
+        toast.success('模型配置已更新');
+      }
+    } catch (error) {
+      console.error('Failed to update model:', error);
+      toast.error('更新失败');
     }
   };
 

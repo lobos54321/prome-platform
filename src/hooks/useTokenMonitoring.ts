@@ -175,35 +175,33 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       const profitInputPrice = difyInputPrice * 1.25;
       const profitOutputPrice = difyOutputPrice * 1.25;
 
-      const newModelConfig = {
-        modelName: modelName,
-        inputTokenPrice: profitInputPrice,
-        outputTokenPrice: profitOutputPrice,
-        serviceType: 'dify',
-        isActive: true,
-        autoCreated: true, // 标记为自动创建
-        createdBy: 'system-auto-extraction'
-      };
+      console.log('[Auto Model] Creating new model config with 25% profit margin');
 
-      console.log('[Auto Model] Creating new model config:', newModelConfig);
-
-      // 尝试添加到数据库
-      await db.addModelConfig(newModelConfig);
+      // 尝试添加到数据库 - 使用正确的参数
+      const newModelConfig = await db.addModelConfig(
+        modelName,                    // modelName
+        profitInputPrice,            // inputTokenPrice  
+        profitOutputPrice,           // outputTokenPrice
+        'system-auto-extraction',    // adminId
+        'ai_model',                  // serviceType
+        undefined,                   // workflowCost
+        true                         // autoCreated
+      );
       
-      console.log('✅ [Auto Model] Successfully auto-created model config:', {
-        model: modelName,
-        difyInput: difyInputPrice,
-        difyOutput: difyOutputPrice,
-        profitInput: profitInputPrice,
-        profitOutput: profitOutputPrice,
-        profitMargin: '25%'
-      });
+      if (newModelConfig) {
+        console.log('✅ [Auto Model] Successfully auto-created model config:', {
+          model: modelName,
+          difyInput: difyInputPrice,
+          difyOutput: difyOutputPrice,
+          profitInput: profitInputPrice,
+          profitOutput: profitOutputPrice,
+          profitMargin: '25%'
+        });
+      } else {
+        console.log('⚠️ [Auto Model] Model config already existed or creation failed');
+      }
 
-      // 通知用户新模型已自动添加
-      toast.success(`新模型已自动添加`, {
-        description: `${modelName} 已添加到管理页面，包含25%利润空间`,
-        duration: 5000,
-      });
+      // 静默添加，不通知用户（后台自动管理）
 
       return newModelConfig;
     } catch (error) {
