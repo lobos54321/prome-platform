@@ -495,7 +495,7 @@ export default function ModelManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-sm text-green-700 space-y-1">
-              <p>• <strong>优先级：手动设置 > 自动识别 > Dify原价</strong></p>
+              <p>• <strong>优先级：手动设置 &gt; 自动识别 &gt; Dify原价</strong></p>
               <p>• 您手动设置的价格始终优先于自动识别的价格</p>
               <p>• 当Dify返回新模型价格时，系统自动提取并计算25%利润</p>
               <p>• 自动创建的模型会标记为"自动识别"，您可以随时修改</p>
