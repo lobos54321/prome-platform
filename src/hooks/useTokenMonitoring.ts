@@ -134,6 +134,36 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
     return null;
   }, []);
 
+  // 🎯 获取默认模型价格 - 基于市场常见定价
+  const getDefaultModelPricing = useCallback((modelName: string) => {
+    const model = modelName.toLowerCase();
+    
+    // 基于模型名称返回合理的默认价格 (USD per 1K tokens)
+    if (model.includes('gpt-4o') || model.includes('gpt4o')) {
+      return { input: 5.0, output: 15.0 }; // GPT-4o
+    } else if (model.includes('gpt-4') || model.includes('gpt4')) {
+      return { input: 30.0, output: 60.0 }; // GPT-4
+    } else if (model.includes('gpt-3.5') || model.includes('gpt35')) {
+      return { input: 0.5, output: 1.5 }; // GPT-3.5
+    } else if (model.includes('claude-3') || model.includes('claude3')) {
+      if (model.includes('opus')) {
+        return { input: 15.0, output: 75.0 }; // Claude-3 Opus
+      } else if (model.includes('sonnet')) {
+        return { input: 3.0, output: 15.0 }; // Claude-3 Sonnet
+      } else if (model.includes('haiku')) {
+        return { input: 0.25, output: 1.25 }; // Claude-3 Haiku
+      }
+      return { input: 3.0, output: 15.0 }; // Claude-3 默认 (Sonnet)
+    } else if (model.includes('gemini')) {
+      return { input: 0.5, output: 1.5 }; // Gemini Pro
+    } else if (model.includes('llama')) {
+      return { input: 0.2, output: 0.2 }; // Llama系列
+    } else {
+      // 通用默认价格 - 中等定价
+      return { input: 2.0, output: 6.0 };
+    }
+  }, []);
+
   // 🚀 自动创建模型配置函数 - 从Dify价格自动生成25%利润配置
   const autoCreateModelConfig = useCallback(async (
     modelName: string,
@@ -210,9 +240,29 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       let outputCost = 0;
       let totalCost = 0;
 
+      // 🔍 Debug: 检查 Dify 返回的数据格式
+      console.log('[Auto Model Debug] Dify usage data:', {
+        hasPromptPrice: !!usage.prompt_price,
+        hasCompletionPrice: !!usage.completion_price,
+        hasTotalPrice: !!usage.total_price,
+        promptPrice: usage.prompt_price,
+        completionPrice: usage.completion_price,
+        totalPrice: usage.total_price,
+        allUsageKeys: Object.keys(usage),
+        modelName: modelName
+      });
+
       // 🎯 优先使用平台配置的价格（手动设置 > 自动创建）
       const modelConfigs = await db.getModelConfigs();
       let modelConfig = findBestModelMatch(modelConfigs, modelName);
+      
+      console.log(`[Auto Model] Looking for model: ${modelName}`);
+      console.log(`[Auto Model] Found existing config:`, modelConfig ? {
+        name: modelConfig.modelName,
+        autoCreated: modelConfig.autoCreated,
+        inputPrice: modelConfig.inputTokenPrice,
+        outputPrice: modelConfig.outputTokenPrice
+      } : 'None');
       
       if (modelConfig) {
         // 使用平台配置的价格 - 手动设置或自动创建的价格
@@ -262,11 +312,36 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           totalCost 
         });
       } else {
-        // 最后的fallback
-
-        if (!modelConfig) {
-          console.log(`Model config not found for: ${modelName}, using fallback`);
-        }
+        // 🚨 没有找到配置也没有Dify价格 - 使用默认价格自动创建
+        console.log(`[Auto Model] ⚡ TRIGGER: No config found and no Dify pricing for: ${modelName}`);
+        console.log(`[Auto Model] Creating with default pricing + 25% profit`);
+        
+        // 使用默认的模型价格（基于常见模型定价）
+        const defaultPricing = getDefaultModelPricing(modelName);
+        console.log(`[Auto Model] Default pricing for ${modelName}:`, defaultPricing);
+        
+        // 自动创建包含25%利润的配置
+        const newConfig = await autoCreateModelConfig(modelName, defaultPricing.input, defaultPricing.output);
+        console.log(`[Auto Model] Auto-creation result:`, newConfig ? 'SUCCESS' : 'FAILED');
+        
+        // 使用带利润的价格计算成本
+        const profitInputPrice = defaultPricing.input * 1.25;
+        const profitOutputPrice = defaultPricing.output * 1.25;
+        
+        inputCost = (inputTokens / 1000) * profitInputPrice;
+        outputCost = (outputTokens / 1000) * profitOutputPrice;
+        totalCost = inputCost + outputCost;
+        
+        console.log('[Auto Model] Using default pricing with 25% profit:', {
+          model: modelName,
+          defaultInput: defaultPricing.input,
+          defaultOutput: defaultPricing.output,
+          profitInputPrice,
+          profitOutputPrice,
+          inputCost,
+          outputCost,
+          totalCost
+        });
         
         // 如果数据库创建失败，使用fallback config确保token处理继续
         if (!modelConfig) {
