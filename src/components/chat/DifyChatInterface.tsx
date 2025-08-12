@@ -360,6 +360,14 @@ export function DifyChatInterface({
     try {
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
       
+      // 🔍 调试：记录加载前的状态
+      console.log('[Chat Debug] 🔄 开始加载历史对话:', {
+        requestedConversationId: conversationId,
+        currentConversationId: conversationId,
+        beforeLoad_localStorage_dify_id: localStorage.getItem('dify_conversation_id'),
+        beforeLoad_currentMessages: messages.length
+      });
+      
       // 使用云端服务的专用函数加载历史对话（包含Dify状态恢复）
       const conversationWithMessages = await cloudChatHistory.loadConversationFromHistory(conversationId);
       
@@ -368,6 +376,15 @@ export function DifyChatInterface({
         setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
         return;
       }
+      
+      // 🔍 调试：记录从云端获取的数据
+      console.log('[Chat Debug] 📥 从云端获取的对话数据:', {
+        cloudConversationId: conversationWithMessages.id,
+        difyConversationId: conversationWithMessages.dify_conversation_id,
+        messageCount: conversationWithMessages.messages.length,
+        hasWorkflowState: !!conversationWithMessages.workflow_state,
+        title: conversationWithMessages.title
+      });
 
       // 转换消息格式
       const convertedMessages: Message[] = conversationWithMessages.messages.map(msg => ({
@@ -388,6 +405,14 @@ export function DifyChatInterface({
         localStorage.setItem('dify_conversation_id_streaming', difyConvId);
         setConversationId(difyConvId);
         console.log('[Chat Debug] ✅ 强制恢复Dify对话ID:', difyConvId);
+        
+        // 🔍 额外调试：验证localStorage确实被设置
+        const verifyStored = localStorage.getItem('dify_conversation_id');
+        console.log('[Chat Debug] 🔍 验证localStorage写入:', {
+          intended: difyConvId,
+          actualStored: verifyStored,
+          isMatch: verifyStored === difyConvId
+        });
       } else {
         setConversationId(conversationWithMessages.id);
         console.log('[Chat Debug] ⚠️ 使用本地对话ID（无Dify ID）:', conversationWithMessages.id);
@@ -703,12 +728,13 @@ export function DifyChatInterface({
       const storedWorkflowState = localStorage.getItem('dify_workflow_state');
       const hasExistingConversation = storedConversationId || conversationId;
       
-      console.log('[Chat Debug] Sending request:', {
+      console.log('[Chat Debug] 📤 准备发送消息:', {
         endpoint,
         messageContent: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
         userId,
-        conversationId,
-        storedConversationId,
+        conversationId_param: conversationId,
+        storedConversationId_localStorage: storedConversationId,
+        finalConversationId_will_send: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
         hasExistingConversation: !!hasExistingConversation,
         hasStoredWorkflow: !!storedWorkflowState,
         storedWorkflowState: storedWorkflowState ? JSON.parse(storedWorkflowState) : null,
@@ -749,25 +775,58 @@ export function DifyChatInterface({
           conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
           response_mode: showWorkflowProgress ? 'streaming' : 'blocking',
           stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
-          // 🚨 关键修复：为工作流用户交互节点提供inputs
+          // 🚨 关键修复：智能判断是否需要为用户交互节点提供inputs
           inputs: (() => {
-            // 如果有现存的对话ID，这意味着是继续对话，需要提供inputs给用户交互节点
-            const hasExistingConversation = localStorage.getItem('dify_conversation_id') || conversationId;
-            if (hasExistingConversation) {
-              return {
+            const storedDifyId = localStorage.getItem('dify_conversation_id');
+            const storedWorkflow = localStorage.getItem('dify_workflow_state');
+            
+            // 🔍 调试：记录inputs决策过程
+            const inputsDecision = {
+              storedDifyId: !!storedDifyId,
+              storedWorkflow: !!storedWorkflow,
+              hasMessages: messages.length > 0,
+              conversationIdParam: !!conversationId
+            };
+            
+            // 判断是否应该提供inputs的逻辑：
+            // 1. 有Dify对话ID 且 有历史消息 = 继续对话，可能需要inputs
+            // 2. 工作流状态存在 = 可能正在等待用户交互
+            const shouldProvideInputs = (storedDifyId && messages.length > 0) || storedWorkflow;
+            
+            inputsDecision.shouldProvideInputs = shouldProvideInputs;
+            console.log('[Chat Debug] 🎯 Inputs决策过程:', inputsDecision);
+            
+            if (shouldProvideInputs) {
+              const inputs = {
                 user_input: messageContent,
                 query: messageContent,
-                text: messageContent
+                text: messageContent,
+                message: messageContent // 额外添加message字段
               };
+              console.log('[Chat Debug] 📨 提供inputs给工作流:', inputs);
+              return inputs;
+            } else {
+              console.log('[Chat Debug] 🆕 新对话或无工作流，使用空inputs');
+              return {};
             }
-            // 新对话时使用空inputs让Dify工作流正常启动
-            return {};
           })()
         }),
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
+      
+      // 🔍 调试：记录响应信息
+      console.log('[Chat Debug] 📥 收到响应:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        headers: {
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length')
+        },
+        timestamp: new Date().toISOString()
+      });
 
       if (!response.ok) {
         // Fix 3: Enhanced Error Handling - Better error reporting
@@ -872,6 +931,21 @@ export function DifyChatInterface({
       } else {
         // 处理普通响应
         const data = await response.json();
+        
+        // 🔍 调试：记录接收到的响应数据
+        console.log('[Chat Debug] 📋 收到响应数据:', {
+          hasAnswer: !!data.answer,
+          answerLength: data.answer?.length || 0,
+          conversationId_returned: data.conversation_id,
+          conversationId_current_state: conversationId,
+          conversationId_localStorage: localStorage.getItem('dify_conversation_id'),
+          messageId: data.message_id,
+          hasMetadata: !!data.metadata,
+          hasUsage: !!data.metadata?.usage,
+          responseMode: data.mode || 'unknown',
+          timestamp: new Date().toISOString()
+        });
+        
         await handleRegularResponse(data, messageContent);
       }
 
