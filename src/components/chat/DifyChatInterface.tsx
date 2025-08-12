@@ -378,14 +378,29 @@ export function DifyChatInterface({
         metadata: msg.metadata
       }));
 
-      // 恢复对话状态
+      // 🔧 强制恢复对话状态和Dify连续性
       setMessages(convertedMessages);
-      setConversationId(conversationWithMessages.dify_conversation_id || conversationWithMessages.id);
+      
+      // 确保Dify对话ID被正确设置到localStorage和组件状态
+      const difyConvId = conversationWithMessages.dify_conversation_id;
+      if (difyConvId) {
+        localStorage.setItem('dify_conversation_id', difyConvId);
+        localStorage.setItem('dify_conversation_id_streaming', difyConvId);
+        setConversationId(difyConvId);
+        console.log('[Chat Debug] ✅ 强制恢复Dify对话ID:', difyConvId);
+      } else {
+        setConversationId(conversationWithMessages.id);
+        console.log('[Chat Debug] ⚠️ 使用本地对话ID（无Dify ID）:', conversationWithMessages.id);
+      }
+      
       setWorkflowState(conversationWithMessages.workflow_state as WorkflowState || {
         isWorkflow: false,
         nodes: [],
         completedNodes: 0
       });
+      
+      // 🚨 关键：防止后续的强制新对话逻辑清除我们刚恢复的状态
+      console.log('[Chat Debug] 📋 已恢复历史对话，消息数:', convertedMessages.length);
       setError(null);
       setIsLoading(false);
 
@@ -645,7 +660,8 @@ export function DifyChatInterface({
       // 🔧 关键修复：检查是否应该强制开始新对话
       // 如果messages为空（除了欢迎消息），且没有有效的conversationId，确保真正开始新对话
       const hasRealMessages = messages.length > 0 && messages.some(m => m.id !== 'welcome');
-      const shouldForceNewConversation = !hasRealMessages && !conversationId;
+      const hasStoredConversationId = localStorage.getItem('dify_conversation_id');
+      const shouldForceNewConversation = !hasRealMessages && !conversationId && !hasStoredConversationId;
       
       if (shouldForceNewConversation) {
         console.log('[Chat Debug] 🔥 FORCING NEW CONVERSATION - clearing any existing state');
