@@ -1101,7 +1101,7 @@ export function DifyChatInterface({
           buffer += chunk;
           
           // 🔧 修复：检测响应格式 - SSE还是普通JSON
-          let processedLines: string[] = [];
+          const processedLines: string[] = [];
           
           // 如果chunk看起来是完整的JSON而不是SSE格式
           if (chunk.trim().startsWith('{') && !chunk.includes('data:')) {
