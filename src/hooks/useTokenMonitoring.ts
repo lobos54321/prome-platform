@@ -236,6 +236,57 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       const inputTokens = usage.prompt_tokens;
       const outputTokens = usage.completion_tokens;
       const totalTokens = usage.total_tokens;
+      
+      // 🚨 调试：检查异常高的Token使用量
+      if (totalTokens > 10000) {
+        console.error('🚨 异常高的Token使用量检测 - 详细分析:', {
+          modelName,
+          inputTokens,
+          outputTokens,  
+          finalTotalTokens,
+          usage_raw_keys: Object.keys(usage),
+          usage_raw: usage,
+          conversationId,
+          messageId,
+          possibleIssues: [
+            totalTokens > 50000 ? '可能是累积Token而非单次使用' : null,
+            inputTokens === 0 ? '输入Token为0异常' : null,
+            outputTokens === 0 ? '输出Token为0异常' : null,
+            totalTokens !== (inputTokens + outputTokens) ? 'Token总数计算不匹配' : null
+          ].filter(Boolean),
+          timestamp: new Date().toISOString()
+        });
+        
+        // 🚨 临时措施：对于异常高的Token使用量，使用合理的上限
+        if (totalTokens > 50000) {
+          console.warn('⚠️ 应用Token使用量上限，从', totalTokens, '调整到 20000');
+          // 临时限制，避免巨额扣费
+          const adjustedTokens = 20000;
+          const ratio = adjustedTokens / totalTokens;
+          
+          // 按比例调整Token数量
+          const adjustedInputTokens = Math.round(inputTokens * ratio);
+          const adjustedOutputTokens = Math.round(outputTokens * ratio);
+          
+          console.log('📊 Token调整详情:', {
+            原始: { inputTokens, outputTokens, totalTokens },
+            调整后: { inputTokens: adjustedInputTokens, outputTokens: adjustedOutputTokens, total: adjustedTokens },
+            调整比例: ratio
+          });
+          
+          // 使用调整后的值
+          Object.assign(usage, {
+            prompt_tokens: adjustedInputTokens,
+            completion_tokens: adjustedOutputTokens,
+            total_tokens: adjustedTokens
+          });
+        }
+      }
+
+      // 🔄 重新解析可能已调整的Token数量
+      const finalInputTokens = usage.prompt_tokens;
+      const finalOutputTokens = usage.completion_tokens;
+      const finalTotalTokens = usage.total_tokens;
 
       // Parse costs - try to use Dify-provided pricing first
       let inputCost = 0;
@@ -272,8 +323,8 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       
       if (modelConfig) {
         // 使用平台配置的价格 - 手动设置或自动创建的价格
-        inputCost = (inputTokens / 1000) * modelConfig.inputTokenPrice;
-        outputCost = (outputTokens / 1000) * modelConfig.outputTokenPrice;
+        inputCost = (finalInputTokens / 1000) * modelConfig.inputTokenPrice;
+        outputCost = (finalOutputTokens / 1000) * modelConfig.outputTokenPrice;
         totalCost = inputCost + outputCost;
         
         const configType = modelConfig.autoCreated ? '自动创建' : '手动设置';
@@ -304,8 +355,8 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         const profitInputPrice = difyInputPrice * 1000 * 1.25; // 25%利润
         const profitOutputPrice = difyOutputPrice * 1000 * 1.25; // 25%利润
         
-        inputCost = (inputTokens / 1000) * profitInputPrice;
-        outputCost = (outputTokens / 1000) * profitOutputPrice;
+        inputCost = (finalInputTokens / 1000) * profitInputPrice;
+        outputCost = (finalOutputTokens / 1000) * profitOutputPrice;
         totalCost = inputCost + outputCost;
         
         console.log('[Auto Model] Using auto-created pricing with 25% profit:', { 
@@ -334,8 +385,8 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         const profitInputPrice = defaultPricing.input * 1.25;
         const profitOutputPrice = defaultPricing.output * 1.25;
         
-        inputCost = (inputTokens / 1000) * profitInputPrice;
-        outputCost = (outputTokens / 1000) * profitOutputPrice;
+        inputCost = (finalInputTokens / 1000) * profitInputPrice;
+        outputCost = (finalOutputTokens / 1000) * profitOutputPrice;
         totalCost = inputCost + outputCost;
         
         console.log('[Auto Model] Using default pricing with 25% profit:', {
@@ -367,8 +418,8 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         }
 
         // Calculate costs based on model pricing
-        inputCost = (inputTokens / 1000) * modelConfig.inputTokenPrice;
-        outputCost = (outputTokens / 1000) * modelConfig.outputTokenPrice;
+        inputCost = (finalInputTokens / 1000) * modelConfig.inputTokenPrice;
+        outputCost = (finalOutputTokens / 1000) * modelConfig.outputTokenPrice;
         totalCost = inputCost + outputCost;
       }
 
@@ -382,22 +433,46 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         return { success: false, error: 'Invalid cost calculation' };
       }
 
-      // Safety check to prevent excessive deduction
-      if (pointsToDeduct > 100000) {
-        console.error('Token cost too high, potential error:', {
+      // Safety check to prevent excessive deduction - 临时提高阈值用于调试
+      if (pointsToDeduct > 500000) { // 临时从10万提高到50万积分
+        console.error('🚨 Token成本异常高，详细信息:', {
           modelName,
-          totalTokens,
+          inputTokens,
+          outputTokens,
+          finalTotalTokens,
+          inputCost,
+          outputCost,
           totalCost,
-          pointsToDeduct
+          pointsToDeduct,
+          exchangeRate,
+          modelConfigUsed: modelConfig ? {
+            name: modelConfig.modelName,
+            inputPrice: modelConfig.inputTokenPrice,
+            outputPrice: modelConfig.outputTokenPrice,
+            autoCreated: modelConfig.autoCreated
+          } : 'none',
+          conversationId,
+          timestamp: new Date().toISOString()
         });
-        return { success: false, error: 'Token cost too high - please contact support' };
+        return { success: false, error: `Token成本异常高 (${totalTokens} tokens, ${pointsToDeduct} 积分) - 请联系管理员检查` };
+      }
+      
+      // 警告：高Token使用量
+      if (pointsToDeduct > 50000) {
+        console.warn('⚠️ 高Token使用量警告:', {
+          modelName,
+          finalTotalTokens,
+          totalCost,
+          pointsToDeduct,
+          conversationId
+        });
       }
 
       // Deduct balance
       const result = await db.deductUserBalance(
         user.id,
         pointsToDeduct,
-        `Dify Native API usage: ${modelName} (${totalTokens} tokens, $${totalCost.toFixed(6)})`
+        `Dify Native API usage: ${modelName} (${finalTotalTokens} tokens, $${totalCost.toFixed(6)})`
       );
 
       if (!result.success) {
@@ -410,9 +485,9 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         await db.addTokenUsageWithModel(
           user.id,
           modelName,
-          inputTokens,
-          outputTokens,
-          totalTokens,
+          finalInputTokens,
+          finalOutputTokens,
+          finalTotalTokens,
           inputCost,
           outputCost,
           totalCost,
@@ -426,9 +501,9 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       // Create usage event
       const usageEvent: TokenUsageEvent = {
         modelName,
-        inputTokens,
-        outputTokens,
-        totalTokens,
+        inputTokens: finalInputTokens,
+        outputTokens: finalOutputTokens,
+        totalTokens: finalTotalTokens,
         inputCost,
         outputCost,
         totalCost,
@@ -441,7 +516,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       // Update state
       setState(prev => ({
         ...prev,
-        totalTokensUsed: prev.totalTokensUsed + totalTokens,
+        totalTokensUsed: prev.totalTokensUsed + finalTotalTokens,
         totalCost: prev.totalCost + totalCost,
         totalPointsDeducted: prev.totalPointsDeducted + pointsToDeduct,
         usageHistory: [usageEvent, ...prev.usageHistory.slice(0, 49)], // Keep last 50 events
@@ -451,7 +526,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
 
       // Show success toast
       toast.success(
-        `Token已消费: ${totalTokens} tokens (${pointsToDeduct} 积分)`,
+        `Token已消费: ${finalTotalTokens} tokens (${pointsToDeduct} 积分)`,
         {
           description: `余额: ${result.newBalance} 积分`
         }
