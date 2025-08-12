@@ -314,6 +314,10 @@ export default function ModelManagement() {
               <span>自动识别: {models.filter(m => m.autoCreated).length}</span>
             </div>
             <div className="flex items-center gap-1">
+              <User className="h-4 w-4 text-blue-500" />
+              <span>手动设置: {models.filter(m => !m.autoCreated).length}</span>
+            </div>
+            <div className="flex items-center gap-1">
               <Activity className="h-4 w-4 text-orange-500" />
               <span>已启用: {models.filter(m => m.isActive).length}</span>
             </div>
@@ -491,9 +495,10 @@ export default function ModelManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-sm text-green-700 space-y-1">
+              <p>• <strong>优先级：手动设置 > 自动识别 > Dify原价</strong></p>
+              <p>• 您手动设置的价格始终优先于自动识别的价格</p>
               <p>• 当Dify返回新模型价格时，系统自动提取并计算25%利润</p>
-              <p>• 自动创建的模型会标记为"自动识别"</p>
-              <p>• 您无需手动添加，系统确保所有模型都有利润空间</p>
+              <p>• 自动创建的模型会标记为"自动识别"，您可以随时修改</p>
             </div>
           </CardContent>
         </Card>
@@ -630,9 +635,13 @@ export default function ModelManagement() {
                           <div>
                             <div className="font-medium flex items-center gap-2">
                               {model.modelName}
-                              {model.autoCreated && (
-                                <Badge variant="outline" className="text-xs">
-                                  自动识别
+                              {model.autoCreated ? (
+                                <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                                  🤖 自动识别
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                                  🥇 手动设置
                                 </Badge>
                               )}
                             </div>

@@ -59,28 +59,53 @@ const INITIAL_STATE: TokenMonitoringState = {
 export function useTokenMonitoring(): UseTokenMonitoringReturn {
   const [state, setState] = useState<TokenMonitoringState>(INITIAL_STATE);
 
-  // 智能模型匹配函数 - 支持模糊匹配和别名
+  // 智能模型匹配函数 - 优先级：手动设置 > 自动创建 > 无匹配
   const findBestModelMatch = useCallback((modelConfigs: ModelConfig[], targetModelName: string): ModelConfig | null => {
     const target = targetModelName.toLowerCase().trim();
     
-    // 1. 精确匹配
+    // 🥇 第一优先级：手动设置的精确匹配 (autoCreated: false)
     let match = modelConfigs.find(config => 
-      config.isActive && config.modelName.toLowerCase() === target
+      config.isActive && 
+      !config.autoCreated && // 手动设置
+      config.modelName.toLowerCase() === target
     );
     if (match) {
-      console.log(`[Model Match] Exact match found: ${target} -> ${match.modelName}`);
+      console.log(`[Model Match] 🥇 Manual exact match (highest priority): ${target} -> ${match.modelName}`);
       return match;
     }
 
-    // 2. 部分匹配 - 检查包含关系
+    // 🥇 第二优先级：手动设置的部分匹配 (autoCreated: false)
     match = modelConfigs.find(config => 
-      config.isActive && (
-        config.modelName.toLowerCase().includes(target) ||
-        target.includes(config.modelName.toLowerCase())
-      )
+      config.isActive && 
+      !config.autoCreated && // 手动设置
+      (config.modelName.toLowerCase().includes(target) ||
+       target.includes(config.modelName.toLowerCase()))
     );
     if (match) {
-      console.log(`[Model Match] Partial match found: ${target} -> ${match.modelName}`);
+      console.log(`[Model Match] 🥇 Manual partial match (high priority): ${target} -> ${match.modelName}`);
+      return match;
+    }
+
+    // 🥈 第三优先级：自动创建的精确匹配
+    match = modelConfigs.find(config => 
+      config.isActive && 
+      config.autoCreated && // 自动创建
+      config.modelName.toLowerCase() === target
+    );
+    if (match) {
+      console.log(`[Model Match] 🥈 Auto-created exact match: ${target} -> ${match.modelName}`);
+      return match;
+    }
+
+    // 🥈 第四优先级：自动创建的部分匹配
+    match = modelConfigs.find(config => 
+      config.isActive && 
+      config.autoCreated && // 自动创建
+      (config.modelName.toLowerCase().includes(target) ||
+       target.includes(config.modelName.toLowerCase()))
+    );
+    if (match) {
+      console.log(`[Model Match] 🥈 Auto-created partial match: ${target} -> ${match.modelName}`);
       return match;
     }
 
@@ -185,18 +210,20 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       let outputCost = 0;
       let totalCost = 0;
 
-      // 🎯 优先使用平台配置的价格（确保利润空间）
+      // 🎯 优先使用平台配置的价格（手动设置 > 自动创建）
       const modelConfigs = await db.getModelConfigs();
       let modelConfig = findBestModelMatch(modelConfigs, modelName);
       
       if (modelConfig) {
-        // 使用平台配置的价格 - 包含利润空间
+        // 使用平台配置的价格 - 手动设置或自动创建的价格
         inputCost = (inputTokens / 1000) * modelConfig.inputTokenPrice;
         outputCost = (outputTokens / 1000) * modelConfig.outputTokenPrice;
         totalCost = inputCost + outputCost;
         
-        console.log('[Token] Using platform pricing with profit margin:', { 
+        const configType = modelConfig.autoCreated ? '自动创建' : '手动设置';
+        console.log(`[Token] Using ${configType} pricing:`, { 
           model: modelConfig.modelName,
+          configType,
           inputCost, 
           outputCost, 
           totalCost,
