@@ -251,7 +251,11 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         completionPrice: usage.completion_price,
         totalPrice: usage.total_price,
         allUsageKeys: Object.keys(usage),
-        modelName: modelName
+        modelName: modelName,
+        fullUsageObject: usage, // 完整对象，查看是否有其他字段
+        promptUnitPrice: usage.prompt_unit_price,
+        completionUnitPrice: usage.completion_unit_price,
+        currency: usage.currency
       });
 
       // 🎯 优先使用平台配置的价格（手动设置 > 自动创建）

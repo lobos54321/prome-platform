@@ -1167,6 +1167,10 @@ export function DifyChatInterface({
                           parsed.metadata.usage,
                           parsed.conversation_id,
                           parsed.id || parsed.message_id,
+                          // 🔍 尝试提取真实模型名称
+                          parsed.metadata.usage?.model || 
+                          parsed.metadata.model || 
+                          parsed.model ||
                           'dify-chatflow'
                         ).then(result => {
                           if (result.success) {
@@ -1214,6 +1218,10 @@ export function DifyChatInterface({
                             tokenUsage,
                             parsed.conversation_id,
                             parsed.message_id,
+                            // 🔍 尝试提取真实模型名称
+                            parsed.metadata?.usage?.model || 
+                            parsed.metadata?.model || 
+                            parsed.model ||
                             'dify-chatflow'
                           ).then(result => {
                             if (result.success) {
@@ -1383,6 +1391,10 @@ export function DifyChatInterface({
           data.metadata.usage,
           data.conversation_id as string,
           data.message_id as string,
+          // 🔍 尝试提取真实模型名称
+          data.metadata.usage?.model || 
+          data.metadata.model || 
+          data.model ||
           'dify-blocking'
         ).then(result => {
           if (result.success) {
