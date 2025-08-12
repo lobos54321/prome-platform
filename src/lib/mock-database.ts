@@ -21,8 +21,8 @@ const mockModelConfigs: ModelConfig[] = [
   {
     id: 'mock-gpt4',
     modelName: 'gpt-4',
-    inputTokenPrice: 0.03,
-    outputTokenPrice: 0.06,
+    inputTokenPrice: 0.05,    // 🎯 设置有利润的价格
+    outputTokenPrice: 0.10,   // 🎯 比原价高66%获取利润
     serviceType: 'ai_model',
     isActive: true,
     autoCreated: false,
