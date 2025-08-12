@@ -83,7 +83,19 @@ CREATE POLICY "Users can access their own messages" ON chat_messages
         )
     );
 
--- 8. 创建便捷的视图
+-- 8. 创建用于会话管理的辅助函数
+CREATE OR REPLACE FUNCTION set_config(setting_name text, setting_value text)
+RETURNS void AS $$
+BEGIN
+    -- 设置会话级别的配置参数
+    PERFORM set_config(setting_name, setting_value, false);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 授予使用权限
+GRANT EXECUTE ON FUNCTION set_config(text, text) TO anon, authenticated;
+
+-- 9. 创建便捷的视图
 CREATE OR REPLACE VIEW chat_conversation_summaries AS
 SELECT 
     c.id,
@@ -101,7 +113,7 @@ FROM chat_conversations c
 LEFT JOIN chat_devices d ON c.device_id = d.device_id
 ORDER BY c.updated_at DESC;
 
--- 9. 插入说明注释
+-- 10. 插入说明注释
 COMMENT ON TABLE chat_devices IS '设备标识表，用于匿名用户的设备识别';
 COMMENT ON TABLE chat_conversations IS '对话表，存储聊天对话的基本信息';
 COMMENT ON TABLE chat_messages IS '消息表，存储对话中的具体消息内容';
