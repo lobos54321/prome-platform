@@ -80,32 +80,66 @@ export function DifyChatInterface({
     completedNodes: 0
   });
   
-  // 🔍 专用的模型提取函数
+  // 🔍 专用的模型提取函数 - 基于实际测试发现的Dify API字段
   const extractModelFromResponse = (data: any, source: string): string | null => {
+    // 🎯 基于实际测试，发现Dify API在node_finished事件中返回模型信息：
+    // data.process_data.model_name = "gpt-4.1-nano-2025-04-14"
+    // data.process_data.model_provider = "langgenius/openai/openai"
     const possiblePaths = [
+      // 🔥 优先搜索实际测试中发现的字段
+      'data.process_data.model_name',
+      'data.process_data.model_provider',
+      'process_data.model_name',
+      'process_data.model_provider',
+      // 🔥 用户提到的后台字段
+      'model_name',
+      'model_provider', 
+      'data.model_name',
+      'data.model_provider',
+      'metadata.model_name',
+      'metadata.model_provider',
+      // 其他可能的路径
+      'execution_metadata.model_name',
+      'execution_metadata.model_provider',
+      'node_data.model_name',
+      'node_data.model_provider',
       'metadata.usage.model',
       'metadata.model', 
       'metadata.llm_model',
-      'metadata.model_name',
       'metadata.provider',
       'model',
       'llm_model',
-      'model_name',
       'provider',
       'usage.model',
       'data.model',
       'data.llm_model',
       'data.model_config.model',
       'data.model_config.provider',
+      'data.model_config.model_name',
       'execution_metadata.model',
-      'node_data.model'
+      'node_data.model',
+      // 嵌套更深层的可能路径
+      'data.execution_metadata.model_name',
+      'data.execution_metadata.model_provider',
+      'workflow_data.model_name',
+      'workflow_data.model_provider'
     ];
     
     let extractedModel = null;
     let extractionPath = null;
     
+    // 🔍 详细记录所有尝试的路径和值
+    const pathResults = [];
+    
     for (const path of possiblePaths) {
       const value = path.split('.').reduce((obj, key) => obj?.[key], data);
+      pathResults.push({
+        path,
+        value: value,
+        type: typeof value,
+        isValid: value && typeof value === 'string' && value !== 'undefined'
+      });
+      
       if (value && typeof value === 'string' && value !== 'undefined') {
         extractedModel = value;
         extractionPath = path;
@@ -113,12 +147,20 @@ export function DifyChatInterface({
       }
     }
     
-    console.log(`[Model Extraction] ${source} - 结果:`, {
-      extracted_model: extractedModel,
-      extraction_path: extractionPath,
-      data_keys: Object.keys(data || {}),
-      search_attempted: possiblePaths.length
-    });
+    // 🎯 特别处理：如果找到了模型信息，记录成功提取
+    if (extractedModel) {
+      console.log(`[Model Extraction] ✅ 成功提取模型: ${extractedModel} (来源: ${source}, 路径: ${extractionPath})`);
+    } else {
+      // 🔍 如果没找到，记录详细的调试信息
+      console.log(`[Model Extraction] ❌ ${source} - 未找到模型信息:`, {
+        extracted_model: extractedModel,
+        extraction_path: extractionPath,
+        data_structure: JSON.stringify(data, null, 2),
+        key_paths_checked: pathResults.filter(r => r.value !== undefined).slice(0, 5),
+        data_keys: Object.keys(data || {}),
+        search_attempted: possiblePaths.length
+      });
+    }
     
     return extractedModel;
   };
