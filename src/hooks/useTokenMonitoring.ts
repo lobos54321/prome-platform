@@ -282,66 +282,78 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
 
       // 🔍 检查 Dify usage 数据格式
       console.log('[Billing] Dify usage data:', {
-        hasPromptPrice: !!usage.prompt_price,
-        hasCompletionPrice: !!usage.completion_price,
-        hasTotalPrice: !!usage.total_price,
-        promptPrice: usage.prompt_price,
-        completionPrice: usage.completion_price,
-        totalPrice: usage.total_price,
         promptTokens: usage.prompt_tokens,
         completionTokens: usage.completion_tokens,
         totalTokens: usage.total_tokens,
+        promptPrice: usage.prompt_price,
+        completionPrice: usage.completion_price,
+        totalPrice: usage.total_price,
+        currency: usage.currency,
         modelName: modelName
       });
 
-      // 🎯 优先策略：直接使用Dify返回的真实价格信息 + 25%利润
-      if (usage.total_price || usage.prompt_price || usage.completion_price) {
-        // 方案1: 如果Dify返回总价格，直接使用
-        if (usage.total_price) {
-          const difyTotalCost = parseFloat(usage.total_price.toString());
-          totalCost = difyTotalCost * 1.25; // 加25%利润
-          
-          console.log('[Billing] Using Dify total_price + 25% profit:', {
-            difyOriginalCost: difyTotalCost,
-            ourTotalCost: totalCost,
-            profitMargin: '25%'
-          });
-        } 
-        // 方案2: 如果Dify返回分开的价格，分别计算
-        else if (usage.prompt_price && usage.completion_price) {
-          const difyInputCost = parseFloat(usage.prompt_price.toString());
-          const difyOutputCost = parseFloat(usage.completion_price.toString());
-          
-          inputCost = difyInputCost * 1.25; // 加25%利润
-          outputCost = difyOutputCost * 1.25; // 加25%利润
-          totalCost = inputCost + outputCost;
-          
-          console.log('[Billing] Using Dify separate prices + 25% profit:', {
-            difyInputCost,
-            difyOutputCost,
-            ourInputCost: inputCost,
-            ourOutputCost: outputCost,
-            ourTotalCost: totalCost,
-            profitMargin: '25%'
-          });
-        }
+      // 🎯 使用Dify的total_price + 25%利润（最准确的方案）
+      if (usage.total_price) {
+        const difyTotalCost = parseFloat(usage.total_price.toString());
+        totalCost = difyTotalCost * 1.25; // 加25%利润
         
-        // 🏦 可选：保存价格信息到数据库用于审计（不影响用户）
+        console.log('[Billing] ✅ Using Dify total_price + 25% profit:', {
+          difyOriginalCost: difyTotalCost,
+          ourFinalCost: totalCost,
+          profitMargin: '25%',
+          tokens: `${usage.prompt_tokens}+${usage.completion_tokens}=${usage.total_tokens}`,
+          priceBreakdown: {
+            promptPrice: usage.prompt_price,
+            completionPrice: usage.completion_price,
+            totalPrice: usage.total_price
+          }
+        });
+        
+        // 🏦 保存价格信息到数据库用于审计和分析（不影响计费流程）
         try {
           const modelConfigs = await db.getModelConfigs();
           let modelConfig = findBestModelMatch(modelConfigs, modelName);
           
-          // 如果模型不存在，自动创建记录（仅用于审计，不影响计费）
+          // 如果模型不存在，自动创建记录（仅用于审计）
           if (!modelConfig && usage.prompt_price && usage.completion_price) {
-            const difyInputPrice = parseFloat(usage.prompt_price.toString()) * 1000; // per 1K tokens
-            const difyOutputPrice = parseFloat(usage.completion_price.toString()) * 1000;
+            // 计算每1K tokens的价格（用于数据库存储格式）
+            const promptPricePer1K = (parseFloat(usage.prompt_price.toString()) / usage.prompt_tokens) * 1000;
+            const completionPricePer1K = (parseFloat(usage.completion_price.toString()) / usage.completion_tokens) * 1000;
             
-            await autoCreateModelConfig(modelName, difyInputPrice, difyOutputPrice);
-            console.log('[Billing] Auto-created model record for audit:', modelName);
+            await autoCreateModelConfig(modelName, promptPricePer1K, completionPricePer1K);
+            console.log('[Billing] Auto-created model record for audit:', {
+              modelName,
+              promptPricePer1K,
+              completionPricePer1K,
+              originalUsage: {
+                promptPrice: usage.prompt_price,
+                completionPrice: usage.completion_price,
+                promptTokens: usage.prompt_tokens,
+                completionTokens: usage.completion_tokens
+              }
+            });
           }
         } catch (auditError) {
           console.warn('[Billing] Failed to save audit record (not affecting billing):', auditError);
         }
+      } 
+      // 🚨 Fallback: 如果没有total_price，尝试使用分开的价格
+      else if (usage.prompt_price && usage.completion_price) {
+        const difyInputCost = parseFloat(usage.prompt_price.toString());
+        const difyOutputCost = parseFloat(usage.completion_price.toString());
+        
+        inputCost = difyInputCost * 1.25; // 加25%利润
+        outputCost = difyOutputCost * 1.25; // 加25%利润
+        totalCost = inputCost + outputCost;
+        
+        console.log('[Billing] Using Dify separate prices + 25% profit:', {
+          difyInputCost,
+          difyOutputCost,
+          ourInputCost: inputCost,
+          ourOutputCost: outputCost,
+          ourTotalCost: totalCost,
+          profitMargin: '25%'
+        });
       } else {
         // 🚨 Fallback: 如果Dify没有返回价格信息，使用估算价格 + 25%利润
         console.warn('[Billing] No Dify pricing found, using fallback estimation + 25% profit');
