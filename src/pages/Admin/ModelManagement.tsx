@@ -209,8 +209,9 @@ export default function ModelManagement() {
                 核心计费逻辑
               </h4>
               <div className="text-sm text-gray-700 space-y-2">
-                <p>• <strong>成本计算</strong>: 根据模型配置计算USD成本 = (输入tokens/1000 × 输入价格) + (输出tokens/1000 × 输出价格)</p>
-                <p>• <strong>积分转换</strong>: 积分扣除 = USD成本 × 汇率({exchangeRate} 积分/USD)</p>
+                <p>• <strong>价格获取</strong>: 从Dify的message_end事件中获取真实的usage价格信息</p>
+                <p>• <strong>利润计算</strong>: 在Dify原价基础上加25%作为利润 (Dify原价 × 1.25)</p>
+                <p>• <strong>积分转换</strong>: 积分扣除 = 加利润后的USD成本 × 汇率({exchangeRate} 积分/USD)</p>
                 <p>• <strong>余额扣除</strong>: 自动从用户账户扣除对应积分，余额不足时停止服务</p>
                 <p>• <strong>记录追踪</strong>: 所有消费记录保存到数据库，支持审计和查询</p>
               </div>
@@ -238,9 +239,9 @@ export default function ModelManagement() {
                     <p className="text-xs text-gray-500 mt-1">假设输入70%, 输出30%</p>
                   </div>
                   <div className="bg-gray-50 p-3 rounded">
-                    <p className="text-sm font-medium text-gray-700">统一定价模型</p>
-                    <p className="text-xs text-gray-600">输入: $0.002/1K tokens</p>
-                    <p className="text-xs text-gray-600">输出: $0.006/1K tokens</p>
+                    <p className="text-sm font-medium text-gray-700">动态定价模型</p>
+                    <p className="text-xs text-gray-600">基于Dify真实价格 + 25%利润</p>
+                    <p className="text-xs text-gray-500">示例显示保守估算价格</p>
                   </div>
                 </div>
                 
@@ -306,10 +307,10 @@ export default function ModelManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-sm text-green-700 space-y-2">
-              <p>• <strong>统一定价</strong>: 所有模型使用基础价格（输入$0.002/1K, 输出$0.006/1K）+ 25%利润</p>
-              <p>• <strong>自动识别</strong>: 当用户使用新模型时，系统自动创建配置并应用统一定价</p>
-              <p>• <strong>透明计费</strong>: 所有Token消费实时转换为积分并从用户余额扣除</p>
-              <p>• <strong>完整审计</strong>: 所有消费记录保存到数据库，支持查询和分析</p>
+              <p>• <strong>动态定价</strong>: 基于Dify返回的真实usage价格信息 + 25%利润</p>
+              <p>• <strong>自动计费</strong>: 从message_end事件中提取真实成本，加利润后扣除积分</p>
+              <p>• <strong>透明计费</strong>: 用户只看到扣除的积分数量，系统自动处理价格计算</p>
+              <p>• <strong>完整审计</strong>: 记录Dify原价、加利润后价格和积分扣除，支持完整审计</p>
             </div>
           </CardContent>
         </Card>
