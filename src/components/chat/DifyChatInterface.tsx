@@ -768,17 +768,13 @@ export function DifyChatInterface({
         timestamp: new Date().toISOString()
       });
 
-      // 重置工作流状态
-      if (showWorkflowProgress) {
-        setWorkflowState({
-          isWorkflow: true,
-          nodes: [],
-          completedNodes: 0
-        });
-      }
+      // 🔧 修复：不要强制启用工作流状态，让Dify API自然响应
+      // 只有当检测到实际工作流事件时才设置isWorkflow=true
+      console.log('[Chat Debug] 💡 准备发送消息，等待Dify响应以确定是否为工作流');
 
-      // 🔧 修复：改进超时机制 - 为工作流提供更长的超时时间
-      const timeoutMs = showWorkflowProgress ? 5 * 60 * 1000 : 2 * 60 * 1000; // 5min for workflows, 2min for regular chat
+      // 🔧 修复：智能超时机制 - 根据实际工作流状态调整超时时间
+      const hasActiveWorkflow = workflowState.isWorkflow && workflowState.nodes.length > 0;
+      const timeoutMs = hasActiveWorkflow ? 3 * 60 * 1000 : 60 * 1000; // 3分钟工作流，1分钟普通聊天
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
@@ -798,8 +794,8 @@ export function DifyChatInterface({
           user: userId || 'default-user',
           // 🔧 关键修复：优先使用localStorage中的dify_conversation_id以确保对话连续性
           conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
-          response_mode: showWorkflowProgress ? 'streaming' : 'blocking',
-          stream: showWorkflowProgress, // 启用流式响应以获取工作流进度
+          response_mode: hasActiveWorkflow ? 'streaming' : 'blocking',
+          stream: hasActiveWorkflow, // 只在实际工作流时启用流式响应
           // 🚨 关键修复：智能判断是否需要为用户交互节点提供inputs
           inputs: (() => {
             const storedDifyId = localStorage.getItem('dify_conversation_id');
@@ -891,7 +887,7 @@ export function DifyChatInterface({
       }
 
       // Fix 4: Improve Stream Response Processing with fallback
-      if (showWorkflowProgress && response.body) {
+      if (hasActiveWorkflow && response.body) {
         try {
           await handleWorkflowStream(response, messageContent);
         } catch (streamError) {
@@ -984,9 +980,9 @@ export function DifyChatInterface({
       // 处理取消请求
       if (error instanceof Error && error.name === 'AbortError') {
         const nodeCount = Object.keys(workflowState.nodes).length;
-        const timeoutError = showWorkflowProgress 
-          ? `工作流执行超时（5分钟）。当前工作流包含${nodeCount || 5}个节点，复杂工作流可能需要更多时间。请尝试简化请求或稍后重试。`
-          : '请求超时（2分钟），请稍后重试';
+        const timeoutError = hasActiveWorkflow 
+          ? `工作流执行超时（3分钟）。当前工作流包含${nodeCount || 5}个节点，复杂工作流可能需要更多时间。请尝试简化请求或稍后重试。`
+          : '请求超时（1分钟），请稍后重试';
         throw new Error(timeoutError);
       }
       
