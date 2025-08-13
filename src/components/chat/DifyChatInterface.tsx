@@ -505,12 +505,21 @@ export function DifyChatInterface({
         console.log('[Chat Debug] ⚠️ 使用本地对话ID（无Dify ID）:', conversationWithMessages.id);
       }
       
-      // 🔧 修复：正确恢复工作流状态，保持节点进度
+      // 🔧 修复：正确恢复工作流状态，保持节点进度，并修复Date对象问题
       const restoredWorkflowState = conversationWithMessages.workflow_state;
       if (restoredWorkflowState && typeof restoredWorkflowState === 'object') {
+        // 🚑 修复Date对象序列化问题：确保startTime和endTime是正确的Date对象
+        const processedNodes = Array.isArray(restoredWorkflowState.nodes) 
+          ? restoredWorkflowState.nodes.map((node: any) => ({
+              ...node,
+              startTime: node.startTime ? new Date(node.startTime) : undefined,
+              endTime: node.endTime ? new Date(node.endTime) : undefined
+            }))
+          : [];
+          
         const workflowState: WorkflowState = {
           isWorkflow: restoredWorkflowState.isWorkflow || false,
-          nodes: Array.isArray(restoredWorkflowState.nodes) ? restoredWorkflowState.nodes : [],
+          nodes: processedNodes,
           completedNodes: typeof restoredWorkflowState.completedNodes === 'number' ? restoredWorkflowState.completedNodes : 0,
           totalNodes: typeof restoredWorkflowState.totalNodes === 'number' ? restoredWorkflowState.totalNodes : undefined,
           currentNodeId: restoredWorkflowState.currentNodeId || undefined
