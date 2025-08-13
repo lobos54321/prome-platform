@@ -80,6 +80,49 @@ export function DifyChatInterface({
     completedNodes: 0
   });
   
+  // 🔍 专用的模型提取函数
+  const extractModelFromResponse = (data: any, source: string): string | null => {
+    const possiblePaths = [
+      'metadata.usage.model',
+      'metadata.model', 
+      'metadata.llm_model',
+      'metadata.model_name',
+      'metadata.provider',
+      'model',
+      'llm_model',
+      'model_name',
+      'provider',
+      'usage.model',
+      'data.model',
+      'data.llm_model',
+      'data.model_config.model',
+      'data.model_config.provider',
+      'execution_metadata.model',
+      'node_data.model'
+    ];
+    
+    let extractedModel = null;
+    let extractionPath = null;
+    
+    for (const path of possiblePaths) {
+      const value = path.split('.').reduce((obj, key) => obj?.[key], data);
+      if (value && typeof value === 'string' && value !== 'undefined') {
+        extractedModel = value;
+        extractionPath = path;
+        break;
+      }
+    }
+    
+    console.log(`[Model Extraction] ${source} - 结果:`, {
+      extracted_model: extractedModel,
+      extraction_path: extractionPath,
+      data_keys: Object.keys(data || {}),
+      search_attempted: possiblePaths.length
+    });
+    
+    return extractedModel;
+  };
+  
   // Token monitoring for balance deduction
   const { processTokenUsage } = useTokenMonitoring();
   
@@ -820,6 +863,34 @@ export function DifyChatInterface({
             inputsDecision.shouldProvideInputs = shouldProvideInputs;
             console.log('[Chat Debug] 🎯 Inputs决策过程:', inputsDecision);
             
+            // 🔍 记录完整的API请求参数用于模型提取分析
+            const requestBody = {
+              query: messageContent,
+              message: messageContent,
+              user: userId || 'default-user',
+              conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
+              response_mode: hasActiveWorkflow ? 'streaming' : 'blocking',
+              stream: hasActiveWorkflow,
+              inputs: shouldProvideInputs ? {
+                user_input: messageContent,
+                query: messageContent,
+                text: messageContent,
+                message: messageContent
+              } : {}
+            };
+            
+            console.log('[Model Extraction] 完整API请求参数:', {
+              endpoint: 'dify-api/chat-messages',
+              method: 'POST',
+              request_body: requestBody,
+              context: {
+                hasActiveWorkflow,
+                storedDifyId: !!localStorage.getItem('dify_conversation_id'),
+                currentUserId: userId,
+                messageLength: messageContent.length
+              }
+            });
+            
             if (shouldProvideInputs) {
               const inputs = {
                 user_input: messageContent,
@@ -1144,6 +1215,27 @@ export function DifyChatInterface({
               // 处理工作流事件 - 修复事件数据结构
               if (parsed.event === 'node_started' && parsed.data?.node_id) {
                 console.log('[Chat Debug] Workflow node started:', parsed.data.node_id, parsed.data.title);
+                
+                // 🔍 尝试从node_started事件中提取模型信息
+                console.log('[Model Extraction] Node started - 详细数据分析:', {
+                  node_id: parsed.data.node_id,
+                  node_type: parsed.data.node_type,
+                  node_title: parsed.data.title,
+                  node_data_keys: Object.keys(parsed.data || {}),
+                  full_node_data: parsed.data,
+                  possible_model_fields: {
+                    'data.model': parsed.data.model,
+                    'data.llm_model': parsed.data.llm_model,
+                    'data.model_name': parsed.data.model_name,
+                    'data.provider': parsed.data.provider,
+                    'data.model_config': parsed.data.model_config,
+                    'data.model_provider': parsed.data.model_provider,
+                    'data.inputs': parsed.data.inputs,
+                    'data.outputs': parsed.data.outputs,
+                    'data.metadata': parsed.data.metadata
+                  }
+                });
+                
                 updateWorkflowProgress({
                   nodeId: parsed.data.node_id,
                   nodeName: parsed.data.title || parsed.data.node_id,
@@ -1157,6 +1249,28 @@ export function DifyChatInterface({
               
               if (parsed.event === 'node_finished' && parsed.data?.node_id) {
                 console.log('[Chat Debug] Workflow node finished:', parsed.data.node_id, parsed.data.status);
+                
+                // 🔍 从node_finished事件中提取模型信息（最有可能包含usage数据）
+                console.log('[Model Extraction] Node finished - 寻找模型和usage信息:', {
+                  node_id: parsed.data.node_id,
+                  node_type: parsed.data.node_type,
+                  node_status: parsed.data.status,
+                  node_data_keys: Object.keys(parsed.data || {}),
+                  full_node_data: parsed.data,
+                  usage_info: parsed.data.usage || parsed.data.metadata?.usage,
+                  model_extraction_attempts: {
+                    'data.model': parsed.data.model,
+                    'data.llm_model': parsed.data.llm_model,
+                    'data.model_name': parsed.data.model_name,
+                    'data.provider': parsed.data.provider,
+                    'data.model_config': parsed.data.model_config,
+                    'data.usage.model': parsed.data.usage?.model,
+                    'data.metadata.usage.model': parsed.data.metadata?.usage?.model,
+                    'data.execution_metadata': parsed.data.execution_metadata,
+                    'data.outputs': parsed.data.outputs
+                  }
+                });
+                
                 updateWorkflowProgress({
                   nodeId: parsed.data.node_id,
                   nodeName: parsed.data.title || parsed.data.node_id,
@@ -1303,33 +1417,32 @@ export function DifyChatInterface({
                     // 💰 处理message_end事件中的token使用和积分扣减
                     if (parsed.metadata && parsed.metadata.usage) {
                       console.log('[Token] Processing message_end token usage:', parsed.metadata.usage);
+                      
+                      // 🔍 详细记录所有可能包含模型信息的字段
+                      console.log('[Model Extraction] 完整metadata分析:', {
+                        full_parsed_data: parsed,
+                        metadata_keys: Object.keys(parsed.metadata || {}),
+                        usage_keys: Object.keys(parsed.metadata.usage || {}),
+                        metadata_complete: parsed.metadata,
+                        possible_model_fields: {
+                          'metadata.usage.model': parsed.metadata.usage?.model,
+                          'metadata.model': parsed.metadata.model,
+                          'metadata.llm_model': parsed.metadata.llm_model,
+                          'metadata.retriever_resource': parsed.metadata.retriever_resource,
+                          'parsed.model': parsed.model,
+                          'parsed.data': parsed.data,
+                          'parsed.task_id': parsed.task_id,
+                          'parsed.workflow_run_id': parsed.workflow_run_id
+                        }
+                      });
                       try {
                         // 异步处理token使用，不阻塞UI
                         processTokenUsage(
                           parsed.metadata.usage,
                           parsed.conversation_id,
                           parsed.id || parsed.message_id,
-                          // 🔍 增强模型名称提取逻辑
-                          (() => {
-                            const extractedModel = parsed.metadata.usage?.model || 
-                                                 parsed.metadata.model || 
-                                                 parsed.model ||
-                                                 parsed.metadata.retriever_resource?.model_name ||
-                                                 parsed.metadata.llm_model ||
-                                                 null;
-                            
-                            console.log('[Model Debug] 尝试提取模型名称:', {
-                              usage_model: parsed.metadata.usage?.model,
-                              metadata_model: parsed.metadata.model,
-                              direct_model: parsed.model,
-                              retriever_model: parsed.metadata.retriever_resource?.model_name,
-                              llm_model: parsed.metadata.llm_model,
-                              full_metadata: parsed.metadata,
-                              extracted: extractedModel
-                            });
-                            
-                            return extractedModel || 'dify-chatflow';
-                          })()
+                          // 🔍 使用专用提取函数获取模型名称
+                          extractModelFromResponse(parsed, 'message_end') || 'dify-chatflow'
                         ).then(result => {
                           if (result.success) {
                             console.log('[Token] Successfully processed message_end token usage:', result.newBalance);
@@ -1376,23 +1489,8 @@ export function DifyChatInterface({
                             tokenUsage,
                             parsed.conversation_id,
                             parsed.message_id,
-                            // 🔍 增强模型名称提取逻辑
-                            (() => {
-                              const extractedModel = parsed.metadata?.usage?.model || 
-                                                   parsed.metadata?.model || 
-                                                   parsed.model ||
-                                                   parsed.metadata?.retriever_resource?.model_name ||
-                                                   parsed.metadata?.llm_model ||
-                                                   null;
-                              
-                              console.log('[Model Debug] node_finished模型提取:', {
-                                usage_model: parsed.metadata?.usage?.model,
-                                metadata_model: parsed.metadata?.model,
-                                extracted: extractedModel
-                              });
-                              
-                              return extractedModel || 'dify-chatflow';
-                            })()
+                            // 🔍 使用专用提取函数获取模型名称
+                            extractModelFromResponse(parsed, 'node_finished') || 'dify-chatflow'
                           ).then(result => {
                             if (result.success) {
                               console.log('[Token] Successfully processed token usage:', result.newBalance);
@@ -1561,25 +1659,8 @@ export function DifyChatInterface({
           data.metadata.usage,
           data.conversation_id as string,
           data.message_id as string,
-          // 🔍 增强blocking API模型名称提取
-          (() => {
-            const extractedModel = data.metadata.usage?.model || 
-                                 data.metadata.model || 
-                                 data.model ||
-                                 data.metadata.retriever_resource?.model_name ||
-                                 data.metadata.llm_model ||
-                                 null;
-            
-            console.log('[Model Debug] blocking API模型提取:', {
-              usage_model: data.metadata.usage?.model,
-              metadata_model: data.metadata.model,
-              direct_model: data.model,
-              full_metadata: data.metadata,
-              extracted: extractedModel
-            });
-            
-            return extractedModel || 'dify-blocking';
-          })()
+          // 🔍 使用专用提取函数获取模型名称
+          extractModelFromResponse(data, 'blocking_api') || 'dify-blocking'
         ).then(result => {
           if (result.success) {
             console.log('[Token] Successfully processed blocking API token usage:', result.newBalance);
