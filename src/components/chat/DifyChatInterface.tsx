@@ -303,6 +303,8 @@ export function DifyChatInterface({
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
       
       const title = generateConversationTitle(messages);
+      // 🔧 修复：使用Dify conversation ID来正确识别对话
+      const difyConvId = localStorage.getItem('dify_conversation_id');
       const cloudConversationId = await cloudChatHistory.saveConversation(
         title,
         messages.map(msg => ({
@@ -313,7 +315,7 @@ export function DifyChatInterface({
           metadata: msg.metadata
         })),
         workflowState,
-        conversationId || undefined
+        difyConvId || conversationId || undefined
       );
 
       // 更新本地状态
@@ -651,9 +653,13 @@ export function DifyChatInterface({
     });
   };
 
-  // 工作流进度更新处理
+  // 工作流进度更新处理 - 优化性能
   const updateWorkflowProgress = (nodeUpdate: Partial<WorkflowProgress> & { nodeId: string }) => {
-    console.log('[Chat Debug] Updating workflow progress:', nodeUpdate);
+    // 减少console.log以提高性能
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Workflow] Node update:', nodeUpdate.nodeId, nodeUpdate.status);
+    }
+    
     setWorkflowState(prev => {
       const existingNodeIndex = prev.nodes.findIndex(n => n.nodeId === nodeUpdate.nodeId);
       const newNodes = [...prev.nodes];
@@ -661,10 +667,9 @@ export function DifyChatInterface({
       if (existingNodeIndex >= 0) {
         // 更新现有节点
         newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], ...nodeUpdate };
-        console.log('[Chat Debug] Updated existing node:', newNodes[existingNodeIndex]);
       } else {
         // 添加新节点
-        const newNode = {
+        newNodes.push({
           nodeId: nodeUpdate.nodeId,
           nodeName: nodeUpdate.nodeName || nodeUpdate.nodeId,
           nodeTitle: nodeUpdate.nodeTitle,
@@ -672,9 +677,7 @@ export function DifyChatInterface({
           startTime: nodeUpdate.startTime,
           endTime: nodeUpdate.endTime,
           error: nodeUpdate.error
-        };
-        newNodes.push(newNode);
-        console.log('[Chat Debug] Added new node:', newNode);
+        });
       }
 
       // 计算完成的节点数
@@ -1149,7 +1152,7 @@ export function DifyChatInterface({
                   status: 'running',
                   startTime: new Date()
                 });
-                console.log('[Chat Debug] Updated workflow progress for node start');
+                // 节点开始 - 减少日志输出
               }
               
               if (parsed.event === 'node_finished' && parsed.data?.node_id) {
@@ -1262,7 +1265,7 @@ export function DifyChatInterface({
                       status: 'running',
                       startTime: new Date()
                     });
-                    console.log('[Chat Debug] Updated workflow progress for node start (path 2)');
+                    // 节点开始 path 2
                   } else if (parsed.event === 'node_finished' && parsed.data?.node_id) {
                     console.log('[Chat Debug] Workflow node finished (path 2):', parsed.data.node_id, parsed.data.status);
                     updateWorkflowProgress({
@@ -1306,11 +1309,27 @@ export function DifyChatInterface({
                           parsed.metadata.usage,
                           parsed.conversation_id,
                           parsed.id || parsed.message_id,
-                          // 🔍 尝试提取真实模型名称
-                          parsed.metadata.usage?.model || 
-                          parsed.metadata.model || 
-                          parsed.model ||
-                          'dify-chatflow'
+                          // 🔍 增强模型名称提取逻辑
+                          (() => {
+                            const extractedModel = parsed.metadata.usage?.model || 
+                                                 parsed.metadata.model || 
+                                                 parsed.model ||
+                                                 parsed.metadata.retriever_resource?.model_name ||
+                                                 parsed.metadata.llm_model ||
+                                                 null;
+                            
+                            console.log('[Model Debug] 尝试提取模型名称:', {
+                              usage_model: parsed.metadata.usage?.model,
+                              metadata_model: parsed.metadata.model,
+                              direct_model: parsed.model,
+                              retriever_model: parsed.metadata.retriever_resource?.model_name,
+                              llm_model: parsed.metadata.llm_model,
+                              full_metadata: parsed.metadata,
+                              extracted: extractedModel
+                            });
+                            
+                            return extractedModel || 'dify-chatflow';
+                          })()
                         ).then(result => {
                           if (result.success) {
                             console.log('[Token] Successfully processed message_end token usage:', result.newBalance);
@@ -1357,11 +1376,23 @@ export function DifyChatInterface({
                             tokenUsage,
                             parsed.conversation_id,
                             parsed.message_id,
-                            // 🔍 尝试提取真实模型名称
-                            parsed.metadata?.usage?.model || 
-                            parsed.metadata?.model || 
-                            parsed.model ||
-                            'dify-chatflow'
+                            // 🔍 增强模型名称提取逻辑
+                            (() => {
+                              const extractedModel = parsed.metadata?.usage?.model || 
+                                                   parsed.metadata?.model || 
+                                                   parsed.model ||
+                                                   parsed.metadata?.retriever_resource?.model_name ||
+                                                   parsed.metadata?.llm_model ||
+                                                   null;
+                              
+                              console.log('[Model Debug] node_finished模型提取:', {
+                                usage_model: parsed.metadata?.usage?.model,
+                                metadata_model: parsed.metadata?.model,
+                                extracted: extractedModel
+                              });
+                              
+                              return extractedModel || 'dify-chatflow';
+                            })()
                           ).then(result => {
                             if (result.success) {
                               console.log('[Token] Successfully processed token usage:', result.newBalance);
@@ -1530,11 +1561,25 @@ export function DifyChatInterface({
           data.metadata.usage,
           data.conversation_id as string,
           data.message_id as string,
-          // 🔍 尝试提取真实模型名称
-          data.metadata.usage?.model || 
-          data.metadata.model || 
-          data.model ||
-          'dify-blocking'
+          // 🔍 增强blocking API模型名称提取
+          (() => {
+            const extractedModel = data.metadata.usage?.model || 
+                                 data.metadata.model || 
+                                 data.model ||
+                                 data.metadata.retriever_resource?.model_name ||
+                                 data.metadata.llm_model ||
+                                 null;
+            
+            console.log('[Model Debug] blocking API模型提取:', {
+              usage_model: data.metadata.usage?.model,
+              metadata_model: data.metadata.model,
+              direct_model: data.model,
+              full_metadata: data.metadata,
+              extracted: extractedModel
+            });
+            
+            return extractedModel || 'dify-blocking';
+          })()
         ).then(result => {
           if (result.success) {
             console.log('[Token] Successfully processed blocking API token usage:', result.newBalance);
@@ -1592,10 +1637,8 @@ export function DifyChatInterface({
       setIsLoading(false);
       setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
       
-      // 🆕 自动保存对话历史（不影响现有功能）
-      setTimeout(async () => {
-        await saveConversationToHistory();
-      }, 100); // 延迟确保状态更新完成
+      // 🔧 修复：移除自动保存，避免创建重复对话记录
+      // 对话历史由用户主动操作时保存（如点击新对话按钮）
       
       // 聚焦输入框
       inputRef.current?.focus();
@@ -1822,7 +1865,7 @@ export function DifyChatInterface({
                         {conversation.lastMessage}
                       </p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                        <span>{Math.ceil(conversation.messageCount / 2)} 轮对话</span>
+                        <span>{conversation.messageCount} 条消息</span>
                         <span>{conversation.lastMessageTime.toLocaleDateString()}</span>
                       </div>
                     </div>

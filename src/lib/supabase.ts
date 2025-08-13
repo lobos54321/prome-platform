@@ -908,6 +908,18 @@ class DatabaseService {
         updateData.workflow_cost = updates.workflowCost;
       }
 
+      // 先检查记录是否存在
+      const { data: existingData, error: checkError } = await supabase!
+        .from('model_configs')
+        .select('id')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !existingData) {
+        console.error('Model config not found for update:', id, checkError);
+        throw new Error(`Model configuration with ID ${id} not found`);
+      }
+
       const { data, error } = await supabase!
         .from('model_configs')
         .update(updateData)
