@@ -882,8 +882,8 @@ export function DifyChatInterface({
           user: userId || 'default-user',
           // 🔧 关键修复：优先使用localStorage中的dify_conversation_id以确保对话连续性
           conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
-          response_mode: hasActiveWorkflow ? 'streaming' : 'blocking',
-          stream: hasActiveWorkflow, // 只在实际工作流时启用流式响应
+          response_mode: 'streaming', // 🔥 始终使用流式模式以捕获详细的模型信息
+          stream: true, // 确保能接收node_finished事件中的模型数据
           // 🚨 关键修复：智能判断是否需要为用户交互节点提供inputs
           inputs: (() => {
             const storedDifyId = localStorage.getItem('dify_conversation_id');
