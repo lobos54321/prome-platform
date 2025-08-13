@@ -1003,7 +1003,8 @@ export function DifyChatInterface({
       }
 
       // Fix 4: Improve Stream Response Processing with fallback
-      if (hasActiveWorkflow && response.body) {
+      // 🔥 现在总是使用流式处理，因为我们总是发送streaming请求
+      if (response.body) {
         try {
           await handleWorkflowStream(response, messageContent);
         } catch (streamError) {
