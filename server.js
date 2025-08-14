@@ -1012,6 +1012,68 @@ app.post('/api/dify', async (req, res) => {
         }
       }
 
+      // 🎯 关键改进：从响应头中提取元数据和token统计（通用端点）
+      const extractMetadataFromHeaders = (response) => {
+        try {
+          // 获取所有响应头（用于调试）
+          const allHeaders = {};
+          response.headers.forEach((value, key) => {
+            allHeaders[key.toLowerCase()] = value;
+          });
+          
+          console.log('[Server Generic] 🔍 Dify API 响应头:', allHeaders);
+          
+          // 提取响应头中的元数据
+          const inputTokensHeader = response.headers.get('x-usage-input-tokens');
+          const outputTokensHeader = response.headers.get('x-usage-output-tokens');
+          const modelHeader = response.headers.get('x-dify-model');
+          const requestIdHeader = response.headers.get('x-dify-request-id');
+          
+          console.log('[Server Generic] 响应头元数据检查:', {
+            'x-usage-input-tokens': inputTokensHeader,
+            'x-usage-output-tokens': outputTokensHeader,
+            'x-dify-model': modelHeader,
+            'x-dify-request-id': requestIdHeader,
+            hasTokenStats: !!(inputTokensHeader && outputTokensHeader),
+            hasModelInfo: !!modelHeader
+          });
+          
+          const metadata = {
+            headers: allHeaders,
+            extractedFromHeaders: true,
+            timestamp: new Date().toISOString()
+          };
+          
+          // 只有在响应头存在token信息时才添加
+          if (inputTokensHeader && outputTokensHeader) {
+            metadata.headerTokenStats = {
+              prompt_tokens: parseInt(inputTokensHeader, 10),
+              completion_tokens: parseInt(outputTokensHeader, 10),
+              total_tokens: parseInt(inputTokensHeader, 10) + parseInt(outputTokensHeader, 10),
+              source: 'response_headers'
+            };
+            console.log('[Server Generic] ✅ 从响应头提取到token统计:', metadata.headerTokenStats);
+          }
+          
+          if (modelHeader) {
+            metadata.modelFromHeader = modelHeader;
+            console.log('[Server Generic] ✅ 从响应头提取到模型信息:', modelHeader);
+          }
+          
+          if (requestIdHeader) {
+            metadata.requestId = requestIdHeader;
+          }
+          
+          return metadata;
+        } catch (error) {
+          console.error('[Server Generic] ❌ 提取响应头元数据时出错:', error);
+          return null;
+        }
+      };
+      
+      // 提取响应头元数据
+      const headerMetadata = extractMetadataFromHeaders(response);
+
       // Handle streaming vs blocking response
       if (stream && requestBody.response_mode === 'streaming') {
         console.log('🔄 Handling streaming response from Dify API');
