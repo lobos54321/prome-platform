@@ -24,7 +24,7 @@ export default function Purchase() {
   const [isLoading, setIsLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(false);
 
-  const minimumUSD = 5;
+  const minimumUSD = 0.1; // 🔧 测试：降低最低充值金额到0.1美元
 
   useEffect(() => {
     const initializePurchase = async () => {
