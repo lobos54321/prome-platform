@@ -45,23 +45,16 @@ class StripeService {
    */
   async createPaymentIntent(data: PaymentIntentData): Promise<CreatePaymentIntentResponse> {
     try {
-      const response = await fetch('/api/stripe/create-payment-intent', {
+      const response = await fetch('/api/payment/stripe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: data.amount,
+          amount: data.amount / 100, // Convert cents to dollars for server
           creditsAmount: data.creditsAmount,
           userId: data.userId,
           packageId: data.packageId,
-          currency: 'usd',
-          metadata: {
-            type: 'credit_purchase',
-            credits: data.creditsAmount.toString(),
-            user_id: data.userId,
-            package_id: data.packageId || 'custom'
-          }
         }),
       });
 
@@ -70,7 +63,16 @@ class StripeService {
       }
 
       const result = await response.json();
-      return result;
+      
+      // Server returns { clientSecret }, but we need to extract the payment intent ID
+      // Payment intent ID is embedded in the client secret
+      const clientSecret = result.clientSecret;
+      const paymentIntentId = clientSecret.split('_secret_')[0];
+      
+      return {
+        clientSecret,
+        paymentIntentId
+      };
     } catch (error) {
       console.error('Failed to create payment intent:', error);
       throw new Error('Failed to initialize payment. Please try again.');

@@ -5,7 +5,7 @@
  * for native Dify API calls.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { DifyUsage } from '@/lib/dify-api-client';
 import { db } from '@/lib/supabase';
 import { ModelConfig } from '@/types';
@@ -58,6 +58,30 @@ const INITIAL_STATE: TokenMonitoringState = {
 
 export function useTokenMonitoring(): UseTokenMonitoringReturn {
   const [state, setState] = useState<TokenMonitoringState>(INITIAL_STATE);
+  const [currentProfitMargin, setCurrentProfitMargin] = useState(25); // 默认25%
+
+  // 监听利润比例变化事件
+  useEffect(() => {
+    // 初始化时从localStorage加载利润比例
+    const savedMargin = localStorage.getItem('profit_margin');
+    if (savedMargin) {
+      const margin = parseInt(savedMargin);
+      setCurrentProfitMargin(margin);
+    }
+
+    // 监听利润比例更新事件
+    const handleProfitMarginUpdate = (event: CustomEvent) => {
+      const newMargin = event.detail.margin;
+      setCurrentProfitMargin(newMargin);
+      console.log(`[Billing] Profit margin updated to ${newMargin}%`);
+    };
+
+    window.addEventListener('profit-margin-updated', handleProfitMarginUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('profit-margin-updated', handleProfitMarginUpdate as EventListener);
+    };
+  }, []);
 
   // 智能模型匹配函数 - 优先级：手动设置 > 自动创建 > 无匹配
   const findBestModelMatch = useCallback((modelConfigs: ModelConfig[], targetModelName: string): ModelConfig | null => {
@@ -171,11 +195,12 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
     difyOutputPrice: number // Dify原价 per 1K tokens
   ) => {
     try {
-      // 计算25%利润的价格
-      const profitInputPrice = difyInputPrice * 1.25;
-      const profitOutputPrice = difyOutputPrice * 1.25;
+      // 计算动态利润比例的价格
+      const profitMultiplier = 1 + (currentProfitMargin / 100);
+      const profitInputPrice = difyInputPrice * profitMultiplier;
+      const profitOutputPrice = difyOutputPrice * profitMultiplier;
 
-      console.log('[Auto Model] Creating new model config with 25% profit margin');
+      console.log(`[Auto Model] Creating new model config with ${currentProfitMargin}% profit margin`);
 
       // 获取当前用户作为创建者
       const currentUser = await authService.getCurrentUser();
@@ -199,7 +224,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           difyOutput: difyOutputPrice,
           profitInput: profitInputPrice,
           profitOutput: profitOutputPrice,
-          profitMargin: '25%'
+          profitMargin: `${currentProfitMargin}%`
         });
       } else {
         console.log('⚠️ [Auto Model] Model config already existed or creation failed');
@@ -216,7 +241,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       
       return null;
     }
-  }, []);
+  }, [currentProfitMargin]);
 
   const processTokenUsage = useCallback(async (
     usage: DifyUsage,
@@ -294,19 +319,22 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         modelName: modelName
       });
 
+      // 动态利润比例计算
+      const profitMultiplier = 1 + (currentProfitMargin / 100);
+
       // 🎯 最高优先级：处理混合数据源（响应头准确token + 响应体价格）
       if (usage.dataSource === 'combined_headers_and_body' && usage.total_price) {
         const difyTotalCost = parseFloat(usage.total_price.toString());
-        totalCost = difyTotalCost * 1.25; // 加25%利润
+        totalCost = difyTotalCost * profitMultiplier; // 加动态利润
         
-        console.log('[Billing] ✅ Using BEST data source (combined headers + body pricing)');
+        console.log(`[Billing] ✅ Using BEST data source (combined headers + body pricing) with ${currentProfitMargin}% profit`);
       }
-      // 🎯 使用Dify的total_price + 25%利润（标准方案）
+      // 🎯 使用Dify的total_price + 动态利润（标准方案）
       else if (usage.total_price) {
         const difyTotalCost = parseFloat(usage.total_price.toString());
-        totalCost = difyTotalCost * 1.25; // 加25%利润
+        totalCost = difyTotalCost * profitMultiplier; // 加动态利润
         
-        console.log('[Billing] ✅ Using real Dify pricing with profit margin applied');
+        console.log(`[Billing] ✅ Using real Dify pricing with ${currentProfitMargin}% profit margin applied`);
         
         // 🏦 保存价格信息到数据库用于审计和分析（不影响计费流程）
         try {
@@ -341,15 +369,15 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         const difyInputCost = parseFloat(usage.prompt_price.toString());
         const difyOutputCost = parseFloat(usage.completion_price.toString());
         
-        inputCost = difyInputCost * 1.25; // 加25%利润
-        outputCost = difyOutputCost * 1.25; // 加25%利润
+        inputCost = difyInputCost * profitMultiplier; // 加动态利润
+        outputCost = difyOutputCost * profitMultiplier; // 加动态利润
         totalCost = inputCost + outputCost;
         
-        console.log('[Billing] Using Dify separate pricing with profit margin applied');
+        console.log(`[Billing] Using Dify separate pricing with ${currentProfitMargin}% profit margin applied`);
       } 
       // 🎯 特殊处理：从服务器响应头提取的真实token数据（没有价格信息）
       else if (usage.extractedFromHeaders) {
-        console.log('[Billing] ✅ Using real token data from server headers + default pricing with 25% profit');
+        console.log(`[Billing] ✅ Using real token data from server headers + default pricing with ${currentProfitMargin}% profit`);
         
         // 尝试获取模型配置以使用准确的定价
         try {
@@ -357,52 +385,52 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           let modelConfig = findBestModelMatch(modelConfigs, modelName);
           
           if (modelConfig) {
-            // 使用配置的价格（已包含25%利润）
+            // 使用配置的价格（需要应用当前利润比例）
             inputCost = (finalInputTokens / 1000) * modelConfig.inputTokenPrice;
             outputCost = (finalOutputTokens / 1000) * modelConfig.outputTokenPrice;
             totalCost = inputCost + outputCost;
             
-            console.log('[Billing] Using model config pricing with profit margin');
+            console.log(`[Billing] Using model config pricing with ${currentProfitMargin}% profit margin`);
           } else {
-            // 使用默认定价 + 25%利润
+            // 使用默认定价 + 动态利润
             const defaultPricing = getDefaultModelPricing(modelName);
-            const profitInputPrice = defaultPricing.input * 1.25 / 1000; // Convert to per-token and add profit
-            const profitOutputPrice = defaultPricing.output * 1.25 / 1000;
+            const profitInputPrice = defaultPricing.input * profitMultiplier / 1000; // Convert to per-token and add profit
+            const profitOutputPrice = defaultPricing.output * profitMultiplier / 1000;
             
             inputCost = finalInputTokens * profitInputPrice;
             outputCost = finalOutputTokens * profitOutputPrice;
             totalCost = inputCost + outputCost;
             
-            console.log('[Billing] Using default pricing with profit margin applied');
+            console.log(`[Billing] Using default pricing with ${currentProfitMargin}% profit margin applied`);
           }
         } catch (error) {
           console.warn('[Billing] Error getting model pricing, using conservative fallback:', error);
           // 最后的备用方案
-          const fallbackInputPrice = 0.0025; // $0.002 + 25%
-          const fallbackOutputPrice = 0.0075; // $0.006 + 25%
+          const fallbackInputPrice = 0.002 * profitMultiplier; // $0.002 + 动态利润
+          const fallbackOutputPrice = 0.006 * profitMultiplier; // $0.006 + 动态利润
           
           inputCost = (finalInputTokens / 1000) * fallbackInputPrice;
           outputCost = (finalOutputTokens / 1000) * fallbackOutputPrice;
           totalCost = inputCost + outputCost;
         }
       } else {
-        // 🚨 Fallback: 如果Dify没有返回价格信息，使用估算价格 + 25%利润
-        console.warn('[Billing] No Dify pricing found, using fallback estimation + 25% profit');
+        // 🚨 Fallback: 如果Dify没有返回价格信息，使用估算价格 + 动态利润
+        console.warn(`[Billing] No Dify pricing found, using fallback estimation + ${currentProfitMargin}% profit`);
         
-        // 使用保守的估算价格（已包含25%利润）
-        const fallbackInputPrice = 0.0025; // $0.002 + 25%
-        const fallbackOutputPrice = 0.0075; // $0.006 + 25%
+        // 使用保守的估算价格（包含动态利润）
+        const fallbackInputPrice = 0.002 * profitMultiplier; // $0.002 + 动态利润
+        const fallbackOutputPrice = 0.006 * profitMultiplier; // $0.006 + 动态利润
         
         inputCost = (finalInputTokens / 1000) * fallbackInputPrice;
         outputCost = (finalOutputTokens / 1000) * fallbackOutputPrice;
         totalCost = inputCost + outputCost;
         
-        console.log('[Billing] Using fallback pricing with profit margin applied');
+        console.log(`[Billing] Using fallback pricing with ${currentProfitMargin}% profit margin applied`);
         
         // 记录到数据库用于后续分析（不影响当前计费）
         try {
           await autoCreateModelConfig(modelName, fallbackInputPrice * 1000, fallbackOutputPrice * 1000);
-          console.log('[Billing] Created fallback model record for future reference');
+          console.log(`[Billing] Created fallback model record with ${currentProfitMargin}% profit for future reference`);
         } catch (auditError) {
           console.warn('[Billing] Failed to save fallback record:', auditError);
         }
@@ -548,7 +576,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
 
       return { success: false, error: errorMessage };
     }
-  }, []);
+  }, [currentProfitMargin, autoCreateModelConfig, findBestModelMatch, getDefaultModelPricing]);
 
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
