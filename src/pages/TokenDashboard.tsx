@@ -77,20 +77,20 @@ export default function TokenDashboard() {
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     const monthlyUsage = tokenUsage.filter(usage => 
-      new Date(usage.timestamp) >= startOfMonth
+      usage.timestamp && new Date(usage.timestamp) >= startOfMonth
     );
     
     const dailyUsage = tokenUsage.filter(usage => 
-      new Date(usage.timestamp) >= startOfDay
+      usage.timestamp && new Date(usage.timestamp) >= startOfDay
     );
 
-    const totalTokens = tokenUsage.reduce((sum, usage) => sum + usage.tokensUsed, 0);
-    const monthlyTokens = monthlyUsage.reduce((sum, usage) => sum + usage.tokensUsed, 0);
-    const dailyTokens = dailyUsage.reduce((sum, usage) => sum + usage.tokensUsed, 0);
+    const totalTokens = tokenUsage.reduce((sum, usage) => sum + (usage.tokensUsed || 0), 0);
+    const monthlyTokens = monthlyUsage.reduce((sum, usage) => sum + (usage.tokensUsed || 0), 0);
+    const dailyTokens = dailyUsage.reduce((sum, usage) => sum + (usage.tokensUsed || 0), 0);
     
-    const totalCost = tokenUsage.reduce((sum, usage) => sum + usage.cost, 0);
-    const monthlyCost = monthlyUsage.reduce((sum, usage) => sum + usage.cost, 0);
-    const dailyCost = dailyUsage.reduce((sum, usage) => sum + usage.cost, 0);
+    const totalCost = tokenUsage.reduce((sum, usage) => sum + (usage.cost || 0), 0);
+    const monthlyCost = monthlyUsage.reduce((sum, usage) => sum + (usage.cost || 0), 0);
+    const dailyCost = dailyUsage.reduce((sum, usage) => sum + (usage.cost || 0), 0);
 
     const avgTokensPerCall = tokenUsage.length > 0 ? Math.round(totalTokens / tokenUsage.length) : 0;
 
@@ -140,7 +140,7 @@ export default function TokenDashboard() {
               Token 仪表板不可用
             </CardTitle>
             <CardDescription>
-              Dify集成功能已禁用，无法显示Token使用统计
+              ProMe集成功能已禁用，无法显示Token使用统计
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -173,7 +173,7 @@ export default function TokenDashboard() {
       </div>
 
       {/* Balance and Status */}
-      <div className="grid gap-6 md:grid-cols-4 mb-8">
+      <div className="grid gap-6 md:grid-cols-5 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">当前余额</CardTitle>
@@ -205,9 +205,9 @@ export default function TokenDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isDataLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : Math.round(stats.monthlyCost)}
+              {isDataLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.monthlyTokens.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">积分</p>
+            <p className="text-xs text-muted-foreground">Token</p>
           </CardContent>
         </Card>
 
@@ -223,10 +223,23 @@ export default function TokenDashboard() {
             <p className="text-xs text-muted-foreground">Token</p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">本月积分消费</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {isDataLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : Math.round(stats.monthlyCost)}
+            </div>
+            <p className="text-xs text-muted-foreground">积分</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Usage Summary */}
-      <div className="grid gap-6 md:grid-cols-2 mb-8">
+      <div className="grid gap-6 mb-8">
         <Card>
           <CardHeader>
             <CardTitle>使用统计</CardTitle>
@@ -252,32 +265,6 @@ export default function TokenDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>监控状态</CardTitle>
-            <CardDescription>
-              实时监控状态
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Dify集成</span>
-              <Badge variant="default">已启用</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">实时监控</span>
-              <Badge variant="default">
-                API集成模式
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">余额状态</span>
-              <Badge variant={(user?.balance || 0) > 1000 ? "default" : "destructive"}>
-                {(user?.balance || 0) > 1000 ? '充足' : '不足'}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Recent Usage */}
@@ -299,21 +286,25 @@ export default function TokenDashboard() {
           ) : tokenUsage.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p>暂无使用记录</p>
-              <p className="text-sm">开始使用Dify服务后将显示记录</p>
+              <p className="text-sm">开始使用ProMe服务后将显示记录</p>
             </div>
           ) : (
             <div className="space-y-4 max-h-[400px] overflow-y-auto">
               {tokenUsage.slice(0, 10).map((usage) => (
                 <div key={usage.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
-                    <div className="font-medium">{usage.serviceId}</div>
+                    <div className="font-medium">
+                      {usage.serviceId?.includes('dify') ? 'ProMe AI Chat' : 
+                       usage.serviceId?.includes('workflow') ? 'ProMe Workflow' : 
+                       usage.serviceId || 'ProMe Service'}
+                    </div>
                     <div className="text-sm text-gray-500">
                       {new Date(usage.timestamp).toLocaleString()}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-medium">{usage.tokensUsed} tokens</div>
-                    <div className="text-sm text-gray-500">{Math.round(usage.cost)} 积分</div>
+                    <div className="font-medium">{usage.tokensUsed?.toLocaleString() || 0} tokens</div>
+                    <div className="text-sm text-gray-500">{Math.round(usage.cost || 0)} 积分</div>
                   </div>
                 </div>
               ))}
