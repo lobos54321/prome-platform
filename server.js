@@ -1034,6 +1034,9 @@ app.post('/api/dify', async (req, res) => {
         let bodyUsageData = null; // 存储响应体中的usage信息
         let streamEnded = false;
         
+        // 🔧 修复：在流处理作用域中引用响应头元数据
+        const responseHeaderMetadata = headerMetadata;
+        
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -1097,19 +1100,19 @@ app.post('/api/dify', async (req, res) => {
           
           // 🎯 结合响应头token统计和响应体价格信息发送混合数据
           // 修复：无论是否收到[DONE]标记，只要有usage数据就发送增强信息
-          if ((streamEnded || bodyUsageData) && (headerMetadata?.headerTokenStats || bodyUsageData)) {
+          if ((streamEnded || bodyUsageData) && (responseHeaderMetadata?.headerTokenStats || bodyUsageData)) {
             console.log('[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息');
             
             // 创建混合的usage数据
             let combinedUsage = null;
             
-            if (headerMetadata?.headerTokenStats && bodyUsageData) {
+            if (responseHeaderMetadata?.headerTokenStats && bodyUsageData) {
               // 最佳情况：同时有响应头的准确token统计和响应体的价格信息
               combinedUsage = {
                 // 使用响应头的精确token数量
-                prompt_tokens: headerMetadata.headerTokenStats.prompt_tokens,
-                completion_tokens: headerMetadata.headerTokenStats.completion_tokens,
-                total_tokens: headerMetadata.headerTokenStats.total_tokens,
+                prompt_tokens: responseHeaderMetadata.headerTokenStats.prompt_tokens,
+                completion_tokens: responseHeaderMetadata.headerTokenStats.completion_tokens,
+                total_tokens: responseHeaderMetadata.headerTokenStats.total_tokens,
                 // 使用响应体的价格信息
                 prompt_price: bodyUsageData.prompt_price,
                 completion_price: bodyUsageData.completion_price,
@@ -1117,19 +1120,19 @@ app.post('/api/dify', async (req, res) => {
                 currency: bodyUsageData.currency,
                 // 标记数据来源
                 dataSource: 'combined_headers_and_body',
-                headerTokens: headerMetadata.headerTokenStats,
+                headerTokens: responseHeaderMetadata.headerTokenStats,
                 bodyPricing: bodyUsageData,
-                model: headerMetadata?.modelFromHeader || bodyUsageData.model,
-                requestId: headerMetadata?.requestId
+                model: responseHeaderMetadata?.modelFromHeader || bodyUsageData.model,
+                requestId: responseHeaderMetadata?.requestId
               };
               console.log('[Server] ✅ 创建混合usage数据 (响应头token + 响应体价格):', combinedUsage);
-            } else if (headerMetadata?.headerTokenStats) {
+            } else if (responseHeaderMetadata?.headerTokenStats) {
               // 只有响应头数据的情况
               combinedUsage = {
-                ...headerMetadata.headerTokenStats,
+                ...responseHeaderMetadata.headerTokenStats,
                 dataSource: 'headers_only',
-                model: headerMetadata?.modelFromHeader,
-                requestId: headerMetadata?.requestId,
+                model: responseHeaderMetadata?.modelFromHeader,
+                requestId: responseHeaderMetadata?.requestId,
                 note: '仅有响应头token统计，无价格信息'
               };
               console.log('[Server] ⚠️ 仅使用响应头token统计 (无价格信息):', combinedUsage);
@@ -1160,10 +1163,10 @@ app.post('/api/dify', async (req, res) => {
               console.log('[Server] ✅ 混合token使用信息已发送到前端');
             } else {
               console.log('[Server] ⚠️ 没有可用的token使用数据发送到前端:', {
-                hasHeaderStats: !!headerMetadata?.headerTokenStats,
+                hasHeaderStats: !!responseHeaderMetadata?.headerTokenStats,
                 hasBodyUsage: !!bodyUsageData,
                 streamEnded,
-                headerMetadata: headerMetadata ? 'present' : 'missing',
+                responseHeaderMetadata: responseHeaderMetadata ? 'present' : 'missing',
                 bodyUsageKeys: bodyUsageData ? Object.keys(bodyUsageData) : 'none'
               });
             }
