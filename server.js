@@ -1037,7 +1037,10 @@ app.post('/api/dify', async (req, res) => {
         try {
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              console.log('[Server] 📡 Stream读取完成 - checking for pending usage data');
+              break;
+            }
             
             const chunk = decoder.decode(value, { stream: true });
             buffer += chunk;
@@ -1093,7 +1096,8 @@ app.post('/api/dify', async (req, res) => {
           }
           
           // 🎯 结合响应头token统计和响应体价格信息发送混合数据
-          if (streamEnded && (headerMetadata?.headerTokenStats || bodyUsageData)) {
+          // 修复：无论是否收到[DONE]标记，只要有usage数据就发送增强信息
+          if ((streamEnded || bodyUsageData) && (headerMetadata?.headerTokenStats || bodyUsageData)) {
             console.log('[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息');
             
             // 创建混合的usage数据
@@ -1154,6 +1158,14 @@ app.post('/api/dify', async (req, res) => {
               
               res.write(`data: ${JSON.stringify(enhancedTokenUsageEvent)}\n\n`);
               console.log('[Server] ✅ 混合token使用信息已发送到前端');
+            } else {
+              console.log('[Server] ⚠️ 没有可用的token使用数据发送到前端:', {
+                hasHeaderStats: !!headerMetadata?.headerTokenStats,
+                hasBodyUsage: !!bodyUsageData,
+                streamEnded,
+                headerMetadata: headerMetadata ? 'present' : 'missing',
+                bodyUsageKeys: bodyUsageData ? Object.keys(bodyUsageData) : 'none'
+              });
             }
           }
           

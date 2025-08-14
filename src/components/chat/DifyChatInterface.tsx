@@ -1641,49 +1641,10 @@ export function DifyChatInterface({
                       finalResponse = parsed.data.outputs.answer; // ChatFlow的答案在data.outputs.answer中
                       messageEndReceived = true; // 标记消息完成
                       
-                      // 🔄 检查是否需要fallback计费
-                      if (!tokenUsageProcessed && parsed.data.total_tokens) {
-                        console.log('[Token] ⚠️ No message_end received yet, using workflow fallback billing:', {
-                          total_tokens: parsed.data.total_tokens,
-                          status: parsed.data.status,
-                          conversation_id: parsed.conversation_id,
-                          message_id: parsed.message_id
-                        });
-                        
-                        // 使用估算的token使用数据进行fallback计费
-                        const fallbackUsage = {
-                          prompt_tokens: Math.floor(parsed.data.total_tokens * 0.7) || 100,
-                          completion_tokens: Math.ceil(parsed.data.total_tokens * 0.3) || 50,
-                          total_tokens: parsed.data.total_tokens || 150,
-                          // 没有价格信息，让billing逻辑使用fallback定价
-                          prompt_price: undefined,
-                          completion_price: undefined,
-                          total_price: undefined
-                        };
-                        
-                        tokenUsageProcessed = true; // 标记已处理
-                        
-                        try {
-                          processTokenUsage(
-                            fallbackUsage,
-                            parsed.conversation_id,
-                            parsed.message_id,
-                            extractModelFromResponse(parsed, 'workflow_finished') || 'dify-chatflow'
-                          ).then(result => {
-                            if (result.success) {
-                              console.log('[Token] Successfully processed workflow fallback token usage:', result.newBalance);
-                            } else {
-                              console.warn('[Token] Failed to process workflow fallback token usage:', result.error);
-                            }
-                          }).catch(error => {
-                            console.error('[Token] Error processing workflow fallback token usage:', error);
-                          });
-                        } catch (tokenError) {
-                          console.error('[Token] Error preparing workflow fallback token usage:', tokenError);
-                        }
-                      } else {
-                        console.log('[Token] ℹ️ Workflow finished - token usage already processed or no token data available');
-                      }
+                      // 🚨 重要修复：workflow_finished不应该立即处理token计费
+                      // 应该等待message_end事件，它包含真实的价格信息
+                      console.log('[Token] ℹ️ Workflow finished - waiting for message_end with real pricing data');
+                      console.log('[Token] 🚫 Delaying token processing to wait for enhanced usage data from server');
                     }
                   } else if (parsed.answer && !parsed.event) {
                     // 兼容性处理：如果没有event字段但有answer字段
