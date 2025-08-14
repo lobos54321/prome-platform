@@ -656,6 +656,36 @@ export function DifyChatInterface({
     initializeCloudHistory();
   }, []);
 
+  // 🔧 修复：添加页面刷新前和组件卸载时保存对话历史
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (messages.length > 0) {
+        saveConversationToHistory();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // 组件卸载时也保存历史
+      if (messages.length > 0) {
+        saveConversationToHistory();
+      }
+    };
+  }, [messages.length]);
+
+  // 🔧 修复：消息更新后自动保存历史（防抖处理）
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    const saveTimer = setTimeout(() => {
+      saveConversationToHistory();
+    }, 2000); // 2秒后保存，避免频繁保存
+
+    return () => clearTimeout(saveTimer);
+  }, [messages]);
+
   useEffect(() => {
     const initUserIdAndSession = () => {
       // 🔥 修复用户身份识别问题：优先使用认证用户的ID
@@ -1948,17 +1978,7 @@ export function DifyChatInterface({
       <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
         <div className="flex items-center gap-2">
           <Bot className="w-6 h-6 text-blue-600" />
-          <h3 className="text-lg font-semibold text-gray-800">AI Assistant</h3>
-          {mode === 'chat' && showWorkflowProgress && (
-            <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded">
-              Chat + Workflow Progress
-            </span>
-          )}
-          {mode === 'workflow' && (
-            <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded">
-              Workflow Mode
-            </span>
-          )}
+          <h3 className="text-lg font-semibold text-gray-800">ProMe</h3>
         </div>
         <div className="flex items-center gap-2">
           <button
