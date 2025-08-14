@@ -1171,6 +1171,7 @@ export function DifyChatInterface({
     let hasReceivedData = false;
     let processedDataCount = 0; // 跟踪处理的数据块数量
     let messageEndReceived = false; // 标记是否收到message_end事件
+    let tokenUsageProcessed = false; // 标记是否已处理token计费
 
     try {
       // 创建超时控制器
@@ -1467,8 +1468,9 @@ export function DifyChatInterface({
                     console.log('[Chat Debug] Message end received, total content length:', finalResponse.length);
                     
                     // 💰 处理message_end事件中的token使用和积分扣减
-                    if (parsed.metadata && parsed.metadata.usage) {
-                      console.log('[Token] Processing message_end token usage:', parsed.metadata.usage);
+                    if (parsed.metadata && parsed.metadata.usage && !tokenUsageProcessed) {
+                      console.log('[Token] ✅ Processing message_end token usage (with real Dify pricing):', parsed.metadata.usage);
+                      tokenUsageProcessed = true; // 标记已处理，避免重复计费
                       
                       // 🔍 详细记录所有可能包含模型信息的字段
                       console.log('[Model Extraction] 完整metadata分析:', {
@@ -1515,65 +1517,48 @@ export function DifyChatInterface({
                       finalResponse = parsed.data.outputs.answer; // ChatFlow的答案在data.outputs.answer中
                       messageEndReceived = true; // 标记消息完成
                       
-                      // 💰 处理token使用和积分扣减
-                      if (parsed.data.total_tokens || (parsed.data.status === 'succeeded' && parsed.data.elapsed_time)) {
-                        console.log('[Token] Processing workflow token usage:', {
+                      // 🔄 检查是否需要fallback计费
+                      if (!tokenUsageProcessed && parsed.data.total_tokens) {
+                        console.log('[Token] ⚠️ No message_end received yet, using workflow fallback billing:', {
                           total_tokens: parsed.data.total_tokens,
                           status: parsed.data.status,
                           conversation_id: parsed.conversation_id,
                           message_id: parsed.message_id
                         });
                         
+                        // 使用估算的token使用数据进行fallback计费
+                        const fallbackUsage = {
+                          prompt_tokens: Math.floor(parsed.data.total_tokens * 0.7) || 100,
+                          completion_tokens: Math.ceil(parsed.data.total_tokens * 0.3) || 50,
+                          total_tokens: parsed.data.total_tokens || 150,
+                          // 没有价格信息，让billing逻辑使用fallback定价
+                          prompt_price: undefined,
+                          completion_price: undefined,
+                          total_price: undefined
+                        };
+                        
+                        tokenUsageProcessed = true; // 标记已处理
+                        
                         try {
-                          // 🔍 全面搜索usage信息 - 检查所有可能的位置
-                          const usageData = parsed.data.usage || parsed.usage || parsed.metadata?.usage || parsed.data.metadata?.usage;
-                          
-                          // 构造token使用数据 - 尝试从Dify数据中提取真实价格
-                          const tokenUsage = {
-                            prompt_tokens: usageData?.prompt_tokens || Math.floor(parsed.data.total_tokens * 0.7) || 100,
-                            completion_tokens: usageData?.completion_tokens || Math.ceil(parsed.data.total_tokens * 0.3) || 50,
-                            total_tokens: usageData?.total_tokens || parsed.data.total_tokens || 150,
-                            // 🎯 尝试从所有可能位置提取价格信息
-                            prompt_price: usageData?.prompt_price,
-                            completion_price: usageData?.completion_price,
-                            total_price: usageData?.total_price
-                          };
-                          
-                          console.log('[Token] 🔍 Workflow完整数据结构分析:', {
-                            hasDataUsage: !!parsed.data.usage,
-                            hasRootUsage: !!parsed.usage,
-                            hasMetadataUsage: !!parsed.metadata?.usage,
-                            extractedUsage: tokenUsage,
-                            allPossibleUsageLocations: {
-                              'parsed.data.usage': parsed.data.usage,
-                              'parsed.usage': parsed.usage,
-                              'parsed.metadata.usage': parsed.metadata?.usage,
-                              'parsed.data.metadata.usage': parsed.data.metadata?.usage
-                            },
-                            fullDataKeys: Object.keys(parsed.data || {}),
-                            fullRootKeys: Object.keys(parsed),
-                            rawEventData: parsed
-                          });
-                          
-                          // 异步处理token使用，不阻塞UI
                           processTokenUsage(
-                            tokenUsage,
+                            fallbackUsage,
                             parsed.conversation_id,
                             parsed.message_id,
-                            // 🔍 使用专用提取函数获取模型名称
-                            extractModelFromResponse(parsed, 'node_finished') || 'dify-chatflow'
+                            extractModelFromResponse(parsed, 'workflow_finished') || 'dify-chatflow'
                           ).then(result => {
                             if (result.success) {
-                              console.log('[Token] Successfully processed token usage:', result.newBalance);
+                              console.log('[Token] Successfully processed workflow fallback token usage:', result.newBalance);
                             } else {
-                              console.warn('[Token] Failed to process token usage:', result.error);
+                              console.warn('[Token] Failed to process workflow fallback token usage:', result.error);
                             }
                           }).catch(error => {
-                            console.error('[Token] Error processing token usage:', error);
+                            console.error('[Token] Error processing workflow fallback token usage:', error);
                           });
                         } catch (tokenError) {
-                          console.error('[Token] Error preparing token usage:', tokenError);
+                          console.error('[Token] Error preparing workflow fallback token usage:', tokenError);
                         }
+                      } else {
+                        console.log('[Token] ℹ️ Workflow finished - token usage already processed or no token data available');
                       }
                     }
                   } else if (parsed.answer && !parsed.event) {
