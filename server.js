@@ -1136,7 +1136,7 @@ app.post('/api/dify', async (req, res) => {
                   // 🎯 提取响应体中的usage信息（包含价格）
                   if (parsed.event === 'message_end' && parsed.metadata?.usage) {
                     bodyUsageData = parsed.metadata.usage;
-                    console.log('[Server] 📊 从响应体提取usage信息 (含价格):', bodyUsageData);
+                    console.log('[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取');
                   }
                   
                   // Forward the streaming data to client
@@ -1187,7 +1187,7 @@ app.post('/api/dify', async (req, res) => {
                 model: responseHeaderMetadata?.modelFromHeader || bodyUsageData.model,
                 requestId: responseHeaderMetadata?.requestId
               };
-              console.log('[Server] ✅ 创建混合usage数据 (响应头token + 响应体价格):', combinedUsage);
+              console.log('[Server] ✅ 创建混合usage数据 (响应头token + 响应体价格)');
             } else if (responseHeaderMetadata?.headerTokenStats) {
               // 只有响应头数据的情况
               combinedUsage = {
@@ -1197,7 +1197,7 @@ app.post('/api/dify', async (req, res) => {
                 requestId: responseHeaderMetadata?.requestId,
                 note: '仅有响应头token统计，无价格信息'
               };
-              console.log('[Server] ⚠️ 仅使用响应头token统计 (无价格信息):', combinedUsage);
+              console.log('[Server] ⚠️ 仅使用响应头token统计 (无价格信息)');
             } else if (bodyUsageData) {
               // 只有响应体数据的情况
               combinedUsage = {
@@ -1205,7 +1205,7 @@ app.post('/api/dify', async (req, res) => {
                 dataSource: 'body_only',
                 note: '仅有响应体usage信息'
               };
-              console.log('[Server] ⚠️ 仅使用响应体usage信息:', combinedUsage);
+              console.log('[Server] ⚠️ 仅使用响应体usage信息');
             }
             
             if (combinedUsage) {

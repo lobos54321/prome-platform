@@ -299,38 +299,14 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         const difyTotalCost = parseFloat(usage.total_price.toString());
         totalCost = difyTotalCost * 1.25; // 加25%利润
         
-        console.log('[Billing] ✅ Using BEST data source (headers + body combined) + 25% profit:', {
-          difyOriginalCost: difyTotalCost,
-          ourFinalCost: totalCost,
-          profitMargin: '25%',
-          dataSource: 'combined_headers_and_body',
-          headerTokens: usage.headerTokens,
-          bodyPricing: usage.bodyPricing,
-          model: usage.model,
-          tokens: `${usage.prompt_tokens}+${usage.completion_tokens}=${usage.total_tokens}`,
-          priceBreakdown: {
-            promptPrice: usage.prompt_price,
-            completionPrice: usage.completion_price,
-            totalPrice: usage.total_price
-          }
-        });
+        console.log('[Billing] ✅ Using BEST data source (combined headers + body pricing)');
       }
       // 🎯 使用Dify的total_price + 25%利润（标准方案）
       else if (usage.total_price) {
         const difyTotalCost = parseFloat(usage.total_price.toString());
         totalCost = difyTotalCost * 1.25; // 加25%利润
         
-        console.log('[Billing] ✅ Using Dify total_price + 25% profit:', {
-          difyOriginalCost: difyTotalCost,
-          ourFinalCost: totalCost,
-          profitMargin: '25%',
-          tokens: `${usage.prompt_tokens}+${usage.completion_tokens}=${usage.total_tokens}`,
-          priceBreakdown: {
-            promptPrice: usage.prompt_price,
-            completionPrice: usage.completion_price,
-            totalPrice: usage.total_price
-          }
-        });
+        console.log('[Billing] ✅ Using real Dify pricing with profit margin applied');
         
         // 🏦 保存价格信息到数据库用于审计和分析（不影响计费流程）
         try {
@@ -369,14 +345,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         outputCost = difyOutputCost * 1.25; // 加25%利润
         totalCost = inputCost + outputCost;
         
-        console.log('[Billing] Using Dify separate prices + 25% profit:', {
-          difyInputCost,
-          difyOutputCost,
-          ourInputCost: inputCost,
-          ourOutputCost: outputCost,
-          ourTotalCost: totalCost,
-          profitMargin: '25%'
-        });
+        console.log('[Billing] Using Dify separate pricing with profit margin applied');
       } 
       // 🎯 特殊处理：从服务器响应头提取的真实token数据（没有价格信息）
       else if (usage.extractedFromHeaders) {
@@ -393,15 +362,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
             outputCost = (finalOutputTokens / 1000) * modelConfig.outputTokenPrice;
             totalCost = inputCost + outputCost;
             
-            console.log('[Billing] Using model config pricing (includes 25% profit):', {
-              model: modelConfig.modelName,
-              inputPrice: modelConfig.inputTokenPrice,
-              outputPrice: modelConfig.outputTokenPrice,
-              inputCost,
-              outputCost,
-              totalCost,
-              source: 'model_config'
-            });
+            console.log('[Billing] Using model config pricing with profit margin');
           } else {
             // 使用默认定价 + 25%利润
             const defaultPricing = getDefaultModelPricing(modelName);
@@ -412,17 +373,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
             outputCost = finalOutputTokens * profitOutputPrice;
             totalCost = inputCost + outputCost;
             
-            console.log('[Billing] Using default pricing + 25% profit:', {
-              model: modelName,
-              defaultInputPrice: defaultPricing.input,
-              defaultOutputPrice: defaultPricing.output,
-              profitInputPrice,
-              profitOutputPrice,
-              inputCost,
-              outputCost,
-              totalCost,
-              source: 'default_with_profit'
-            });
+            console.log('[Billing] Using default pricing with profit margin applied');
           }
         } catch (error) {
           console.warn('[Billing] Error getting model pricing, using conservative fallback:', error);
@@ -446,15 +397,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         outputCost = (finalOutputTokens / 1000) * fallbackOutputPrice;
         totalCost = inputCost + outputCost;
         
-        console.log('[Billing] Using fallback pricing with 25% profit:', {
-          model: modelName,
-          fallbackInputPrice,
-          fallbackOutputPrice,
-          inputCost,
-          outputCost,
-          totalCost,
-          note: 'Fallback pricing used due to missing Dify usage.price'
-        });
+        console.log('[Billing] Using fallback pricing with profit margin applied');
         
         // 记录到数据库用于后续分析（不影响当前计费）
         try {
