@@ -2435,8 +2435,8 @@ app.post('/api/dify/:conversationId', async (req, res) => {
 app.post('/api/payment/stripe', async (req, res) => {
   try {
     const { amount } = req.body; // 单位：美元
-    if (!amount || amount < 5) {
-      return res.status(400).json({ error: '充值金额不能低于5美元' });
+    if (!amount || amount < 0.1) {
+      return res.status(400).json({ error: '充值金额不能低于0.1美元' });
     }
 
     // Stripe 以分为单位，需*100
