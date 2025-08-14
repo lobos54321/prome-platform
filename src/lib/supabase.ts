@@ -684,7 +684,7 @@ class DatabaseService {
 
   async addBillingRecord(
     userId: string,
-    type: 'charge' | 'refund',
+    type: 'charge' | 'usage',
     amount: number,
     description: string
   ): Promise<BillingRecord | null> {
@@ -1198,7 +1198,7 @@ class DatabaseService {
       const updatedBalance = await this.updateUserBalance(userId, newBalance);
 
       // Add billing record for consumption (negative amount)
-      await this.addBillingRecord(userId, 'refund', amount, description);
+      await this.addBillingRecord(userId, 'usage', amount, description);
 
       return { 
         success: true, 

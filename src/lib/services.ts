@@ -53,7 +53,7 @@ class ServicesAPI {
   
   // 安全添加账单记录
   async addBillingRecord(
-    type: 'charge' | 'refund',
+    type: 'charge' | 'usage',
     amount: number,
     description: string
   ) {
