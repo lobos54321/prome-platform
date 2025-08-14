@@ -1453,8 +1453,70 @@ export function DifyChatInterface({
                     });
                   }
 
+                  // 🎯 最高优先级：处理结合响应头和响应体的增强token使用信息
+                  if (parsed.event === 'enhanced_token_usage') {
+                    console.log('[Chat Debug] 🚨 收到增强的token使用信息 (响应头+响应体):', parsed.data);
+                    
+                    if (parsed.data.usage && !tokenUsageProcessed) {
+                      console.log('[Token] ✅ Processing enhanced token usage (headers + body combined):', parsed.data.usage);
+                      tokenUsageProcessed = true; // 标记已处理，避免重复计费
+                      
+                      try {
+                        // 使用结合响应头准确token数量和响应体价格信息的数据进行计费
+                        processTokenUsage(
+                          parsed.data.usage,
+                          parsed.conversation_id,
+                          parsed.message_id || `enhanced_${Date.now()}`,
+                          parsed.data.usage.model || extractModelFromResponse(parsed, 'enhanced_combined') || 'dify-chatflow'
+                        ).then(result => {
+                          if (result.success) {
+                            console.log('[Token] ✅ Successfully processed enhanced token usage:', result.newBalance);
+                          } else {
+                            console.warn('[Token] ❌ Failed to process enhanced token usage:', result.error);
+                          }
+                        }).catch(error => {
+                          console.error('[Token] ❌ Error processing enhanced token usage:', error);
+                        });
+                      } catch (tokenError) {
+                        console.error('[Token] ❌ Error preparing enhanced token usage:', tokenError);
+                      }
+                    } else {
+                      console.log('[Token] ℹ️ Enhanced token usage already processed or no usage data available');
+                    }
+                  }
+                  // 🎯 备用方案：从服务器响应头提取的token使用信息（仅token统计）
+                  else if (parsed.event === 'token_usage_extracted') {
+                    console.log('[Chat Debug] 🚨 收到从服务器响应头提取的token使用信息:', parsed.data);
+                    
+                    if (parsed.data.usage && !tokenUsageProcessed) {
+                      console.log('[Token] ✅ Processing server-extracted token usage (from Dify response headers):', parsed.data.usage);
+                      tokenUsageProcessed = true; // 标记已处理，避免重复计费
+                      
+                      try {
+                        // 使用从响应头提取的真实token数据进行计费
+                        processTokenUsage(
+                          parsed.data.usage,
+                          parsed.conversation_id,
+                          parsed.message_id || `server_extracted_${Date.now()}`,
+                          extractModelFromResponse(parsed, 'server_headers') || 'dify-chatflow'
+                        ).then(result => {
+                          if (result.success) {
+                            console.log('[Token] ✅ Successfully processed server-extracted token usage:', result.newBalance);
+                          } else {
+                            console.warn('[Token] ❌ Failed to process server-extracted token usage:', result.error);
+                          }
+                        }).catch(error => {
+                          console.error('[Token] ❌ Error processing server-extracted token usage:', error);
+                        });
+                      } catch (tokenError) {
+                        console.error('[Token] ❌ Error preparing server-extracted token usage:', tokenError);
+                      }
+                    } else {
+                      console.log('[Token] ℹ️ Server-extracted token usage already processed or no usage data available');
+                    }
+                  }
                   // 🔧 修复：正确解析和累积消息内容 - 处理DIFY流格式
-                  if (parsed.event === 'message' && parsed.answer) {
+                  else if (parsed.event === 'message' && parsed.answer) {
                     console.log('[Chat Debug] Accumulating message answer:', parsed.answer.length, 'chars');
                     finalResponse += parsed.answer;
                   } else if (parsed.event === 'message_end') {
@@ -1470,6 +1532,57 @@ export function DifyChatInterface({
                     // 💰 处理message_end事件中的token使用和积分扣减
                     if (parsed.metadata && parsed.metadata.usage && !tokenUsageProcessed) {
                       console.log('[Token] ✅ Processing message_end token usage (with real Dify pricing):', parsed.metadata.usage);
+                      
+                      // 🔍 详细调试：检查Dify usage数据的完整结构
+                      console.log('[DEBUG MESSAGE_END] 🚨 完整的message_end事件数据结构分析:', {
+                        event_type: parsed.event,
+                        has_metadata: !!parsed.metadata,
+                        has_usage: !!parsed.metadata?.usage,
+                        usage_keys: Object.keys(parsed.metadata?.usage || {}),
+                        usage_complete_object: JSON.stringify(parsed.metadata?.usage, null, 2),
+                        
+                        // 检查价格字段的所有可能命名方式
+                        price_fields_check: {
+                          'usage.prompt_price': parsed.metadata?.usage?.prompt_price,
+                          'usage.completion_price': parsed.metadata?.usage?.completion_price,
+                          'usage.total_price': parsed.metadata?.usage?.total_price,
+                          'usage.price': parsed.metadata?.usage?.price,
+                          'usage.cost': parsed.metadata?.usage?.cost,
+                          'usage.prompt_cost': parsed.metadata?.usage?.prompt_cost,
+                          'usage.completion_cost': parsed.metadata?.usage?.completion_cost,
+                          'usage.total_cost': parsed.metadata?.usage?.total_cost,
+                          'usage.input_price': parsed.metadata?.usage?.input_price,
+                          'usage.output_price': parsed.metadata?.usage?.output_price,
+                          'usage.pricing': parsed.metadata?.usage?.pricing,
+                          'usage.price_breakdown': parsed.metadata?.usage?.price_breakdown
+                        },
+                        
+                        // 检查其他可能的位置
+                        other_locations: {
+                          'metadata.price': parsed.metadata?.price,
+                          'metadata.cost': parsed.metadata?.cost,
+                          'metadata.pricing': parsed.metadata?.pricing,
+                          'parsed.price': parsed.price,
+                          'parsed.cost': parsed.cost,
+                          'parsed.pricing': parsed.pricing,
+                          'parsed.data.price': parsed.data?.price,
+                          'parsed.data.cost': parsed.data?.cost,
+                          'parsed.data.usage': parsed.data?.usage
+                        },
+                        
+                        // 检查currency字段
+                        currency_info: {
+                          'usage.currency': parsed.metadata?.usage?.currency,
+                          'metadata.currency': parsed.metadata?.currency,
+                          'parsed.currency': parsed.currency
+                        },
+                        
+                        // 完整的事件数据（为了发现新字段）
+                        full_parsed_keys: Object.keys(parsed),
+                        full_metadata_keys: Object.keys(parsed.metadata || {}),
+                        timestamp: new Date().toISOString()
+                      });
+                      
                       tokenUsageProcessed = true; // 标记已处理，避免重复计费
                       
                       // 🔍 详细记录所有可能包含模型信息的字段
@@ -1509,6 +1622,17 @@ export function DifyChatInterface({
                       } catch (tokenError) {
                         console.error('[Token] Error preparing message_end token usage:', tokenError);
                       }
+                    } else {
+                      // 🔍 调试：记录为什么message_end事件没有被处理
+                      console.log('[DEBUG MESSAGE_END] ❌ message_end事件未处理原因分析:', {
+                        event_type: parsed.event,
+                        has_parsed: !!parsed,
+                        has_metadata: !!parsed.metadata,
+                        has_usage: !!parsed.metadata?.usage,
+                        token_usage_already_processed: tokenUsageProcessed,
+                        metadata_structure: parsed.metadata ? Object.keys(parsed.metadata) : 'no metadata',
+                        full_event_data: JSON.stringify(parsed, null, 2)
+                      });
                     }
                   } else if (parsed.event === 'workflow_finished') {
                     // 🎯 关键修复：处理ChatFlow的workflow_finished事件

@@ -20,6 +20,21 @@ export interface DifyChatResponse {
   }
 }
 
+// 流式响应的 token 使用信息（从响应头提取）
+export interface DifyStreamTokenUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  extractedFromHeaders: boolean
+  headers?: Record<string, string>
+}
+
+// 带有 token 使用信息的流式响应
+export interface DifyStreamResponse {
+  response: Response
+  tokenUsage?: DifyStreamTokenUsage
+}
+
 export interface DifyFileUploadResponse {
   id: string
   name: string
@@ -158,7 +173,7 @@ export class DifyAPIClient {
   /**
    * 发送聊天消息（流式）
    */
-  async sendChatMessageStream(params: SendChatMessageParams): Promise<Response> {
+  async sendChatMessageStream(params: SendChatMessageParams): Promise<DifyStreamResponse> {
     const body = {
       inputs: params.inputs || {},
       query: params.query,
@@ -185,7 +200,71 @@ export class DifyAPIClient {
       throw new Error(errorData.message || `Stream API Error: ${response.status}`)
     }
     
-    return response
+    // 🎯 关键改进：从响应头中提取 token 使用信息
+    const tokenUsage = this.extractTokenUsageFromHeaders(response)
+    console.log('[Dify API] 🚨 从响应头提取的token信息:', tokenUsage)
+    
+    return {
+      response,
+      tokenUsage
+    }
+  }
+  
+  /**
+   * 从 Dify API 响应头中提取 token 使用信息
+   * 根据官方文档，Dify 会在响应头中返回：
+   * - x-usage-input-tokens: 输入 token 数量
+   * - x-usage-output-tokens: 输出 token 数量
+   */
+  private extractTokenUsageFromHeaders(response: Response): DifyStreamTokenUsage | undefined {
+    try {
+      // 获取所有响应头（用于调试）
+      const allHeaders: Record<string, string> = {}
+      response.headers.forEach((value, key) => {
+        allHeaders[key.toLowerCase()] = value
+      })
+      
+      console.log('[Dify API] 🔍 所有响应头:', allHeaders)
+      
+      // 提取 token 使用信息
+      const inputTokensHeader = response.headers.get('x-usage-input-tokens')
+      const outputTokensHeader = response.headers.get('x-usage-output-tokens')
+      
+      console.log('[Dify API] Token 响应头检查:', {
+        'x-usage-input-tokens': inputTokensHeader,
+        'x-usage-output-tokens': outputTokensHeader,
+        hasInputTokens: !!inputTokensHeader,
+        hasOutputTokens: !!outputTokensHeader
+      })
+      
+      if (inputTokensHeader && outputTokensHeader) {
+        const inputTokens = parseInt(inputTokensHeader, 10)
+        const outputTokens = parseInt(outputTokensHeader, 10)
+        const totalTokens = inputTokens + outputTokens
+        
+        const tokenUsage: DifyStreamTokenUsage = {
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          extractedFromHeaders: true,
+          headers: allHeaders
+        }
+        
+        console.log('[Dify API] ✅ 成功从响应头提取token使用信息:', tokenUsage)
+        return tokenUsage
+      } else {
+        console.warn('[Dify API] ⚠️ 响应头中未找到token使用信息，可能的原因:', {
+          missingInputHeader: !inputTokensHeader,
+          missingOutputHeader: !outputTokensHeader,
+          availableHeaders: Object.keys(allHeaders),
+          note: '检查Dify版本是否支持响应头中的token信息'
+        })
+        return undefined
+      }
+    } catch (error) {
+      console.error('[Dify API] ❌ 提取token使用信息时出错:', error)
+      return undefined
+    }
   }
   
   /**

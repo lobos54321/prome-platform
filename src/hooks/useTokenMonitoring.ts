@@ -289,11 +289,34 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         completionPrice: usage.completion_price,
         totalPrice: usage.total_price,
         currency: usage.currency,
+        extractedFromHeaders: usage.extractedFromHeaders,
+        dataSource: usage.dataSource,
         modelName: modelName
       });
 
-      // 🎯 使用Dify的total_price + 25%利润（最准确的方案）
-      if (usage.total_price) {
+      // 🎯 最高优先级：处理混合数据源（响应头准确token + 响应体价格）
+      if (usage.dataSource === 'combined_headers_and_body' && usage.total_price) {
+        const difyTotalCost = parseFloat(usage.total_price.toString());
+        totalCost = difyTotalCost * 1.25; // 加25%利润
+        
+        console.log('[Billing] ✅ Using BEST data source (headers + body combined) + 25% profit:', {
+          difyOriginalCost: difyTotalCost,
+          ourFinalCost: totalCost,
+          profitMargin: '25%',
+          dataSource: 'combined_headers_and_body',
+          headerTokens: usage.headerTokens,
+          bodyPricing: usage.bodyPricing,
+          model: usage.model,
+          tokens: `${usage.prompt_tokens}+${usage.completion_tokens}=${usage.total_tokens}`,
+          priceBreakdown: {
+            promptPrice: usage.prompt_price,
+            completionPrice: usage.completion_price,
+            totalPrice: usage.total_price
+          }
+        });
+      }
+      // 🎯 使用Dify的total_price + 25%利润（标准方案）
+      else if (usage.total_price) {
         const difyTotalCost = parseFloat(usage.total_price.toString());
         totalCost = difyTotalCost * 1.25; // 加25%利润
         
@@ -354,6 +377,63 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           ourTotalCost: totalCost,
           profitMargin: '25%'
         });
+      } 
+      // 🎯 特殊处理：从服务器响应头提取的真实token数据（没有价格信息）
+      else if (usage.extractedFromHeaders) {
+        console.log('[Billing] ✅ Using real token data from server headers + default pricing with 25% profit');
+        
+        // 尝试获取模型配置以使用准确的定价
+        try {
+          const modelConfigs = await db.getModelConfigs();
+          let modelConfig = findBestModelMatch(modelConfigs, modelName);
+          
+          if (modelConfig) {
+            // 使用配置的价格（已包含25%利润）
+            inputCost = (finalInputTokens / 1000) * modelConfig.inputTokenPrice;
+            outputCost = (finalOutputTokens / 1000) * modelConfig.outputTokenPrice;
+            totalCost = inputCost + outputCost;
+            
+            console.log('[Billing] Using model config pricing (includes 25% profit):', {
+              model: modelConfig.modelName,
+              inputPrice: modelConfig.inputTokenPrice,
+              outputPrice: modelConfig.outputTokenPrice,
+              inputCost,
+              outputCost,
+              totalCost,
+              source: 'model_config'
+            });
+          } else {
+            // 使用默认定价 + 25%利润
+            const defaultPricing = getDefaultModelPricing(modelName);
+            const profitInputPrice = defaultPricing.input * 1.25 / 1000; // Convert to per-token and add profit
+            const profitOutputPrice = defaultPricing.output * 1.25 / 1000;
+            
+            inputCost = finalInputTokens * profitInputPrice;
+            outputCost = finalOutputTokens * profitOutputPrice;
+            totalCost = inputCost + outputCost;
+            
+            console.log('[Billing] Using default pricing + 25% profit:', {
+              model: modelName,
+              defaultInputPrice: defaultPricing.input,
+              defaultOutputPrice: defaultPricing.output,
+              profitInputPrice,
+              profitOutputPrice,
+              inputCost,
+              outputCost,
+              totalCost,
+              source: 'default_with_profit'
+            });
+          }
+        } catch (error) {
+          console.warn('[Billing] Error getting model pricing, using conservative fallback:', error);
+          // 最后的备用方案
+          const fallbackInputPrice = 0.0025; // $0.002 + 25%
+          const fallbackOutputPrice = 0.0075; // $0.006 + 25%
+          
+          inputCost = (finalInputTokens / 1000) * fallbackInputPrice;
+          outputCost = (finalOutputTokens / 1000) * fallbackOutputPrice;
+          totalCost = inputCost + outputCost;
+        }
       } else {
         // 🚨 Fallback: 如果Dify没有返回价格信息，使用估算价格 + 25%利润
         console.warn('[Billing] No Dify pricing found, using fallback estimation + 25% profit');

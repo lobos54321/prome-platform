@@ -1031,6 +1031,8 @@ app.post('/api/dify', async (req, res) => {
         const decoder = new TextDecoder();
         let buffer = '';
         let finalData = null;
+        let bodyUsageData = null; // 存储响应体中的usage信息
+        let streamEnded = false;
         
         try {
           while (true) {
@@ -1051,6 +1053,7 @@ app.post('/api/dify', async (req, res) => {
                 
                 if (data === '[DONE]') {
                   console.log('🔚 Streaming ended with [DONE]');
+                  streamEnded = true;
                   break;
                 }
                 
@@ -1062,13 +1065,20 @@ app.post('/api/dify', async (req, res) => {
                     finalData = parsed;
                   }
                   
+                  // 🎯 提取响应体中的usage信息（包含价格）
+                  if (parsed.event === 'message_end' && parsed.metadata?.usage) {
+                    bodyUsageData = parsed.metadata.usage;
+                    console.log('[Server] 📊 从响应体提取usage信息 (含价格):', bodyUsageData);
+                  }
+                  
                   // Forward the streaming data to client
                   res.write(`data: ${data}\n\n`);
                   
                   console.log('📤 Forwarded streaming data:', {
                     event: parsed.event,
                     hasAnswer: !!parsed.answer,
-                    conversationId: parsed.conversation_id
+                    conversationId: parsed.conversation_id,
+                    hasUsage: !!parsed.metadata?.usage
                   });
                   
                 } catch (parseError) {
@@ -1077,6 +1087,73 @@ app.post('/api/dify', async (req, res) => {
                   res.write(`data: ${data}\n\n`);
                 }
               }
+            }
+            
+            if (streamEnded) break;
+          }
+          
+          // 🎯 结合响应头token统计和响应体价格信息发送混合数据
+          if (streamEnded && (headerMetadata?.headerTokenStats || bodyUsageData)) {
+            console.log('[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息');
+            
+            // 创建混合的usage数据
+            let combinedUsage = null;
+            
+            if (headerMetadata?.headerTokenStats && bodyUsageData) {
+              // 最佳情况：同时有响应头的准确token统计和响应体的价格信息
+              combinedUsage = {
+                // 使用响应头的精确token数量
+                prompt_tokens: headerMetadata.headerTokenStats.prompt_tokens,
+                completion_tokens: headerMetadata.headerTokenStats.completion_tokens,
+                total_tokens: headerMetadata.headerTokenStats.total_tokens,
+                // 使用响应体的价格信息
+                prompt_price: bodyUsageData.prompt_price,
+                completion_price: bodyUsageData.completion_price,
+                total_price: bodyUsageData.total_price,
+                currency: bodyUsageData.currency,
+                // 标记数据来源
+                dataSource: 'combined_headers_and_body',
+                headerTokens: headerMetadata.headerTokenStats,
+                bodyPricing: bodyUsageData,
+                model: headerMetadata?.modelFromHeader || bodyUsageData.model,
+                requestId: headerMetadata?.requestId
+              };
+              console.log('[Server] ✅ 创建混合usage数据 (响应头token + 响应体价格):', combinedUsage);
+            } else if (headerMetadata?.headerTokenStats) {
+              // 只有响应头数据的情况
+              combinedUsage = {
+                ...headerMetadata.headerTokenStats,
+                dataSource: 'headers_only',
+                model: headerMetadata?.modelFromHeader,
+                requestId: headerMetadata?.requestId,
+                note: '仅有响应头token统计，无价格信息'
+              };
+              console.log('[Server] ⚠️ 仅使用响应头token统计 (无价格信息):', combinedUsage);
+            } else if (bodyUsageData) {
+              // 只有响应体数据的情况
+              combinedUsage = {
+                ...bodyUsageData,
+                dataSource: 'body_only',
+                note: '仅有响应体usage信息'
+              };
+              console.log('[Server] ⚠️ 仅使用响应体usage信息:', combinedUsage);
+            }
+            
+            if (combinedUsage) {
+              // 创建一个特殊的事件来传递混合的token使用信息
+              const enhancedTokenUsageEvent = {
+                event: 'enhanced_token_usage',
+                data: {
+                  usage: combinedUsage,
+                  source: 'dify_headers_and_body_combined',
+                  note: '结合了响应头准确token统计和响应体价格信息的混合数据'
+                },
+                conversation_id: finalData?.conversation_id,
+                timestamp: new Date().toISOString()
+              };
+              
+              res.write(`data: ${JSON.stringify(enhancedTokenUsageEvent)}\n\n`);
+              console.log('[Server] ✅ 混合token使用信息已发送到前端');
             }
           }
           
@@ -1614,6 +1691,68 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       },
       STREAMING_TIMEOUT // Use streaming timeout for chat streams
     );
+
+    // 🎯 关键改进：从响应头中提取元数据和token统计
+    const extractMetadataFromHeaders = (response) => {
+      try {
+        // 获取所有响应头（用于调试）
+        const allHeaders = {};
+        response.headers.forEach((value, key) => {
+          allHeaders[key.toLowerCase()] = value;
+        });
+        
+        console.log('[Server] 🔍 Dify API 响应头:', allHeaders);
+        
+        // 提取响应头中的元数据
+        const inputTokensHeader = response.headers.get('x-usage-input-tokens');
+        const outputTokensHeader = response.headers.get('x-usage-output-tokens');
+        const modelHeader = response.headers.get('x-dify-model');
+        const requestIdHeader = response.headers.get('x-dify-request-id');
+        
+        console.log('[Server] 响应头元数据检查:', {
+          'x-usage-input-tokens': inputTokensHeader,
+          'x-usage-output-tokens': outputTokensHeader,
+          'x-dify-model': modelHeader,
+          'x-dify-request-id': requestIdHeader,
+          hasTokenStats: !!(inputTokensHeader && outputTokensHeader),
+          hasModelInfo: !!modelHeader
+        });
+        
+        const metadata = {
+          headers: allHeaders,
+          extractedFromHeaders: true,
+          timestamp: new Date().toISOString()
+        };
+        
+        // 只有在响应头存在token信息时才添加
+        if (inputTokensHeader && outputTokensHeader) {
+          metadata.headerTokenStats = {
+            prompt_tokens: parseInt(inputTokensHeader, 10),
+            completion_tokens: parseInt(outputTokensHeader, 10),
+            total_tokens: parseInt(inputTokensHeader, 10) + parseInt(outputTokensHeader, 10),
+            source: 'response_headers'
+          };
+          console.log('[Server] ✅ 从响应头提取到token统计:', metadata.headerTokenStats);
+        }
+        
+        if (modelHeader) {
+          metadata.modelFromHeader = modelHeader;
+          console.log('[Server] ✅ 从响应头提取到模型信息:', modelHeader);
+        }
+        
+        if (requestIdHeader) {
+          metadata.requestId = requestIdHeader;
+        }
+        
+        return metadata;
+      } catch (error) {
+        console.error('[Server] ❌ 提取响应头元数据时出错:', error);
+        return null;
+      }
+    };
+    
+    // 提取响应头元数据
+    const headerMetadata = extractMetadataFromHeaders(response);
 
     if (!response.ok) {
       const errorData = await response.json();
