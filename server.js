@@ -2433,12 +2433,35 @@ app.post('/api/dify/:conversationId', async (req, res) => {
 
 // Stripe 充值积分接口
 app.post('/api/payment/stripe', async (req, res) => {
+  console.log('💳 [STRIPE] Payment intent request received:', {
+    body: req.body,
+    stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
+    minimumAmount: 0.1
+  });
+  
   try {
     const { amount } = req.body; // 单位：美元
+    
+    // 详细的金额验证日志
+    console.log('💳 [STRIPE] Amount validation:', {
+      amount,
+      type: typeof amount,
+      isValid: amount && amount >= 0.1
+    });
+    
     if (!amount || amount < 0.1) {
+      console.log('❌ [STRIPE] Amount validation failed:', amount);
       return res.status(400).json({ error: '充值金额不能低于0.1美元' });
     }
 
+    // 检查Stripe配置
+    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'your_stripe_secret_key_here') {
+      console.log('❌ [STRIPE] Secret key not configured');
+      return res.status(500).json({ error: 'Stripe not configured' });
+    }
+
+    console.log('💳 [STRIPE] Creating payment intent for amount:', amount);
+    
     // Stripe 以分为单位，需*100
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100),
@@ -2449,8 +2472,14 @@ app.post('/api/payment/stripe', async (req, res) => {
       }
     });
 
+    console.log('✅ [STRIPE] Payment intent created successfully:', paymentIntent.id);
     res.json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
+    console.error('❌ [STRIPE] Payment intent creation failed:', {
+      error: error.message,
+      stack: error.stack,
+      stripeConfigured: !!process.env.STRIPE_SECRET_KEY
+    });
     res.status(500).json({ error: error.message });
   }
 });
