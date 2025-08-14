@@ -1327,6 +1327,25 @@ app.post('/api/dify', async (req, res) => {
       }
     };
 
+    // 🔧 调试：记录发送给前端的完整响应数据
+    console.log('📤 [SERVER → FRONTEND] Sending response to frontend:', {
+      hasAnswer: !!responseData.answer,
+      answerLength: responseData.answer?.length || 0,
+      conversation_id: responseData.conversation_id,
+      message_id: responseData.message_id,
+      hasMetadata: !!responseData.metadata,
+      hasUsage: !!responseData.metadata?.usage,
+      usageDetails: responseData.metadata?.usage ? {
+        prompt_tokens: responseData.metadata.usage.prompt_tokens,
+        completion_tokens: responseData.metadata.usage.completion_tokens,
+        total_tokens: responseData.metadata.usage.total_tokens,
+        total_price: responseData.metadata.usage.total_price,
+        currency: responseData.metadata.usage.currency
+      } : 'NO_USAGE_DATA',
+      metadataKeys: Object.keys(responseData.metadata || {}),
+      timestamp: new Date().toISOString()
+    });
+
     res.json(responseData);
   } catch (error) {
     console.error('Generic Dify API error:', error);

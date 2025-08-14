@@ -1744,8 +1744,17 @@ export function DifyChatInterface({
     console.log('[Chat Debug] Added assistant message from regular response');
     
     // 💰 处理blocking API的token使用
+    console.log('[Token Debug] Checking for usage data in blocking API response:', {
+      hasMetadata: !!data.metadata,
+      hasUsage: !!data.metadata?.usage,
+      metadataKeys: data.metadata ? Object.keys(data.metadata) : [],
+      usageKeys: data.metadata?.usage ? Object.keys(data.metadata.usage) : [],
+      fullUsageData: data.metadata?.usage,
+      responseKeys: Object.keys(data)
+    });
+
     if (data.metadata?.usage) {
-      console.log('[Token] Processing blocking API token usage:', data.metadata.usage);
+      console.log('[Token] ✅ Processing blocking API token usage:', data.metadata.usage);
       try {
         // 异步处理token使用，不阻塞UI
         processTokenUsage(
@@ -1756,16 +1765,18 @@ export function DifyChatInterface({
           extractModelFromResponse(data, 'blocking_api') || 'dify-blocking'
         ).then(result => {
           if (result.success) {
-            console.log('[Token] Successfully processed blocking API token usage:', result.newBalance);
+            console.log('[Token] ✅ Successfully processed blocking API token usage:', result.newBalance);
           } else {
-            console.warn('[Token] Failed to process blocking API token usage:', result.error);
+            console.warn('[Token] ❌ Failed to process blocking API token usage:', result.error);
           }
         }).catch(error => {
-          console.error('[Token] Error processing blocking API token usage:', error);
+          console.error('[Token] ❌ Error processing blocking API token usage:', error);
         });
       } catch (tokenError) {
-        console.error('[Token] Error preparing blocking API token usage:', tokenError);
+        console.error('[Token] ❌ Error preparing blocking API token usage:', tokenError);
       }
+    } else {
+      console.warn('[Token] ⚠️ No usage data found in blocking API response - credits will not be deducted!');
     }
   };
 
