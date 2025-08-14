@@ -17,7 +17,7 @@ export default function Pricing() {
   const [customAmount, setCustomAmount] = useState<string>('');
   const [customCredits, setCustomCredits] = useState<number>(0);
 
-  const minimumUSD = 0.1; // 🔧 测试：降低最低充值金额到0.1美元
+  const minimumUSD = 0.5; // 🔧 Stripe最低要求：50美分
 
   useEffect(() => {
     const loadData = async () => {

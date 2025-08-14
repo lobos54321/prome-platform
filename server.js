@@ -2436,7 +2436,7 @@ app.post('/api/payment/stripe', async (req, res) => {
   console.log('💳 [STRIPE] Payment intent request received:', {
     body: req.body,
     stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
-    minimumAmount: 0.1
+    minimumAmount: 0.5
   });
   
   try {
@@ -2449,9 +2449,9 @@ app.post('/api/payment/stripe', async (req, res) => {
       isValid: amount && amount >= 0.1
     });
     
-    if (!amount || amount < 0.1) {
+    if (!amount || amount < 0.5) {
       console.log('❌ [STRIPE] Amount validation failed:', amount);
-      return res.status(400).json({ error: '充值金额不能低于0.1美元' });
+      return res.status(400).json({ error: '充值金额不能低于0.5美元（Stripe最低要求）' });
     }
 
     // 检查Stripe配置
