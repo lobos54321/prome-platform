@@ -1216,6 +1216,32 @@ export function DifyChatInterface({
                 // 标记为已收到内容
                 hasReceivedData = true;
               }
+
+              // 🔧 修复：处理JSON响应中的usage信息（积分扣除的关键修复）
+              if (parsed.metadata?.usage && !tokenUsageProcessed) {
+                console.log('[Token] ✅ Processing JSON response token usage:', parsed.metadata.usage);
+                tokenUsageProcessed = true; // 标记已处理，避免重复计费
+                
+                try {
+                  // 异步处理token使用，不阻塞UI
+                  processTokenUsage(
+                    parsed.metadata.usage,
+                    parsed.conversation_id,
+                    parsed.message_id || `json_response_${Date.now()}`,
+                    extractModelFromResponse(parsed, 'json_blocking') || 'dify-blocking'
+                  ).then(result => {
+                    if (result.success) {
+                      console.log('[Token] ✅ Successfully processed JSON response token usage:', result.newBalance);
+                    } else {
+                      console.warn('[Token] ❌ Failed to process JSON response token usage:', result.error);
+                    }
+                  }).catch(error => {
+                    console.error('[Token] ❌ Error processing JSON response token usage:', error);
+                  });
+                } catch (tokenError) {
+                  console.error('[Token] ❌ Error preparing JSON response token usage:', tokenError);
+                }
+              }
               
               // 处理工作流事件 - 修复事件数据结构
               if (parsed.event === 'node_started' && parsed.data?.node_id) {
