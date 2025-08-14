@@ -43,7 +43,7 @@ export default function BalanceProtection({
           <Alert>
             <InfoIcon className="h-4 w-4" />
             <AlertDescription>
-              Dify集成已禁用，AI服务使用基本配置运行
+              ProMe集成已禁用，AI服务使用基本配置运行
             </AlertDescription>
           </Alert>
           

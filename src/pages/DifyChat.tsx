@@ -88,10 +88,10 @@ export default function DifyChat() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
-              Dify AI聊天
+              ProMe AI聊天
             </CardTitle>
             <CardDescription>
-              直接调用Dify API的原生聊天界面
+              直接调用ProMe API的原生聊天界面
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -145,12 +145,12 @@ export default function DifyChat() {
               </div>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              {service ? service.name : 'Dify AI聊天助手'}
+              {service ? service.name : 'ProMe AI聊天助手'}
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               {service 
                 ? service.description 
-                : '基于Dify原生API的智能聊天界面，提供100%准确的Token监控和实时计费'
+                : '基于ProMe原生API的智能聊天界面，提供100%准确的Token监控和实时计费'
               }
             </p>
           </div>
@@ -296,7 +296,7 @@ export default function DifyChat() {
                 ) : (
                   <>
                     <MessageSquare className="h-6 w-6 text-blue-600" />
-                    Dify AI聊天
+                    ProMe AI聊天
                   </>
                 )}
                 <Badge variant="secondary" className="ml-2">

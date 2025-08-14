@@ -128,8 +128,8 @@ export default function ModelManagement() {
       }
 
       // 管理员充值
-      const result = await db.addUserBalance(
-        user.id,
+      const result = await db.addCreditsToAdmin(
+        user.email,
         rechargeAmount,
         `管理员充值: ${rechargeAmount}积分`
       );

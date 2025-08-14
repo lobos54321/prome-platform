@@ -59,7 +59,7 @@ export default function Home() {
             ProMe AI 服务平台
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            连接 Dify AI 应用与专业服务，提供高效、可靠的人工智能解决方案
+            连接 ProMe AI 应用与专业服务，提供高效、可靠的人工智能解决方案
           </p>
           
           {/* 动态按钮区域 */}
