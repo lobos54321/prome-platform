@@ -195,26 +195,52 @@ class StripeService {
   }
 
   /**
-   * 模拟添加积分到用户账户 (开发环境)
-   * 生产环境中应该通过后端API处理
+   * 添加积分到用户账户
+   * 通过数据库服务和认证服务协同处理
    */
   async addCreditsToUser(userId: string, creditsAmount: number): Promise<{ success: boolean; newBalance?: number }> {
     try {
-      // 临时方案：直接调用认证服务更新余额
-      // 生产环境中应该通过后端API处理以确保安全性
-      
       console.log(`[Stripe] Adding ${creditsAmount} credits to user ${userId}`);
       
-      // 这里调用我们现有的认证服务来更新余额
+      // 🔧 修复：使用正确的数据库服务和认证服务
       const { authService } = await import('./auth');
-      const result = await authService.addBalance(creditsAmount);
+      const { db } = await import('./supabase');
       
-      if (result.success) {
-        console.log(`[Stripe] Successfully added credits, new balance: ${result.newBalance}`);
-        return { success: true, newBalance: result.newBalance };
+      // 首先获取当前用户信息
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser || currentUser.id !== userId) {
+        console.error(`[Stripe] User mismatch or not authenticated: expected ${userId}, got ${currentUser?.id}`);
+        return { success: false };
       }
       
-      return { success: false };
+      // 计算新余额
+      const currentBalance = currentUser.balance || 0;
+      const newBalance = currentBalance + creditsAmount;
+      
+      // 更新数据库中的余额
+      const updatedBalance = await db.updateUserBalance(userId, newBalance);
+      
+      // 添加计费记录
+      await db.addBillingRecord(
+        userId, 
+        'charge', 
+        creditsAmount, 
+        `Stripe payment credit addition: $${(creditsAmount / 10000).toFixed(2)} USD`
+      );
+      
+      // 更新认证服务中的用户信息（如果是当前用户）
+      if (authService.currentUser && authService.currentUser.id === userId) {
+        authService.currentUser.balance = updatedBalance;
+        
+        // 触发余额更新事件
+        window.dispatchEvent(new CustomEvent('balance-updated', {
+          detail: { balance: updatedBalance, source: 'stripe_payment' }
+        }));
+      }
+      
+      console.log(`[Stripe] Successfully added ${creditsAmount} credits, new balance: ${updatedBalance}`);
+      return { success: true, newBalance: updatedBalance };
+      
     } catch (error) {
       console.error('Failed to add credits to user:', error);
       return { success: false };

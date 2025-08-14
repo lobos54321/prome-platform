@@ -28,10 +28,13 @@ function CheckoutForm({ amount, creditsAmount, packageId, onSuccess, onCancel }:
 
   useEffect(() => {
     // 预填用户信息
-    const user = authService.getCurrentUser();
-    if (user?.email) {
-      setBillingEmail(user.email);
-    }
+    const loadUserInfo = async () => {
+      const user = await authService.getCurrentUser(); // 🔧 修复：使用await获取用户数据
+      if (user?.email) {
+        setBillingEmail(user.email);
+      }
+    };
+    loadUserInfo();
   }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -76,8 +79,10 @@ function CheckoutForm({ amount, creditsAmount, packageId, onSuccess, onCancel }:
         toast.success('Payment successful! Credits are being added to your account.');
         
         // 验证支付并添加积分
-        const user = authService.getCurrentUser();
-        if (user) {
+        const user = await authService.getCurrentUser(); // 🔧 修复：使用await获取最新用户数据
+        console.log('[Stripe] Current user after payment:', user);
+        
+        if (user && user.id) {
           const addCreditsResult = await stripeService.addCreditsToUser(user.id, creditsAmount);
           
           if (addCreditsResult.success) {
@@ -221,9 +226,9 @@ export default function StripePaymentForm(props: StripePaymentFormProps) {
           return;
         }
 
-        // 创建支付意图
-        const user = authService.getCurrentUser();
-        if (!user) {
+        // 创建支付意图  
+        const user = await authService.getCurrentUser(); // 🔧 修复：使用await获取用户数据
+        if (!user || !user.id) {
           setError('请先登录后再进行充值。');
           setLoading(false);
           return;
