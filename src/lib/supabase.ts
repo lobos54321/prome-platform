@@ -1197,8 +1197,8 @@ class DatabaseService {
       // Update balance
       const updatedBalance = await this.updateUserBalance(userId, newBalance);
 
-      // Add billing record
-      await this.addBillingRecord(userId, 'charge', amount, description);
+      // Add billing record for consumption (negative amount)
+      await this.addBillingRecord(userId, 'refund', amount, description);
 
       return { 
         success: true, 
