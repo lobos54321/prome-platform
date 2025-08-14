@@ -497,7 +497,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       const result = await db.deductUserBalance(
         user.id,
         pointsToDeduct,
-        `Dify Native API usage: ${modelName} (${finalTotalTokens} tokens, $${totalCost.toFixed(6)})`
+        `ProMe AI API usage: ${modelName} (${finalTotalTokens} tokens, $${totalCost.toFixed(6)})`
       );
 
       if (!result.success) {

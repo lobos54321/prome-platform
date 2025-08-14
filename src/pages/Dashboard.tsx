@@ -274,7 +274,11 @@ export default function Dashboard() {
                 {usageRecords.slice(0, 5).map((record, index) => (
                   <div key={index} className="flex justify-between items-center">
                     <div>
-                      <p className="font-medium">{record.serviceId}</p>
+                      <p className="font-medium">
+                        {record.serviceId?.includes('dify') ? 'ProMe AI' : 
+                         record.serviceId?.includes('workflow') ? 'ProMe Workflow' : 
+                         record.serviceId || 'ProMe Service'}
+                      </p>
                       <p className="text-sm text-gray-500">{formatDate(record.timestamp)}</p>
                     </div>
                     <Badge variant="outline">
@@ -317,7 +321,9 @@ export default function Dashboard() {
                       {filteredUsage.map((record, index) => (
                         <tr key={index} className="border-b">
                           <td className="px-6 py-4 font-medium">
-                            {record.serviceId}
+                            {record.serviceId?.includes('dify') ? 'ProMe AI' : 
+                             record.serviceId?.includes('workflow') ? 'ProMe Workflow' : 
+                             record.serviceId || 'ProMe Service'}
                           </td>
                           <td className="px-6 py-4 text-gray-500">
                             {typeof record.sessionId === 'string' ? record.sessionId.substring(0, 8) + '...' : ''}
