@@ -58,6 +58,7 @@ interface DifyChatInterfaceProps {
   mode?: 'chat' | 'workflow'; // 支持不同模式
   showWorkflowProgress?: boolean; // 是否显示工作流进度
   enableRetry?: boolean; // 是否启用重试功能
+  user?: { id: string; email: string; name: string }; // 已认证用户信息
 }
 
 export function DifyChatInterface({
@@ -66,7 +67,8 @@ export function DifyChatInterface({
   welcomeMessage = "Hello! How can I help you today?",
   mode = 'chat',
   showWorkflowProgress = true,
-  enableRetry = true
+  enableRetry = true,
+  user
 }: DifyChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -656,12 +658,25 @@ export function DifyChatInterface({
 
   useEffect(() => {
     const initUserIdAndSession = () => {
+      // 🔥 修复用户身份识别问题：优先使用认证用户的ID
+      if (user?.id) {
+        console.log('[Chat Debug] 🔑 使用认证用户ID:', user.id);
+        setUserId(user.id);
+        
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('dify_user_id', user.id);
+          localStorage.setItem('dify_session_timestamp', Date.now().toString());
+        }
+        
+        setIsUserIdReady(true);
+        return;
+      }
+      
       if (typeof window !== 'undefined') {
+        // 🚨 仅在未认证时才强制重置状态
+        console.log('[Chat Debug] ⚠️ 未认证用户 - 清理所有Dify状态');
         
-        // 🚨 最激进的修复：页面加载时立即强制重置所有状态
-        console.log('[Chat Debug] 🚨 页面初始化 - 强制清理所有Dify状态');
-        
-        // 激进清理：无条件删除所有dify相关数据
+        // 清理无效的会话数据
         ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_session_timestamp', 'dify_workflow_state', 'dify_last_real_activity', 'dify_last_visit'].forEach(key => {
           if (localStorage.getItem(key)) {
             console.log(`[Chat Debug] 清除 ${key}:`, localStorage.getItem(key));
@@ -670,14 +685,14 @@ export function DifyChatInterface({
           sessionStorage.removeItem(key);
         });
         
-        // 生成全新用户ID
-        const freshUserId = 'auto-reset-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-        setUserId(freshUserId);
-        localStorage.setItem('dify_user_id', freshUserId);
+        // 生成匿名用户ID
+        const anonymousUserId = 'anonymous-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+        setUserId(anonymousUserId);
+        localStorage.setItem('dify_user_id', anonymousUserId);
         localStorage.setItem('dify_last_visit', Date.now().toString());
         localStorage.setItem('dify_session_timestamp', Date.now().toString());
         
-        console.log('[Chat Debug] 🔥 强制重置完成，新用户ID:', freshUserId);
+        console.log('[Chat Debug] 🔥 匿名用户ID已生成:', anonymousUserId);
         
         setIsUserIdReady(true);
         return;
@@ -694,7 +709,7 @@ export function DifyChatInterface({
     };
     
     initUserIdAndSession();
-  }, []);
+  }, [user?.id]); // 🔥 关键：依赖用户ID变化
   
 
   // 自动滚动到底部

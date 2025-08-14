@@ -343,6 +343,7 @@ export default function DifyChat() {
             mode="workflow" // Enable workflow mode by default
             showWorkflowProgress={true}
             enableRetry={true}
+            user={user} // 🔥 传递认证用户信息
             placeholder={service 
               ? `输入您的${service.name}需求...` 
               : "输入您的消息或工作流指令..."
