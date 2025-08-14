@@ -1525,16 +1525,35 @@ export function DifyChatInterface({
                         });
                         
                         try {
-                          // 构造token使用数据 - 兼容Dify ChatFlow格式
+                          // 🔍 全面搜索usage信息 - 检查所有可能的位置
+                          const usageData = parsed.data.usage || parsed.usage || parsed.metadata?.usage || parsed.data.metadata?.usage;
+                          
+                          // 构造token使用数据 - 尝试从Dify数据中提取真实价格
                           const tokenUsage = {
-                            prompt_tokens: Math.floor(parsed.data.total_tokens * 0.7) || 100, // 估算输入token
-                            completion_tokens: Math.ceil(parsed.data.total_tokens * 0.3) || 50, // 估算输出token
-                            total_tokens: parsed.data.total_tokens || 150,
-                            // Dify通常不提供具体价格，使用默认值
-                            prompt_price: undefined,
-                            completion_price: undefined,
-                            total_price: undefined
+                            prompt_tokens: usageData?.prompt_tokens || Math.floor(parsed.data.total_tokens * 0.7) || 100,
+                            completion_tokens: usageData?.completion_tokens || Math.ceil(parsed.data.total_tokens * 0.3) || 50,
+                            total_tokens: usageData?.total_tokens || parsed.data.total_tokens || 150,
+                            // 🎯 尝试从所有可能位置提取价格信息
+                            prompt_price: usageData?.prompt_price,
+                            completion_price: usageData?.completion_price,
+                            total_price: usageData?.total_price
                           };
+                          
+                          console.log('[Token] 🔍 Workflow完整数据结构分析:', {
+                            hasDataUsage: !!parsed.data.usage,
+                            hasRootUsage: !!parsed.usage,
+                            hasMetadataUsage: !!parsed.metadata?.usage,
+                            extractedUsage: tokenUsage,
+                            allPossibleUsageLocations: {
+                              'parsed.data.usage': parsed.data.usage,
+                              'parsed.usage': parsed.usage,
+                              'parsed.metadata.usage': parsed.metadata?.usage,
+                              'parsed.data.metadata.usage': parsed.data.metadata?.usage
+                            },
+                            fullDataKeys: Object.keys(parsed.data || {}),
+                            fullRootKeys: Object.keys(parsed),
+                            rawEventData: parsed
+                          });
                           
                           // 异步处理token使用，不阻塞UI
                           processTokenUsage(
