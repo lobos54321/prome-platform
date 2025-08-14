@@ -833,18 +833,16 @@ export function DifyChatInterface({
       const shouldForceNewConversation = !hasRealMessages && !conversationId && !hasStoredConversationId;
       
       if (shouldForceNewConversation) {
-        console.log('[Chat Debug] 🔥 FORCING NEW CONVERSATION - clearing any existing state');
+        console.log('[Chat Debug] 🔥 FORCING NEW CONVERSATION - clearing conversation state');
         
-        // 强制清除所有可能干扰的状态，包括用户ID
-        ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_session_timestamp', 'dify_workflow_state'].forEach(key => {
+        // 🔥 修复：只清除对话相关状态，保留认证用户ID
+        ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_session_timestamp', 'dify_workflow_state'].forEach(key => {
           localStorage.removeItem(key);
           sessionStorage.removeItem(key);
         });
         
-        // 🔥 关键：生成新的用户ID，确保后端认为这是全新用户  
-        const newUserId = generateUUID();
-        setUserId(newUserId);
-        localStorage.setItem('dify_user_id', newUserId);
+        // 🔥 关键修复：不要重新生成用户ID，保持认证用户的ID
+        console.log('[Chat Debug] ✅ 保持认证用户ID:', userId);
         
         // 重置conversation ID状态
         setConversationId(null);
@@ -903,7 +901,7 @@ export function DifyChatInterface({
           // Fix 2: Standardize Request Format - Use both fields for compatibility
           query: messageContent,        // Standard field expected by Dify API
           message: messageContent,      // Keep for backward compatibility
-          user: userId || 'default-user',
+          user: userId || 'default-user', // 🔥 这里userId应该已经是认证用户的ID
           // 🔧 关键修复：优先使用localStorage中的dify_conversation_id以确保对话连续性
           conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
           response_mode: 'streaming', // 🔥 始终使用流式模式以捕获详细的模型信息
@@ -921,10 +919,17 @@ export function DifyChatInterface({
               conversationIdParam: !!conversationId
             };
             
-            // 判断是否应该提供inputs的逻辑：
-            // 1. 有Dify对话ID 且 有历史消息 = 继续对话，可能需要inputs
-            // 2. 工作流状态存在 = 可能正在等待用户交互
-            const shouldProvideInputs = (storedDifyId && messages.length > 0) || storedWorkflow;
+            // 🔥 修复工作流执行异常：更严格的inputs判断逻辑
+            // 只有在明确的继续对话场景下才提供inputs，避免跳过信息收集阶段
+            const hasValidConversation = storedDifyId && messages.length > 1; // 至少要有用户消息
+            let hasActiveWorkflowState = false;
+            try {
+              hasActiveWorkflowState = storedWorkflow && JSON.parse(storedWorkflow).isWorkflow;
+            } catch (e) {
+              console.warn('[Chat Debug] Invalid workflow state in localStorage, clearing it');
+              localStorage.removeItem('dify_workflow_state');
+            }
+            const shouldProvideInputs = hasValidConversation && hasActiveWorkflowState;
             
             inputsDecision.shouldProvideInputs = shouldProvideInputs;
             console.log('[Chat Debug] 🎯 Inputs决策过程:', inputsDecision);
@@ -1055,7 +1060,7 @@ export function DifyChatInterface({
               body: JSON.stringify({
                 query: messageContent,
                 message: messageContent,
-                user: userId || 'default-user',
+                user: userId || 'default-user', // 🔥 这里userId应该已经是认证用户的ID
                 // 传递会话ID保持连续性
                 conversation_id: fallbackConversationId,
                 response_mode: 'blocking', // Force blocking mode for fallback
@@ -1919,14 +1924,12 @@ export function DifyChatInterface({
       }]);
     }
     
-    // 生成新的用户ID，确保后端认为这是全新用户
+    // 🔥 修复：保持认证用户的ID，不要重新生成
     if (typeof window !== 'undefined') {
-      const newUserId = generateUUID();
-      setUserId(newUserId);
-      localStorage.setItem('dify_user_id', newUserId);
+      // 只更新session时间戳，保持现有的用户ID
       localStorage.setItem('dify_session_timestamp', Date.now().toString());
       
-      console.log('[Chat Debug] 🔥 GENERATED NEW USER ID for fresh conversation:', newUserId);
+      console.log('[Chat Debug] ✅ 保持认证用户ID for fresh conversation:', userId);
     }
     
     // 🔧 提供用户反馈
