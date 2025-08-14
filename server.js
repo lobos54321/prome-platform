@@ -925,6 +925,16 @@ app.post('/api/dify', async (req, res) => {
       stream: stream,
       user: getValidUserId(user)
     };
+    
+    // 🔧 调试：记录发送给DIFY的完整请求
+    console.log('📤 [DIFY API] Sending request to chat-messages:', {
+      query: actualMessage.substring(0, 100) + '...',
+      inputs: inputs,
+      response_mode: requestBody.response_mode,
+      user: requestBody.user,
+      conversation_id: difyConversationId || 'NEW_CONVERSATION',
+      timestamp: new Date().toISOString()
+    });
 
     // Detect context overflow risk before processing
     let overflowRisk = await detectContextOverflowRisk(conversationId, actualMessage);
@@ -1262,6 +1272,18 @@ app.post('/api/dify', async (req, res) => {
       } else {
         // Handle blocking response
         data = await response.json();
+        
+        // 🔧 调试：记录DIFY的完整响应
+        console.log('📥 [DIFY API] Received blocking response:', {
+          conversation_id: data.conversation_id,
+          message_id: data.message_id,
+          answer_preview: data.answer?.substring(0, 200) + '...',
+          mode: data.mode,
+          hasMetadata: !!data.metadata,
+          hasUsage: !!data.metadata?.usage,
+          timestamp: new Date().toISOString()
+        });
+        
         console.log('✅ Successfully received response from Dify API');
       }
       

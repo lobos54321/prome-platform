@@ -898,84 +898,16 @@ export function DifyChatInterface({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Fix 2: Standardize Request Format - Use both fields for compatibility
-          query: messageContent,        // Standard field expected by Dify API
-          message: messageContent,      // Keep for backward compatibility
-          user: userId || 'default-user', // 🔥 这里userId应该已经是认证用户的ID
+          // 🔥 修复：使用官方API规范的标准字段
+          query: messageContent,        // ✅ 官方API必需字段
+          user: userId || 'anonymous-user', // ✅ 官方API必需字段，用户标识
           // 🔧 关键修复：优先使用localStorage中的dify_conversation_id以确保对话连续性
           conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
-          response_mode: 'streaming', // 🔥 始终使用流式模式以捕获详细的模型信息
-          stream: true, // 确保能接收node_finished事件中的模型数据
-          // 🚨 关键修复：智能判断是否需要为用户交互节点提供inputs
-          inputs: (() => {
-            const storedDifyId = localStorage.getItem('dify_conversation_id');
-            const storedWorkflow = localStorage.getItem('dify_workflow_state');
-            
-            // 🔍 调试：记录inputs决策过程
-            const inputsDecision = {
-              storedDifyId: !!storedDifyId,
-              storedWorkflow: !!storedWorkflow,
-              hasMessages: messages.length > 0,
-              conversationIdParam: !!conversationId
-            };
-            
-            // 🔥 修复工作流执行异常：更严格的inputs判断逻辑
-            // 只有在明确的继续对话场景下才提供inputs，避免跳过信息收集阶段
-            const hasValidConversation = storedDifyId && messages.length > 1; // 至少要有用户消息
-            let hasActiveWorkflowState = false;
-            try {
-              hasActiveWorkflowState = storedWorkflow && JSON.parse(storedWorkflow).isWorkflow;
-            } catch (e) {
-              console.warn('[Chat Debug] Invalid workflow state in localStorage, clearing it');
-              localStorage.removeItem('dify_workflow_state');
-            }
-            const shouldProvideInputs = hasValidConversation && hasActiveWorkflowState;
-            
-            inputsDecision.shouldProvideInputs = shouldProvideInputs;
-            console.log('[Chat Debug] 🎯 Inputs决策过程:', inputsDecision);
-            
-            // 🔍 记录完整的API请求参数用于模型提取分析
-            const requestBody = {
-              query: messageContent,
-              message: messageContent,
-              user: userId || 'default-user',
-              conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
-              response_mode: hasActiveWorkflow ? 'streaming' : 'blocking',
-              stream: hasActiveWorkflow,
-              inputs: shouldProvideInputs ? {
-                user_input: messageContent,
-                query: messageContent,
-                text: messageContent,
-                message: messageContent
-              } : {}
-            };
-            
-            console.log('[Model Extraction] 完整API请求参数:', {
-              endpoint: 'dify-api/chat-messages',
-              method: 'POST',
-              request_body: requestBody,
-              context: {
-                hasActiveWorkflow,
-                storedDifyId: !!localStorage.getItem('dify_conversation_id'),
-                currentUserId: userId,
-                messageLength: messageContent.length
-              }
-            });
-            
-            if (shouldProvideInputs) {
-              const inputs = {
-                user_input: messageContent,
-                query: messageContent,
-                text: messageContent,
-                message: messageContent // 额外添加message字段
-              };
-              console.log('[Chat Debug] 📨 提供inputs给工作流:', inputs);
-              return inputs;
-            } else {
-              console.log('[Chat Debug] 🆕 新对话或无工作流，使用空inputs');
-              return {};
-            }
-          })()
+          response_mode: 'streaming', // ✅ 官方API字段：streaming/blocking
+          auto_generate_name: true,   // ✅ 官方API字段：自动生成会话标题
+          // 🔥 修复：根据官方API文档，inputs用于传递应用定义的变量值
+          // 通常应该为空对象，让Dify根据workflow配置和对话上下文处理
+          inputs: {}
         }),
         signal: controller.signal
       });
@@ -1058,14 +990,14 @@ export function DifyChatInterface({
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                query: messageContent,
-                message: messageContent,
-                user: userId || 'default-user', // 🔥 这里userId应该已经是认证用户的ID
+                // 🔥 修复：使用官方API规范的标准字段
+                query: messageContent,        // ✅ 官方API必需字段
+                user: userId || 'anonymous-user', // ✅ 官方API必需字段，用户标识
                 // 传递会话ID保持连续性
                 conversation_id: fallbackConversationId,
-                response_mode: 'blocking', // Force blocking mode for fallback
-                stream: false,
-                inputs: {}
+                response_mode: 'blocking', // ✅ 官方API字段：blocking模式fallback
+                auto_generate_name: true,  // ✅ 官方API字段：自动生成会话标题
+                inputs: {}                 // ✅ 官方API字段：应用变量
               }),
               signal: controller.signal
             });

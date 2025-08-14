@@ -135,11 +135,19 @@ export function useDifyChat(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: query, // 后端使用message字段
+          query: query, // 🔧 修复：使用query字段，符合DIFY API规范
           user: userId,
           conversation_id: convId || '', // 后端server.js需要的字段
-          inputs: {}, // 额外输入参数
-          stream: false // 使用blocking模式
+          inputs: {
+            // 🔧 修复：传递空的inputs让DIFY自行管理conversation variables
+            // DIFY chatflow会自动维护：
+            // - conversation_info_completeness (信息完整度)
+            // - conversation_collection_count (收集计数)
+            // - dialogue_count (对话轮数)
+            // - 其他workflow中定义的变量
+          },
+          response_mode: 'blocking', // 🔧 明确指定blocking模式
+          stream: false
         }),
         signal: abortControllerRef.current.signal,
       })
