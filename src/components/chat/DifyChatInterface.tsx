@@ -604,8 +604,8 @@ export function DifyChatInterface({
       completedNodes: 0
     });
 
-    // 清除localStorage中的对话数据
-    ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_session_timestamp', 'dify_workflow_state'].forEach(key => {
+    // 🆕 清除localStorage中的对话数据（包括消息历史）
+    ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_session_timestamp', 'dify_workflow_state', 'dify_messages'].forEach(key => {
       localStorage.removeItem(key);
       sessionStorage.removeItem(key);
     });
@@ -707,6 +707,14 @@ export function DifyChatInterface({
   useEffect(() => {
     if (messages.length === 0) return;
     
+    // 🆕 立即保存到localStorage用于页面刷新恢复
+    try {
+      localStorage.setItem('dify_messages', JSON.stringify(messages));
+      console.log('[Chat Debug] 💾 已保存消息到localStorage:', messages.length, '条');
+    } catch (error) {
+      console.warn('[Chat Debug] 保存消息到localStorage失败:', error);
+    }
+    
     const saveTimer = setTimeout(() => {
       saveConversationToHistory();
     }, 2000); // 2秒后保存，避免频繁保存
@@ -739,10 +747,37 @@ export function DifyChatInterface({
           // 页面刷新，保持原有的会话状态
           console.log('[Chat Debug] 🔄 页面刷新 - 保持原有用户ID和对话状态:', storedUserId);
           setUserId(storedUserId);
+          
           if (storedConversationId) {
             setConversationId(storedConversationId);
             console.log('[Chat Debug] 🔄 恢复对话ID:', storedConversationId);
+            
+            // 🆕 关键修复：页面刷新时恢复消息历史
+            try {
+              const storedMessages = localStorage.getItem('dify_messages');
+              const storedWorkflowState = localStorage.getItem('dify_workflow_state');
+              
+              if (storedMessages) {
+                const parsedMessages = JSON.parse(storedMessages);
+                if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
+                  console.log('[Chat Debug] 🔄 恢复消息历史:', parsedMessages.length, '条消息');
+                  setMessages(parsedMessages.map((msg: any) => ({
+                    ...msg,
+                    timestamp: new Date(msg.timestamp)
+                  })));
+                }
+              }
+              
+              if (storedWorkflowState) {
+                const parsedWorkflowState = JSON.parse(storedWorkflowState);
+                console.log('[Chat Debug] 🔄 恢复工作流状态:', parsedWorkflowState);
+                setWorkflowState(parsedWorkflowState);
+              }
+            } catch (error) {
+              console.warn('[Chat Debug] 恢复消息历史失败:', error);
+            }
           }
+          
           setIsUserIdReady(true);
           return;
         }
@@ -856,6 +891,7 @@ export function DifyChatInterface({
           nodeId: nodeUpdate.nodeId,
           nodeName: nodeUpdate.nodeName || nodeUpdate.nodeId,
           nodeTitle: nodeUpdate.nodeTitle,
+          nodeType: nodeUpdate.nodeType,
           status: nodeUpdate.status || 'waiting',
           startTime: nodeUpdate.startTime,
           endTime: nodeUpdate.endTime,
@@ -874,6 +910,16 @@ export function DifyChatInterface({
         completedNodes,
         totalNodes: Math.max(prev.totalNodes || 0, newNodes.length) // 动态更新总节点数
       };
+      
+      // 🆕 保存工作流状态到localStorage用于页面刷新时恢复
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('dify_workflow_state', JSON.stringify(newState));
+          console.log('[Workflow] 💾 State saved to localStorage');
+        } catch (error) {
+          console.warn('[Workflow] Failed to save state to localStorage:', error);
+        }
+      }
       
       console.log('[Chat Debug] New workflow state:', newState);
       return newState;
