@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock, MessageSquare, X, Trash2, Cloud, Wifi, WifiOff } from 'lucide-react';
+import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock, MessageSquare, X, Trash2, Cloud, Wifi, WifiOff, Code, FileText, Database, Settings, Users, MessageCircle, Zap, Cpu, Globe } from 'lucide-react';
 import { cn, isValidUUID, generateUUID } from '@/lib/utils';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
 import { cloudChatHistory, ChatConversation } from '@/lib/cloudChatHistory';
@@ -19,6 +19,7 @@ interface WorkflowProgress {
   nodeId: string;
   nodeName: string;
   nodeTitle?: string;
+  nodeType?: string;
   status: 'waiting' | 'running' | 'completed' | 'failed';
   startTime?: Date;
   endTime?: Date;
@@ -60,6 +61,26 @@ interface DifyChatInterfaceProps {
   enableRetry?: boolean; // 是否启用重试功能
   user?: { id: string; email: string; name: string }; // 已认证用户信息
 }
+
+// 获取工作流节点图标的辅助函数
+const getNodeIcon = (nodeType?: string) => {
+  if (!nodeType) return Clock;
+  
+  const type = nodeType.toLowerCase();
+  
+  if (type.includes('llm') || type.includes('ai') || type.includes('model')) return Bot;
+  if (type.includes('code') || type.includes('python') || type.includes('javascript')) return Code;
+  if (type.includes('knowledge') || type.includes('retrieval') || type.includes('document')) return FileText;
+  if (type.includes('database') || type.includes('sql') || type.includes('query')) return Database;
+  if (type.includes('parameter') || type.includes('variable') || type.includes('setting')) return Settings;
+  if (type.includes('human') || type.includes('user') || type.includes('approval')) return Users;
+  if (type.includes('message') || type.includes('text') || type.includes('template')) return MessageCircle;
+  if (type.includes('tool') || type.includes('api') || type.includes('webhook')) return Zap;
+  if (type.includes('http') || type.includes('request') || type.includes('url')) return Globe;
+  if (type.includes('condition') || type.includes('if') || type.includes('logic')) return Cpu;
+  
+  return Clock; // 默认图标
+};
 
 export function DifyChatInterface({
   className,
@@ -908,6 +929,34 @@ export function DifyChatInterface({
       // 只有当检测到实际工作流事件时才设置isWorkflow=true
       console.log('[Chat Debug] 💡 准备发送消息，等待Dify响应以确定是否为工作流');
 
+      // 🆕 智能预测：如果这是一个复杂的请求，预先准备工作流UI
+      const isComplexRequest = messageContent.length > 100 || 
+                              messageContent.includes('分析') || 
+                              messageContent.includes('生成') || 
+                              messageContent.includes('创建') ||
+                              messageContent.includes('explain') ||
+                              messageContent.includes('analyze') ||
+                              messageContent.includes('generate');
+                              
+      if (isComplexRequest) {
+        console.log('[Workflow] 🔮 检测到复杂请求，预先准备工作流UI');
+        // 预先显示一个通用的处理节点
+        setTimeout(() => {
+          updateWorkflowProgress({
+            nodeId: 'preparing',
+            nodeName: '准备处理您的请求...',
+            nodeTitle: '初始化',
+            nodeType: 'start',
+            status: 'running',
+            startTime: new Date()
+          });
+          setWorkflowState(prev => ({
+            ...prev,
+            isWorkflow: true
+          }));
+        }, 500); // 延迟500ms显示，避免简单请求的误判
+      }
+
       // 🔧 修复：智能超时机制 - 根据实际工作流状态调整超时时间
       const hasActiveWorkflow = workflowState.isWorkflow && workflowState.nodes.length > 0;
       const timeoutMs = hasActiveWorkflow ? 3 * 60 * 1000 : 60 * 1000; // 3分钟工作流，1分钟普通聊天
@@ -1269,6 +1318,31 @@ export function DifyChatInterface({
                 }
               }
               
+              // 🎯 处理工作流开始事件 - 预先显示所有节点
+              if (parsed.event === 'workflow_started' && parsed.data?.nodes) {
+                console.log('[Workflow] 🚀 工作流已开始，预加载所有节点:', parsed.data.nodes);
+                
+                // 预先添加所有节点到UI中
+                parsed.data.nodes.forEach((nodeInfo: any, index: number) => {
+                  updateWorkflowProgress({
+                    nodeId: nodeInfo.node_id || `node_${index}`,
+                    nodeName: nodeInfo.title || nodeInfo.node_name || `节点 ${index + 1}`,
+                    nodeTitle: nodeInfo.title || nodeInfo.node_name,
+                    nodeType: nodeInfo.node_type || 'unknown',
+                    status: 'waiting',
+                    startTime: undefined
+                  });
+                });
+
+                // 设置工作流状态并清理预备节点
+                setWorkflowState(prev => ({
+                  ...prev,
+                  isWorkflow: true,
+                  totalNodes: parsed.data.nodes.length,
+                  nodes: prev.nodes.filter(node => node.nodeId !== 'preparing') // 清理预备节点
+                }));
+              }
+
               // 处理工作流事件 - 修复事件数据结构
               if (parsed.event === 'node_started' && parsed.data?.node_id) {
                 console.log('[Chat Debug] Workflow node started:', parsed.data.node_id, parsed.data.title);
@@ -1301,7 +1375,24 @@ export function DifyChatInterface({
                   status: 'running',
                   startTime: new Date()
                 });
-                // 节点开始 - 减少日志输出
+                
+                // 🆕 如果这是第一个节点且还没有设置工作流状态，自动设置并清理预备节点
+                setWorkflowState(prev => {
+                  if (!prev.isWorkflow) {
+                    console.log('[Workflow] 🔄 自动启用工作流模式（检测到节点开始）');
+                    return {
+                      ...prev,
+                      isWorkflow: true,
+                      nodes: prev.nodes.filter(node => node.nodeId !== 'preparing') // 清理预备节点
+                    };
+                  } else {
+                    // 如果已经是工作流模式，也清理预备节点
+                    return {
+                      ...prev,
+                      nodes: prev.nodes.filter(node => node.nodeId !== 'preparing')
+                    };
+                  }
+                });
               }
               
               if (parsed.event === 'node_finished' && parsed.data?.node_id) {
@@ -1425,6 +1516,31 @@ export function DifyChatInterface({
                     }
                   }
 
+                  // 🎯 处理工作流开始事件 - 预先显示所有节点 (SSE path)
+                  if (parsed.event === 'workflow_started' && parsed.data?.nodes) {
+                    console.log('[Workflow] 🚀 工作流已开始，预加载所有节点 (SSE path):', parsed.data.nodes);
+                    
+                    // 预先添加所有节点到UI中
+                    parsed.data.nodes.forEach((nodeInfo: any, index: number) => {
+                      updateWorkflowProgress({
+                        nodeId: nodeInfo.node_id || `node_${index}`,
+                        nodeName: nodeInfo.title || nodeInfo.node_name || `节点 ${index + 1}`,
+                        nodeTitle: nodeInfo.title || nodeInfo.node_name,
+                        nodeType: nodeInfo.node_type || 'unknown',
+                        status: 'waiting',
+                        startTime: undefined
+                      });
+                    });
+
+                    // 设置工作流状态并清理预备节点
+                    setWorkflowState(prev => ({
+                      ...prev,
+                      isWorkflow: true,
+                      totalNodes: parsed.data.nodes.length,
+                      nodes: prev.nodes.filter(node => node.nodeId !== 'preparing') // 清理预备节点
+                    }));
+                  }
+
                   // 处理工作流节点事件 - 在第二个处理路径中也需要
                   if (parsed.event === 'node_started' && parsed.data?.node_id) {
                     console.log('[Chat Debug] Workflow node started (path 2):', parsed.data.node_id, parsed.data.title);
@@ -1436,7 +1552,24 @@ export function DifyChatInterface({
                       status: 'running',
                       startTime: new Date()
                     });
-                    // 节点开始 path 2
+                    
+                    // 🆕 如果这是第一个节点且还没有设置工作流状态，自动设置并清理预备节点 (SSE path)
+                    setWorkflowState(prev => {
+                      if (!prev.isWorkflow) {
+                        console.log('[Workflow] 🔄 自动启用工作流模式（检测到节点开始）(SSE path)');
+                        return {
+                          ...prev,
+                          isWorkflow: true,
+                          nodes: prev.nodes.filter(node => node.nodeId !== 'preparing') // 清理预备节点
+                        };
+                      } else {
+                        // 如果已经是工作流模式，也清理预备节点
+                        return {
+                          ...prev,
+                          nodes: prev.nodes.filter(node => node.nodeId !== 'preparing')
+                        };
+                      }
+                    });
                   } else if (parsed.event === 'node_finished' && parsed.data?.node_id) {
                     console.log('[Chat Debug] Workflow node finished (path 2):', parsed.data.node_id, parsed.data.status);
                     updateWorkflowProgress({
@@ -2196,56 +2329,84 @@ export function DifyChatInterface({
                     </div>
                   )}
 
-                  {/* 节点状态列表 */}
-                  <div className="max-h-32 overflow-y-auto space-y-1">
-                    {workflowState.nodes.map((node) => (
-                      <div 
-                        key={node.nodeId} 
-                        className={cn(
-                          "flex items-center gap-2 text-xs p-2 rounded",
-                          node.status === 'running' && "bg-blue-50 border border-blue-200",
-                          node.status === 'completed' && "bg-green-50 border border-green-200",
-                          node.status === 'failed' && "bg-red-50 border border-red-200",
-                          node.status === 'waiting' && "bg-gray-50 border border-gray-200"
-                        )}
-                      >
-                        {/* 状态图标 */}
-                        {node.status === 'waiting' && <Clock className="w-3 h-3 text-gray-400" />}
-                        {node.status === 'running' && <Play className="w-3 h-3 text-blue-600 animate-pulse" />}
-                        {node.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
-                        {node.status === 'failed' && <AlertCircle className="w-3 h-3 text-red-600" />}
-                        
-                        {/* 节点信息 */}
-                        <div className="flex-1 min-w-0">
-                          <div className={cn(
-                            "font-medium truncate",
-                            node.status === 'running' && "text-blue-700",
-                            node.status === 'completed' && "text-green-700",
-                            node.status === 'failed' && "text-red-700",
-                            node.status === 'waiting' && "text-gray-600"
-                          )}>
-                            {node.nodeTitle || node.nodeName}
+                  {/* 节点状态列表 - 增强显示 */}
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {workflowState.nodes.map((node) => {
+                      const NodeIcon = getNodeIcon(node.nodeType);
+                      return (
+                        <div 
+                          key={node.nodeId} 
+                          className={cn(
+                            "flex items-center gap-3 text-xs p-2 rounded-lg transition-all duration-200",
+                            node.status === 'running' && "bg-blue-50 border border-blue-200 shadow-sm",
+                            node.status === 'completed' && "bg-green-50 border border-green-200 shadow-sm",
+                            node.status === 'failed' && "bg-red-50 border border-red-200 shadow-sm",
+                            node.status === 'waiting' && "bg-gray-50 border border-gray-100"
+                          )}
+                        >
+                          {/* 节点类型图标 */}
+                          <div className="flex-shrink-0">
+                            <NodeIcon className={cn(
+                              "w-4 h-4",
+                              node.status === 'running' && "text-blue-600",
+                              node.status === 'completed' && "text-green-600", 
+                              node.status === 'failed' && "text-red-600",
+                              node.status === 'waiting' && "text-gray-400"
+                            )} />
                           </div>
-                          {node.error && (
-                            <div className="text-red-600 text-xs mt-1">
-                              错误: {node.error}
+
+                          {/* 状态图标 */}
+                          <div className="flex-shrink-0">
+                            {node.status === 'waiting' && <Clock className="w-3 h-3 text-gray-400" />}
+                            {node.status === 'running' && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+                            {node.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
+                            {node.status === 'failed' && <AlertCircle className="w-3 h-3 text-red-600" />}
+                          </div>
+                          
+                          {/* 节点信息 */}
+                          <div className="flex-1 min-w-0">
+                            <div className={cn(
+                              "font-medium truncate",
+                              node.status === 'running' && "text-blue-700",
+                              node.status === 'completed' && "text-green-700",
+                              node.status === 'failed' && "text-red-700",
+                              node.status === 'waiting' && "text-gray-600"
+                            )}>
+                              {node.nodeTitle || node.nodeName}
+                            </div>
+                            {node.nodeType && (
+                              <div className="text-gray-500 text-xs truncate">
+                                {node.nodeType}
+                              </div>
+                            )}
+                            {node.error && (
+                              <div className="text-red-600 text-xs mt-1 truncate">
+                                错误: {node.error}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 执行时间 */}
+                          {node.status === 'running' && node.startTime && (
+                            <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
+                              {Math.floor((Date.now() - node.startTime.getTime()) / 1000)}s
+                            </div>
+                          )}
+                          {node.status === 'completed' && node.startTime && node.endTime && (
+                            <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
+                              {Math.floor((node.endTime.getTime() - node.startTime.getTime()) / 1000)}s
+                            </div>
+                          )}
+
+                          {/* 正在运行的动态指示器 */}
+                          {node.status === 'running' && (
+                            <div className="flex-shrink-0">
+                              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
                             </div>
                           )}
                         </div>
-
-                        {/* 执行时间 */}
-                        {node.status === 'running' && node.startTime && (
-                          <div className="text-gray-500 text-xs">
-                            {Math.floor((Date.now() - node.startTime.getTime()) / 1000)}s
-                          </div>
-                        )}
-                        {node.status === 'completed' && node.startTime && node.endTime && (
-                          <div className="text-gray-500 text-xs">
-                            {Math.floor((node.endTime.getTime() - node.startTime.getTime()) / 1000)}s
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
