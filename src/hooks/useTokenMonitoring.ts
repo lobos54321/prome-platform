@@ -515,7 +515,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           finalTotalTokens,
           inputCost,
           outputCost,
-          totalCost,
+          pointsToDeduct, // 🔧 修复：保存积分数量而不是美元成本
           conversationId,
           messageId
         );

@@ -216,7 +216,7 @@ export class MockDatabaseService {
     totalTokens: number,
     inputCost: number,
     outputCost: number,
-    totalCost: number,
+    totalCostInCredits: number, // 🔧 重命名：明确这是积分成本
     conversationId?: string,
     messageId?: string
   ): Promise<TokenUsage | null> {
@@ -229,7 +229,7 @@ export class MockDatabaseService {
       userId,
       serviceId: 'dify',
       tokensUsed: totalTokens,
-      cost: totalCost,
+      cost: totalCostInCredits,
       timestamp: new Date().toISOString(),
       sessionId
     };

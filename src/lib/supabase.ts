@@ -1062,14 +1062,14 @@ class DatabaseService {
     totalTokens: number,
     inputCost: number,
     outputCost: number,
-    totalCost: number,
+    totalCostInCredits: number, // 🔧 重命名：明确这是积分成本
     conversationId?: string,
     messageId?: string
   ): Promise<TokenUsage | null> {
     if (!isSupabaseConfigured) {
       return await mockDb.addTokenUsageWithModel(
         userId, modelName, inputTokens, outputTokens, totalTokens,
-        inputCost, outputCost, totalCost, conversationId, messageId
+        inputCost, outputCost, totalCostInCredits, conversationId, messageId
       );
     }
 
@@ -1089,7 +1089,7 @@ class DatabaseService {
             tokens_used: totalTokens,
             input_cost: inputCost,
             output_cost: outputCost,
-            cost: totalCost,
+            cost: totalCostInCredits,
             conversation_id: conversationId,
             message_id: messageId,
             session_id: sessionId,
