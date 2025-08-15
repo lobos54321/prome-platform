@@ -66,6 +66,9 @@ function isValidUUID(str) {
 // Removed complex warmup and state detection functions - now handled by Dify opening statement
 
 // Helper function to get a valid user ID
+// Store user ID mappings to maintain consistency across conversation turns
+const userIdMappings = new Map();
+
 function getValidUserId(user) {
   // If user is provided and it's a valid UUID, use it
   if (user && isValidUUID(user)) {
@@ -78,10 +81,21 @@ function getValidUserId(user) {
     if (uuidMatch) {
       return uuidMatch[0];
     }
+    
+    // Check if we already have a mapping for this user string
+    if (userIdMappings.has(user)) {
+      console.log('🔄 Using existing user ID mapping for:', user);
+      return userIdMappings.get(user);
+    }
+    
+    // Create new mapping for this user string
+    const anonymousUserId = generateUUID();
+    userIdMappings.set(user, anonymousUserId);
+    console.log('🔧 Created new user ID mapping:', user, '->', anonymousUserId);
+    return anonymousUserId;
   }
   
-  // FIXED: Generate a valid UUID for anonymous users instead of returning null
-  // This ensures Dify API always receives a valid user parameter
+  // For completely anonymous users, generate a UUID
   const anonymousUserId = generateUUID();
   console.log('🔧 Generated anonymous user ID:', anonymousUserId);
   return anonymousUserId;
