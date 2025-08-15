@@ -584,8 +584,15 @@ export function DifyChatInterface({
     });
 
     // 清除localStorage中的对话数据
-    localStorage.removeItem('dify_conversation_id');
-    localStorage.removeItem('dify_conversation_id_streaming');
+    ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_session_timestamp', 'dify_workflow_state'].forEach(key => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+    
+    // 设置新的session时间戳
+    localStorage.setItem('dify_session_timestamp', Date.now().toString());
+    
+    console.log('[Chat Debug] 🔥 新对话创建 - 清除所有对话状态，保持用户ID:', userId);
     
     // 更新历史状态
     setChatHistory(prev => ({
@@ -703,7 +710,23 @@ export function DifyChatInterface({
       }
       
       if (typeof window !== 'undefined') {
-        // 🚨 仅在未认证时才强制重置状态
+        // 检查是否有已存储的用户ID，如果有就使用（页面刷新场景）
+        const storedUserId = localStorage.getItem('dify_user_id');
+        const storedConversationId = localStorage.getItem('dify_conversation_id');
+        
+        if (storedUserId && !storedUserId.startsWith('anonymous-')) {
+          // 页面刷新，保持原有的会话状态
+          console.log('[Chat Debug] 🔄 页面刷新 - 保持原有用户ID和对话状态:', storedUserId);
+          setUserId(storedUserId);
+          if (storedConversationId) {
+            setConversationId(storedConversationId);
+            console.log('[Chat Debug] 🔄 恢复对话ID:', storedConversationId);
+          }
+          setIsUserIdReady(true);
+          return;
+        }
+        
+        // 🚨 仅在真正需要时才清理状态（没有有效用户ID的情况）
         console.log('[Chat Debug] ⚠️ 未认证用户 - 清理所有Dify状态');
         
         // 清理无效的会话数据
@@ -856,33 +879,6 @@ export function DifyChatInterface({
     }
     
     try {
-      // 🔧 关键修复：检查是否应该强制开始新对话
-      // 如果messages为空（除了欢迎消息），且没有有效的conversationId，确保真正开始新对话
-      const hasRealMessages = messages.length > 0 && messages.some(m => m.id !== 'welcome');
-      const hasStoredConversationId = localStorage.getItem('dify_conversation_id');
-      const shouldForceNewConversation = !hasRealMessages && !conversationId && !hasStoredConversationId;
-      
-      if (shouldForceNewConversation) {
-        console.log('[Chat Debug] 🔥 FORCING NEW CONVERSATION - clearing conversation state');
-        
-        // 🔥 修复：只清除对话相关状态，保留认证用户ID
-        ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_session_timestamp', 'dify_workflow_state'].forEach(key => {
-          localStorage.removeItem(key);
-          sessionStorage.removeItem(key);
-        });
-        
-        // 🔥 关键修复：不要重新生成用户ID，保持认证用户的ID
-        console.log('[Chat Debug] ✅ 保持认证用户ID:', userId);
-        
-        // 重置conversation ID状态
-        setConversationId(null);
-        
-        // 设置新的session时间戳
-        localStorage.setItem('dify_session_timestamp', Date.now().toString());
-        
-        console.log('[Chat Debug] 🔥 FORCING NEW CONVERSATION - keeping authenticated user ID:', userId);
-        console.log('[Chat Debug] ✅ All state cleared for fresh conversation');
-      }
       
       // Check if we have a valid conversation ID for targeted API calls
       // Always use generic endpoint - let backend handle conversation ID consistency
