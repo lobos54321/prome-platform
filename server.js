@@ -966,8 +966,8 @@ app.post('/api/dify', async (req, res) => {
       console.log(`🆕 Emergency new conversation ID: ${conversationId}`);
     }
 
-    // Only add conversation_id if it exists and is valid
-    if (difyConversationId && supabase) {
+    // Always add conversation_id if it exists and is valid (don't depend on supabase)
+    if (difyConversationId) {
       requestBody.conversation_id = difyConversationId;
     }
 
@@ -994,29 +994,11 @@ app.post('/api/dify', async (req, res) => {
         console.error('Dify API error:', errorData);
 
         if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-          console.log('🔄 Conversation not found in DIFY, but maintaining dialogue continuity for ChatFlow');
-          console.log('📝 Keeping original conversation_id to preserve dialogue_count progression');
+          console.log('❌ Conversation not found in DIFY - this breaks chatflow continuity');
+          console.log('🚨 Rejecting request to maintain proper chatflow state management');
           
-          // Create a new request without conversation_id for DIFY, but maintain our internal tracking
-          const retryRequestBody = {
-            ...requestBody
-          };
-          delete retryRequestBody.conversation_id;
-
-          response = await fetch(`${DIFY_API_URL}/chat-messages`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${DIFY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(retryRequestBody),
-          });
-
-          if (!response.ok) {
-            throw new Error('Dify API request failed after retry');
-          }
-          
-          console.log('✅ Successfully retried without breaking conversation continuity');
+          // Return the error to frontend instead of silently creating new conversation
+          throw new Error(`Dify conversation not found: ${errorData.message}`);
         } else {
           throw new Error(`Dify API error: ${errorData.message || 'Unknown error'}`);
         }
@@ -1876,45 +1858,13 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       const errorData = await response.json();
       console.error('Dify API error:', errorData);
 
-      // Handle Dify conversation expiry while maintaining dialogue continuity
+      // Handle Dify conversation expiry - reject to maintain chatflow state
       if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-        console.log('🔄 Stream: Conversation not found in DIFY, but maintaining dialogue continuity for ChatFlow');
-        console.log('📝 Stream: Keeping original conversation_id to preserve dialogue_count progression');
+        console.log('❌ Stream: Conversation not found in DIFY - this breaks chatflow continuity');
+        console.log('🚨 Stream: Rejecting request to maintain proper chatflow state management');
         
-        // Create a new request without conversation_id for DIFY, but maintain our internal tracking
-        const retryApiRequestBody = {
-          ...apiRequestBody
-        };
-        delete retryApiRequestBody.conversation_id;
-
-        console.log('🔄 Stream: Retrying request without conversation_id');
-        
-        // Retry the request
-        const retryResponse = await fetchWithTimeoutAndRetry(
-          apiEndpoint,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${DIFY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(retryApiRequestBody),
-          },
-          STREAMING_TIMEOUT
-        );
-
-        if (!retryResponse.ok) {
-          const retryErrorData = await retryResponse.json();
-          console.error('Dify API retry error:', retryErrorData);
-          return res.status(retryResponse.status).json({
-            error: retryErrorData.message || 'Dify API retry error',
-            detail: retryErrorData
-          });
-        }
-
-        // Use the retry response for streaming
-        response = retryResponse;
-        console.log('✅ Stream: Successfully retried without breaking conversation continuity');
+        // Return the error to frontend instead of silently creating new conversation
+        throw new Error(`Dify conversation not found: ${errorData.message}`);
       } else {
         return res.status(response.status).json({
           error: errorData.message || 'Dify API error',
@@ -2365,36 +2315,11 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       console.error('Dify API error:', errorData);
 
       if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
-        console.log('🔄 Conversation not found in DIFY, but maintaining dialogue continuity for ChatFlow');
-        console.log('📝 Keeping original conversation_id to preserve dialogue_count progression');
+        console.log('❌ Conversation not found in DIFY - this breaks chatflow continuity');
+        console.log('🚨 Rejecting request to maintain proper chatflow state management');
         
-        // Create a new request without conversation_id for DIFY, but maintain our internal tracking
-        const retryApiRequestBody = {
-          ...apiRequestBody
-        };
-        delete retryApiRequestBody.conversation_id;
-
-        response = await fetchWithTimeoutAndRetry(
-          apiEndpoint,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${DIFY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(retryApiRequestBody),
-          },
-          DEFAULT_TIMEOUT
-        );
-
-        // 如果重试依然失败，返回错误
-        if (!response.ok) {
-          const retryErrorData = await response.json();
-          return res.status(response.status).json({
-            error: retryErrorData.message || 'Dify API error',
-            detail: retryErrorData
-          });
-        }
+        // Return the error to frontend instead of silently creating new conversation
+        throw new Error(`Dify conversation not found: ${errorData.message}`);
       } else {
         return res.status(response.status).json({
           error: errorData.message || 'Dify API error',
