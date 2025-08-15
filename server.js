@@ -932,8 +932,19 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
+    // 🔧 关键修复：为新会话添加正确的初始化变量
+    const isNewConversation = !difyConversationId;
+    const enhancedInputs = isNewConversation ? {
+      // 确保新会话从信息收集阶段开始
+      conversation_info_completeness: 0,
+      conversation_collection_count: 0,
+      start_paint_point: '',
+      product_info: '',
+      ...inputs // 保留用户传入的其他inputs
+    } : inputs;
+    
     const requestBody = {
-      inputs: inputs,
+      inputs: enhancedInputs,
       query: actualMessage,
       response_mode: stream ? 'streaming' : 'blocking',
       stream: stream,
@@ -943,7 +954,8 @@ app.post('/api/dify', async (req, res) => {
     // 🔧 调试：记录发送给DIFY的完整请求
     console.log('📤 [DIFY API] Sending request to chat-messages:', {
       query: actualMessage.substring(0, 100) + '...',
-      inputs: inputs,
+      inputs: enhancedInputs,
+      isNewConversation: isNewConversation,
       response_mode: requestBody.response_mode,
       user: requestBody.user,
       conversation_id: difyConversationId || 'NEW_CONVERSATION',
@@ -1399,11 +1411,23 @@ app.post('/api/dify/workflow', async (req, res) => {
       }
     }
 
+    // 🔧 关键修复：为workflow新会话添加初始化变量
+    const isNewWorkflowConversation = !difyConversationId;
+    const workflowInputs = isNewWorkflowConversation ? {
+      // 确保新会话从信息收集阶段开始
+      conversation_info_completeness: 0,
+      conversation_collection_count: 0,
+      start_paint_point: '',
+      product_info: '',
+      query: actualMessage, // For workflows, message goes in inputs.query
+      ...inputs // 保留用户传入的其他inputs
+    } : {
+      ...inputs,
+      query: actualMessage // For workflows, message goes in inputs.query
+    };
+    
     const requestBody = {
-      inputs: {
-        ...inputs,
-        query: actualMessage // For workflows, message goes in inputs.query
-      },
+      inputs: workflowInputs,
       response_mode: stream ? 'streaming' : 'blocking',
       user: getValidUserId(user)
     };
