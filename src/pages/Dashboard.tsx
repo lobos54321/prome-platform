@@ -172,10 +172,10 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ¥{user && typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'}
+              {user && typeof user.balance === 'number' ? Math.round(user.balance).toLocaleString() : '0'} 积分
             </div>
             <p className="text-xs text-muted-foreground">
-              余额过低时会影响服务使用
+              积分过低时会影响服务使用
             </p>
             <Button size="sm" className="mt-4" onClick={() => navigate('/settings')}>
               充值账户
@@ -199,12 +199,12 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">总消费金额</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">总消费积分</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ¥{typeof totalSpent === 'number' ? totalSpent.toFixed(2) : '0.00'}
+              {typeof totalSpent === 'number' ? Math.round(totalSpent).toLocaleString() : '0'} 积分
             </div>
             <p className="text-xs text-muted-foreground">
               共产生{billingRecords.length}条账单
@@ -217,11 +217,10 @@ export default function Dashboard() {
         <TabsList>
           <TabsTrigger value="overview">概览</TabsTrigger>
           <TabsTrigger value="usage">使用记录</TabsTrigger>
-          <TabsTrigger value="billing">账单记录</TabsTrigger>
         </TabsList>
 
         <div className="my-4">
-          {(activeTab === 'usage' || activeTab === 'billing') && (
+          {activeTab === 'usage' && (
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
               <Input
@@ -255,10 +254,6 @@ export default function Dashboard() {
                 <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => navigate('/token-dashboard')}>
                   <Clock className="h-8 w-8 text-orange-500" />
                   <span>Token 分析</span>
-                </Button>
-                <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => setActiveTab('billing')}>
-                  <CreditCard className="h-8 w-8 text-purple-500" />
-                  <span>账单记录</span>
                 </Button>
               </CardContent>
             </Card>
@@ -313,7 +308,7 @@ export default function Dashboard() {
                         <th className="px-6 py-3">服务</th>
                         <th className="px-6 py-3">会话ID</th>
                         <th className="px-6 py-3">Token使用量</th>
-                        <th className="px-6 py-3">费用</th>
+                        <th className="px-6 py-3">积分使用</th>
                         <th className="px-6 py-3">时间</th>
                       </tr>
                     </thead>
@@ -331,8 +326,8 @@ export default function Dashboard() {
                           <td className="px-6 py-4">
                             {typeof record.tokensUsed === 'number' ? record.tokensUsed : ''}
                           </td>
-                          <td className="px-6 py-4 text-green-600">
-                            ¥{typeof record.cost === 'number' ? record.cost.toFixed(4) : '0.0000'}
+                          <td className="px-6 py-4 text-red-600">
+                            -{typeof record.cost === 'number' ? Math.round(record.cost) : '0'} 积分
                           </td>
                           <td className="px-6 py-4 text-gray-500">
                             {formatDate(record.timestamp)}
@@ -353,62 +348,6 @@ export default function Dashboard() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="billing">
-          <Card>
-            <CardHeader>
-              <CardTitle>账单记录</CardTitle>
-              <CardDescription>
-                您的所有充值和消费记录
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {filteredBilling.length > 0 ? (
-                <div className="relative overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-600">
-                      <tr>
-                        <th className="px-6 py-3">交易ID</th>
-                        <th className="px-6 py-3">类型</th>
-                        <th className="px-6 py-3">描述</th>
-                        <th className="px-6 py-3">金额</th>
-                        <th className="px-6 py-3">时间</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredBilling.map((record, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="px-6 py-4 font-medium">
-                            {typeof record.id === 'string' ? record.id.substring(0, 8) : ''}
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge variant={record.type === 'charge' ? 'default' : 'destructive'}>
-                              {record.type === 'charge' ? '充值' : '消费'}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4">
-                            {record.description}
-                          </td>
-                          <td className={`px-6 py-4 ${record.type === 'charge' ? 'text-green-600' : 'text-red-600'}`}>
-                            {record.type === 'charge' ? '+' : '-'}¥{typeof record.amount === 'number' ? record.amount.toFixed(2) : '0.00'}
-                          </td>
-                          <td className="px-6 py-4 text-gray-500">
-                            {formatDate(record.timestamp)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">
-                    {searchTerm ? '未找到匹配的账单记录' : '暂无账单记录'}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
