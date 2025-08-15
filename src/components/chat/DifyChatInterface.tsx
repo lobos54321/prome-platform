@@ -258,6 +258,20 @@ export function DifyChatInterface({
           isLoading,
           error
         }),
+        // 🆕 调试localStorage状态
+        checkLocalStorage: () => {
+          const localStorage_data = {
+            dify_user_id: localStorage.getItem('dify_user_id'),
+            dify_conversation_id: localStorage.getItem('dify_conversation_id'),
+            dify_messages: localStorage.getItem('dify_messages'),
+            dify_workflow_state: localStorage.getItem('dify_workflow_state'),
+            messages_count: messages.length,
+            current_workflow: workflowState.isWorkflow
+          };
+          console.table(localStorage_data);
+          console.log('📋 Complete localStorage dump:', localStorage_data);
+          return localStorage_data;
+        },
         // 🔧 新增：测试对话流程的工具
         testWorkflowPath: async (message = '你好') => {
           const userId = 'workflow-test-' + Date.now();
@@ -771,6 +785,14 @@ export function DifyChatInterface({
               if (storedWorkflowState) {
                 const parsedWorkflowState = JSON.parse(storedWorkflowState);
                 console.log('[Chat Debug] 🔄 恢复工作流状态:', parsedWorkflowState);
+                // 🔧 修复：确保工作流状态的时间戳字段正确转换
+                if (parsedWorkflowState.nodes) {
+                  parsedWorkflowState.nodes = parsedWorkflowState.nodes.map((node: any) => ({
+                    ...node,
+                    startTime: node.startTime ? new Date(node.startTime) : undefined,
+                    endTime: node.endTime ? new Date(node.endTime) : undefined
+                  }));
+                }
                 setWorkflowState(parsedWorkflowState);
               }
             } catch (error) {
@@ -851,7 +873,11 @@ export function DifyChatInterface({
 
   // 添加欢迎消息 - 等待 userId 准备完成
   useEffect(() => {
-    if (messages.length === 0 && welcomeMessage && isUserIdReady) {
+    // 🔧 修复：检查localStorage是否有恢复的消息，避免覆盖
+    const storedMessages = localStorage.getItem('dify_messages');
+    const hasStoredMessages = storedMessages && JSON.parse(storedMessages).length > 0;
+    
+    if (messages.length === 0 && welcomeMessage && isUserIdReady && !hasStoredMessages) {
       setMessages([{
         id: 'welcome',
         content: welcomeMessage,
@@ -1025,6 +1051,7 @@ export function DifyChatInterface({
           // 🔧 关键修复：优先使用localStorage中的dify_conversation_id以确保对话连续性
           conversation_id: localStorage.getItem('dify_conversation_id') || conversationId || undefined,
           response_mode: 'streaming', // ✅ 官方API字段：streaming/blocking
+          stream: true, // 🔧 关键修复：启用流式响应
           auto_generate_name: true,   // ✅ 官方API字段：自动生成会话标题
           // 🔥 修复：根据官方API文档，inputs用于传递应用定义的变量值
           // 通常应该为空对象，让Dify根据workflow配置和对话上下文处理
