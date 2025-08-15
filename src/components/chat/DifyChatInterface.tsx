@@ -880,7 +880,7 @@ export function DifyChatInterface({
         // 设置新的session时间戳
         localStorage.setItem('dify_session_timestamp', Date.now().toString());
         
-        console.log('[Chat Debug] 🔥 GENERATED NEW USER ID for forced fresh conversation:', newUserId);
+        console.log('[Chat Debug] 🔥 FORCING NEW CONVERSATION - keeping authenticated user ID:', userId);
         console.log('[Chat Debug] ✅ All state cleared for fresh conversation');
       }
       
