@@ -757,8 +757,8 @@ export function DifyChatInterface({
         const storedUserId = localStorage.getItem('dify_user_id');
         const storedConversationId = localStorage.getItem('dify_conversation_id');
         
-        if (storedUserId && !storedUserId.startsWith('anonymous-')) {
-          // 页面刷新，保持原有的会话状态
+        if (storedUserId) {
+          // 页面刷新，保持原有的会话状态（包括匿名用户）
           console.log('[Chat Debug] 🔄 页面刷新 - 保持原有用户ID和对话状态:', storedUserId);
           setUserId(storedUserId);
           
