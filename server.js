@@ -934,14 +934,26 @@ app.post('/api/dify', async (req, res) => {
 
     // 🔧 关键修复：为新会话添加正确的初始化变量
     const isNewConversation = !difyConversationId;
+    
+    // 🚨 重要：确保新会话不进入营销文案生成流程
+    // 根据workflow分析，条件分支0检查 conversation_info_completeness ≥ 4
+    // 新会话必须 < 4 才能进入信息收集阶段
     const enhancedInputs = isNewConversation ? {
-      // 确保新会话从信息收集阶段开始
+      // 强制设置为0，确保 < 4，避免直接进入LLM0
       conversation_info_completeness: 0,
       conversation_collection_count: 0,
       start_paint_point: '',
       product_info: '',
+      LLM0: '', // 确保LLM0变量为空
+      // 添加明确的新用户标识
+      new_conversation_flag: 'true',
       ...inputs // 保留用户传入的其他inputs
     } : inputs;
+    
+    // 🔧 为新会话强制设置conversation_id为空，确保DIFY创建新会话
+    if (isNewConversation) {
+      difyConversationId = '';
+    }
     
     const requestBody = {
       inputs: enhancedInputs,
@@ -956,11 +968,22 @@ app.post('/api/dify', async (req, res) => {
       query: actualMessage.substring(0, 100) + '...',
       inputs: enhancedInputs,
       isNewConversation: isNewConversation,
+      conversation_info_completeness: enhancedInputs.conversation_info_completeness,
       response_mode: requestBody.response_mode,
       user: requestBody.user,
       conversation_id: difyConversationId || 'NEW_CONVERSATION',
       timestamp: new Date().toISOString()
     });
+    
+    // 🚨 关键调试：验证条件分支0逻辑
+    if (isNewConversation) {
+      console.log('🔍 [WORKFLOW DEBUG] 新会话条件分支分析:', {
+        'conversation_info_completeness': enhancedInputs.conversation_info_completeness,
+        '是否满足≥4条件': enhancedInputs.conversation_info_completeness >= 4,
+        'LLM0变量状态': enhancedInputs.LLM0,
+        '预期路径': enhancedInputs.conversation_info_completeness >= 4 ? 'LLM0 (营销文案)' : '信息收集阶段'
+      });
+    }
 
     // Detect context overflow risk before processing
     let overflowRisk = await detectContextOverflowRisk(conversationId, actualMessage);
@@ -1413,12 +1436,16 @@ app.post('/api/dify/workflow', async (req, res) => {
 
     // 🔧 关键修复：为workflow新会话添加初始化变量
     const isNewWorkflowConversation = !difyConversationId;
+    
+    // 🚨 重要：workflow也需要相同的逻辑确保不直接进入LLM0
     const workflowInputs = isNewWorkflowConversation ? {
-      // 确保新会话从信息收集阶段开始
+      // 强制设置为0，确保 < 4，避免直接进入LLM0
       conversation_info_completeness: 0,
       conversation_collection_count: 0,
       start_paint_point: '',
       product_info: '',
+      LLM0: '', // 确保LLM0变量为空
+      new_conversation_flag: 'true', // 新会话标识
       query: actualMessage, // For workflows, message goes in inputs.query
       ...inputs // 保留用户传入的其他inputs
     } : {
@@ -1426,11 +1453,38 @@ app.post('/api/dify/workflow', async (req, res) => {
       query: actualMessage // For workflows, message goes in inputs.query
     };
     
+    // 🔧 为新会话强制设置conversation_id为空
+    if (isNewWorkflowConversation) {
+      difyConversationId = '';
+    }
+    
     const requestBody = {
       inputs: workflowInputs,
       response_mode: stream ? 'streaming' : 'blocking',
       user: getValidUserId(user)
     };
+    
+    // 🔧 调试：记录发送给DIFY workflow的完整请求
+    console.log('📤 [DIFY WORKFLOW] Sending request:', {
+      query: actualMessage.substring(0, 100) + '...',
+      inputs: workflowInputs,
+      isNewWorkflowConversation: isNewWorkflowConversation,
+      conversation_info_completeness: workflowInputs.conversation_info_completeness,
+      response_mode: requestBody.response_mode,
+      user: requestBody.user,
+      conversation_id: difyConversationId || 'NEW_CONVERSATION',
+      timestamp: new Date().toISOString()
+    });
+    
+    // 🚨 关键调试：验证workflow条件分支0逻辑
+    if (isNewWorkflowConversation) {
+      console.log('🔍 [WORKFLOW DEBUG] 新workflow会话条件分支分析:', {
+        'conversation_info_completeness': workflowInputs.conversation_info_completeness,
+        '是否满足≥4条件': workflowInputs.conversation_info_completeness >= 4,
+        'LLM0变量状态': workflowInputs.LLM0,
+        '预期路径': workflowInputs.conversation_info_completeness >= 4 ? 'LLM0 (营销文案)' : '信息收集阶段'
+      });
+    }
 
     // Context length management - Check and manage conversation history before API call
     let contextManagementResult = null;
