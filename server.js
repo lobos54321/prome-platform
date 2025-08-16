@@ -932,22 +932,17 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
-    // 🔧 关键修复：为新会话添加正确的初始化变量
+    // 🔧 重大修正：让DIFY使用workflow配置的默认值
     const isNewConversation = !difyConversationId;
     
-    // 🚨 重要：确保新会话不进入营销文案生成流程
-    // 根据workflow分析，条件分支0检查 conversation_info_completeness ≥ 4
-    // 新会话必须 < 4 才能进入信息收集阶段
+    // 🎯 核心洞察：conversation变量由workflow自动管理，不应该通过inputs传递
+    // workflow配置显示：conversation_info_completeness默认值为0
+    // 条件分支4: conversation_info_completeness < 4 → 信息收集LLM
+    // 条件分支4: conversation_info_completeness ≥ 4 → 营销文案生成
     const enhancedInputs = isNewConversation ? {
-      // 强制设置为0，确保 < 4，避免直接进入LLM0
-      conversation_info_completeness: 0,
-      conversation_collection_count: 0,
-      start_paint_point: '',
-      product_info: '',
-      LLM0: '', // 确保LLM0变量为空
-      // 添加明确的新用户标识
-      new_conversation_flag: 'true',
-      ...inputs // 保留用户传入的其他inputs
+      // 🚨 关键：新会话使用完全空的inputs，让DIFY使用默认值
+      // 不传递conversation变量，避免干扰workflow的自动管理
+      ...inputs // 只保留用户传入的非conversation变量
     } : inputs;
     
     // 🔧 为新会话强制设置conversation_id为空，确保DIFY创建新会话
@@ -975,13 +970,13 @@ app.post('/api/dify', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
-    // 🚨 关键调试：验证条件分支0逻辑
+    // 🚨 关键调试：验证新的修复逻辑
     if (isNewConversation) {
-      console.log('🔍 [WORKFLOW DEBUG] 新会话条件分支分析:', {
-        'conversation_info_completeness': enhancedInputs.conversation_info_completeness,
-        '是否满足≥4条件': enhancedInputs.conversation_info_completeness >= 4,
-        'LLM0变量状态': enhancedInputs.LLM0,
-        '预期路径': enhancedInputs.conversation_info_completeness >= 4 ? 'LLM0 (营销文案)' : '信息收集阶段'
+      console.log('🔍 [WORKFLOW DEBUG] 新会话策略分析:', {
+        '策略': '让DIFY使用workflow默认值',
+        'inputs内容': enhancedInputs,
+        '包含conversation变量': Object.keys(enhancedInputs).some(key => key.includes('conversation')),
+        '预期行为': 'DIFY使用conversation_info_completeness=0默认值，进入信息收集LLM'
       });
     }
 
@@ -1434,20 +1429,14 @@ app.post('/api/dify/workflow', async (req, res) => {
       }
     }
 
-    // 🔧 关键修复：为workflow新会话添加初始化变量
+    // 🔧 重大修正：workflow端点也让DIFY使用默认值
     const isNewWorkflowConversation = !difyConversationId;
     
-    // 🚨 重要：workflow也需要相同的逻辑确保不直接进入LLM0
+    // 🎯 核心洞察：conversation变量由workflow自动管理，不应该通过inputs传递
     const workflowInputs = isNewWorkflowConversation ? {
-      // 强制设置为0，确保 < 4，避免直接进入LLM0
-      conversation_info_completeness: 0,
-      conversation_collection_count: 0,
-      start_paint_point: '',
-      product_info: '',
-      LLM0: '', // 确保LLM0变量为空
-      new_conversation_flag: 'true', // 新会话标识
+      // 🚨 关键：新workflow会话使用空inputs，让DIFY使用默认值
       query: actualMessage, // For workflows, message goes in inputs.query
-      ...inputs // 保留用户传入的其他inputs
+      ...inputs // 只保留用户传入的非conversation变量
     } : {
       ...inputs,
       query: actualMessage // For workflows, message goes in inputs.query
@@ -1476,13 +1465,13 @@ app.post('/api/dify/workflow', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
-    // 🚨 关键调试：验证workflow条件分支0逻辑
+    // 🚨 关键调试：验证workflow新修复逻辑
     if (isNewWorkflowConversation) {
-      console.log('🔍 [WORKFLOW DEBUG] 新workflow会话条件分支分析:', {
-        'conversation_info_completeness': workflowInputs.conversation_info_completeness,
-        '是否满足≥4条件': workflowInputs.conversation_info_completeness >= 4,
-        'LLM0变量状态': workflowInputs.LLM0,
-        '预期路径': workflowInputs.conversation_info_completeness >= 4 ? 'LLM0 (营销文案)' : '信息收集阶段'
+      console.log('🔍 [WORKFLOW DEBUG] 新workflow会话策略分析:', {
+        '策略': '让DIFY使用workflow默认值',
+        'workflowInputs内容': workflowInputs,
+        '包含conversation变量': Object.keys(workflowInputs).some(key => key.includes('conversation')),
+        '预期行为': 'DIFY使用conversation_info_completeness=0默认值，进入信息收集LLM'
       });
     }
 
