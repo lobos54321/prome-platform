@@ -948,11 +948,21 @@ app.post('/api/dify', async (req, res) => {
       // 添加明确的新用户标识
       new_conversation_flag: 'true',
       ...inputs // 保留用户传入的其他inputs
-    } : inputs;
+    } : {
+      // 🚨 修复核心问题：连续对话中如果信息未收集完整，强制重置为信息收集状态
+      // 这解决了dialogue_count增加但conversation_info_completeness仍为0时的路由问题
+      conversation_info_completeness: inputs.conversation_info_completeness || 0,
+      conversation_collection_count: inputs.conversation_collection_count || 0,
+      start_paint_point: inputs.start_paint_point || '',
+      product_info: inputs.product_info || '',
+      LLM0: inputs.LLM0 || '',
+      ...inputs // 保留用户传入的其他inputs
+    };
     
-    // 🔧 为新会话强制设置conversation_id为空，确保DIFY创建新会话
-    if (isNewConversation) {
-      difyConversationId = '';
+    // 🔧 核心修复：如果conversation_info_completeness < 4，强制创建新会话重置dialogue_count
+    if (enhancedInputs.conversation_info_completeness < 4) {
+      difyConversationId = ''; // 强制新会话，重置dialogue_count=0
+      console.log('🔧 [CRITICAL FIX] 强制创建新会话因为conversation_info_completeness < 4:', enhancedInputs.conversation_info_completeness);
     }
     
     const requestBody = {
@@ -1452,13 +1462,20 @@ app.post('/api/dify/workflow', async (req, res) => {
       query: actualMessage, // For workflows, message goes in inputs.query
       ...inputs // 保留用户传入的其他inputs
     } : {
-      ...inputs,
-      query: actualMessage // For workflows, message goes in inputs.query
+      // 🚨 修复核心问题：连续对话中如果信息未收集完整，强制重置为信息收集状态
+      conversation_info_completeness: inputs.conversation_info_completeness || 0,
+      conversation_collection_count: inputs.conversation_collection_count || 0,
+      start_paint_point: inputs.start_paint_point || '',
+      product_info: inputs.product_info || '',
+      LLM0: inputs.LLM0 || '',
+      query: actualMessage, // For workflows, message goes in inputs.query
+      ...inputs // 保留用户传入的其他inputs
     };
     
-    // 🔧 为新会话强制设置conversation_id为空
-    if (isNewWorkflowConversation) {
-      difyConversationId = '';
+    // 🔧 核心修复：如果conversation_info_completeness < 4，强制创建新会话重置dialogue_count
+    if (workflowInputs.conversation_info_completeness < 4) {
+      difyConversationId = ''; // 强制新会话，重置dialogue_count=0
+      console.log('🔧 [WORKFLOW CRITICAL FIX] 强制创建新会话因为conversation_info_completeness < 4:', workflowInputs.conversation_info_completeness);
     }
     
     const requestBody = {
