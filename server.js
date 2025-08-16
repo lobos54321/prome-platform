@@ -932,17 +932,22 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
-    // 🔧 重大修正：让DIFY使用workflow配置的默认值
+    // 🔧 关键修复：为新会话添加正确的初始化变量
     const isNewConversation = !difyConversationId;
     
-    // 🎯 核心洞察：conversation变量由workflow自动管理，不应该通过inputs传递
-    // workflow配置显示：conversation_info_completeness默认值为0
-    // 条件分支4: conversation_info_completeness < 4 → 信息收集LLM
-    // 条件分支4: conversation_info_completeness ≥ 4 → 营销文案生成
+    // 🚨 重要：确保新会话不进入营销文案生成流程
+    // 根据workflow分析，条件分支4检查 conversation_info_completeness ≥ 4
+    // 新会话必须 < 4 才能进入信息收集阶段
     const enhancedInputs = isNewConversation ? {
-      // 🚨 关键：新会话使用完全空的inputs，让DIFY使用默认值
-      // 不传递conversation变量，避免干扰workflow的自动管理
-      ...inputs // 只保留用户传入的非conversation变量
+      // 强制设置为0，确保 < 4，避免直接进入LLM0
+      conversation_info_completeness: 0,
+      conversation_collection_count: 0,
+      start_paint_point: '',
+      product_info: '',
+      LLM0: '', // 确保LLM0变量为空
+      // 添加明确的新用户标识
+      new_conversation_flag: 'true',
+      ...inputs // 保留用户传入的其他inputs
     } : inputs;
     
     // 🔧 为新会话强制设置conversation_id为空，确保DIFY创建新会话
@@ -1429,14 +1434,23 @@ app.post('/api/dify/workflow', async (req, res) => {
       }
     }
 
-    // 🔧 重大修正：workflow端点也让DIFY使用默认值
+    // 🔧 关键修复：为新workflow会话添加正确的初始化变量
     const isNewWorkflowConversation = !difyConversationId;
     
-    // 🎯 核心洞察：conversation变量由workflow自动管理，不应该通过inputs传递
+    // 🚨 重要：确保新workflow会话不进入营销文案生成流程
+    // 根据workflow分析，条件分支4检查 conversation_info_completeness ≥ 4
+    // 新会话必须 < 4 才能进入信息收集阶段
     const workflowInputs = isNewWorkflowConversation ? {
-      // 🚨 关键：新workflow会话使用空inputs，让DIFY使用默认值
+      // 强制设置为0，确保 < 4，避免直接进入LLM0
+      conversation_info_completeness: 0,
+      conversation_collection_count: 0,
+      start_paint_point: '',
+      product_info: '',
+      LLM0: '', // 确保LLM0变量为空
+      // 添加明确的新用户标识
+      new_conversation_flag: 'true',
       query: actualMessage, // For workflows, message goes in inputs.query
-      ...inputs // 只保留用户传入的非conversation变量
+      ...inputs // 保留用户传入的其他inputs
     } : {
       ...inputs,
       query: actualMessage // For workflows, message goes in inputs.query
