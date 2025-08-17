@@ -611,9 +611,12 @@ export function useTokenCostEstimation() {
     currentBalance: number;
   }> => {
     try {
-      // Get model configuration with improved matching
+      // Get model configuration with simple matching
       const modelConfigs = await db.getModelConfigs();
-      let modelConfig = findBestModelMatch(modelConfigs, modelName);
+      let modelConfig = modelConfigs.find(config => 
+        config.isActive && 
+        config.modelName.toLowerCase() === modelName.toLowerCase()
+      ) || null;
 
       if (!modelConfig) {
         // Use default pricing
