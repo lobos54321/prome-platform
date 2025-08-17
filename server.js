@@ -932,38 +932,12 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
-    // 🔧 关键修复：为新会话添加正确的初始化变量
-    const isNewConversation = !difyConversationId;
-    
-    // 🚨 重要：确保新会话不进入营销文案生成流程
-    // 根据workflow分析，条件分支4检查 conversation_info_completeness ≥ 4
-    // 新会话必须 < 4 才能进入信息收集阶段
-    const enhancedInputs = isNewConversation ? {
-      // 强制设置为0，确保 < 4，避免直接进入LLM0
-      conversation_info_completeness: 0,
-      conversation_collection_count: 0,
-      start_paint_point: '',
-      product_info: '',
-      LLM0: '', // 确保LLM0变量为空
-      // 添加明确的新用户标识
-      new_conversation_flag: 'true',
-      ...inputs // 保留用户传入的其他inputs
-    } : {
-      // 🚨 修复核心问题：连续对话中如果信息未收集完整，强制重置为信息收集状态
-      // 这解决了dialogue_count增加但conversation_info_completeness仍为0时的路由问题
-      conversation_info_completeness: inputs.conversation_info_completeness || 0,
-      conversation_collection_count: inputs.conversation_collection_count || 0,
-      start_paint_point: inputs.start_paint_point || '',
-      product_info: inputs.product_info || '',
-      LLM0: inputs.LLM0 || '',
-      ...inputs // 保留用户传入的其他inputs
+    // 🔧 正确做法：完全按照DIFY ChatFlow设计，不干预conversation_variables
+    // conversation_variables由DIFY的"变量赋值"节点自动管理，不应通过inputs传递
+    const enhancedInputs = {
+      // 只传递真正的用户业务变量，让DIFY自然管理conversation状态
+      ...inputs 
     };
-    
-    // 🔧 核心修复：如果conversation_info_completeness < 4，强制创建新会话重置dialogue_count
-    if (enhancedInputs.conversation_info_completeness < 4) {
-      difyConversationId = ''; // 强制新会话，重置dialogue_count=0
-      console.log('🔧 [CRITICAL FIX] 强制创建新会话因为conversation_info_completeness < 4:', enhancedInputs.conversation_info_completeness);
-    }
     
     const requestBody = {
       inputs: enhancedInputs,
@@ -985,15 +959,7 @@ app.post('/api/dify', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
-    // 🚨 关键调试：验证新的修复逻辑
-    if (isNewConversation) {
-      console.log('🔍 [WORKFLOW DEBUG] 新会话策略分析:', {
-        '策略': '让DIFY使用workflow默认值',
-        'inputs内容': enhancedInputs,
-        '包含conversation变量': Object.keys(enhancedInputs).some(key => key.includes('conversation')),
-        '预期行为': 'DIFY使用conversation_info_completeness=0默认值，进入信息收集LLM'
-      });
-    }
+    // ✅ 完全信任DIFY ChatFlow的自然流程管理
 
     // Detect context overflow risk before processing
     let overflowRisk = await detectContextOverflowRisk(conversationId, actualMessage);
@@ -1444,39 +1410,13 @@ app.post('/api/dify/workflow', async (req, res) => {
       }
     }
 
-    // 🔧 关键修复：为新workflow会话添加正确的初始化变量
-    const isNewWorkflowConversation = !difyConversationId;
-    
-    // 🚨 重要：确保新workflow会话不进入营销文案生成流程
-    // 根据workflow分析，条件分支4检查 conversation_info_completeness ≥ 4
-    // 新会话必须 < 4 才能进入信息收集阶段
-    const workflowInputs = isNewWorkflowConversation ? {
-      // 强制设置为0，确保 < 4，避免直接进入LLM0
-      conversation_info_completeness: 0,
-      conversation_collection_count: 0,
-      start_paint_point: '',
-      product_info: '',
-      LLM0: '', // 确保LLM0变量为空
-      // 添加明确的新用户标识
-      new_conversation_flag: 'true',
-      query: actualMessage, // For workflows, message goes in inputs.query
-      ...inputs // 保留用户传入的其他inputs
-    } : {
-      // 🚨 修复核心问题：连续对话中如果信息未收集完整，强制重置为信息收集状态
-      conversation_info_completeness: inputs.conversation_info_completeness || 0,
-      conversation_collection_count: inputs.conversation_collection_count || 0,
-      start_paint_point: inputs.start_paint_point || '',
-      product_info: inputs.product_info || '',
-      LLM0: inputs.LLM0 || '',
+    // 🔧 正确做法：完全按照DIFY ChatFlow设计，不干预conversation_variables  
+    // conversation_variables由DIFY的"变量赋值"节点自动管理，不应通过inputs传递
+    const workflowInputs = {
+      // 只传递真正的用户业务变量，让DIFY自然管理conversation状态
       query: actualMessage, // For workflows, message goes in inputs.query
       ...inputs // 保留用户传入的其他inputs
     };
-    
-    // 🔧 核心修复：如果conversation_info_completeness < 4，强制创建新会话重置dialogue_count
-    if (workflowInputs.conversation_info_completeness < 4) {
-      difyConversationId = ''; // 强制新会话，重置dialogue_count=0
-      console.log('🔧 [WORKFLOW CRITICAL FIX] 强制创建新会话因为conversation_info_completeness < 4:', workflowInputs.conversation_info_completeness);
-    }
     
     const requestBody = {
       inputs: workflowInputs,
@@ -1496,15 +1436,7 @@ app.post('/api/dify/workflow', async (req, res) => {
       timestamp: new Date().toISOString()
     });
     
-    // 🚨 关键调试：验证workflow新修复逻辑
-    if (isNewWorkflowConversation) {
-      console.log('🔍 [WORKFLOW DEBUG] 新workflow会话策略分析:', {
-        '策略': '让DIFY使用workflow默认值',
-        'workflowInputs内容': workflowInputs,
-        '包含conversation变量': Object.keys(workflowInputs).some(key => key.includes('conversation')),
-        '预期行为': 'DIFY使用conversation_info_completeness=0默认值，进入信息收集LLM'
-      });
-    }
+    // ✅ 完全信任DIFY ChatFlow的自然流程管理
 
     // Context length management - Check and manage conversation history before API call
     let contextManagementResult = null;
