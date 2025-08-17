@@ -932,12 +932,23 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
-    // 🔧 正确做法：完全按照DIFY ChatFlow设计，不干预conversation_variables
-    // conversation_variables由DIFY的"变量赋值"节点自动管理，不应通过inputs传递
+    // 🔧 修正：新会话时需要传递conversation variables的初始值
     const isNewConversation = !difyConversationId;
     const enhancedInputs = {
-      // 只传递真正的用户业务变量，让DIFY自然管理conversation状态
-      ...inputs 
+      ...inputs,
+      // 🎯 关键修复：新会话时显式传递conversation variables初始值
+      ...(isNewConversation ? {
+        conversation_info_completeness: 0,
+        conversation_collection_count: 0,
+        conversation_product_info: '',
+        start_paint_point: '',
+        product_info: '',
+        LLM0: '',
+        modification_LLM0: '',
+        modification_summary: '',
+        New_instructions: '',
+        Ds2_instructions: ''
+      } : {})
     };
     
     const requestBody = {
