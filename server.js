@@ -934,6 +934,7 @@ app.post('/api/dify', async (req, res) => {
 
     // 🔧 正确做法：完全按照DIFY ChatFlow设计，不干预conversation_variables
     // conversation_variables由DIFY的"变量赋值"节点自动管理，不应通过inputs传递
+    const isNewConversation = !difyConversationId;
     const enhancedInputs = {
       // 只传递真正的用户业务变量，让DIFY自然管理conversation状态
       ...inputs 
@@ -1412,6 +1413,7 @@ app.post('/api/dify/workflow', async (req, res) => {
 
     // 🔧 正确做法：完全按照DIFY ChatFlow设计，不干预conversation_variables  
     // conversation_variables由DIFY的"变量赋值"节点自动管理，不应通过inputs传递
+    const isNewWorkflowConversation = !difyConversationId;
     const workflowInputs = {
       // 只传递真正的用户业务变量，让DIFY自然管理conversation状态
       query: actualMessage, // For workflows, message goes in inputs.query
