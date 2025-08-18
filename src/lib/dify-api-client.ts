@@ -333,8 +333,8 @@ export class DifyAPIClient {
         },
         body: JSON.stringify({
           message,
-          user: this.getValidUserId(user),
-          inputs: this.sanitizeClientInputs(inputs)
+          user: this.getValidUserId(user)
+          // No inputs for chat-messages (advanced-chat contract)
         }),
       },
       this.config.timeoutMs // Use standard timeout for regular messages
@@ -441,8 +441,8 @@ export class DifyAPIClient {
         },
         body: JSON.stringify({
           message,
-          user: this.getValidUserId(user),
-          inputs: inputs || {}
+          user: this.getValidUserId(user)
+          // No inputs for chat-messages streaming (advanced-chat contract)
         }),
       },
       this.config.workflowTimeoutMs || this.config.timeoutMs || 240000 // Use extended timeout for streaming (4 minutes)

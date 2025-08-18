@@ -1,44 +1,62 @@
 # Dify API Integration Fix Summary
 
-## Finalized Behavior
+## Finalized Behavior (Updated for Advanced-Chat Contract)
 
-- 新会话（chat-messages）：
-  - inputs: {}，用户消息在顶层 query
-  - 不传任何 conversation_*，完全由 Dify workflow/ChatFlow 默认值管理
+**IMPORTANT**: This implementation now strictly follows Dify's advanced-chat (chatflow) contract requirements.
 
-- 既有会话：
-  - 继续使用同一会话，inputs 仅保留业务入参（已清洗）
-  - 不传任何 conversation_* 字段
+### Chat-Messages Endpoints (Advanced-Chat Contract)
+- **New conversations**: `{ query, user, response_mode }` - NO inputs field, NO conversation_id
+- **Continuing conversations**: `{ query, user, response_mode, conversation_id }` - NO inputs field
+- **NO greeting-based resets**: Greetings like "hello/hi/你好" do NOT force new conversations
+- **Conversation continuity**: Only depends on presence/absence of conversation_id from client
+- **Internal variables**: All conversation_* variables managed internally by Dify, never sent via API
 
-- 简单问候语重置：
-  - 当检测到 "nihao/你好/hi/hello/嗨/哈喽" 等问候语时，强制创建新的 Dify conversation（不传 conversation_id）
-  - chat-messages：inputs: {}
-  - workflows：inputs 仅包含 query，不包含任何 conversation_* 字段
+### Workflow Endpoints (Unchanged)
+- **New workflows**: `{ inputs: { query }, response_mode, user }` - inputs contains query only
+- **Continuing workflows**: `{ inputs: { query, ...sanitized_inputs }, response_mode, user, conversation_id }`
+- **Greeting detection**: Still applies for workflow endpoints if needed
+- **Input sanitization**: conversation_* variables still filtered for workflows
 
-- workflows/run 与 chat-messages：
-  - ChatFlow 依赖对话状态与对话变量，由 Dify 内部管理
-  - workflows.run 仅传业务入参和 query，禁止传 conversation_*；新会话时仅传 { query }
+### Key Changes from Previous Implementation
+1. **Removed `inputs` field completely** from all chat-messages endpoints
+2. **Removed greeting-based conversation reset logic** - greetings no longer force new conversations
+3. **Simplified conversation logic** - new conversation only when conversation_id not provided by client
+4. **Maintained workflow compatibility** - workflow endpoints unchanged to avoid scope creep
 
 ## Implementation Details
 
-### Input Sanitization
-- **Backend**: `src/server/utils/sanitizeInputs.cjs` provides `sanitizeInputs()` and `isSimpleGreeting()`
-- **Frontend**: Both `src/lib/dify-api-client.ts` and `src/lib/dify-client.ts` have client-side sanitization
-- **Safety**: Double-layer protection ensures conversation_* variables never reach Dify API
+### Advanced-Chat Contract Compliance
+- **Backend**: All chat-messages endpoints in `server.js` now send only `{ query, user, response_mode, conversation_id }` 
+- **Frontend**: `src/lib/dify-client.ts` and `src/lib/dify-api-client.ts` removed inputs field for chat-messages calls
+- **No Greeting Resets**: Removed `isSimpleGreeting` logic that forced new conversations on greetings
+- **Conversation Logic**: Simple rule - new conversation only when no conversation_id provided by client
 
-### Greeting Detection
-- Detects simple greetings: nihao, 你好, 您好, hi, hello, hey, 嗨, 哈喽, 哈啰, 哈羅
-- Supports punctuation variants: "hello!", "hi.", etc.
-- Triggers new conversation behavior even with existing conversation_id
+### Input Sanitization (Workflow Only)
+- **Backend**: `src/server/utils/sanitizeInputs.cjs` still provides `sanitizeInputs()` for workflow endpoints  
+- **Usage**: Only used for workflow endpoints, not for chat-messages
+- **Safety**: conversation_* variables still filtered for workflows to prevent conflicts
+
+### Conversation Management
+- **New Conversation**: Only when client omits conversation_id (explicit new chat window)
+- **Continue Conversation**: When client provides valid conversation_id
+- **No Interference**: No server-side logic overrides client's conversation intention
+- **Greeting Behavior**: Greetings like "hello/hi/你好" treated as normal messages, don't reset conversations
 
 ### API Endpoints Behavior
-- `POST /api/dify` - Chat messages with greeting detection and sanitization
-- `POST /api/dify/workflow` - Workflow execution with greeting detection and sanitization  
+- `POST /api/dify` - Chat messages with advanced-chat contract (no inputs, no greeting resets)
+- `POST /api/dify/:conversationId` - Blocking chat messages (advanced-chat contract) 
+- `POST /api/dify/:conversationId/stream` - Streaming chat messages (advanced-chat contract)
+- `POST /api/dify/workflow` - Workflow execution with input sanitization (unchanged)
 
 ## Testing
-- `scripts/dify-tests/verify-fix.cjs` - Tests sanitization and greeting detection
-- `scripts/dify-tests/test-empty-inputs-fix.cjs` - Validates input filtering
-- `scripts/dify-tests/test-condition-fix.cjs` - Tests greeting condition logic
+
+### New Tests
+- `scripts/dify-tests/test-chat-messages-contract.cjs` - Validates advanced-chat contract compliance
+- `scripts/dify-tests/test-greeting-behavior.cjs` - Confirms greetings don't reset conversations
+
+### Existing Tests  
+- `scripts/dify-tests/verify-fix.cjs` - Tests sanitization and greeting detection (still works for workflows)
+- `scripts/dify-tests/test-empty-inputs-fix.cjs` - Validates input filtering (for workflows)
 
 ## Issues Fixed
 

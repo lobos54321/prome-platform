@@ -936,30 +936,30 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
-    // Apply greeting detection and input sanitization
+    // For advanced-chat (chat-messages), only use query and conversation_id - no inputs field
     const isNewConversation = !difyConversationId;
-    const greetingReset = isSimpleGreeting(actualMessage) && !isNewConversation;
-    const sanitizedInputs = sanitizeInputs(inputs);
     
     const requestBody = {
-      inputs: (isNewConversation || greetingReset) ? {} : sanitizedInputs,
       query: actualMessage,
       response_mode: stream ? 'streaming' : 'blocking',
       stream: stream,
-      user: getValidUserId(user),
-      ...((!isNewConversation && !greetingReset) ? { conversation_id: difyConversationId } : {})
+      user: getValidUserId(user)
     };
     
-    // 🔧 调试：记录发送给DIFY的完整请求
+    // Only add conversation_id if continuing an existing conversation
+    if (!isNewConversation) {
+      requestBody.conversation_id = difyConversationId;
+    }
+    
+    // 🔧 调试：记录发送给DIFY的完整请求 (Advanced-chat contract: no inputs field)
     console.log('📤 [DIFY API] Sending request to chat-messages:', {
       query: actualMessage.substring(0, 100) + '...',
-      inputs: requestBody.inputs,
       isNewConversation: isNewConversation,
-      greetingReset: greetingReset,
       response_mode: requestBody.response_mode,
       user: requestBody.user,
       conversation_id: requestBody.conversation_id || 'NEW_CONVERSATION',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      note: 'Using advanced-chat contract: query-only, no inputs field'
     });
     
     // ✅ 完全信任DIFY ChatFlow的自然流程管理
@@ -992,11 +992,6 @@ app.post('/api/dify', async (req, res) => {
       // Generate a new conversation ID for our records
       conversationId = generateUUID();
       console.log(`🆕 Emergency new conversation ID: ${conversationId}`);
-    }
-
-    // Always add conversation_id if it exists and is valid (don't depend on supabase)
-    if (difyConversationId) {
-      requestBody.conversation_id = difyConversationId;
     }
 
     // Send message to Dify API
@@ -1784,14 +1779,14 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       console.log(`🆕 Stream emergency new conversation ID: ${conversationId}`);
     }
 
+    // For advanced-chat (chat-messages), only use query and conversation_id - no inputs field
     const requestBody = {
-      inputs: inputs,
       query: message,
       response_mode: 'streaming',
-      user: getValidUserId(req.body.user) // FIXED: Pass user from request body
+      user: getValidUserId(req.body.user)
     };
 
-    // 只有在 dify_conversation_id 存在且有效时才添加
+    // Only add conversation_id if continuing an existing conversation
     if (difyConversationId && supabase) {
       requestBody.conversation_id = difyConversationId;
     }
@@ -2297,14 +2292,14 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       console.log(`🆕 Chat emergency new conversation ID: ${conversationId}`);
     }
 
+    // For advanced-chat (chat-messages), only use query and conversation_id - no inputs field
     const requestBody = {
-      inputs: inputs,
       query: message,
       response_mode: 'blocking',
-      user: getValidUserId(req.body.user) // FIXED: Pass user from request body
+      user: getValidUserId(req.body.user)
     };
 
-    // 只有在 dify_conversation_id 存在且有效时才添加
+    // Only add conversation_id if continuing an existing conversation
     if (difyConversationId) {
       console.log('🔍 Found existing DIFY conversation ID:', difyConversationId);
       requestBody.conversation_id = difyConversationId;

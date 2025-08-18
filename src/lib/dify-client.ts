@@ -50,15 +50,15 @@ export class DifyClient {
       // 使用存储的 conversation_id 或传入的
       const actualConversationId = conversationId || this.conversationStore.get(user);
       
+      // For advanced-chat (chat-messages), only use query and conversation_id - no inputs field
       const payload = {
-        inputs: inputs || {},
         query: query,
         response_mode: 'blocking',
         user: user,
         ...(actualConversationId && { conversation_id: actualConversationId })
       };
 
-      console.log('[Dify Client] Chat Request:', JSON.stringify(payload, null, 2));
+      console.log('[Dify Client] Chat Request (advanced-chat):', JSON.stringify(payload, null, 2));
 
       const response = await this.fetchWithTimeout(`${this.baseUrl}/chat-messages`, {
         method: 'POST',
@@ -111,15 +111,15 @@ export class DifyClient {
     try {
       const actualConversationId = conversationId || this.conversationStore.get(user);
       
+      // For advanced-chat (chat-messages), only use query and conversation_id - no inputs field
       const payload = {
-        inputs: this.sanitizeClientInputs(inputs),
         query: query,
         response_mode: 'streaming',
         user: user,
         ...(actualConversationId && { conversation_id: actualConversationId })
       };
 
-      console.log('[Dify Client] Stream Request:', JSON.stringify(payload, null, 2));
+      console.log('[Dify Client] Stream Request (advanced-chat):', JSON.stringify(payload, null, 2));
 
       const response = await this.fetchWithTimeout(`${this.baseUrl}/chat-messages`, {
         method: 'POST',
