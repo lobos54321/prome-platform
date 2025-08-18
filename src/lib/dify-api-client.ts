@@ -299,6 +299,19 @@ export class DifyAPIClient {
   }
 
   /**
+   * Sanitize inputs to remove conversation_* keys
+   */
+  private sanitizeClientInputs(inputs?: Record<string, unknown>): Record<string, unknown> {
+    if (!inputs) return {};
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(inputs)) {
+      if (/^conversation_/i.test(k)) continue;
+      out[k] = v;
+    }
+    return out;
+  }
+
+  /**
    * Send a message to Dify via backend proxy and get response
    */
   async sendMessage(
@@ -321,7 +334,7 @@ export class DifyAPIClient {
         body: JSON.stringify({
           message,
           user: this.getValidUserId(user),
-          inputs: inputs || {}
+          inputs: this.sanitizeClientInputs(inputs)
         }),
       },
       this.config.timeoutMs // Use standard timeout for regular messages
@@ -374,7 +387,7 @@ export class DifyAPIClient {
         body: JSON.stringify({
           message,
           user: this.getValidUserId(user),
-          inputs: inputs || {},
+          inputs: this.sanitizeClientInputs(inputs),
           stream: false // For non-streaming workflow requests
         }),
       },

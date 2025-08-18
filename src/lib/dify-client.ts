@@ -89,6 +89,19 @@ export class DifyClient {
     }
   }
 
+  /**
+   * Sanitize inputs to remove conversation_* keys
+   */
+  private sanitizeClientInputs(inputs?: Record<string, unknown>): Record<string, unknown> {
+    if (!inputs) return {};
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(inputs)) {
+      if (/^conversation_/i.test(k)) continue;
+      out[k] = v;
+    }
+    return out;
+  }
+
   async chatStream(
     query: string, 
     user: string, 
@@ -99,7 +112,7 @@ export class DifyClient {
       const actualConversationId = conversationId || this.conversationStore.get(user);
       
       const payload = {
-        inputs: inputs || {},
+        inputs: this.sanitizeClientInputs(inputs),
         query: query,
         response_mode: 'streaming',
         user: user,
@@ -143,8 +156,8 @@ export class DifyClient {
       
       const payload = {
         inputs: {
-          ...inputs,
-          query: query, // 确保 query 在 inputs 中
+          ...this.sanitizeClientInputs(inputs),
+          query: query,
         },
         response_mode: 'blocking',
         user: user,

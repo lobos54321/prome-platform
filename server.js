@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { sanitizeInputs, isSimpleGreeting } = require('./src/server/utils/sanitizeInputs.js');
+const { sanitizeInputs, isSimpleGreeting } = require('./src/server/utils/sanitizeInputs.cjs');
 
 // Load environment variables
 dotenv.config();
