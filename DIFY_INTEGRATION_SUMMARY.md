@@ -1,5 +1,45 @@
 # Dify API Integration Fix Summary
 
+## Finalized Behavior
+
+- 新会话（chat-messages）：
+  - inputs: {}，用户消息在顶层 query
+  - 不传任何 conversation_*，完全由 Dify workflow/ChatFlow 默认值管理
+
+- 既有会话：
+  - 继续使用同一会话，inputs 仅保留业务入参（已清洗）
+  - 不传任何 conversation_* 字段
+
+- 简单问候语重置：
+  - 当检测到 "nihao/你好/hi/hello/嗨/哈喽" 等问候语时，强制创建新的 Dify conversation（不传 conversation_id）
+  - chat-messages：inputs: {}
+  - workflows：inputs 仅包含 query，不包含任何 conversation_* 字段
+
+- workflows/run 与 chat-messages：
+  - ChatFlow 依赖对话状态与对话变量，由 Dify 内部管理
+  - workflows.run 仅传业务入参和 query，禁止传 conversation_*；新会话时仅传 { query }
+
+## Implementation Details
+
+### Input Sanitization
+- **Backend**: `src/server/utils/sanitizeInputs.cjs` provides `sanitizeInputs()` and `isSimpleGreeting()`
+- **Frontend**: Both `src/lib/dify-api-client.ts` and `src/lib/dify-client.ts` have client-side sanitization
+- **Safety**: Double-layer protection ensures conversation_* variables never reach Dify API
+
+### Greeting Detection
+- Detects simple greetings: nihao, 你好, 您好, hi, hello, hey, 嗨, 哈喽, 哈啰, 哈羅
+- Supports punctuation variants: "hello!", "hi.", etc.
+- Triggers new conversation behavior even with existing conversation_id
+
+### API Endpoints Behavior
+- `POST /api/dify` - Chat messages with greeting detection and sanitization
+- `POST /api/dify/workflow` - Workflow execution with greeting detection and sanitization  
+
+## Testing
+- `scripts/dify-tests/verify-fix.cjs` - Tests sanitization and greeting detection
+- `scripts/dify-tests/test-empty-inputs-fix.cjs` - Validates input filtering
+- `scripts/dify-tests/test-condition-fix.cjs` - Tests greeting condition logic
+
 ## Issues Fixed
 
 ### 1. Routing Conflicts Resolved

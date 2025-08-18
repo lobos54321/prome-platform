@@ -4,6 +4,10 @@ import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { sanitizeInputs, isSimpleGreeting } = require('./src/server/utils/sanitizeInputs.cjs');
 
 // Load environment variables
 dotenv.config();
@@ -932,42 +936,29 @@ app.post('/api/dify', async (req, res) => {
       }
     }
 
-    // 🔧 修正：新会话时需要传递conversation variables的初始值
+    // Apply greeting detection and input sanitization
     const isNewConversation = !difyConversationId;
-    const enhancedInputs = {
-      ...inputs,
-      // 🎯 关键修复：新会话时显式传递conversation variables初始值
-      ...(isNewConversation ? {
-        conversation_info_completeness: 0,
-        conversation_collection_count: 0,
-        conversation_product_info: '',
-        start_paint_point: '',
-        product_info: '',
-        LLM0: '',
-        modification_LLM0: '',
-        modification_summary: '',
-        New_instructions: '',
-        Ds2_instructions: ''
-      } : {})
-    };
+    const greetingReset = isSimpleGreeting(actualMessage) && !isNewConversation;
+    const sanitizedInputs = sanitizeInputs(inputs);
     
     const requestBody = {
-      inputs: enhancedInputs,
+      inputs: (isNewConversation || greetingReset) ? {} : sanitizedInputs,
       query: actualMessage,
       response_mode: stream ? 'streaming' : 'blocking',
       stream: stream,
-      user: getValidUserId(user)
+      user: getValidUserId(user),
+      ...((!isNewConversation && !greetingReset) ? { conversation_id: difyConversationId } : {})
     };
     
     // 🔧 调试：记录发送给DIFY的完整请求
     console.log('📤 [DIFY API] Sending request to chat-messages:', {
       query: actualMessage.substring(0, 100) + '...',
-      inputs: enhancedInputs,
+      inputs: requestBody.inputs,
       isNewConversation: isNewConversation,
-      conversation_info_completeness: enhancedInputs.conversation_info_completeness,
+      greetingReset: greetingReset,
       response_mode: requestBody.response_mode,
       user: requestBody.user,
-      conversation_id: difyConversationId || 'NEW_CONVERSATION',
+      conversation_id: requestBody.conversation_id || 'NEW_CONVERSATION',
       timestamp: new Date().toISOString()
     });
     
@@ -1424,28 +1415,29 @@ app.post('/api/dify/workflow', async (req, res) => {
 
     // 🔧 正确做法：完全按照DIFY ChatFlow设计，不干预conversation_variables  
     // conversation_variables由DIFY的"变量赋值"节点自动管理，不应通过inputs传递
-    const isNewWorkflowConversation = !difyConversationId;
+    const greetingResetWorkflow = isSimpleGreeting(actualMessage) && !!difyConversationId;
+    const isNewWorkflowConversation = !difyConversationId || greetingResetWorkflow;
     const workflowInputs = {
-      // 只传递真正的用户业务变量，让DIFY自然管理conversation状态
       query: actualMessage, // For workflows, message goes in inputs.query
-      ...inputs // 保留用户传入的其他inputs
+      ...sanitizeInputs(inputs)
     };
     
     const requestBody = {
-      inputs: workflowInputs,
+      inputs: isNewWorkflowConversation ? { query: actualMessage } : workflowInputs,
       response_mode: stream ? 'streaming' : 'blocking',
-      user: getValidUserId(user)
+      user: getValidUserId(user),
+      ...(isNewWorkflowConversation ? {} : { conversation_id: difyConversationId })
     };
     
     // 🔧 调试：记录发送给DIFY workflow的完整请求
     console.log('📤 [DIFY WORKFLOW] Sending request:', {
       query: actualMessage.substring(0, 100) + '...',
-      inputs: workflowInputs,
-      isNewWorkflowConversation: isNewWorkflowConversation,
-      conversation_info_completeness: workflowInputs.conversation_info_completeness,
+      inputs: requestBody.inputs,
+      isNewWorkflowConversation,
+      greetingResetWorkflow,
       response_mode: requestBody.response_mode,
       user: requestBody.user,
-      conversation_id: difyConversationId || 'NEW_CONVERSATION',
+      conversation_id: requestBody.conversation_id || 'NEW_CONVERSATION',
       timestamp: new Date().toISOString()
     });
     
@@ -1461,13 +1453,7 @@ app.post('/api/dify/workflow', async (req, res) => {
       }
     }
 
-    // 🔧 修复工作流对话连续性：正确处理conversation_id
-    if (difyConversationId) {
-      requestBody.conversation_id = difyConversationId;
-      console.log('🔗 Using existing Dify conversation ID for workflow:', difyConversationId);
-    } else {
-      console.log('🆕 Starting new workflow conversation');
-    }
+    // Conversation ID is already handled in requestBody construction above
 
     if (stream) {
       // Handle streaming response for workflow progress
