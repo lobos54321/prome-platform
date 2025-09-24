@@ -1,6 +1,6 @@
 # Digital Human Video System
 
-This directory contains the complete digital human video creation system with A2E API integration.
+This repository contains the complete digital human video creation system with A2E API integration.
 
 ## Features
 
@@ -16,6 +16,7 @@ This directory contains the complete digital human video creation system with A2
 2. `server-api-endpoints.js` - Backend API endpoints for A2E integration
 3. `environment-config.env` - Required environment variables
 4. `digital-human-routes.js` - React Router configuration
+5. `supabase-setup.sql` - Database configuration and setup
 
 ## Setup Instructions
 
