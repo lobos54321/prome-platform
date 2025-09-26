@@ -1,0 +1,1531 @@
+[
+  {
+    "event": "workflow_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+      "workflow_id": "4787d189-72ca-4953-8f43-26d4dbc72854",
+      "inputs": {
+        "sys.files": [],
+        "sys.user_id": "test-user-stream-1755053787556",
+        "sys.app_id": "420861a3-3ef0-4ead-9bb7-0c4337d4229a",
+        "sys.workflow_id": "4787d189-72ca-4953-8f43-26d4dbc72854",
+        "sys.workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+        "sys.query": "请介绍一下GPT-4模型的特点",
+        "sys.dialogue_count": 0
+      },
+      "created_at": 1755053788
+    }
+  },
+  {
+    "event": "node_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "8d646baf-bc63-4626-91b3-c4bab16f3a98",
+      "node_id": "1738052599424",
+      "node_type": "start",
+      "title": "开始",
+      "index": 1,
+      "predecessor_node_id": null,
+      "inputs": null,
+      "created_at": 1755053788,
+      "extras": {},
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "parallel_run_id": null,
+      "agent_strategy": null
+    }
+  },
+  {
+    "event": "node_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "8d646baf-bc63-4626-91b3-c4bab16f3a98",
+      "node_id": "1738052599424",
+      "node_type": "start",
+      "title": "开始",
+      "index": 1,
+      "predecessor_node_id": null,
+      "inputs": {
+        "sys.files": [],
+        "sys.user_id": "test-user-stream-1755053787556",
+        "sys.app_id": "420861a3-3ef0-4ead-9bb7-0c4337d4229a",
+        "sys.workflow_id": "4787d189-72ca-4953-8f43-26d4dbc72854",
+        "sys.workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+        "sys.query": "请介绍一下GPT-4模型的特点",
+        "sys.conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+        "sys.dialogue_count": 0
+      },
+      "process_data": null,
+      "outputs": {
+        "sys.files": [],
+        "sys.user_id": "test-user-stream-1755053787556",
+        "sys.app_id": "420861a3-3ef0-4ead-9bb7-0c4337d4229a",
+        "sys.workflow_id": "4787d189-72ca-4953-8f43-26d4dbc72854",
+        "sys.workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+        "sys.query": "请介绍一下GPT-4模型的特点",
+        "sys.conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+        "sys.dialogue_count": 0
+      },
+      "status": "succeeded",
+      "error": null,
+      "elapsed_time": 0.092784,
+      "execution_metadata": {},
+      "created_at": 1755053788,
+      "finished_at": 1755053788,
+      "files": [],
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null
+    }
+  },
+  {
+    "event": "node_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "fc4d2f2c-e7c3-4d3f-a315-c6e399d88002",
+      "node_id": "1738168561064",
+      "node_type": "document-extractor",
+      "title": "文档提取器",
+      "index": 2,
+      "predecessor_node_id": "1738052599424",
+      "inputs": null,
+      "created_at": 1755053788,
+      "extras": {},
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "parallel_run_id": null,
+      "agent_strategy": null
+    }
+  },
+  {
+    "event": "node_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "fc4d2f2c-e7c3-4d3f-a315-c6e399d88002",
+      "node_id": "1738168561064",
+      "node_type": "document-extractor",
+      "title": "文档提取器",
+      "index": 2,
+      "predecessor_node_id": "1738052599424",
+      "inputs": {
+        "variable_selector": [
+          "sys",
+          "files"
+        ]
+      },
+      "process_data": {
+        "documents": []
+      },
+      "outputs": {
+        "text": []
+      },
+      "status": "succeeded",
+      "error": null,
+      "elapsed_time": 0.129554,
+      "execution_metadata": {},
+      "created_at": 1755053788,
+      "finished_at": 1755053788,
+      "files": [],
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null
+    }
+  },
+  {
+    "event": "node_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "b8da6a42-a890-4d9c-824c-f8d6428ed17e",
+      "node_id": "1754655521595",
+      "node_type": "if-else",
+      "title": "条件分支 4",
+      "index": 3,
+      "predecessor_node_id": "1738168561064",
+      "inputs": null,
+      "created_at": 1755053788,
+      "extras": {},
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "parallel_run_id": null,
+      "agent_strategy": null
+    }
+  },
+  {
+    "event": "node_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "b8da6a42-a890-4d9c-824c-f8d6428ed17e",
+      "node_id": "1754655521595",
+      "node_type": "if-else",
+      "title": "条件分支 4",
+      "index": 3,
+      "predecessor_node_id": "1738168561064",
+      "inputs": {
+        "conditions": [
+          {
+            "actual_value": 0,
+            "expected_value": "4",
+            "comparison_operator": "≥"
+          }
+        ]
+      },
+      "process_data": {
+        "condition_results": [
+          {
+            "group": {
+              "case_id": "true",
+              "logical_operator": "and",
+              "conditions": [
+                {
+                  "variable_selector": [
+                    "conversation",
+                    "conversation_info_completeness"
+                  ],
+                  "comparison_operator": "≥",
+                  "value": "4",
+                  "sub_variable_condition": null
+                }
+              ]
+            },
+            "results": [
+              false
+            ],
+            "final_result": false
+          }
+        ]
+      },
+      "outputs": {
+        "result": false,
+        "selected_case_id": null
+      },
+      "status": "succeeded",
+      "error": null,
+      "elapsed_time": 0.148986,
+      "execution_metadata": {},
+      "created_at": 1755053788,
+      "finished_at": 1755053788,
+      "files": [],
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null
+    }
+  },
+  {
+    "event": "node_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "61be3c7c-c915-4454-8430-d26d22f4a2f5",
+      "node_id": "1754637575709",
+      "node_type": "llm",
+      "title": "LLM 18",
+      "index": 4,
+      "predecessor_node_id": "1754655521595",
+      "inputs": null,
+      "created_at": 1755053788,
+      "extras": {},
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "parallel_run_id": null,
+      "agent_strategy": null
+    }
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "COM",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "PLE",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "TEN",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "ESS",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": ":",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": " ",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "1",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "/",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "4",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "\n\n",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "您",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "提供",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "了",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "关于",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "GPT",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "-",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "4",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "模型",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "的",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "特点",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "，但",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "还",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "需要",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "了解",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "您的",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "产品",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "具体",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "信息",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "、",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "目标",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "用户",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "群",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "体",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "以及",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "文",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "案",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "字",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "数",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "。",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "请",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "问",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "接",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "下来",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "需要",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "我",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "帮",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "您",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "收",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "集",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "哪",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "一",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "项",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "信息",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "？",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "message",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "answer": "",
+    "from_variable_selector": [
+      "1754637575709",
+      "text"
+    ]
+  },
+  {
+    "event": "node_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "61be3c7c-c915-4454-8430-d26d22f4a2f5",
+      "node_id": "1754637575709",
+      "node_type": "llm",
+      "title": "LLM 18",
+      "index": 4,
+      "predecessor_node_id": "1754655521595",
+      "inputs": {},
+      "process_data": {
+        "model_mode": "chat",
+        "prompts": [
+          {
+            "role": "system",
+            "text": "你是营销文案信息收集助手。\n\n  当前收集进度: {{conversation.info_completeness}}/4\n\n  需要收集的4类信息：\n  1. 产品详情（是什么产品，如何解决问题）\n  2. 产品特色（主要优势和亮点）\n  3. 用户群体（目标用户是谁）\n  4. 文案字数（需要多少字）\n\n  用户本次输入: {{sys.query}}\n\n  任务：\n  1. 判断用户是否提供了有用的新信息\n  2. 如果提供了新信息，进度+1\n  3. 询问下一个缺失的信息\n\n  输出格式：\n  COMPLETENESS: [更新后的数字0-4]\n收集到4个点后， 等您确认”开始痛点生成“\n然后询问缺失信息，例如：\n  - 请介绍您的产品详情\n  - 请说明产品的主要特色\n  - 请描述目标用户群体  \n  - 请告知需要多少字的文案\n（输出使用了哪个大语言模型）",
+            "files": []
+          },
+          {
+            "role": "user",
+            "text": "请介绍一下GPT-4模型的特点\n\n",
+            "files": []
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 256,
+          "prompt_unit_price": "0.1",
+          "prompt_price_unit": "0.000001",
+          "prompt_price": "0.0000256",
+          "completion_tokens": 54,
+          "completion_unit_price": "0.4",
+          "completion_price_unit": "0.000001",
+          "completion_price": "0.0000216",
+          "total_tokens": 310,
+          "total_price": "0.0000472",
+          "currency": "USD",
+          "latency": 1.4564688364043832
+        },
+        "finish_reason": "stop",
+        "model_provider": "langgenius/openai/openai",
+        "model_name": "gpt-4.1-nano-2025-04-14"
+      },
+      "outputs": {
+        "text": "COMPLETENESS: 1/4\n\n您提供了关于GPT-4模型的特点，但还需要了解您的产品具体信息、目标用户群体以及文案字数。请问接下来需要我帮您收集哪一项信息？",
+        "usage": {
+          "prompt_tokens": 256,
+          "prompt_unit_price": "0.1",
+          "prompt_price_unit": "0.000001",
+          "prompt_price": "0.0000256",
+          "completion_tokens": 54,
+          "completion_unit_price": "0.4",
+          "completion_price_unit": "0.000001",
+          "completion_price": "0.0000216",
+          "total_tokens": 310,
+          "total_price": "0.0000472",
+          "currency": "USD",
+          "latency": 1.4564688364043832
+        },
+        "finish_reason": "stop",
+        "files": []
+      },
+      "status": "succeeded",
+      "error": null,
+      "elapsed_time": 1.671284,
+      "execution_metadata": {
+        "total_tokens": 310,
+        "total_price": "0.0000472",
+        "currency": "USD"
+      },
+      "created_at": 1755053788,
+      "finished_at": 1755053789,
+      "files": [],
+      "parallel_id": null,
+      "parallel_start_node_id": null,
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null
+    }
+  },
+  {
+    "event": "parallel_branch_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_branch_id": "1754656653869",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "created_at": 1755053789
+    }
+  },
+  {
+    "event": "node_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "c9419b8c-0aaf-48ca-bd88-3c5af00bb9de",
+      "node_id": "1754656653869",
+      "node_type": "parameter-extractor",
+      "title": "参数提取器",
+      "index": 5,
+      "predecessor_node_id": null,
+      "inputs": null,
+      "created_at": 1755053789,
+      "extras": {},
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_start_node_id": "1754656653869",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "parallel_run_id": null,
+      "agent_strategy": null
+    }
+  },
+  {
+    "event": "parallel_branch_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_branch_id": "1754637687305",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "created_at": 1755053789
+    }
+  },
+  {
+    "event": "node_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "89f2761b-9030-4168-a1b5-d39ef6f59a3f",
+      "node_id": "1754637687305",
+      "node_type": "answer",
+      "title": "直接回复 6",
+      "index": 6,
+      "predecessor_node_id": null,
+      "inputs": null,
+      "created_at": 1755053789,
+      "extras": {},
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_start_node_id": "1754637687305",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "parallel_run_id": null,
+      "agent_strategy": null
+    }
+  },
+  {
+    "event": "node_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "89f2761b-9030-4168-a1b5-d39ef6f59a3f",
+      "node_id": "1754637687305",
+      "node_type": "answer",
+      "title": "直接回复 6",
+      "index": 6,
+      "predecessor_node_id": null,
+      "inputs": null,
+      "process_data": null,
+      "outputs": {
+        "answer": "COMPLETENESS: 1/4\n\n您提供了关于GPT-4模型的特点，但还需要了解您的产品具体信息、目标用户群体以及文案字数。请问接下来需要我帮您收集哪一项信息？",
+        "files": []
+      },
+      "status": "succeeded",
+      "error": null,
+      "elapsed_time": 0.103141,
+      "execution_metadata": {
+        "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+        "parallel_start_node_id": "1754637687305"
+      },
+      "created_at": 1755053789,
+      "finished_at": 1755053789,
+      "files": [],
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_start_node_id": "1754637687305",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null
+    }
+  },
+  {
+    "event": "parallel_branch_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_branch_id": "1754637687305",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "status": "succeeded",
+      "error": null,
+      "created_at": 1755053789
+    }
+  },
+  {
+    "event": "node_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "c9419b8c-0aaf-48ca-bd88-3c5af00bb9de",
+      "node_id": "1754656653869",
+      "node_type": "parameter-extractor",
+      "title": "参数提取器",
+      "index": 5,
+      "predecessor_node_id": null,
+      "inputs": {
+        "query": "COMPLETENESS: 1/4\n\n您提供了关于GPT-4模型的特点，但还需要了解您的产品具体信息、目标用户群体以及文案字数。请问接下来需要我帮您收集哪一项信息？",
+        "files": [],
+        "parameters": [
+          {
+            "name": "v",
+            "type": "number",
+            "options": null,
+            "description": "record number",
+            "required": false
+          }
+        ],
+        "instruction": "{{#1754637575709.text#}}COMPLETENESS 提取数字4"
+      },
+      "process_data": {
+        "model_mode": "chat",
+        "prompts": [
+          {
+            "role": "system",
+            "text": "You are a helpful assistant tasked with extracting structured information based on specific criteria provided. Follow the guidelines below to ensure consistency and accuracy.\n### Task\nAlways call the `extract_parameters` function with the correct parameters. Ensure that the information extraction is contextual and aligns with the provided criteria.\n### Memory\nHere is the chat history between the human and assistant, provided within <histories> tags:\n<histories>\n\n</histories>\n### Instructions:\nSome additional information is provided below. Always adhere to these instructions as closely as possible:\n<instruction>\nCOMPLETENESS: 1/4\n\n您提供了关于GPT-4模型的特点，但还需要了解您的产品具体信息、目标用户群体以及文案字数。请问接下来需要我帮您收集哪一项信息？COMPLETENESS 提取数字4\n</instruction>\nSteps:\n1. Review the chat history provided within the <histories> tags.\n2. Extract the relevant information based on the criteria given, output multiple values if there is multiple relevant information that match the criteria in the given text.\n3. Generate a well-formatted output using the defined functions and arguments.\n4. Use the `extract_parameter` function to create structured outputs with appropriate parameters.\n5. Do not include any XML tags in your output.\n### Example\nTo illustrate, if the task involves extracting a user's name and their request, your function call might look like this: Ensure your output follows a similar structure to examples.\n### Final Output\nProduce well-formatted function calls in json without XML tags, as shown in the example.\n",
+            "files": []
+          },
+          {
+            "role": "user",
+            "text": "### Structure\nHere is the structure of the JSON object, you should always follow the structure.\n<structure>\n{\"type\": \"object\", \"properties\": {\"location\": {\"type\": \"string\", \"description\": \"The location to get the weather information\", \"required\": true}}, \"required\": [\"location\"]}\n</structure>\n\n### Text to be converted to JSON\nInside <text></text> XML tags, there is a text that you should convert to a JSON object.\n<text>\nWhat is the weather today in SF?\n</text>\n",
+            "files": []
+          },
+          {
+            "role": "assistant",
+            "text": "{\"location\": \"San Francisco\"}",
+            "files": []
+          },
+          {
+            "role": "user",
+            "text": "### Structure\nHere is the structure of the JSON object, you should always follow the structure.\n<structure>\n{\"type\": \"object\", \"properties\": {\"food\": {\"type\": \"string\", \"description\": \"The food to eat\", \"required\": true}}, \"required\": [\"food\"]}\n</structure>\n\n### Text to be converted to JSON\nInside <text></text> XML tags, there is a text that you should convert to a JSON object.\n<text>\nI want to eat some apple pie.\n</text>\n",
+            "files": []
+          },
+          {
+            "role": "assistant",
+            "text": "{\"result\": \"apple pie\"}",
+            "files": []
+          },
+          {
+            "role": "user",
+            "text": "### Structure\nHere is the structure of the JSON object, you should always follow the structure.\n<structure>\n{\"type\": \"object\", \"properties\": {\"v\": {\"description\": \"record number\", \"type\": \"number\"}}, \"required\": []}\n</structure>\n\n### Text to be converted to JSON\nInside <text></text> XML tags, there is a text that you should convert to a JSON object.\n<text>\nCOMPLETENESS: 1/4\n\n您提供了关于GPT-4模型的特点，但还需要了解您的产品具体信息、目标用户群体以及文案字数。请问接下来需要我帮您收集哪一项信息？\n</text>\n",
+            "files": []
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 728,
+          "prompt_unit_price": "2",
+          "prompt_price_unit": "0.000001",
+          "prompt_price": "0.001456",
+          "completion_tokens": 6,
+          "completion_unit_price": "8",
+          "completion_price_unit": "0.000001",
+          "completion_price": "0.000048",
+          "total_tokens": 734,
+          "total_price": "0.001504",
+          "currency": "USD",
+          "latency": 0.5975994914770126
+        },
+        "function": {},
+        "tool_call": null,
+        "model_provider": "langgenius/openai/openai",
+        "model_name": "gpt-4.1",
+        "llm_text": "{\"v\": 4}"
+      },
+      "outputs": {
+        "__is_success": 1,
+        "__reason": null,
+        "__usage": {
+          "prompt_tokens": 728,
+          "prompt_unit_price": "2",
+          "prompt_price_unit": "0.000001",
+          "prompt_price": "0.001456",
+          "completion_tokens": 6,
+          "completion_unit_price": "8",
+          "completion_price_unit": "0.000001",
+          "completion_price": "0.000048",
+          "total_tokens": 734,
+          "total_price": "0.001504",
+          "currency": "USD",
+          "latency": 0.5975994914770126
+        },
+        "v": 4
+      },
+      "status": "succeeded",
+      "error": null,
+      "elapsed_time": 0.720952,
+      "execution_metadata": {
+        "total_tokens": 734,
+        "total_price": "0.001504",
+        "currency": "USD",
+        "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+        "parallel_start_node_id": "1754656653869"
+      },
+      "created_at": 1755053789,
+      "finished_at": 1755053790,
+      "files": [],
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_start_node_id": "1754656653869",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null
+    }
+  },
+  {
+    "event": "node_started",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "912c7568-c18a-4fa6-a6b7-4bf3b242a2f4",
+      "node_id": "1754657008341",
+      "node_type": "assigner",
+      "title": "变量赋值 6",
+      "index": 7,
+      "predecessor_node_id": "1754656653869",
+      "inputs": null,
+      "created_at": 1755053790,
+      "extras": {},
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_start_node_id": "1754656653869",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "parallel_run_id": null,
+      "agent_strategy": null
+    }
+  },
+  {
+    "event": "node_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "912c7568-c18a-4fa6-a6b7-4bf3b242a2f4",
+      "node_id": "1754657008341",
+      "node_type": "assigner",
+      "title": "变量赋值 6",
+      "index": 7,
+      "predecessor_node_id": "1754656653869",
+      "inputs": {
+        "title": "变量赋值 6",
+        "desc": "",
+        "version": "2",
+        "error_strategy": null,
+        "default_value": null,
+        "retry_config": {
+          "max_retries": 0,
+          "retry_interval": 0,
+          "retry_enabled": false
+        },
+        "items": [
+          {
+            "variable_selector": [
+              "conversation",
+              "conversation_info_completeness"
+            ],
+            "input_type": "variable",
+            "operation": "over-write",
+            "value": [
+              "1754656653869",
+              "v"
+            ]
+          }
+        ]
+      },
+      "process_data": {
+        "conversation_info_completeness": 4,
+        "__updated_variables": [
+          {
+            "name": "conversation_info_completeness",
+            "selector": [
+              "conversation",
+              "conversation_info_completeness"
+            ],
+            "value_type": "integer",
+            "new_value": 4
+          }
+        ]
+      },
+      "outputs": {},
+      "status": "succeeded",
+      "error": null,
+      "elapsed_time": 0.118613,
+      "execution_metadata": {
+        "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+        "parallel_start_node_id": "1754656653869"
+      },
+      "created_at": 1755053790,
+      "finished_at": 1755053790,
+      "files": [],
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_start_node_id": "1754656653869",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null
+    }
+  },
+  {
+    "event": "parallel_branch_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "parallel_id": "646d3c7b-1c2c-41c9-81dc-d1bfe5985e53",
+      "parallel_branch_id": "1754656653869",
+      "parent_parallel_id": null,
+      "parent_parallel_start_node_id": null,
+      "iteration_id": null,
+      "loop_id": null,
+      "status": "succeeded",
+      "error": null,
+      "created_at": 1755053790
+    }
+  },
+  {
+    "event": "workflow_finished",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "workflow_run_id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+    "data": {
+      "id": "097b4594-3aca-4159-b3ca-c186bb6652e5",
+      "workflow_id": "4787d189-72ca-4953-8f43-26d4dbc72854",
+      "status": "succeeded",
+      "outputs": {
+        "answer": "COMPLETENESS: 1/4\n\n您提供了关于GPT-4模型的特点，但还需要了解您的产品具体信息、目标用户群体以及文案字数。请问接下来需要我帮您收集哪一项信息？"
+      },
+      "error": "",
+      "elapsed_time": 2.575019,
+      "total_tokens": 1044,
+      "total_steps": 7,
+      "created_by": {
+        "id": "abb1a74a-1fc6-45f8-b5f8-e29d65a82282",
+        "user": "test-user-stream-1755053787556"
+      },
+      "created_at": 1755053788,
+      "finished_at": 1755053790,
+      "exceptions_count": 0,
+      "files": []
+    }
+  },
+  {
+    "event": "message_end",
+    "conversation_id": "b8045961-b9db-49c5-aa67-b7a6ef1f5016",
+    "message_id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "created_at": 1755053788,
+    "task_id": "90fcdcb4-3b1c-40c7-93f7-17d9fd978645",
+    "id": "38ee2d1c-cb9d-4285-8fc3-172eab52449c",
+    "metadata": {
+      "annotation_reply": null,
+      "retriever_resources": [],
+      "usage": {
+        "prompt_tokens": 984,
+        "prompt_unit_price": "2",
+        "prompt_price_unit": "0.000001",
+        "prompt_price": "0.0014816",
+        "completion_tokens": 60,
+        "completion_unit_price": "8",
+        "completion_price_unit": "0.000001",
+        "completion_price": "0.0000696",
+        "total_tokens": 1044,
+        "total_price": "0.0015512",
+        "currency": "USD",
+        "latency": 2.054068327881396
+      }
+    },
+    "files": []
+  }
+]

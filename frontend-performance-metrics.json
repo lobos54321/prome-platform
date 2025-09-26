@@ -1,0 +1,144 @@
+{
+  "history": [
+    {
+      "timestamp": "2025-08-28T23:33:28.189Z",
+      "checks": {
+        "bundleAnalysis": {
+          "status": "PASS",
+          "totalSize": 2205841,
+          "largestFiles": [
+            {
+              "path": "dist/assets/propen-logo.png",
+              "size": 1286826,
+              "sizeFormatted": "1.23 MB"
+            },
+            {
+              "path": "dist/assets/index-CPmsa_vg.js",
+              "size": 839625,
+              "sizeFormatted": "819.95 KB"
+            },
+            {
+              "path": "dist/assets/index-Cb8upJYT.css",
+              "size": 74976,
+              "sizeFormatted": "73.22 KB"
+            },
+            {
+              "path": "dist/favicon.svg",
+              "size": 2700,
+              "sizeFormatted": "2.64 KB"
+            },
+            {
+              "path": "dist/index.html",
+              "size": 1691,
+              "sizeFormatted": "1.65 KB"
+            },
+            {
+              "path": "dist/robots.txt",
+              "size": 23,
+              "sizeFormatted": "23 Bytes"
+            }
+          ],
+          "recommendation": [
+            "📦 dist/assets/index-CPmsa_vg.js: 建议代码分割"
+          ]
+        },
+        "buildPerformance": {
+          "status": "PASS",
+          "buildTime": 10313,
+          "recommendation": "构建性能良好"
+        },
+        "componentOptimization": {
+          "status": "PASS",
+          "score": 100,
+          "optimizations": {
+            "useMemo": 2,
+            "useCallback": 4,
+            "memo": true,
+            "virtualScroll": true
+          },
+          "recommendation": [
+            "组件优化良好"
+          ]
+        },
+        "memoryAnalysis": {
+          "status": "PASS",
+          "heapUsed": 4579760,
+          "heapTotal": 5603328,
+          "external": 1589381,
+          "recommendation": "内存使用正常"
+        }
+      },
+      "totalCheckTime": 10318
+    }
+  ],
+  "latest": {
+    "timestamp": "2025-08-28T23:33:28.189Z",
+    "checks": {
+      "bundleAnalysis": {
+        "status": "PASS",
+        "totalSize": 2205841,
+        "largestFiles": [
+          {
+            "path": "dist/assets/propen-logo.png",
+            "size": 1286826,
+            "sizeFormatted": "1.23 MB"
+          },
+          {
+            "path": "dist/assets/index-CPmsa_vg.js",
+            "size": 839625,
+            "sizeFormatted": "819.95 KB"
+          },
+          {
+            "path": "dist/assets/index-Cb8upJYT.css",
+            "size": 74976,
+            "sizeFormatted": "73.22 KB"
+          },
+          {
+            "path": "dist/favicon.svg",
+            "size": 2700,
+            "sizeFormatted": "2.64 KB"
+          },
+          {
+            "path": "dist/index.html",
+            "size": 1691,
+            "sizeFormatted": "1.65 KB"
+          },
+          {
+            "path": "dist/robots.txt",
+            "size": 23,
+            "sizeFormatted": "23 Bytes"
+          }
+        ],
+        "recommendation": [
+          "📦 dist/assets/index-CPmsa_vg.js: 建议代码分割"
+        ]
+      },
+      "buildPerformance": {
+        "status": "PASS",
+        "buildTime": 10313,
+        "recommendation": "构建性能良好"
+      },
+      "componentOptimization": {
+        "status": "PASS",
+        "score": 100,
+        "optimizations": {
+          "useMemo": 2,
+          "useCallback": 4,
+          "memo": true,
+          "virtualScroll": true
+        },
+        "recommendation": [
+          "组件优化良好"
+        ]
+      },
+      "memoryAnalysis": {
+        "status": "PASS",
+        "heapUsed": 4579760,
+        "heapTotal": 5603328,
+        "external": 1589381,
+        "recommendation": "内存使用正常"
+      }
+    },
+    "totalCheckTime": 10318
+  }
+}

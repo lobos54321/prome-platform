@@ -1,0 +1,45 @@
+
+> prome@0.0.0 dev
+> vite
+
+
+  VITE v5.4.19  ready in 467 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+10:57:35 PM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+10:57:35 PM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+10:57:54 PM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+10:58:03 PM [vite] page reload src/components/chat/ChatHistory.tsx
+10:58:13 PM [vite] page reload src/components/chat/ChatHistory.tsx
+10:58:21 PM [vite] page reload src/components/chat/ChatHistory.tsx
+11:06:35 PM [vite] page reload src/components/chat/ChatHistory.tsx
+11:06:53 PM [vite] page reload src/components/chat/ChatHistory.tsx
+11:06:59 PM [vite] page reload src/components/chat/ChatHistory.tsx
+11:07:32 PM [vite] page reload src/hooks/useDifyChat.ts
+11:07:44 PM [vite] page reload src/hooks/useDifyChat.ts
+11:07:51 PM [vite] page reload src/hooks/useDifyChat.ts
+11:08:22 PM [vite] page reload src/hooks/useDifyChat.ts
+11:08:35 PM [vite] page reload src/hooks/useDifyChat.ts
+11:09:01 PM [vite] page reload src/components/chat/ChatInput.tsx
+11:09:14 PM [vite] page reload src/components/chat/ChatInput.tsx
+11:09:25 PM [vite] page reload src/components/chat/ChatInput.tsx
+11:09:37 PM [vite] page reload src/components/chat/ChatInput.tsx
+11:09:42 PM [vite] page reload src/components/chat/ChatInput.tsx
+11:10:41 PM [vite] page reload src/components/chat/ChatHistory.tsx
+11:10:47 PM [vite] page reload src/components/chat/ChatHistory.tsx
+11:10:54 PM [vite] page reload src/components/chat/ChatHistory.tsx
+11:12:09 PM [vite] page reload src/hooks/useDifyChat.ts
+11:18:45 PM [vite] page reload src/components/chat/ChatMessage.tsx
+9:22:31 AM [vite] page reload src/components/chat/ChatMessage.tsx
+9:22:44 AM [vite] page reload src/components/chat/ChatMessage.tsx
+9:33:06 AM [vite] page reload src/hooks/useDifyChat.ts
+9:33:12 AM [vite] page reload src/hooks/useDifyChat.ts
+9:33:25 AM [vite] page reload src/hooks/useDifyChat.ts
+9:33:45 AM [vite] page reload src/components/chat/ChatHistory.tsx
+9:34:08 AM [vite] page reload src/components/chat/ChatHistory.tsx
+9:35:03 AM [vite] page reload src/hooks/useDifyChat.ts
+9:35:12 AM [vite] page reload src/components/chat/ChatHistory.tsx
+9:35:18 AM [vite] page reload src/hooks/useDifyChat.ts
+9:36:18 AM [vite] page reload src/hooks/useDifyChat.ts
+9:36:33 AM [vite] page reload src/hooks/useDifyChat.ts

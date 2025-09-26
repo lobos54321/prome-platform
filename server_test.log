@@ -1,0 +1,2039 @@
+[dotenv@17.2.1] injecting env (14) from .env -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
+🚀 Starting Prome Platform server
+✅ Dify API environment variables are configured
+Server is running on port 8080
+🔍 Performing database health check...
+✅ Database health check passed - all required tables exist
+📊 [BILLING-STATS] Stats requested: { totalCalls: 0, successRate: '0.00%', status: 'HEALTHY' }
+🔍 INCOMING REQUEST: POST /api/dify/chat/mock
+🎯 [BILLING-TRACKER] Call #1: MOCK-1756614298969-tj1bk
+🔍 [BILLING-MOCK] Checking responseData structure: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTotalTokens: true,
+  hasUsageField: false,
+  responseDataKeys: [
+    'conversation_id',
+    'message_id',
+    'answer',
+    'metadata',
+    'conversationId',
+    'userId',
+    'created_at'
+  ],
+  metadataKeys: [ 'usage', 'node_status' ],
+  usageKeys: [ 'prompt_tokens', 'completion_tokens', 'total_tokens' ]
+}
+✅ [BILLING-MOCK] Found usage in metadata.usage
+💰 [BILLING-MOCK] Multi-node LLM: 50 tokens
+💰 [COST-MOCK] Actual cost: $0.000109 = 2 points
+🔧 Created new user ID mapping: test-user-123 -> d9789d91-4ced-4038-a00b-609930e11864
+⚠️  [BILLING-MOCK] User not found in database: d9789d91-4ced-4038-a00b-609930e11864
+💡 [BILLING-MOCK] Creating guest user session for: d9789d91-4ced-4038-a00b-609930e11864
+⚠️  [BILLING-MOCK] Guest user - no points deducted, usage recorded only
+📝 [BILLING-MOCK] Guest balance updated: 10000 → 9998 (memory only)
+✅ [BILLING-TRACKER] Success #1: MOCK-1756614298969-tj1bk
+✅ Mock response generated for user test-user-123, conversation e6926b92-e4c9-42be-badd-bd1526b16d86
+📊 [BILLING-STATS] Stats requested: { totalCalls: 1, successRate: '100.00%', status: 'HEALTHY' }
+🔍 INCOMING REQUEST: POST /api/dify/chat/mock
+🎯 [BILLING-TRACKER] Call #2: MOCK-1756614448317-99fuq
+🔍 [BILLING-MOCK] Checking responseData structure: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTotalTokens: true,
+  hasUsageField: false,
+  responseDataKeys: [
+    'conversation_id',
+    'message_id',
+    'answer',
+    'metadata',
+    'conversationId',
+    'userId',
+    'created_at'
+  ],
+  metadataKeys: [ 'usage', 'node_status' ],
+  usageKeys: [ 'prompt_tokens', 'completion_tokens', 'total_tokens' ]
+}
+✅ [BILLING-MOCK] Found usage in metadata.usage
+💰 [BILLING-MOCK] Multi-node LLM: 50 tokens
+💰 [COST-MOCK] Actual cost: $0.000109 = 2 points
+⚠️  [BILLING-MOCK] User not found in database: d03560a3-4a7e-4bdf-9757-85757e3ec6e7
+💡 [BILLING-MOCK] Creating guest user session for: d03560a3-4a7e-4bdf-9757-85757e3ec6e7
+⚠️  [BILLING-MOCK] Guest user - no points deducted, usage recorded only
+📝 [BILLING-MOCK] Guest balance updated: 10000 → 9998 (memory only)
+✅ [BILLING-TRACKER] Success #2: MOCK-1756614448317-99fuq
+✅ Mock response generated for user user-d03560a3-4a7e-4bdf-9757-85757e3ec6e7, conversation 6dc4d50b-944e-44c3-aeb7-d66eafcfc90e
+📊 [BILLING-STATS] Stats requested: { totalCalls: 2, successRate: '100.00%', status: 'HEALTHY' }
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=true, query=false, final=true
+🔍 Full request body: {
+  "query": "你好",
+  "user": "9dee4891-89a6-44ee-8fe8-69097846e97d",
+  "conversation_id": "836f4898-d32a-4173-8bf9-beeead7ae6f5",
+  "response_mode": "streaming",
+  "stream": true,
+  "auto_generate_name": true,
+  "inputs": {}
+}
+🔍 Looking up conversation in database: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+✅ Found existing DIFY conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+🔄 Continuing existing conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+📤 [DIFY API] Sending request to chat-messages: {
+  query: '你好...',
+  inputs: {},
+  response_mode: 'streaming',
+  user: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  conversation_id: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  timestamp: '2025-08-31T04:29:51.973Z'
+}
+📊 Context check: 298 tokens, within limit
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '9779ca12df5ce7e0-SYD',
+  connection: 'keep-alive',
+  'content-type': 'text/event-stream; charset=utf-8',
+  date: 'Sun, 31 Aug 2025 04:29:53 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=M3rUQSG8YTlbZQmKrUo6%2FD%2Bwta%2F31kp9B9YXhH8LdVM4xxEWr5TuANqH5Ts%2FOvsvboBlRNfSp8i1Bp%2F60ggjxK5bfBFeyTt6kZvwHH2Tlfo1FL0p2zAaXuq370FUqbhkEIEci4byaELL"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=4194&min_rtt=3974&rtt_var=1930&sent=5&recv=5&lost=0&retrans=0&sent_bytes=2827&recv_bytes=939&delivery_rate=705143&cwnd=251&unsent_bytes=0&cid=71c1e2a0e32831af&ts=1009&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+🔄 Handling streaming response from Dify API
+📤 Forwarded streaming data: {
+  event: 'workflow_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'workflow_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取
+📤 Forwarded streaming data: {
+  event: 'message_end',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: true
+}
+[Server] 📡 Stream读取完成 - checking for pending usage data
+[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息
+[Server] ⚠️ 仅使用响应体usage信息
+[Server] ✅ 混合token使用信息已发送到前端
+🔍 [DEBUG] finalData structure for billing: {
+  hasFinalData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 1560,
+  billingSource: 'NORMAL'
+}
+🎯 [BILLING-TRACKER] Call #3: WORKFLOW_STREAM-1756614595475-wrwfy
+🔍 [BILLING-WORKFLOW_STREAM] Checking responseData structure: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTotalTokens: true,
+  hasUsageField: false,
+  responseDataKeys: [
+    'event',
+    'conversation_id',
+    'message_id',
+    'created_at',
+    'task_id',
+    'id',
+    'metadata',
+    'files'
+  ],
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage' ],
+  usageKeys: [
+    'prompt_tokens',
+    'prompt_unit_price',
+    'prompt_price_unit',
+    'prompt_price',
+    'completion_tokens',
+    'completion_unit_price',
+    'completion_price_unit',
+    'completion_price',
+    'total_tokens',
+    'total_price',
+    'currency',
+    'latency'
+  ]
+}
+✅ [BILLING-WORKFLOW_STREAM] Found usage in metadata.usage
+💰 [BILLING-WORKFLOW_STREAM] Multi-node LLM: 1560 tokens
+💰 [COST-WORKFLOW_STREAM] Actual cost: $0.003306 = 34 points
+✅ [BILLING-WORKFLOW_STREAM] Deducted 34 points. Balance: 1424 → 1390
+✅ [BILLING-TRACKER] Success #3: WORKFLOW_STREAM-1756614595475-wrwfy
+🔥 [STREAM] Sending balance update to frontend: 1390
+🔍 ensureConversationExists called with: {
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  difyConversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  userId: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  hasSupabase: true
+}
+✅ Messages saved successfully
+✅ Saved streaming conversation to database
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=true, query=false, final=true
+🔍 Full request body: {
+  "query": "你哈",
+  "user": "9dee4891-89a6-44ee-8fe8-69097846e97d",
+  "conversation_id": "836f4898-d32a-4173-8bf9-beeead7ae6f5",
+  "response_mode": "streaming",
+  "stream": true,
+  "auto_generate_name": true,
+  "inputs": {}
+}
+🔍 Looking up conversation in database: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+✅ Found existing DIFY conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+🔄 Continuing existing conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+📤 [DIFY API] Sending request to chat-messages: {
+  query: '你哈...',
+  inputs: {},
+  response_mode: 'streaming',
+  user: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  conversation_id: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  timestamp: '2025-08-31T04:30:02.896Z'
+}
+📊 Context check: 315 tokens, within limit
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '9779ca59fc9aa95c-SYD',
+  connection: 'keep-alive',
+  'content-type': 'text/event-stream; charset=utf-8',
+  date: 'Sun, 31 Aug 2025 04:30:04 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=PK5o3qg%2FR5vlgAGExuepop3FsGqXKJXgLFzU8F2nu1fJar5jZPw%2B2ydk4tnWuv9dltFMJXfr13b7d2ZeXYTmzcFVD98vn5jFDKszH1Zx6rRYNgXZh9Bb6XLsQz6vTKYsdjWH9AtPvpJu"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=3965&min_rtt=3943&rtt_var=1523&sent=3&recv=5&lost=0&retrans=0&sent_bytes=234&recv_bytes=1210&delivery_rate=327184&cwnd=250&unsent_bytes=0&cid=66e2d2abbf948ac4&ts=773&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+🔄 Handling streaming response from Dify API
+📤 Forwarded streaming data: {
+  event: 'workflow_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'workflow_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取
+📤 Forwarded streaming data: {
+  event: 'message_end',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: true
+}
+[Server] 📡 Stream读取完成 - checking for pending usage data
+[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息
+[Server] ⚠️ 仅使用响应体usage信息
+[Server] ✅ 混合token使用信息已发送到前端
+🔍 [DEBUG] finalData structure for billing: {
+  hasFinalData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 1595,
+  billingSource: 'NORMAL'
+}
+🎯 [BILLING-TRACKER] Call #4: WORKFLOW_STREAM-1756614606496-wrfqa
+🔍 [BILLING-WORKFLOW_STREAM] Checking responseData structure: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTotalTokens: true,
+  hasUsageField: false,
+  responseDataKeys: [
+    'event',
+    'conversation_id',
+    'message_id',
+    'created_at',
+    'task_id',
+    'id',
+    'metadata',
+    'files'
+  ],
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage' ],
+  usageKeys: [
+    'prompt_tokens',
+    'prompt_unit_price',
+    'prompt_price_unit',
+    'prompt_price',
+    'completion_tokens',
+    'completion_unit_price',
+    'completion_price_unit',
+    'completion_price',
+    'total_tokens',
+    'total_price',
+    'currency',
+    'latency'
+  ]
+}
+✅ [BILLING-WORKFLOW_STREAM] Found usage in metadata.usage
+💰 [BILLING-WORKFLOW_STREAM] Multi-node LLM: 1595 tokens
+💰 [COST-WORKFLOW_STREAM] Actual cost: $0.003376 = 34 points
+✅ [BILLING-WORKFLOW_STREAM] Deducted 34 points. Balance: 1390 → 1356
+✅ [BILLING-TRACKER] Success #4: WORKFLOW_STREAM-1756614606496-wrfqa
+🔥 [STREAM] Sending balance update to frontend: 1356
+🔍 ensureConversationExists called with: {
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  difyConversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  userId: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  hasSupabase: true
+}
+✅ Messages saved successfully
+✅ Saved streaming conversation to database
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=true, query=false, final=true
+🔍 Full request body: {
+  "query": "nih",
+  "user": "9dee4891-89a6-44ee-8fe8-69097846e97d",
+  "conversation_id": "836f4898-d32a-4173-8bf9-beeead7ae6f5",
+  "response_mode": "streaming",
+  "stream": true,
+  "auto_generate_name": true,
+  "inputs": {}
+}
+🔍 Looking up conversation in database: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+✅ Found existing DIFY conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+🔄 Continuing existing conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+📤 [DIFY API] Sending request to chat-messages: {
+  query: 'nih...',
+  inputs: {},
+  response_mode: 'streaming',
+  user: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  conversation_id: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  timestamp: '2025-08-31T04:31:30.575Z'
+}
+📊 Context check: 330 tokens, within limit
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '9779cc7acc5ba82f-SYD',
+  connection: 'keep-alive',
+  'content-type': 'text/event-stream; charset=utf-8',
+  date: 'Sun, 31 Aug 2025 04:31:31 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=rkx0cT6kyF2XQmg8OFqytdblI998knARfl3%2Bfpf9iljdpJ29lzRF7I%2BeSqEM6qzH53XYhFFPk4LjGV7iU0yXrBUKprVIs9to54yeC4BtFb2TfFTITcXiAPAdhF8dEuMAtnytytyzwvCX"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=5063&min_rtt=3348&rtt_var=2481&sent=3&recv=5&lost=0&retrans=0&sent_bytes=234&recv_bytes=1207&delivery_rate=402628&cwnd=241&unsent_bytes=0&cid=b54c5ff1a329d1b3&ts=961&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+🔄 Handling streaming response from Dify API
+📤 Forwarded streaming data: {
+  event: 'workflow_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'workflow_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取
+📤 Forwarded streaming data: {
+  event: 'message_end',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: true
+}
+[Server] 📡 Stream读取完成 - checking for pending usage data
+[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息
+[Server] ⚠️ 仅使用响应体usage信息
+[Server] ✅ 混合token使用信息已发送到前端
+🔍 [DEBUG] finalData structure for billing: {
+  hasFinalData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 1629,
+  billingSource: 'NORMAL'
+}
+🎯 [BILLING-TRACKER] Call #5: WORKFLOW_STREAM-1756614693654-fogt1
+🔍 [BILLING-WORKFLOW_STREAM] Checking responseData structure: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTotalTokens: true,
+  hasUsageField: false,
+  responseDataKeys: [
+    'event',
+    'conversation_id',
+    'message_id',
+    'created_at',
+    'task_id',
+    'id',
+    'metadata',
+    'files'
+  ],
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage' ],
+  usageKeys: [
+    'prompt_tokens',
+    'prompt_unit_price',
+    'prompt_price_unit',
+    'prompt_price',
+    'completion_tokens',
+    'completion_unit_price',
+    'completion_price_unit',
+    'completion_price',
+    'total_tokens',
+    'total_price',
+    'currency',
+    'latency'
+  ]
+}
+✅ [BILLING-WORKFLOW_STREAM] Found usage in metadata.usage
+💰 [BILLING-WORKFLOW_STREAM] Multi-node LLM: 1629 tokens
+💰 [COST-WORKFLOW_STREAM] Actual cost: $0.003444 = 35 points
+✅ [BILLING-WORKFLOW_STREAM] Deducted 35 points. Balance: 1356 → 1321
+✅ [BILLING-TRACKER] Success #5: WORKFLOW_STREAM-1756614693654-fogt1
+🔥 [STREAM] Sending balance update to frontend: 1321
+🔍 ensureConversationExists called with: {
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  difyConversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  userId: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  hasSupabase: true
+}
+✅ Messages saved successfully
+✅ Saved streaming conversation to database
+📊 [BILLING-STATS] Stats requested: { totalCalls: 5, successRate: '100.00%', status: 'HEALTHY' }
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=true, query=false, final=true
+🔍 Full request body: {
+  "query": "你好",
+  "user": "9dee4891-89a6-44ee-8fe8-69097846e97d",
+  "conversation_id": "836f4898-d32a-4173-8bf9-beeead7ae6f5",
+  "response_mode": "streaming",
+  "stream": true,
+  "auto_generate_name": true,
+  "inputs": {}
+}
+🔍 Looking up conversation in database: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+✅ Found existing DIFY conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+🔄 Continuing existing conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+📤 [DIFY API] Sending request to chat-messages: {
+  query: '你好...',
+  inputs: {},
+  response_mode: 'streaming',
+  user: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  conversation_id: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  timestamp: '2025-08-31T04:35:06.679Z'
+}
+📊 Context check: 347 tokens, within limit
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '9779d1c2c9a0d7ff-SYD',
+  connection: 'keep-alive',
+  'content-type': 'text/event-stream; charset=utf-8',
+  date: 'Sun, 31 Aug 2025 04:35:08 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=95XaqVaNOpV5tUKVXXI0x6An8Ql%2FdUlK9vzO3nh%2FJm6E3AYWavh1GZDK7QNQ8IFk1YJQxnDN6gk4qVdyHr6s1uVgs%2FnvQkO2OSzq%2FSqEcKUtTH1CpRoWiM3YRaKXUz8teEg%2FBpc29gJf"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=4988&min_rtt=4919&rtt_var=1984&sent=3&recv=5&lost=0&retrans=0&sent_bytes=234&recv_bytes=1210&delivery_rate=246120&cwnd=250&unsent_bytes=0&cid=a86bc984b2194a34&ts=981&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+🔄 Handling streaming response from Dify API
+📤 Forwarded streaming data: {
+  event: 'workflow_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'workflow_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取
+📤 Forwarded streaming data: {
+  event: 'message_end',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: true
+}
+[Server] 📡 Stream读取完成 - checking for pending usage data
+[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息
+[Server] ⚠️ 仅使用响应体usage信息
+[Server] ✅ 混合token使用信息已发送到前端
+🔍 [DEBUG] finalData structure for billing: {
+  hasFinalData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 1663,
+  billingSource: 'NORMAL'
+}
+🎯 [BILLING-TRACKER] Call #6: WORKFLOW_STREAM-1756614910000-u7ygo
+🔍 [BILLING-WORKFLOW_STREAM] Checking responseData structure: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTotalTokens: true,
+  hasUsageField: false,
+  responseDataKeys: [
+    'event',
+    'conversation_id',
+    'message_id',
+    'created_at',
+    'task_id',
+    'id',
+    'metadata',
+    'files'
+  ],
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage' ],
+  usageKeys: [
+    'prompt_tokens',
+    'prompt_unit_price',
+    'prompt_price_unit',
+    'prompt_price',
+    'completion_tokens',
+    'completion_unit_price',
+    'completion_price_unit',
+    'completion_price',
+    'total_tokens',
+    'total_price',
+    'currency',
+    'latency'
+  ]
+}
+✅ [BILLING-WORKFLOW_STREAM] Found usage in metadata.usage
+💰 [BILLING-WORKFLOW_STREAM] Multi-node LLM: 1663 tokens
+💰 [COST-WORKFLOW_STREAM] Actual cost: $0.003512 = 36 points
+✅ [BILLING-WORKFLOW_STREAM] Deducted 36 points. Balance: 1321 → 1285
+✅ [BILLING-TRACKER] Success #6: WORKFLOW_STREAM-1756614910000-u7ygo
+🔥 [STREAM] Sending balance update to frontend: 1285
+🔍 ensureConversationExists called with: {
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  difyConversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  userId: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  hasSupabase: true
+}
+✅ Messages saved successfully
+✅ Saved streaming conversation to database
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=true, query=false, final=true
+🔍 Full request body: {
+  "query": "你好",
+  "user": "9dee4891-89a6-44ee-8fe8-69097846e97d",
+  "conversation_id": "836f4898-d32a-4173-8bf9-beeead7ae6f5",
+  "response_mode": "streaming",
+  "stream": true,
+  "auto_generate_name": true,
+  "inputs": {}
+}
+🔍 Looking up conversation in database: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+✅ Found existing DIFY conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+🔄 Continuing existing conversation: 836f4898-d32a-4173-8bf9-beeead7ae6f5
+📤 [DIFY API] Sending request to chat-messages: {
+  query: '你好...',
+  inputs: {},
+  response_mode: 'streaming',
+  user: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  conversation_id: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  timestamp: '2025-08-31T04:38:02.906Z'
+}
+📊 Context check: 364 tokens, within limit
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '9779d60f7f87571d-SYD',
+  connection: 'keep-alive',
+  'content-type': 'text/event-stream; charset=utf-8',
+  date: 'Sun, 31 Aug 2025 04:38:04 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=D3Mmc3s5eF5Q%2B%2FxnP2q%2BlIzRiWrfj0eh2qrh9FlSgRYRzH%2FBYHopXI3MgTjcHOQLjPnf%2BVZ3hrvL202I%2BuVPDLLGDK%2BaOqiCbso5MJx6CdAWUHNZpV8z7QzPEDQEYltTau20tzoMxJ6n"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=3943&min_rtt=3729&rtt_var=1551&sent=3&recv=5&lost=0&retrans=0&sent_bytes=234&recv_bytes=1210&delivery_rate=361491&cwnd=250&unsent_bytes=0&cid=fa045a3edc576c5d&ts=1015&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+🔄 Handling streaming response from Dify API
+📤 Forwarded streaming data: {
+  event: 'workflow_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: true,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'message',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_started',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'node_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'parallel_branch_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+📤 Forwarded streaming data: {
+  event: 'workflow_finished',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: false
+}
+[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取
+📤 Forwarded streaming data: {
+  event: 'message_end',
+  hasAnswer: false,
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  hasUsage: true
+}
+[Server] 📡 Stream读取完成 - checking for pending usage data
+[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息
+[Server] ⚠️ 仅使用响应体usage信息
+[Server] ✅ 混合token使用信息已发送到前端
+🔍 [DEBUG] finalData structure for billing: {
+  hasFinalData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 1697,
+  billingSource: 'NORMAL'
+}
+🎯 [BILLING-TRACKER] Call #7: WORKFLOW_STREAM-1756615086635-99blf
+🔍 [BILLING-WORKFLOW_STREAM] Checking responseData structure: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTotalTokens: true,
+  hasUsageField: false,
+  responseDataKeys: [
+    'event',
+    'conversation_id',
+    'message_id',
+    'created_at',
+    'task_id',
+    'id',
+    'metadata',
+    'files'
+  ],
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage' ],
+  usageKeys: [
+    'prompt_tokens',
+    'prompt_unit_price',
+    'prompt_price_unit',
+    'prompt_price',
+    'completion_tokens',
+    'completion_unit_price',
+    'completion_price_unit',
+    'completion_price',
+    'total_tokens',
+    'total_price',
+    'currency',
+    'latency'
+  ]
+}
+✅ [BILLING-WORKFLOW_STREAM] Found usage in metadata.usage
+💰 [BILLING-WORKFLOW_STREAM] Multi-node LLM: 1697 tokens
+💰 [COST-WORKFLOW_STREAM] Actual cost: $0.003580 = 36 points
+✅ [BILLING-WORKFLOW_STREAM] Deducted 36 points. Balance: 1285 → 1249
+✅ [BILLING-TRACKER] Success #7: WORKFLOW_STREAM-1756615086635-99blf
+🔥 [STREAM] Sending balance update to frontend: 1249
+🔍 ensureConversationExists called with: {
+  conversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  difyConversationId: '836f4898-d32a-4173-8bf9-beeead7ae6f5',
+  userId: '9dee4891-89a6-44ee-8fe8-69097846e97d',
+  hasSupabase: true
+}
+✅ Messages saved successfully
+✅ Saved streaming conversation to database

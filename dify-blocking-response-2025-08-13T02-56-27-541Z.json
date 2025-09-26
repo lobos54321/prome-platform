@@ -1,0 +1,28 @@
+{
+  "event": "message",
+  "task_id": "b153aa06-3b19-4557-bdb8-05ee42428888",
+  "id": "e0501d1d-c499-4afb-aad2-7a6d38a9ec6e",
+  "message_id": "e0501d1d-c499-4afb-aad2-7a6d38a9ec6e",
+  "conversation_id": "50ab4742-02d3-43c7-a22c-e19603c17ce3",
+  "mode": "advanced-chat",
+  "answer": "COMPLETENESS: 1/4\n\n您提供了关于GPT-4模型的特点，属于产品特色信息。请继续提供其他信息。\n\n请介绍您的产品详情。",
+  "metadata": {
+    "annotation_reply": null,
+    "retriever_resources": [],
+    "usage": {
+      "prompt_tokens": 952,
+      "prompt_unit_price": "2",
+      "prompt_price_unit": "0.000001",
+      "prompt_price": "0.0014176",
+      "completion_tokens": 44,
+      "completion_unit_price": "8",
+      "completion_price_unit": "0.000001",
+      "completion_price": "0.0000632",
+      "total_tokens": 996,
+      "total_price": "0.0014808",
+      "currency": "USD",
+      "latency": 1.6883447859436274
+    }
+  },
+  "created_at": 1755053785
+}

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dify API Route Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #response { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Dify API Integration Test</h1>
+    
+    <div class="test-section info">
+        <h3>Testing Route Fixes</h3>
+        <p>This page tests the fixed Dify API routes and demonstrates that the 404 errors have been resolved.</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 1: Check if /api/dify route exists</h3>
+        <button onclick="testRoute()">Test Route</button>
+        <div id="route-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 2: Test API call with message</h3>
+        <input type="text" id="message-input" placeholder="Enter a test message" value="Hello, this is a test" style="width: 300px; padding: 5px;">
+        <button onclick="testMessage()">Send Message</button>
+        <div id="message-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Response Details</h3>
+        <div id="response"></div>
+    </div>
+
+    <script>
+        async function testRoute() {
+            const resultDiv = document.getElementById('route-result');
+            const responseDiv = document.getElementById('response');
+            
+            try {
+                const response = await fetch('/api/dify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: 'test' })
+                });
+                
+                const result = await response.text();
+                responseDiv.textContent = `Status: ${response.status}\nResponse: ${result}`;
+                
+                if (response.status === 404) {
+                    resultDiv.innerHTML = '<div class="error">❌ Route still returns 404 - fix needed</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="success">✅ Route exists - no more 404 errors!</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                responseDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function testMessage() {
+            const message = document.getElementById('message-input').value;
+            const resultDiv = document.getElementById('message-result');
+            const responseDiv = document.getElementById('response');
+            
+            if (!message.trim()) {
+                resultDiv.innerHTML = '<div class="error">Please enter a message</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/dify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: message,
+                        user: 'test-user',
+                        conversation_id: 'test-conversation'
+                    })
+                });
+                
+                const result = await response.text();
+                responseDiv.textContent = `Status: ${response.status}\nResponse: ${result}`;
+                
+                if (response.status === 404) {
+                    resultDiv.innerHTML = '<div class="error">❌ Still getting 404 - route not found</div>';
+                } else if (response.status === 500) {
+                    try {
+                        const errorData = JSON.parse(result);
+                        if (errorData.error?.includes('configuration') || errorData.error?.includes('EAI_AGAIN')) {
+                            resultDiv.innerHTML = '<div class="success">✅ Route works! (Server config/network issue is expected in sandbox)</div>';
+                        } else {
+                            resultDiv.innerHTML = '<div class="info">⚠️ Route exists but there\'s a server error</div>';
+                        }
+                    } catch {
+                        resultDiv.innerHTML = '<div class="info">⚠️ Route exists but there\'s a server error</div>';
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div class="success">✅ Route working perfectly!</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+                responseDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            testRoute();
+        });
+    </script>
+</body>
+</html>

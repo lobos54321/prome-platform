@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Frontend Cache Issue</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+        button { margin: 5px; padding: 10px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Frontend Cache Debug Tool</h1>
+    
+    <div class="section">
+        <h2>Step 1: Check Current Cache State</h2>
+        <button onclick="checkCacheState()">Check Cache</button>
+        <pre id="cache-state"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: Clear All Cache</h2>
+        <button onclick="clearAllCache()">Clear Everything</button>
+        <pre id="clear-result"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>Step 3: Test Fresh Request</h2>
+        <button onclick="testFreshRequest()">Test Fresh</button>
+        <pre id="fresh-test-result"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>Step 4: Direct API Test</h2>
+        <button onclick="testDirectAPI()">Test API Directly</button>
+        <pre id="api-test-result"></pre>
+    </div>
+
+    <script>
+        function checkCacheState() {
+            const result = {
+                localStorage: {},
+                sessionStorage: {},
+                cookies: document.cookie,
+                url: window.location.href,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Check all localStorage keys
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('dify_') || key.includes('conversation') || key.includes('chat')) {
+                    result.localStorage[key] = localStorage.getItem(key);
+                }
+            }
+            
+            // Check all sessionStorage keys  
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key.startsWith('dify_') || key.includes('conversation') || key.includes('chat')) {
+                    result.sessionStorage[key] = sessionStorage.getItem(key);
+                }
+            }
+            
+            document.getElementById('cache-state').textContent = JSON.stringify(result, null, 2);
+        }
+        
+        function clearAllCache() {
+            const result = {
+                clearedLocalStorage: [],
+                clearedSessionStorage: [],
+                timestamp: new Date().toISOString()
+            };
+            
+            // Clear localStorage
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('dify_') || key.includes('conversation') || key.includes('chat')) {
+                    result.clearedLocalStorage.push(key);
+                    localStorage.removeItem(key);
+                }
+            });
+            
+            // Clear sessionStorage
+            Object.keys(sessionStorage).forEach(key => {
+                if (key.startsWith('dify_') || key.includes('conversation') || key.includes('chat')) {
+                    result.clearedSessionStorage.push(key);
+                    sessionStorage.removeItem(key);
+                }
+            });
+            
+            document.getElementById('clear-result').textContent = JSON.stringify(result, null, 2);
+            document.getElementById('clear-result').className = 'success';
+        }
+        
+        async function testFreshRequest() {
+            try {
+                const conversationId = 'debug-fresh-' + Date.now();
+                const response = await fetch(`https://prome.live/api/dify/${conversationId}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: '你好',
+                        user: 'debug-user-' + Date.now()
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                let nodeEvents = [];
+                let conditionals = [];
+                let llmNodes = [];
+                let chunkCount = 0;
+                
+                while (chunkCount < 30) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunkCount++;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+                            try {
+                                const parsed = JSON.parse(line.slice(6));
+                                
+                                if (parsed.event === 'node_started') {
+                                    nodeEvents.push(`START: ${parsed.data?.title} [${parsed.data?.node_id}]`);
+                                    if (parsed.data?.node_type === 'llm') {
+                                        llmNodes.push(`${parsed.data.title} [${parsed.data.node_id}]`);
+                                    }
+                                }
+                                
+                                if (parsed.event === 'node_finished' && parsed.data?.node_type === 'if-else') {
+                                    conditionals.push(`${parsed.data.title}: ${parsed.data.outputs?.result}`);
+                                }
+                                
+                            } catch (e) {
+                                // ignore
+                            }
+                        }
+                    }
+                }
+                
+                reader.releaseLock();
+                
+                const result = {
+                    conversationId,
+                    nodeEvents,
+                    conditionals,
+                    llmNodes,
+                    success: true,
+                    timestamp: new Date().toISOString()
+                };
+                
+                document.getElementById('fresh-test-result').textContent = JSON.stringify(result, null, 2);
+                document.getElementById('fresh-test-result').className = llmNodes.some(llm => llm.includes('1754637575709')) ? 'success' : 'error';
+                
+            } catch (error) {
+                document.getElementById('fresh-test-result').textContent = JSON.stringify({
+                    error: error.message,
+                    success: false,
+                    timestamp: new Date().toISOString()
+                }, null, 2);
+                document.getElementById('fresh-test-result').className = 'error';
+            }
+        }
+        
+        async function testDirectAPI() {
+            try {
+                const conversationId = 'debug-direct-' + Date.now();
+                const response = await fetch(`https://prome.live/api/dify/${conversationId}/stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: '你好',
+                        user: 'direct-user-' + Date.now()
+                    })
+                });
+                
+                const text = await response.text();
+                const lines = text.split('\\n').slice(0, 20); // First 20 lines
+                
+                document.getElementById('api-test-result').textContent = lines.join('\\n');
+                
+            } catch (error) {
+                document.getElementById('api-test-result').textContent = 'Error: ' + error.message;
+                document.getElementById('api-test-result').className = 'error';
+            }
+        }
+        
+        // Auto-run cache check on load
+        window.onload = () => {
+            checkCacheState();
+        };
+    </script>
+</body>
+</html>

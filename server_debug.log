@@ -1,0 +1,204 @@
+[dotenv@17.2.1] injecting env (14) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+🚀 Starting Prome Platform server
+✅ Dify API environment variables are configured
+Server is running on port 8080
+🔍 Performing database health check...
+✅ Database health check passed - all required tables exist
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=false, query=false, final=false
+🔍 Full request body: {
+  "message": "你好",
+  "user": "test-user-123",
+  "stream": false
+}
+🆕 Generated new conversation UUID: 235462d2-d156-43d0-bda9-23367aa510e5
+🔍 Looking up conversation in database: 235462d2-d156-43d0-bda9-23367aa510e5
+📝 No existing conversation found for: 235462d2-d156-43d0-bda9-23367aa510e5
+🔧 Created new user ID mapping: test-user-123 -> 80501b1d-f18a-4cc9-bda5-ba43378ca72a
+🆕 Starting new conversation - letting DIFY initialize conversation variables
+📤 [DIFY API] Sending request to chat-messages: {
+  query: '你好...',
+  inputs: {},
+  response_mode: 'blocking',
+  user: '80501b1d-f18a-4cc9-bda5-ba43378ca72a',
+  conversation_id: 'NEW_CONVERSATION',
+  timestamp: '2025-08-30T06:03:25.539Z'
+}
+📊 New conversation, no context management needed
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '977215c128e4268c-SYD',
+  connection: 'keep-alive',
+  'content-encoding': 'br',
+  'content-type': 'application/json',
+  date: 'Sat, 30 Aug 2025 06:03:29 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=OSeAQdygV%2FhcEufh9KVm4mR3AqLJgEf9pYEXp2IApqGDp4irNXEy0ruqO7jKKuODQ8OGnFoiSU8uQqQoXTNbfTT2NNMPnpduJzvXQVzwpFoW6AUuTrY7cy%2BxrUJ2vxz69npOJPJLN7T5"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=5098&min_rtt=4986&rtt_var=2094&sent=5&recv=5&lost=0&retrans=0&sent_bytes=2826&recv_bytes=881&delivery_rate=687404&cwnd=252&unsent_bytes=0&cid=83b7c3366532d83f&ts=3329&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+📥 [DIFY API] Received blocking response: {
+  conversation_id: 'a596193c-db7d-44e6-936c-113098066445',
+  message_id: 'cced64c8-2aad-40e0-ad0f-8219861c0d90',
+  answer_preview: 'COMPLETENESS: 0  \n您好！请介绍您的产品详情（是什么产品，如何解决用户问题）。...',
+  mode: 'advanced-chat',
+  hasMetadata: true,
+  hasUsage: true,
+  timestamp: '2025-08-30T06:03:29.579Z'
+}
+✅ Successfully received response from Dify API
+🔄 Using existing user ID mapping for: test-user-123
+🔍 ensureConversationExists called with: {
+  conversationId: 'a596193c-db7d-44e6-936c-113098066445',
+  difyConversationId: 'a596193c-db7d-44e6-936c-113098066445',
+  userId: '80501b1d-f18a-4cc9-bda5-ba43378ca72a',
+  hasSupabase: true
+}
+⚠️ User not found in database, creating conversation without user_id: 80501b1d-f18a-4cc9-bda5-ba43378ca72a
+✅ Created new conversation record
+✅ Messages saved successfully
+📤 [SERVER → FRONTEND] Sending response to frontend: {
+  hasAnswer: true,
+  answerLength: 47,
+  conversation_id: 'a596193c-db7d-44e6-936c-113098066445',
+  message_id: 'cced64c8-2aad-40e0-ad0f-8219861c0d90',
+  hasMetadata: true,
+  hasUsage: true,
+  usageDetails: {
+    prompt_tokens: 906,
+    completion_tokens: 30,
+    total_tokens: 936,
+    total_price: '0.002052',
+    currency: 'USD'
+  },
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage', 'timestamp' ],
+  timestamp: '2025-08-30T06:03:30.408Z'
+}
+🔍 [DEBUG] responseData structure for billing: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 936
+}
+💰 [BILLING-DIFY_GENERIC] Multi-node LLM: 936 tokens
+💰 [COST-DIFY_GENERIC] Actual cost: $0.002052 = 21 points
+🔄 Using existing user ID mapping for: test-user-123
+⚠️  [BILLING-DIFY_GENERIC] User not found in database: 80501b1d-f18a-4cc9-bda5-ba43378ca72a
+✅ [BILLING-DIFY_GENERIC] Created user with balance: 9979 points
+🔥 [BLOCKING] Adding balance update to response: 9979
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=false, query=false, final=false
+🔍 Full request body: {
+  "message": "我的产品是AI助手",
+  "user": "test-user-123",
+  "conversation_id": "a596193c-db7d-44e6-936c-113098066445",
+  "stream": false
+}
+🔍 Looking up conversation in database: a596193c-db7d-44e6-936c-113098066445
+✅ Found existing DIFY conversation: a596193c-db7d-44e6-936c-113098066445
+🔄 Using existing user ID mapping for: test-user-123
+🔄 Continuing existing conversation: a596193c-db7d-44e6-936c-113098066445
+📤 [DIFY API] Sending request to chat-messages: {
+  query: '我的产品是AI助手...',
+  inputs: {},
+  response_mode: 'blocking',
+  user: '80501b1d-f18a-4cc9-bda5-ba43378ca72a',
+  conversation_id: 'a596193c-db7d-44e6-936c-113098066445',
+  timestamp: '2025-08-30T06:03:46.030Z'
+}
+📊 Context check: 50 tokens, within limit
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '977216422be5aae3-SYD',
+  connection: 'keep-alive',
+  'content-encoding': 'br',
+  'content-type': 'application/json',
+  date: 'Sat, 30 Aug 2025 06:03:49 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=TFBNumbiZDKSRo1ZYDeISS%2BVNMRU6lsYAfoGEMsoCgSp7emqPGGnu%2FqwdkE6IHi6nhSuaWDsLIWzegDfBprwmcgCKy6gGO5g10ZaoboH6LoOeBGxnQkWUJJh1Yoqxueo6z%2Bl%2BzvKy4Gj"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=3961&min_rtt=3959&rtt_var=1486&sent=3&recv=5&lost=0&retrans=0&sent_bytes=234&recv_bytes=1226&delivery_rate=340490&cwnd=238&unsent_bytes=0&cid=fc3fcadb3fc7fe7d&ts=2887&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+📥 [DIFY API] Received blocking response: {
+  conversation_id: 'a596193c-db7d-44e6-936c-113098066445',
+  message_id: '5145746d-156b-4c16-b8fd-79b737b7cc50',
+  answer_preview: 'COMPLETENESS: 1  \n感谢您的信息！请说明您的AI助手的主要特色或优势（例如功能亮点、与众不同之处等）。...',
+  mode: 'advanced-chat',
+  hasMetadata: true,
+  hasUsage: true,
+  timestamp: '2025-08-30T06:03:49.627Z'
+}
+✅ Successfully received response from Dify API
+🔄 Using existing user ID mapping for: test-user-123
+🔍 ensureConversationExists called with: {
+  conversationId: 'a596193c-db7d-44e6-936c-113098066445',
+  difyConversationId: 'a596193c-db7d-44e6-936c-113098066445',
+  userId: '80501b1d-f18a-4cc9-bda5-ba43378ca72a',
+  hasSupabase: true
+}
+✅ Messages saved successfully
+📤 [SERVER → FRONTEND] Sending response to frontend: {
+  hasAnswer: true,
+  answerLength: 59,
+  conversation_id: 'a596193c-db7d-44e6-936c-113098066445',
+  message_id: '5145746d-156b-4c16-b8fd-79b737b7cc50',
+  hasMetadata: true,
+  hasUsage: true,
+  usageDetails: {
+    prompt_tokens: 965,
+    completion_tokens: 41,
+    total_tokens: 1006,
+    total_price: '0.002258',
+    currency: 'USD'
+  },
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage', 'timestamp' ],
+  timestamp: '2025-08-30T06:03:50.221Z'
+}
+🔍 [DEBUG] responseData structure for billing: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 1006
+}
+💰 [BILLING-DIFY_GENERIC] Multi-node LLM: 1006 tokens
+💰 [COST-DIFY_GENERIC] Actual cost: $0.002258 = 23 points
+🔄 Using existing user ID mapping for: test-user-123
+⚠️  [BILLING-DIFY_GENERIC] User not found in database: 80501b1d-f18a-4cc9-bda5-ba43378ca72a
+✅ [BILLING-DIFY_GENERIC] Created user with balance: 9977 points
+🔥 [BLOCKING] Adding balance update to response: 9977

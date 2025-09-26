@@ -1,0 +1,16 @@
+{
+  "allowedTools": [
+    "Bash",
+    "Edit",
+    "Read", 
+    "Write",
+    "Grep",
+    "LS",
+    "WebFetch",
+    "TodoWrite",
+    "MultiEdit",
+    "Glob"
+  ],
+  "hasTrustDialogAccepted": true,
+  "autoAcceptTools": true
+}

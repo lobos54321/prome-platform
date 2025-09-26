@@ -1,0 +1,23 @@
+{
+  "name": "prome-platform",
+  "services": [
+    {
+      "name": "frontend",
+      "type": "web",
+      "buildCommand": "npm ci --prefer-offline --no-audit --cache .npm && npm run build",
+      "startCommand": "node server.js",
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": "8080",
+        "VITE_SUPABASE_URL": "https://lfjslsygnitdgdnfboiy.supabase.co",
+        "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmanNsc3lnbml0ZGdkbmZib2l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxODI5NjksImV4cCI6MjA2ODc1ODk2OX0.VpgSYmwW6mJ0iSaART16Ptb96zACJVJIdlskwBmIRsM",
+        "VITE_SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmanNsc3lnbml0ZGdkbmZib2l5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzE4Mjk2OSwiZXhwIjoyMDY4NzU4OTY5fQ.qXlnEUkpx7gp2Irv0M9WU9y-DX8TAG6bzKonFcBXwko",
+        "VITE_ENABLE_DIFY_INTEGRATION": "true",
+        "VITE_DIFY_API_URL": "https://api.dify.ai/v1",
+        "VITE_DIFY_APP_ID": "420861a3-3ef0-4ead-9bb7-0c4337d4229a",
+        "VITE_DIFY_API_KEY": "app-IjKktE91BQKi8J1lex4aFkbg",
+        "VITE_DIFY_TIMEOUT_MS": "120000"
+      }
+    }
+  ]
+}

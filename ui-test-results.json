@@ -1,0 +1,290 @@
+{
+  "history": [
+    {
+      "timestamp": "2025-08-28T23:36:40.784Z",
+      "tests": {
+        "componentLoad": {
+          "status": "PASS",
+          "avgLoadTime": 3.75,
+          "results": [
+            {
+              "file": "src/components/chat/ChatHistory.tsx",
+              "status": "PASS",
+              "loadTime": 0,
+              "complexity": {
+                "hooks": 15,
+                "conditions": 30,
+                "loops": 7,
+                "components": 24,
+                "complexity": 76
+              },
+              "size": 8050
+            },
+            {
+              "file": "src/components/chat/ChatInput.tsx",
+              "status": "PASS",
+              "loadTime": 10,
+              "complexity": {
+                "hooks": 15,
+                "conditions": 16,
+                "loops": 2,
+                "components": 10,
+                "complexity": 43
+              },
+              "size": 5053
+            },
+            {
+              "file": "src/components/chat/ChatMessage.tsx",
+              "status": "PASS",
+              "loadTime": 5,
+              "complexity": {
+                "hooks": 4,
+                "conditions": 21,
+                "loops": 1,
+                "components": 17,
+                "complexity": 43
+              },
+              "size": 6522
+            },
+            {
+              "file": "src/components/chat/VirtualizedMessageList.tsx",
+              "status": "PASS",
+              "loadTime": 0,
+              "complexity": {
+                "hooks": 5,
+                "conditions": 10,
+                "loops": 3,
+                "components": 3,
+                "complexity": 21
+              },
+              "size": 2446
+            }
+          ],
+          "recommendation": "组件加载速度优秀"
+        },
+        "chatInteraction": {
+          "status": "PASS",
+          "score": 83.33333333333334,
+          "features": {
+            "sendMessage": true,
+            "clearMessages": true,
+            "retryMessage": true,
+            "messageHistory": true,
+            "streaming": false,
+            "errorHandling": true
+          },
+          "recommendation": "缺少功能: 流式响应"
+        },
+        "performanceMetrics": {
+          "status": "PASS",
+          "score": 85,
+          "optimizations": {
+            "useMemo": 2,
+            "useCallback": 4,
+            "memo": true,
+            "lazyLoading": false,
+            "virtualization": true
+          },
+          "bundleSize": 2206270,
+          "recommendation": "性能优化良好"
+        },
+        "accessibility": {
+          "status": "WARN",
+          "avgScore": 0,
+          "results": [
+            {
+              "component": "src/components/chat/ChatHistory.tsx",
+              "score": 0,
+              "accessibility": {
+                "ariaLabels": 0,
+                "ariaDescribedby": 0,
+                "keyboardNav": false,
+                "semanticHTML": false,
+                "altText": false
+              }
+            },
+            {
+              "component": "src/components/chat/ChatInput.tsx",
+              "score": 0,
+              "accessibility": {
+                "ariaLabels": 0,
+                "ariaDescribedby": 0,
+                "keyboardNav": false,
+                "semanticHTML": false,
+                "altText": false
+              }
+            },
+            {
+              "component": "src/components/chat/ChatMessage.tsx",
+              "score": 0,
+              "accessibility": {
+                "ariaLabels": 0,
+                "ariaDescribedby": 0,
+                "keyboardNav": false,
+                "semanticHTML": false,
+                "altText": false
+              }
+            }
+          ],
+          "recommendation": "需要改善可访问性，添加更多aria标签和语义化HTML"
+        },
+        "responsiveDesign": {
+          "status": "WARN",
+          "score": 55,
+          "features": {
+            "flexbox": false,
+            "grid": false,
+            "mediaQueries": true,
+            "tailwindResponsive": true,
+            "mobileFirst": false
+          },
+          "recommendation": "采用移动端优先设计"
+        }
+      },
+      "totalTestTime": 24
+    }
+  ],
+  "latest": {
+    "timestamp": "2025-08-28T23:36:40.784Z",
+    "tests": {
+      "componentLoad": {
+        "status": "PASS",
+        "avgLoadTime": 3.75,
+        "results": [
+          {
+            "file": "src/components/chat/ChatHistory.tsx",
+            "status": "PASS",
+            "loadTime": 0,
+            "complexity": {
+              "hooks": 15,
+              "conditions": 30,
+              "loops": 7,
+              "components": 24,
+              "complexity": 76
+            },
+            "size": 8050
+          },
+          {
+            "file": "src/components/chat/ChatInput.tsx",
+            "status": "PASS",
+            "loadTime": 10,
+            "complexity": {
+              "hooks": 15,
+              "conditions": 16,
+              "loops": 2,
+              "components": 10,
+              "complexity": 43
+            },
+            "size": 5053
+          },
+          {
+            "file": "src/components/chat/ChatMessage.tsx",
+            "status": "PASS",
+            "loadTime": 5,
+            "complexity": {
+              "hooks": 4,
+              "conditions": 21,
+              "loops": 1,
+              "components": 17,
+              "complexity": 43
+            },
+            "size": 6522
+          },
+          {
+            "file": "src/components/chat/VirtualizedMessageList.tsx",
+            "status": "PASS",
+            "loadTime": 0,
+            "complexity": {
+              "hooks": 5,
+              "conditions": 10,
+              "loops": 3,
+              "components": 3,
+              "complexity": 21
+            },
+            "size": 2446
+          }
+        ],
+        "recommendation": "组件加载速度优秀"
+      },
+      "chatInteraction": {
+        "status": "PASS",
+        "score": 83.33333333333334,
+        "features": {
+          "sendMessage": true,
+          "clearMessages": true,
+          "retryMessage": true,
+          "messageHistory": true,
+          "streaming": false,
+          "errorHandling": true
+        },
+        "recommendation": "缺少功能: 流式响应"
+      },
+      "performanceMetrics": {
+        "status": "PASS",
+        "score": 85,
+        "optimizations": {
+          "useMemo": 2,
+          "useCallback": 4,
+          "memo": true,
+          "lazyLoading": false,
+          "virtualization": true
+        },
+        "bundleSize": 2206270,
+        "recommendation": "性能优化良好"
+      },
+      "accessibility": {
+        "status": "WARN",
+        "avgScore": 0,
+        "results": [
+          {
+            "component": "src/components/chat/ChatHistory.tsx",
+            "score": 0,
+            "accessibility": {
+              "ariaLabels": 0,
+              "ariaDescribedby": 0,
+              "keyboardNav": false,
+              "semanticHTML": false,
+              "altText": false
+            }
+          },
+          {
+            "component": "src/components/chat/ChatInput.tsx",
+            "score": 0,
+            "accessibility": {
+              "ariaLabels": 0,
+              "ariaDescribedby": 0,
+              "keyboardNav": false,
+              "semanticHTML": false,
+              "altText": false
+            }
+          },
+          {
+            "component": "src/components/chat/ChatMessage.tsx",
+            "score": 0,
+            "accessibility": {
+              "ariaLabels": 0,
+              "ariaDescribedby": 0,
+              "keyboardNav": false,
+              "semanticHTML": false,
+              "altText": false
+            }
+          }
+        ],
+        "recommendation": "需要改善可访问性，添加更多aria标签和语义化HTML"
+      },
+      "responsiveDesign": {
+        "status": "WARN",
+        "score": 55,
+        "features": {
+          "flexbox": false,
+          "grid": false,
+          "mediaQueries": true,
+          "tailwindResponsive": true,
+          "mobileFirst": false
+        },
+        "recommendation": "采用移动端优先设计"
+      }
+    },
+    "totalTestTime": 24
+  }
+}

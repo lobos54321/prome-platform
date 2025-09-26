@@ -1,134 +1,240 @@
-# Digital Human Video System
+# ProMe Platform - AI营销文案生成平台
 
-This repository contains the complete digital human video creation system with A2E API integration.
+基于Dify工作流的智能营销文案生成平台，支持流式响应、工作流可视化、对话连续性管理等功能。
 
-## Features
+## 🚀 核心功能
 
-- **Beautiful UI**: Modern gradient design with 4-step workflow visualization
-- **Deep Copywriting Integration**: Automatic import of AI-generated copywriting content
-- **A2E API Integration**: Complete integration with A2E digital human training and video generation
-- **Supabase Storage**: Temporary video file storage with automatic cleanup
-- **Step-by-step Workflow**: Clear progress tracking through the video creation process
+- ✅ **Dify集成**: 支持复杂的chatflow工作流
+- ✅ **流式响应**: 实时打字效果和节点显示
+- ✅ **对话连续性**: 页面刷新保持对话状态
+- ✅ **工作流可视化**: 实时显示节点执行进度
+- ✅ **历史对话管理**: 云端同步和本地缓存
+- ✅ **用户认证**: Supabase认证和权限管理
+- ✅ **支付集成**: Stripe订阅和信用点系统
 
-## Files Included
+## 🛠 技术栈
 
-1. `DigitalHumanVideoComplete2.tsx` - Main React component with full UI
-2. `server-api-endpoints.js` - Backend API endpoints for A2E integration
-3. `environment-config.env` - Required environment variables
-4. `digital-human-routes.js` - React Router configuration
-5. `supabase-setup.sql` - Database configuration and setup
+- **前端**: Vite + React + TypeScript + Tailwind CSS
+- **UI组件**: shadcn/ui
+- **后端**: Node.js + Express
+- **数据库**: Supabase
+- **AI集成**: Dify API
+- **支付**: Stripe
+- **部署**: 支持Docker和云平台部署
 
-## Setup Instructions
+## 📦 快速开始
 
-### 1. Environment Variables (.env)
+### 1. 环境配置
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 文件，填入必要的配置：
+# - Supabase URL和密钥
+# - Dify API密钥和App ID
+# - Stripe密钥（可选）
+```
+
+### 2. 安装依赖
+
+```bash
+pnpm install
+```
+
+### 3. 启动开发服务器
+
+```bash
+# 启动后端服务 (端口: 8080)
+node server.js
+
+# 启动前端服务 (端口: 5173)
+pnpm run dev
+```
+
+### 4. 访问应用
+
+- 前端: http://localhost:5173
+- 后端API: http://localhost:8080
+- Dify调试工具: http://localhost:5173/dify-debug
+
+## 🔧 环境变量配置
+
+### 必需配置
+
 ```env
-# A2E API Configuration
-A2E_API_KEY=your_a2e_api_key_here
-A2E_API_URL=https://video.a2e.ai
-
-# Supabase Configuration
+# Supabase
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Dify
+VITE_ENABLE_DIFY_INTEGRATION=true
+VITE_DIFY_API_URL=https://api.dify.ai/v1
+VITE_DIFY_APP_ID=your_dify_app_id
+VITE_DIFY_API_KEY=your_dify_api_key
 ```
 
-### 2. Supabase Storage Bucket
-Create a storage bucket named `digital-human-videos` in your Supabase project:
-```sql
-INSERT INTO storage.buckets (id, name, public) VALUES ('digital-human-videos', 'digital-human-videos', true);
+### 可选配置
+
+```env
+# Dify超时设置 (毫秒)
+VITE_DIFY_TIMEOUT_MS=120000
+VITE_DIFY_WORKFLOW_TIMEOUT_MS=300000
+VITE_DIFY_STREAMING_TIMEOUT_MS=240000
+
+# Stripe
+VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_key
 ```
 
-### 3. Install Dependencies
-```bash
-npm install @supabase/supabase-js multer express
+## 📁 项目结构
+
+```
+prome-platform/
+├── src/
+│   ├── components/
+│   │   ├── ui/                 # shadcn/ui组件
+│   │   ├── chat/              # 聊天界面组件
+│   │   └── layout/            # 布局组件
+│   ├── pages/                 # 页面组件
+│   ├── lib/                   # 工具库和API客户端
+│   ├── hooks/                 # React Hooks
+│   └── types/                 # TypeScript类型定义
+├── server.js                 # Express后端服务器
+├── .env.example              # 环境变量模板
+└── README.md                 # 本文档
 ```
 
-### 4. React Router Setup
-Add the route to your App.tsx:
+## 🎯 主要功能说明
+
+### Dify集成
+
+- 支持复杂的chatflow工作流
+- 自动处理conversation_id连续性
+- 智能错误处理和重试机制
+- 流式响应和实时节点显示
+
+### 聊天界面
+
+- 实时流式响应
+- 工作流节点可视化
+- 消息历史持久化
+- 错误处理和重试功能
+
+### 用户管理
+
+- Supabase认证集成
+- 用户权限和角色管理
+- 信用点系统
+- 使用统计和监控
+
+## 🔨 开发指南
+
+### 添加新页面
+
 ```typescript
-import DigitalHumanVideoComplete2 from './pages/DigitalHumanVideoComplete2';
+// src/pages/NewPage.tsx
+export default function NewPage() {
+  return <div>New Page</div>;
+}
 
-// In your Routes component:
-<Route path="/digital-human-video" element={<DigitalHumanVideoComplete2 />} />
+// 在 src/App.tsx 中添加路由
+<Route path="/new-page" element={<NewPage />} />
 ```
 
-## Workflow
+### 调用Dify API
 
-### Step 1: Prepare Content
-- Users can manually input video script content
-- Auto-import from Deep Copywriting results stored in localStorage
-- Content validation before proceeding to next step
+```typescript
+import { difyChatService } from '@/lib/dify-client';
 
-### Step 2: Train Digital Human (A2E Integration)
-- Upload video files to Supabase temporary storage
-- Send training request to A2E API with:
-  - Name and gender settings
-  - Video URL from Supabase storage
-  - Background image and color options
-- Automatic cleanup of temporary files
+const response = await difyChatService.sendMessage({
+  query: '用户消息',
+  user: userId,
+  conversationId: conversationId
+});
+```
 
-### Step 3: Generate Video
-- Use trained digital human to generate final video
-- Integration with A2E video generation API
-- Progress tracking and status updates
+### 调试工具
 
-### Step 4: Complete
-- Video download and final delivery
-- Cleanup and resource management
+访问 `/dify-debug` 页面可以：
+- 测试Dify API连接
+- 调试流式响应
+- 验证对话连续性
+- 检查工作流执行
 
-## API Endpoints
+## 🚀 生产部署
 
-### POST /api/upload/video
-Upload video files for digital human training
-- Accepts multipart/form-data with video file
-- Stores in Supabase temporary storage
-- Auto-deletes after 30 minutes
+### 构建项目
 
-### POST /api/digital-human/train
-Start digital human training with A2E API
-- Integrates with A2E training endpoint
-- Handles video URL and configuration parameters
-- Manages temporary file cleanup
+```bash
+# 构建前端
+pnpm run build
 
-### POST /api/digital-human/generate
-Generate videos using trained digital human
-- Calls A2E video generation API
-- Credit/balance system integration
-- Status tracking and webhook support
+# 测试生产构建
+pnpm run preview
+```
 
-## Technical Features
+### Docker部署
 
-### File Upload & Storage
-- Multipart file upload handling
-- Supabase Storage integration
-- Automatic temporary file cleanup
-- Public URL generation for A2E API
+```bash
+# 构建镜像
+docker build -t prome-platform .
 
-### A2E API Integration
-- Complete training workflow implementation
-- Video generation with customizable parameters
-- Error handling and fallback modes
-- Mock mode for development/testing
+# 运行容器
+docker run -p 3000:3000 -p 8080:8080 --env-file .env prome-platform
+```
 
-### UI/UX Features
-- Responsive design with gradient backgrounds
-- Step-by-step progress visualization
-- Real-time status updates
-- Deep Copywriting content integration
-- Form validation and error handling
+### 云平台部署
 
-## Security & Best Practices
+支持部署到：
+- Vercel (前端)
+- Railway (后端)
+- Supabase (数据库)
 
-- API key protection with environment variables
-- Input validation and sanitization
-- Automatic resource cleanup
-- Error handling with user-friendly messages
-- Service role key usage for secure storage operations
+## 🧪 测试
 
-## Future Enhancements
+```bash
+# 运行单元测试
+pnpm run test
 
-- Real-time progress updates via WebSocket
-- Advanced video customization options
-- Batch processing capabilities
-- Enhanced error recovery mechanisms
-- Video preview and editing features
+# 端到端测试
+pnpm run test:e2e
+
+# Dify集成测试
+# 访问 /dify-debug 页面进行手动测试
+```
+
+## 📝 常见问题
+
+### Q: Dify API连接失败
+A: 检查环境变量配置，确认API_KEY和APP_ID正确
+
+### Q: 流式响应不工作
+A: 确认后端服务器运行正常，检查network面板的SSE连接
+
+### Q: 对话连续性断开
+A: 检查conversation_id是否正确传递，查看浏览器控制台错误
+
+### Q: 页面刷新丢失对话
+A: 检查localStorage存储，确认消息恢复逻辑正常工作
+
+## 🤝 贡献
+
+欢迎提交Issue和Pull Request来改进项目。
+
+## 📄 许可证
+
+MIT License
+
+---
+
+## 🔄 最近更新
+
+- ✅ 修复用户ID一致性，确保对话连续性
+- ✅ 实现完整的流式响应功能
+- ✅ 添加工作流节点实时显示
+- ✅ 优化错误处理和重试机制
+- ✅ 完善localStorage消息恢复
+
+## 📞 技术支持
+
+如有问题，请访问项目的GitHub Issues页面。

@@ -1,0 +1,58 @@
+
+> prome@0.0.0 dev
+> vite
+
+Port 5173 is in use, trying another one...
+
+  VITE v5.4.19  ready in 752 ms
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: use --host to expose
+8:58:50 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+8:59:07 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+8:59:26 AM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+8:59:39 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+8:59:53 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:08:10 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:09:44 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:10:19 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:11:21 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+9:12:53 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:14:10 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:14:25 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:15:41 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:16:14 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:35:03 AM [vite] hmr update /src/pages/DifyChat.tsx, /src/index.css
+9:35:23 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+9:35:51 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+9:46:09 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+9:49:02 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+9:49:32 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:09:58 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+11:21:12 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:21:28 AM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+11:27:55 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:28:12 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:29:24 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:39:55 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:47:46 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:48:15 AM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+11:48:49 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+11:48:59 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+11:52:34 AM [vite] hmr update /src/pages/DifyChat.tsx, /src/index.css
+11:54:31 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:54:48 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:55:14 AM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:59:51 AM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+1:15:46 PM [vite] hmr update /src/index.css, /src/components/chat/DifyChatInterface.tsx
+1:21:23 PM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+1:24:14 PM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+1:30:33 PM [vite] hmr update /src/pages/DifyChat.tsx, /src/index.css
+10:25:12 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:25:25 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:26:24 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:27:01 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:27:29 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:27:50 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:28:18 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+10:28:48 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css

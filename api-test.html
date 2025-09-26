@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ProMe API 测试工具</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .response { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 10px 0; white-space: pre-wrap; }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ProMe API 测试工具</h1>
+        
+        <h3>1. 信息收集测试</h3>
+        <textarea id="productInfo" placeholder="输入产品信息，例如：产品：AI编程助手。特色：代码生成、bug检测、优化建议。用户：程序员。价格：199元/月。">产品：AI编程助手。特色：代码生成、bug检测、优化建议。用户：程序员。价格：199元/月。</textarea>
+        <button onclick="testInfoCollection()">开始信息收集</button>
+        
+        <h3>2. 痛点生成测试</h3>
+        <button onclick="testPainGeneration()">开始痛点生成</button>
+        
+        <h3>3. LLM7-14多节点测试</h3>
+        <textarea id="painPoint" placeholder="选择一个痛点内容">深夜加班时，程序员小李发现AI助手生成的代码虽然能运行，但总是缺少那种"优雅简洁"的感觉...</textarea>
+        <button onclick="testMultiNode()">触发LLM7-14处理</button>
+        
+        <h3>📊 响应结果</h3>
+        <div id="response" class="response">等待测试...</div>
+        
+        <h3>💰 Token统计</h3>
+        <div id="tokenStats" class="response">
+            总消耗: <span id="totalTokens">0</span> tokens<br>
+            总成本: $<span id="totalCost">0.00</span><br>
+            会话ID: <span id="conversationId">-</span>
+        </div>
+    </div>
+
+    <script>
+        let currentConversationId = '';
+        let totalTokensUsed = 0;
+        let totalCostAccumulated = 0;
+
+        async function apiCall(query) {
+            const response = await fetch('http://localhost:8080/api/dify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer test-user-token'
+                },
+                body: JSON.stringify({
+                    inputs: {},
+                    query: query,
+                    response_mode: 'streaming',
+                    conversation_id: currentConversationId,
+                    user: 'test-user',
+                    files: []
+                })
+            });
+            
+            const data = await response.json();
+            
+            // 更新会话ID
+            if (data.conversation_id) {
+                currentConversationId = data.conversation_id;
+                document.getElementById('conversationId').textContent = currentConversationId;
+            }
+            
+            // 更新Token统计
+            if (data.metadata && data.metadata.usage) {
+                const tokens = data.metadata.usage.total_tokens || 0;
+                const cost = parseFloat(data.metadata.usage.total_price || 0);
+                totalTokensUsed += tokens;
+                totalCostAccumulated += cost;
+                
+                document.getElementById('totalTokens').textContent = totalTokensUsed.toLocaleString();
+                document.getElementById('totalCost').textContent = totalCostAccumulated.toFixed(6);
+            }
+            
+            return data;
+        }
+
+        async function testInfoCollection() {
+            const productInfo = document.getElementById('productInfo').value;
+            try {
+                showResponse('🔄 发送产品信息...', 'info');
+                const result = await apiCall(productInfo);
+                showResponse(`✅ 信息收集响应:\n${result.answer}`, 'success');
+                
+                // 如果需要补充信息
+                if (result.answer.includes('请告知') || result.answer.includes('缺失')) {
+                    setTimeout(async () => {
+                        showResponse('🔄 补充文案字数要求...', 'info');
+                        const wordCountResult = await apiCall('文案字数：800字');
+                        showResponse(`✅ 补充信息响应:\n${wordCountResult.answer}`, 'success');
+                    }, 2000);
+                }
+            } catch (error) {
+                showResponse(`❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPainGeneration() {
+            try {
+                showResponse('🔄 开始痛点生成...', 'info');
+                const result = await apiCall('开始痛点生成');
+                showResponse(`✅ 痛点生成响应:\n${result.answer}`, 'success');
+            } catch (error) {
+                showResponse(`❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMultiNode() {
+            const painPoint = document.getElementById('painPoint').value;
+            try {
+                showResponse('🔄 选择痛点...', 'info');
+                const selectResult = await apiCall(painPoint);
+                showResponse(`✅ 痛点选择响应:\n${selectResult.answer}`, 'success');
+                
+                setTimeout(async () => {
+                    showResponse('🚀 触发LLM7-14多节点处理...', 'info');
+                    const biubiuResult = await apiCall('biubiu');
+                    showResponse(`🎯 LLM7-14处理完成!\n响应长度: ${biubiuResult.answer?.length || 0} 字符\n内容预览: ${biubiuResult.answer?.substring(0, 500)}...`, 'success');
+                }, 3000);
+            } catch (error) {
+                showResponse(`❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        function showResponse(text, type = 'info') {
+            const responseDiv = document.getElementById('response');
+            responseDiv.textContent = text;
+            responseDiv.className = `response ${type}`;
+        }
+
+        // 页面加载时显示说明
+        window.onload = function() {
+            showResponse('🎯 ProMe API 测试工具已准备就绪!\n\n使用说明:\n1. 先测试信息收集 - 输入产品信息\n2. 然后测试痛点生成 - 会生成3个痛点选项\n3. 最后测试LLM7-14 - 选择痛点并触发多节点处理\n\n每个步骤会显示Token消耗统计。', 'info');
+        };
+    </script>
+</body>
+</html>

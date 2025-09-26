@@ -1,0 +1,112 @@
+[dotenv@17.2.1] injecting env (14) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+🚀 Starting Prome Platform server
+✅ Dify API environment variables are configured
+Server is running on port 8080
+🔍 Performing database health check...
+✅ Database health check passed - all required tables exist
+🔍 INCOMING REQUEST: POST /api/dify
+🗣️ GENERIC /api/dify ENDPOINT CALLED
+📊 Streaming mode: body=false, query=false, final=false
+🔍 Full request body: {
+  "message": "你好",
+  "user": "test-user-999",
+  "stream": false
+}
+🆕 Generated new conversation UUID: 3cb315ba-40c9-4c6b-a0b4-bb06d9cbaeac
+🔍 Looking up conversation in database: 3cb315ba-40c9-4c6b-a0b4-bb06d9cbaeac
+📝 No existing conversation found for: 3cb315ba-40c9-4c6b-a0b4-bb06d9cbaeac
+🔧 Created new user ID mapping: test-user-999 -> 7057c440-84a5-412f-a71e-86d94fdc94c3
+🆕 Starting new conversation - letting DIFY initialize conversation variables
+📤 [DIFY API] Sending request to chat-messages: {
+  query: '你好...',
+  inputs: {},
+  response_mode: 'blocking',
+  user: '7057c440-84a5-412f-a71e-86d94fdc94c3',
+  conversation_id: 'NEW_CONVERSATION',
+  timestamp: '2025-08-30T06:11:44.186Z'
+}
+📊 New conversation, no context management needed
+📋 Preparing request for DIFY chatflow processing...
+[Server Generic] 🔍 Dify API 响应头: {
+  'access-control-allow-origin': '*',
+  'cf-cache-status': 'DYNAMIC',
+  'cf-ray': '977221ecbc4ce7c1-SYD',
+  connection: 'keep-alive',
+  'content-encoding': 'br',
+  'content-type': 'application/json',
+  date: 'Sat, 30 Aug 2025 06:11:47 GMT',
+  nel: '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}',
+  'report-to': '{"endpoints":[{"url":"https:\\/\\/a.nel.cloudflare.com\\/report\\/v4?s=hTrYukCf%2FBbiuQRFf%2BbzJuFmjtpDcrNimTBlygHVn7qnCYRNdUON0izGbbW%2F06%2BX%2Bj1erRC%2B%2Fy94Xp%2FtYVZHxte3PYje6ti69eqSLnH2RLnpv0qZUm1%2BwiM9sZX%2BTz26z945%2BDwPd%2B60"}],"group":"cf-nel","max_age":604800}',
+  server: 'cloudflare',
+  'server-timing': 'cfL4;desc="?proto=TCP&rtt=6034&min_rtt=4982&rtt_var=3973&sent=5&recv=5&lost=0&retrans=0&sent_bytes=2827&recv_bytes=881&delivery_rate=301723&cwnd=252&unsent_bytes=0&cid=7e3bb2ac09f87855&ts=3106&x=0"',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'transfer-encoding': 'chunked',
+  'x-content-type-options': 'nosniff',
+  'x-env': 'PRODUCTION',
+  'x-frame-options': 'DENY',
+  'x-version': '1.7.2'
+}
+[Server Generic] 响应头元数据检查: {
+  'x-usage-input-tokens': null,
+  'x-usage-output-tokens': null,
+  'x-dify-model': null,
+  'x-dify-request-id': null,
+  hasTokenStats: false,
+  hasModelInfo: false
+}
+📥 [DIFY API] Received blocking response: {
+  conversation_id: '7baadcaf-8c5c-4e3e-935e-98337d2fa6ab',
+  message_id: '8244b7cf-822b-4cad-ae13-0fd770af488d',
+  answer_preview: 'COMPLETENESS: 0\n您好！请介绍您的产品详情（是什么产品，如何解决问题）。...',
+  mode: 'advanced-chat',
+  hasMetadata: true,
+  hasUsage: true,
+  timestamp: '2025-08-30T06:11:47.859Z'
+}
+✅ Successfully received response from Dify API
+🔄 Using existing user ID mapping for: test-user-999
+🔍 ensureConversationExists called with: {
+  conversationId: '7baadcaf-8c5c-4e3e-935e-98337d2fa6ab',
+  difyConversationId: '7baadcaf-8c5c-4e3e-935e-98337d2fa6ab',
+  userId: '7057c440-84a5-412f-a71e-86d94fdc94c3',
+  hasSupabase: true
+}
+⚠️ User not found in database, creating conversation without user_id: 7057c440-84a5-412f-a71e-86d94fdc94c3
+✅ Created new conversation record
+✅ Messages saved successfully
+📤 [SERVER → FRONTEND] Sending response to frontend: {
+  hasAnswer: true,
+  answerLength: 43,
+  conversation_id: '7baadcaf-8c5c-4e3e-935e-98337d2fa6ab',
+  message_id: '8244b7cf-822b-4cad-ae13-0fd770af488d',
+  hasMetadata: true,
+  hasUsage: true,
+  usageDetails: {
+    prompt_tokens: 904,
+    completion_tokens: 29,
+    total_tokens: 933,
+    total_price: '0.002040',
+    currency: 'USD'
+  },
+  metadataKeys: [ 'annotation_reply', 'retriever_resources', 'usage', 'timestamp' ],
+  timestamp: '2025-08-30T06:11:48.700Z'
+}
+🔍 [DEBUG] responseData structure for billing: {
+  hasResponseData: true,
+  hasMetadata: true,
+  hasUsage: true,
+  hasTokens: true,
+  tokensValue: 933
+}
+💰 [BILLING-DIFY_GENERIC] Multi-node LLM: 933 tokens
+💰 [COST-DIFY_GENERIC] Actual cost: $0.002040 = 21 points
+🔄 Using existing user ID mapping for: test-user-999
+⚠️  [BILLING-DIFY_GENERIC] User not found in database: 7057c440-84a5-412f-a71e-86d94fdc94c3
+❌ [BILLING-DIFY_GENERIC] Failed to create user: null value in column "name" of relation "users" violates not-null constraint
+❌ [BILLING-DIFY_GENERIC] Insert error details: {
+  code: '23502',
+  details: 'Failing row contains (7057c440-84a5-412f-a71e-86d94fdc94c3, null, null, null, user, 9979, 2025-08-30 06:11:48.847+00).',
+  hint: null,
+  message: 'null value in column "name" of relation "users" violates not-null constraint'
+}
+❌ [BILLING-DIFY_GENERIC] User creation and retry both failed

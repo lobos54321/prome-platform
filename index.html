@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProMe - Feed your feed to your AI, and let it feed you</title>
+  <meta name="description" content="Feed your feed to your AI, and let it feed you" />
+  <meta name="author" content="ProMe" />
+
+  <!-- Content Security Policy for Stripe and other external resources -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://checkout.stripe.com https://udify.app https://*.udify.app https://*.dify.ai https://*.dify.dev;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: https: blob:;
+    connect-src 'self' https://api.stripe.com https://checkout.stripe.com https://*.supabase.co wss://*.supabase.co https://udify.app https://*.udify.app https://*.dify.ai https://*.dify.dev https://*.zeabur.app;
+    frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://udify.app https://*.udify.app https://*.dify.ai https://*.dify.dev;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self' https://checkout.stripe.com;" />
+
+  <meta property="og:title" content="ProMe" />
+  <meta property="og:description" content="Feed your feed to your AI, and let it feed you" />
+  <meta property="og:type" content="website" />
+
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dify API Integration Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .response { margin-top: 10px; padding: 10px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; white-space: pre-wrap; font-family: monospace; }
+        .log { max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Dify API Integration Test</h1>
+        <p>This page tests the fixed Dify API integration to ensure routes work correctly.</p>
+        
+        <div class="test-section info">
+            <h3>🔧 Environment Check</h3>
+            <p>Current URL: <span id="currentUrl"></span></p>
+            <p>Testing API endpoints for proper routing and JSON responses...</p>
+        </div>
+
+        <div class="test-section">
+            <h3>📡 API Endpoint Tests</h3>
+            <button onclick="testNewConversation()">Test New Conversation (/api/dify)</button>
+            <button onclick="testExistingConversation()">Test Existing Conversation (/api/dify/{id})</button>
+            <button onclick="testStreamEndpoint()">Test Stream Endpoint (/api/dify/{id}/stream)</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Test Results</h3>
+            <div id="testLog" class="log response"></div>
+        </div>
+
+        <div class="test-section info">
+            <h3>✅ Expected Results</h3>
+            <ul>
+                <li><strong>Before Fix:</strong> 404 errors with HTML responses like "<!DOCTYPE html..."</li>
+                <li><strong>After Fix:</strong> Proper JSON responses (may be errors due to missing external API access, but should be valid JSON)</li>
+                <li><strong>Key Success Criteria:</strong> No more "not valid JSON" errors in browser console</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('currentUrl').textContent = window.location.href;
+        
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logEntry;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').textContent = '';
+        }
+
+        async function makeApiCall(endpoint, data = null) {
+            try {
+                log(`🔄 Testing ${endpoint}...`);
+                
+                const options = {
+                    method: data ? 'POST' : 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(endpoint, options);
+                const responseText = await response.text();
+                
+                // Check if response is JSON
+                let responseData;
+                let isValidJson = false;
+                try {
+                    responseData = JSON.parse(responseText);
+                    isValidJson = true;
+                } catch (e) {
+                    responseData = responseText;
+                }
+
+                if (isValidJson) {
+                    log(`✅ ${endpoint} - PASS: Valid JSON response (Status: ${response.status})`);
+                    log(`   Response: ${JSON.stringify(responseData, null, 2).substring(0, 200)}...`);
+                } else {
+                    log(`❌ ${endpoint} - FAIL: Invalid JSON response (Status: ${response.status})`);
+                    log(`   Response: ${responseText.substring(0, 200)}...`);
+                }
+
+                return { success: isValidJson, status: response.status, data: responseData };
+            } catch (error) {
+                log(`❌ ${endpoint} - ERROR: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testNewConversation() {
+            await makeApiCall('/api/dify', { 
+                message: 'Test message for new conversation',
+                user: 'test-user'
+            });
+        }
+
+        async function testExistingConversation() {
+            await makeApiCall('/api/dify/test-conversation-id', { 
+                message: 'Test message for existing conversation',
+                conversation_id: 'test-conversation-id',
+                user: 'test-user'
+            });
+        }
+
+        async function testStreamEndpoint() {
+            await makeApiCall('/api/dify/test-conversation-id/stream', { 
+                message: 'Test stream message',
+                conversation_id: 'test-conversation-id',
+                user: 'test-user'
+            });
+        }
+
+        // Auto-run basic test on page load
+        window.addEventListener('load', () => {
+            log('🚀 Dify API Integration Test Started');
+            log('📝 This test validates that the API routing fixes are working correctly');
+            log('💡 Click the buttons above to test different endpoints');
+            log('');
+        });
+    </script>
+</body>
+</html>
