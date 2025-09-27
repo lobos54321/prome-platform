@@ -319,14 +319,20 @@ class AuthService {
         return this.currentUser;
       }
 
-      // Production mode: attempt real authentication with enhanced session recovery
-      await this.attemptSessionRecovery();
+      // Production mode: attempt real authentication with timeout
+      await Promise.race([
+        this.attemptSessionRecovery(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth initialization timeout')), 5000)
+        )
+      ]);
       
       this.isInitialized = true;
       return this.currentUser;
     } catch (error) {
       console.warn('Auth initialization encountered error:', error);
       // Don't throw - just mark as initialized with no user
+      this.isInitialized = true;
       this.clearUserState();
       return null;
     }
@@ -390,7 +396,14 @@ class AuthService {
   private async tryServerSessionRecovery(): Promise<User | null> {
     try {
       console.log('Attempting server session recovery...');
-      const user = await db.getCurrentUser();
+      
+      // 添加超时机制避免卡住
+      const user = await Promise.race([
+        db.getCurrentUser(),
+        new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error('Server session recovery timeout')), 3000)
+        )
+      ]);
       
       if (user && this.isValidUserObject(user)) {
         return user;
@@ -429,10 +442,17 @@ class AuthService {
   }
 
   private async validateAndRefreshSession(): Promise<void> {
-    // Run validation in background without affecting UI
+    // Run validation in background without affecting UI - 缩短延时避免启动卡住
     setTimeout(async () => {
       try {
-        const freshUser = await db.getCurrentUser();
+        // 添加超时机制避免后台验证卡住
+        const freshUser = await Promise.race([
+          db.getCurrentUser(),
+          new Promise<null>((_, reject) => 
+            setTimeout(() => reject(new Error('Background validation timeout')), 2000)
+          )
+        ]);
+        
         if (freshUser && this.currentUser && freshUser.id === this.currentUser.id) {
           // Update user data if needed
           if (freshUser.balance !== this.currentUser.balance) {
@@ -456,7 +476,7 @@ class AuthService {
         console.warn('Background session validation failed:', error);
         // Don't clear user state on network errors
       }
-    }, 2000); // Wait 2 seconds before validating
+    }, 100); // 减少延时从2秒到100毫秒
   }
   
   // Logout - 修复路由跳转问题

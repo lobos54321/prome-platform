@@ -57,24 +57,67 @@ const App = () => {
       try {
         console.log('Starting application initialization...');
         
-        // 临时跳过所有检查以解决启动卡住问题
-        console.log('Skipping environment validation and database tests for now...');
-        console.log('Skipping auth initialization for now...');
-        
-        // 临时设置为null，避免调用可能卡住的服务
-        setCurrentUser(null);
-        
-        console.log('✅ Application initialized successfully');
+        // 为整个初始化过程添加超时保护
+        await Promise.race([
+          (async () => {
+            // Validate environment configuration
+            environmentValidator.logValidationResults();
+            
+            // Test database connection if not in test mode
+            const isTestMode = import.meta.env.VITE_TEST_MODE === 'true' ||
+                               import.meta.env.VITE_NON_ADMIN_TEST === 'true' ||
+                               import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
+            
+            if (!isTestMode) {
+              console.log('Testing database connection...');
+              try {
+                await databaseTester.testBasicConnection();
+              } catch (dbError) {
+                console.warn('Database connection test failed, continuing...', dbError);
+              }
+            }
+            
+            console.log('Starting auth initialization...');
+            try {
+              await authService.initializeAuth();
+              console.log('Auth initialization completed');
+            } catch (authError) {
+              console.warn('Auth initialization failed, continuing...', authError);
+            }
+            
+            // Get initial user state synchronously
+            const user = authService.getCurrentUserSync();
+            setCurrentUser(user);
+            
+            console.log('✅ Application initialized successfully');
+          })(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Application initialization timeout')), 10000)
+          )
+        ]);
       } catch (error) {
         console.error('Application initialization failed:', error);
-        // 不强制登出，可能只是网络问题
-        console.warn('Continuing app initialization despite auth error');
+        // 确保应用仍能启动，即使初始化失败
+        console.warn('Continuing app initialization despite errors');
+        setCurrentUser(null);
       } finally {
+        // 确保无论如何都标记为已初始化
         setIsInitialized(true);
       }
     };
 
-    initializeApp();
+    // 防止React严格模式的双重执行导致问题
+    let cancelled = false;
+    initializeApp().catch(error => {
+      if (!cancelled) {
+        console.error('Unhandled initialization error:', error);
+        setIsInitialized(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Listen for auth state changes
@@ -106,12 +149,30 @@ const App = () => {
 
 
 
+  // 启动超时检测
+  useEffect(() => {
+    const startupTimeout = setTimeout(() => {
+      if (!isInitialized) {
+        console.error('Application startup timeout detected - forcing initialization');
+        setIsInitialized(true);
+        setCurrentUser(null);
+      }
+    }, 15000); // 15秒超时
+
+    if (isInitialized) {
+      clearTimeout(startupTimeout);
+    }
+
+    return () => clearTimeout(startupTimeout);
+  }, [isInitialized]);
+
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">{t('common.loading')}</p>
+          <p className="text-gray-400 text-sm mt-2">初始化应用中...</p>
         </div>
       </div>
     );

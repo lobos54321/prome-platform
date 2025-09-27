@@ -270,10 +270,17 @@ export class DatabaseConnectionTester {
     }
 
     try {
-      const { data, error } = await supabase!.from('users').select('count').limit(1);
-      if (error) {
-        console.error('❌ Database connection failed:', error.message);
-        emitDatabaseError('连接测试', error);
+      // 添加超时机制避免连接测试卡住
+      const connectionTest = await Promise.race([
+        supabase!.from('users').select('count').limit(1),
+        new Promise<{ data: null; error: Error }>((_, reject) => 
+          setTimeout(() => reject(new Error('Database connection timeout')), 3000)
+        )
+      ]);
+
+      if (connectionTest.error) {
+        console.error('❌ Database connection failed:', connectionTest.error.message);
+        emitDatabaseError('连接测试', connectionTest.error);
         return false;
       }
       
