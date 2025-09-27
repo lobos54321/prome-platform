@@ -76,6 +76,86 @@ const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.DIFY_API_KEY |
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+// 仙宫云API配置
+const XIANGONG_API_KEY = process.env.VITE_XIANGONG_API_KEY || 'miv4n5hh6313imnijhgqpzqbb0at3xxlm2l24x7r';
+// ComfyUI集成了InfiniteTalk和IndexTTS2，运行在8188端口
+const XIANGONG_COMFYUI_URL = process.env.VITE_XIANGONG_COMFYUI_URL || 'https://3iaszw98tkh12h9x-8188.container.x-gpu.com';
+const XIANGONG_INFINITETALK_URL = XIANGONG_COMFYUI_URL;
+
+// 仙宫云实例使用跟踪
+let lastApiCallTime = null;
+let autoShutdownTimer = null;
+const IDLE_TIMEOUT_MINUTES = 20; // 20分钟闲置自动关机
+
+// 更新最后使用时间的函数
+function updateLastUsage() {
+  lastApiCallTime = new Date();
+  console.log(`📱 更新API使用时间: ${lastApiCallTime.toISOString()}`);
+  
+  // 重置自动关机定时器
+  resetAutoShutdownTimer();
+}
+
+// 重置自动关机定时器
+function resetAutoShutdownTimer() {
+  // 清除之前的定时器
+  if (autoShutdownTimer) {
+    clearTimeout(autoShutdownTimer);
+  }
+  
+  // 设置新的定时器：20分钟后自动关机
+  autoShutdownTimer = setTimeout(async () => {
+    try {
+      console.log(`⏰ ${IDLE_TIMEOUT_MINUTES}分钟无活动，开始自动关机...`);
+      
+      // 首先检查实例状态
+      const statusResponse = await fetch('http://localhost:8080/api/xiangong/instance/status');
+      if (statusResponse.ok) {
+        const statusResult = await statusResponse.json();
+        
+        if (statusResult.success && statusResult.data.status === 'running') {
+          console.log('🔄 实例正在运行，执行自动关机...');
+          
+          // 调用关机API
+          const shutdownResponse = await fetch('http://localhost:8080/api/xiangong/instance/stop', {
+            method: 'POST'
+          });
+          
+          if (shutdownResponse.ok) {
+            const shutdownResult = await shutdownResponse.json();
+            console.log('✅ 自动关机成功:', shutdownResult);
+          } else {
+            console.error('❌ 自动关机失败:', await shutdownResponse.text());
+          }
+        } else {
+          console.log(`ℹ️ 实例状态为 ${statusResult.data.status}，无需关机`);
+        }
+      } else {
+        console.error('❌ 无法获取实例状态，跳过自动关机');
+      }
+    } catch (error) {
+      console.error('❌ 自动关机过程出错:', error);
+    }
+  }, IDLE_TIMEOUT_MINUTES * 60 * 1000); // 转换为毫秒
+  
+  console.log(`⏱️ 自动关机定时器已设置：${IDLE_TIMEOUT_MINUTES}分钟后执行`);
+}
+
+// 检查闲置时间的函数
+function checkIdleTime() {
+  if (!lastApiCallTime) {
+    return;
+  }
+  
+  const now = new Date();
+  const idleMinutes = (now - lastApiCallTime) / (1000 * 60);
+  
+  console.log(`📊 当前闲置时间: ${idleMinutes.toFixed(1)} 分钟`);
+  
+  return idleMinutes;
+}
+const XIANGONG_INDEXTTS2_URL = XIANGONG_COMFYUI_URL;
+
 // Environment validation
 console.log('🚀 Starting Prome Platform server');
 const requiredVars = ['DIFY_API_URL', 'DIFY_API_KEY'];
@@ -5787,6 +5867,1172 @@ app.get('/api/voice/status/:voiceId', async (req, res) => {
   }
 });
 
+
+// 仙宫云实例管理API
+app.post('/api/xiangong/instance/start', async (req, res) => {
+  try {
+    console.log('🚀 启动仙宫云实例请求');
+    
+    const xiangongAPI = 'https://api.xiangongyun.com';
+    const instanceId = '3iaszw98tkh12h9x';
+    
+    // 使用官方文档的正确端点: /open/instance/boot
+    console.log('🔍 使用官方API端点: /open/instance/boot');
+    
+    const response = await fetch(`${xiangongAPI}/open/instance/boot`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      },
+      body: JSON.stringify({
+        id: instanceId,
+        gpu_count: 1  // 使用1个GPU
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ 实例启动命令发送成功');
+      console.log('📊 响应结果:', result);
+      
+      return res.json({
+        success: true,
+        message: '实例启动命令已发送，请等待实例启动',
+        data: result
+      });
+    }
+
+    const errorText = await response.text();
+    console.error('❌ 实例启动失败:', response.status, errorText);
+    
+    return res.status(response.status).json({ 
+      error: `实例启动失败: ${errorText}`,
+      statusCode: response.status
+    });
+    
+  } catch (error) {
+    console.error('启动实例错误:', error);
+    res.status(500).json({ 
+      error: error.message || '启动实例失败' 
+    });
+  }
+});
+
+app.post('/api/xiangong/instance/stop', async (req, res) => {
+  try {
+    console.log('⏸️ 停止仙宫云实例请求');
+    
+    const xiangongAPI = 'https://api.xiangongyun.com';
+    const instanceId = '3iaszw98tkh12h9x';
+    
+    const response = await fetch(`${xiangongAPI}/open/instance/shutdown`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      },
+      body: JSON.stringify({
+        id: instanceId
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('停止实例失败:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: `停止实例失败: ${errorText}` 
+      });
+    }
+
+    const result = await response.json();
+    console.log('✅ 实例停止成功:', result);
+
+    res.json({
+      success: true,
+      message: '实例停止成功',
+      data: result
+    });
+
+  } catch (error) {
+    console.error('停止实例失败:', error);
+    res.status(500).json({ 
+      error: error.message || '停止实例失败' 
+    });
+  }
+});
+
+// 获取自动关机状态API
+app.get('/api/xiangong/auto-shutdown/status', async (req, res) => {
+  try {
+    const now = new Date();
+    let idleMinutes = 0;
+    let remainingMinutes = IDLE_TIMEOUT_MINUTES;
+    
+    if (lastApiCallTime) {
+      idleMinutes = (now - lastApiCallTime) / (1000 * 60);
+      remainingMinutes = Math.max(0, IDLE_TIMEOUT_MINUTES - idleMinutes);
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        autoShutdownEnabled: true,
+        timeoutMinutes: IDLE_TIMEOUT_MINUTES,
+        lastApiCall: lastApiCallTime,
+        currentIdleMinutes: parseFloat(idleMinutes.toFixed(1)),
+        remainingMinutes: parseFloat(remainingMinutes.toFixed(1)),
+        willShutdownAt: lastApiCallTime ? new Date(lastApiCallTime.getTime() + IDLE_TIMEOUT_MINUTES * 60 * 1000) : null
+      }
+    });
+  } catch (error) {
+    console.error('获取自动关机状态失败:', error);
+    res.status(500).json({ 
+      error: error.message || '获取自动关机状态失败' 
+    });
+  }
+});
+
+app.get('/api/xiangong/instance/status', async (req, res) => {
+  try {
+    console.log('🔍 获取仙宫云实例状态');
+    
+    const xiangongAPI = 'https://api.xiangongyun.com';
+    const instanceId = '3iaszw98tkh12h9x';
+    
+    // 使用单个实例API获取状态
+    const response = await fetch(`${xiangongAPI}/open/instance/${instanceId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('获取实例状态失败:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: `获取实例状态失败: ${errorText}` 
+      });
+    }
+
+    const instance = await response.json();
+    console.log('✅ 获取实例状态成功');
+    console.log('📊 实例信息:', instance);
+    
+    if (!instance || !instance.data) {
+      return res.status(404).json({ error: '实例不存在或数据格式错误' });
+    }
+    
+    const instanceData = instance.data;
+    console.log(`实例状态: ${instanceData.status}`);
+
+    res.json({
+      success: true,
+      message: '获取实例状态成功',
+      data: {
+        status: instanceData.status,
+        id: instanceData.id,
+        name: instanceData.name,
+        gpu_model: instanceData.gpu_model,
+        start_timestamp: instanceData.start_timestamp,
+        stop_timestamp: instanceData.stop_timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error('获取实例状态失败:', error);
+    res.status(500).json({ 
+      error: error.message || '获取实例状态失败' 
+    });
+  }
+});
+
+// 数字人视频上传和特征提取API
+app.post('/api/xiangong/upload-training-video', async (req, res) => {
+  try {
+    // 跟踪API使用情况，重置自动关机定时器
+    updateLastUsage();
+    
+    // 使用已经配置好的videoUpload中间件
+    const upload = multer({ 
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 100 * 1024 * 1024 }, // 100MB限制
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('video/')) {
+          cb(null, true);
+        } else {
+          cb(new Error('只支持视频文件'));
+        }
+      }
+    }).single('video');
+
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ 
+          success: false, 
+          error: err.message 
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '未找到视频文件' 
+        });
+      }
+
+      const { userId } = req.body;
+      const videoFilename = `training_video_${userId}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
+
+      console.log('📹 接收训练视频:', {
+        filename: req.file.originalname,
+        size: req.file.size,
+        userId
+      });
+
+      // 上传到ComfyUI
+      const formData = new FormData();
+      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      formData.append('image', blob, videoFilename);
+
+      const uploadResponse = await fetch(`${XIANGONG_COMFYUI_URL}/upload/image`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`ComfyUI上传失败: ${uploadResponse.status}`);
+      }
+
+      const uploadResult = await uploadResponse.json();
+      
+      // 保存用户数字人信息到数据库
+      if (supabase) {
+        const { error } = await supabase
+          .from('digital_human_profiles')
+          .upsert({
+            user_id: userId,
+            training_video_filename: uploadResult.name,
+            training_video_path: uploadResult.subfolder || '',
+            status: 'uploaded',
+            created_at: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('数据库保存失败:', error);
+        }
+      }
+
+      // 保存数字人档案到数据库，不强制生成预览
+      console.log('📁 保存数字人档案到数据库...');
+      
+      res.json({
+        success: true,
+        message: '数字人训练视频上传成功',
+        profileId: userId,
+        videoInfo: {
+          filename: uploadResult.name,
+          subfolder: uploadResult.subfolder || '',
+          size: req.file.size
+        },
+        note: '数字人档案已创建，可以开始生成个性化视频。预览功能依赖于ComfyUI服务状态。'
+      });
+    });
+
+  } catch (error) {
+    console.error('视频上传失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 可选的数字人预览生成API
+app.post('/api/xiangong/generate-preview', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    console.log('🎭 开始生成数字人预览...');
+    
+    // 获取用户档案
+    let userProfile = null;
+    if (supabase && userId) {
+      const { data, error } = await supabase
+        .from('digital_human_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      if (error || !data) {
+        return res.status(404).json({
+          success: false,
+          error: '用户数字人档案不存在'
+        });
+      }
+      
+      userProfile = data;
+    }
+    
+    if (!userProfile?.training_video_filename) {
+      return res.status(400).json({
+        success: false,
+        error: '用户尚未上传训练视频'
+      });
+    }
+
+    // 尝试生成预览
+    const workflowData = {
+      prompt: {
+        "1": {
+          "inputs": {
+            "text": "您好，我是您的专属数字人。",
+            "speaker_audio": userProfile.training_video_filename,
+            "output_filename": `preview_${userId}_${Date.now()}`
+          },
+          "class_type": "IndexTTS2_Basic"
+        },
+        "2": {
+          "inputs": {
+            "audio": ["1", 0],
+            "reference_video": userProfile.training_video_filename,
+            "text": "您好，我是您的专属数字人。",
+            "emotion": "neutral"
+          },
+          "class_type": "InfiniteTalk"
+        }
+      }
+    };
+
+    const workflowResponse = await fetch(`${XIANGONG_COMFYUI_URL}/prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workflowData)
+    });
+
+    if (!workflowResponse.ok) {
+      throw new Error(`ComfyUI请求失败: ${workflowResponse.status}`);
+    }
+
+    const workflowResult = await workflowResponse.json();
+    
+    res.json({
+      success: true,
+      message: '预览生成任务已提交',
+      taskId: workflowResult.prompt_id,
+      note: '预览生成需要1-3分钟，请稍后查看结果'
+    });
+
+  } catch (error) {
+    console.error('预览生成失败:', error);
+    res.status(500).json({
+      success: false,
+      error: `预览生成失败: ${error.message}`,
+      note: 'ComfyUI服务可能不可用，但不影响正常的视频生成功能'
+    });
+  }
+});
+
+// 仙宫云 InfiniteTalk 个性化数字人视频生成API (智能启动)
+// 存储进行中的任务状态
+const activeInfiniteTalkTasks = new Map();
+
+app.post('/api/xiangong/infinitetalk', async (req, res) => {
+  try {
+    const { text, avatar, voice, emotion, background, userId } = req.body;
+
+    // 跟踪API使用情况，重置自动关机定时器
+    updateLastUsage();
+
+    console.log('🎬 仙宫云InfiniteTalk请求:', { 
+      textLength: text?.length, 
+      avatar, 
+      voice, 
+      emotion, 
+      background,
+      userId 
+    });
+
+    if (!text) {
+      return res.status(400).json({ error: '文本内容不能为空' });
+    }
+
+    // 首先确保实例正在运行
+    console.log('🔄 检查实例状态...');
+    const statusResponse = await fetch('http://localhost:8080/api/xiangong/instance/status');
+    
+    let needsStart = true;
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      if (statusData.success && statusData.data.status === 'running') {
+        needsStart = false;
+        console.log('✅ 实例已运行');
+      }
+    }
+
+    if (needsStart) {
+      console.log('🚀 自动启动实例...');
+      const startResponse = await fetch('http://localhost:8080/api/xiangong/instance/start', {
+        method: 'POST'
+      });
+      
+      if (!startResponse.ok) {
+        throw new Error('无法启动实例');
+      }
+      
+      // 等待实例启动
+      console.log('⏳ 等待实例启动...');
+      await new Promise(resolve => setTimeout(resolve, 30000)); // 等待30秒
+    }
+
+    if (!XIANGONG_COMFYUI_URL) {
+      return res.status(500).json({ error: '仙宫云ComfyUI服务地址未配置' });
+    }
+
+    // 生成唯一客户端ID和任务ID
+    const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const taskId = `infinitetalk_${Date.now()}`;
+    
+    console.log('🎬 准备InfiniteTalk工作流...');
+    
+    // 首先获取用户的数字人配置文件
+    let userProfile = null;
+    if (supabase && userId) {
+      try {
+        const { data, error } = await supabase
+          .from('digital_human_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+        
+        if (!error && data) {
+          userProfile = data;
+          console.log('✅ 找到用户数字人配置:', userProfile.training_video_filename);
+        }
+      } catch (dbError) {
+        console.log('⚠️ 用户数字人配置查询失败:', dbError.message);
+      }
+    }
+
+    // 创建个性化数字人工作流
+    const workflowData = {
+      prompt: {
+        // IndexTTS2 声音克隆节点
+        "1": {
+          "inputs": {
+            "text": text,
+            "speaker_audio": userProfile?.training_video_filename || "唐曾的声音.WAV", // 使用用户训练视频或默认音频
+            "output_filename": `tts_${userId}_${Date.now()}`
+          },
+          "class_type": "IndexTTS2_Basic",
+          "_meta": {
+            "title": "个性化语音合成"
+          }
+        },
+        // InfiniteTalk 数字人生成节点 (待配置)
+        "2": {
+          "inputs": {
+            "audio": ["1", 0], // 从TTS获取音频
+            "reference_video": userProfile?.training_video_filename || "example.png", // 用户训练视频
+            "text": text,
+            "emotion": emotion || "neutral"
+          },
+          "class_type": "InfiniteTalk", // 这个可能需要调整为实际的节点名
+          "_meta": {
+            "title": "个性化数字人生成"
+          }
+        }
+      },
+      client_id: clientId
+    };
+    
+    console.log('🚀 提交ComfyUI工作流...');
+    const response = await fetch(`${XIANGONG_COMFYUI_URL}/prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(workflowData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('ComfyUI API错误:', response.status, errorText);
+      
+      // 智能错误分析和临时解决方案
+      let errorAnalysis = '工作流提交失败';
+      let suggestions = [];
+      
+      if (errorText.includes('IndexTTS2')) {
+        errorAnalysis = 'IndexTTS2节点配置问题';
+        suggestions.push('检查IndexTTS2模型是否正确加载');
+      } else if (errorText.includes('InfiniteTalk')) {
+        errorAnalysis = 'InfiniteTalk节点配置问题';
+        suggestions.push('检查InfiniteTalk模型是否正确加载');
+      }
+      
+      console.log('🔗 提供ComfyUI直接访问方案');
+      return res.json({
+        success: false,
+        error: errorAnalysis,
+        message: '数字人API集成正在优化中，请使用直接访问方案',
+        temporarySolution: {
+          comfyuiUrl: `${XIANGONG_COMFYUI_URL}`,
+          instructions: [
+            '1. 点击上方链接访问ComfyUI界面',
+            '2. 加载 "InfiniteTalk数字人-indexTTS驱动" 工作流',
+            '3. 在文本输入节点中输入下方内容',
+            '4. 点击Queue Prompt开始生成',
+            '5. 生成完成后查看输出文件夹中的视频'
+          ],
+          inputText: text,
+          debug: {
+            apiError: errorText.substring(0, 500),
+            suggestions,
+            clientId,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    }
+
+    const result = await response.json();
+    const promptId = result.prompt_id;
+    
+    console.log('✅ ComfyUI工作流提交成功:', { promptId, clientId });
+
+    // 存储任务状态
+    activeInfiniteTalkTasks.set(promptId, {
+      taskId,
+      promptId,
+      clientId,
+      userId,
+      text,
+      status: 'submitted',
+      createdAt: new Date(),
+      progress: 0
+    });
+
+    // 启动WebSocket监控（异步）
+    startInfiniteTalkMonitoring(promptId, clientId, userId).catch(error => {
+      console.error('WebSocket监控启动失败:', error);
+    });
+
+    res.json({
+      success: true,
+      taskId: promptId,
+      message: '数字人视频生成任务已提交',
+      estimatedTime: '3-5分钟',
+      comfyuiUrl: `${XIANGONG_COMFYUI_URL}`,
+      debug: {
+        promptId,
+        clientId
+      }
+    });
+
+  } catch (error) {
+    console.error('InfiniteTalk生成失败:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message || '数字人视频生成失败' 
+    });
+  }
+});
+
+// WebSocket监控InfiniteTalk任务进度
+async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
+  try {
+    console.log(`🔗 启动WebSocket监控: ${promptId}`);
+    
+    const WebSocket = require('ws');
+    const wsUrl = XIANGONG_COMFYUI_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws';
+    
+    const ws = new WebSocket(`${wsUrl}?clientId=${clientId}`);
+    let heartbeatInterval;
+
+    ws.on('open', () => {
+      console.log(`✅ WebSocket连接成功: ${promptId}`);
+      
+      // 发送心跳包
+      heartbeatInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.ping();
+        }
+      }, 30000);
+      
+      // 更新任务状态
+      const task = activeInfiniteTalkTasks.get(promptId);
+      if (task) {
+        task.status = 'processing';
+        task.wsConnected = true;
+      }
+    });
+
+    ws.on('message', async (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log(`📨 ComfyUI消息 [${promptId}]:`, message.type);
+
+        const task = activeInfiniteTalkTasks.get(promptId);
+        if (!task) return;
+
+        if (message.type === 'progress' && message.data.prompt_id === promptId) {
+          const progress = Math.round((message.data.value / message.data.max) * 100);
+          console.log(`⏳ 进度更新: ${progress}% (${message.data.value}/${message.data.max})`);
+          
+          task.progress = progress;
+          task.status = 'processing';
+          task.lastUpdate = new Date();
+        }
+
+        if (message.type === 'executing' && message.data.prompt_id === promptId) {
+          if (message.data.node === null) {
+            console.log('✅ 工作流执行完成，获取结果...');
+            
+            try {
+              // 获取并处理结果
+              const results = await getInfiniteTalkResults(promptId);
+              await processInfiniteTalkResults(promptId, results, userId);
+              
+            } catch (error) {
+              console.error('结果处理失败:', error);
+              task.status = 'failed';
+              task.error = error.message;
+            }
+            
+            ws.close();
+          }
+        }
+
+        if (message.type === 'execution_error' && message.data.prompt_id === promptId) {
+          console.error('❌ 执行错误:', message.data);
+          task.status = 'failed';
+          task.error = message.data.exception_message || '执行失败';
+          ws.close();
+        }
+
+      } catch (error) {
+        console.error('WebSocket消息处理错误:', error);
+      }
+    });
+
+    ws.on('error', (error) => {
+      console.error(`❌ WebSocket错误 [${promptId}]:`, error.message);
+      const task = activeInfiniteTalkTasks.get(promptId);
+      if (task) {
+        task.wsError = error.message;
+      }
+    });
+
+    ws.on('close', () => {
+      console.log(`🔌 WebSocket连接关闭: ${promptId}`);
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      
+      const task = activeInfiniteTalkTasks.get(promptId);
+      if (task) {
+        task.wsConnected = false;
+      }
+    });
+
+    // 30分钟超时保护
+    setTimeout(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        console.log(`⏰ WebSocket超时关闭: ${promptId}`);
+        ws.close();
+        
+        const task = activeInfiniteTalkTasks.get(promptId);
+        if (task && task.status !== 'completed') {
+          task.status = 'timeout';
+          task.error = '任务执行超时';
+        }
+      }
+    }, 30 * 60 * 1000); // 30分钟
+
+  } catch (error) {
+    console.error('WebSocket监控启动失败:', error);
+    const task = activeInfiniteTalkTasks.get(promptId);
+    if (task) {
+      task.status = 'failed';
+      task.error = 'WebSocket监控失败: ' + error.message;
+    }
+  }
+}
+
+// 获取InfiniteTalk任务结果
+async function getInfiniteTalkResults(promptId) {
+  console.log(`🔍 获取任务结果: ${promptId}`);
+  
+  const historyResponse = await fetch(`${XIANGONG_COMFYUI_URL}/history/${promptId}`);
+  if (!historyResponse.ok) {
+    throw new Error(`无法获取任务历史: ${historyResponse.status}`);
+  }
+  
+  const history = await historyResponse.json();
+  const promptHistory = history[promptId];
+  
+  if (!promptHistory || !promptHistory.outputs) {
+    throw new Error('任务历史中未找到输出结果');
+  }
+
+  const outputs = promptHistory.outputs;
+  const results = [];
+
+  // 遍历所有输出节点，查找视频和图像文件
+  Object.keys(outputs).forEach(nodeId => {
+    const nodeOutputs = outputs[nodeId];
+    
+    // 查找视频输出
+    if (nodeOutputs.gifs) { // ComfyUI视频通常保存为gif
+      nodeOutputs.gifs.forEach(gif => {
+        results.push({
+          type: 'video',
+          filename: gif.filename,
+          subfolder: gif.subfolder || '',
+          type_folder: gif.type || 'output',
+          nodeId: nodeId
+        });
+      });
+    }
+    
+    if (nodeOutputs.videos) {
+      nodeOutputs.videos.forEach(video => {
+        results.push({
+          type: 'video',
+          filename: video.filename,
+          subfolder: video.subfolder || '',
+          type_folder: video.type || 'output',
+          nodeId: nodeId
+        });
+      });
+    }
+    
+    // 查找图像序列
+    if (nodeOutputs.images) {
+      nodeOutputs.images.forEach(image => {
+        results.push({
+          type: 'image',
+          filename: image.filename,
+          subfolder: image.subfolder || '',
+          type_folder: image.type || 'output',
+          nodeId: nodeId
+        });
+      });
+    }
+  });
+
+  console.log(`✅ 找到 ${results.length} 个输出文件`);
+  return results;
+}
+
+// 处理InfiniteTalk结果
+async function processInfiniteTalkResults(promptId, results, userId) {
+  try {
+    const task = activeInfiniteTalkTasks.get(promptId);
+    if (!task) {
+      throw new Error('任务状态未找到');
+    }
+
+    console.log(`🎬 处理视频结果: ${results.length} 个文件`);
+    
+    let finalVideoUrl = null;
+    const processedFiles = [];
+
+    for (const result of results) {
+      if (result.type === 'video') {
+        // 构建下载URL
+        const downloadUrl = `${XIANGONG_COMFYUI_URL}/view?filename=${encodeURIComponent(result.filename)}&subfolder=${encodeURIComponent(result.subfolder)}&type=${result.type_folder}`;
+        
+        console.log('📥 下载视频文件:', result.filename);
+        const videoResponse = await fetch(downloadUrl);
+        
+        if (!videoResponse.ok) {
+          console.error('视频下载失败:', downloadUrl);
+          continue;
+        }
+
+        const videoBuffer = await videoResponse.arrayBuffer();
+        
+        // 生成唯一文件名
+        const videoFilename = `infinitetalk_${promptId}_${Date.now()}.${result.filename.split('.').pop()}`;
+        
+        // 上传到Supabase存储
+        if (supabase) {
+          console.log('☁️ 上传视频到Supabase...');
+          const { data, error } = await supabase.storage
+            .from('digital-human-videos')
+            .upload(videoFilename, videoBuffer, {
+              contentType: result.filename.endsWith('.mp4') ? 'video/mp4' : 'image/gif'
+            });
+
+          if (error) {
+            console.error('Supabase上传失败:', error);
+            continue;
+          }
+
+          // 获取公共URL
+          const { data: urlData } = supabase.storage
+            .from('digital-human-videos')
+            .getPublicUrl(videoFilename);
+
+          finalVideoUrl = urlData.publicUrl;
+          console.log('✅ 视频上传成功:', finalVideoUrl);
+        } else {
+          // 如果没有Supabase，使用ComfyUI直接链接
+          finalVideoUrl = downloadUrl;
+          console.log('⚠️ 使用ComfyUI直接链接:', finalVideoUrl);
+        }
+
+        processedFiles.push({
+          type: 'video',
+          url: finalVideoUrl,
+          filename: result.filename,
+          size: videoBuffer.byteLength
+        });
+        
+        break; // 只处理第一个视频文件
+      }
+    }
+
+    // 更新任务状态
+    task.status = 'completed';
+    task.completedAt = new Date();
+    task.results = processedFiles;
+    task.videoUrl = finalVideoUrl;
+    task.progress = 100;
+
+    // 保存到数据库
+    if (supabase && userId) {
+      try {
+        const { error } = await supabase
+          .from('digital_human_videos')
+          .insert({
+            task_id: promptId,
+            user_id: userId,
+            text_content: task.text,
+            video_url: finalVideoUrl,
+            status: 'completed',
+            created_at: task.createdAt.toISOString(),
+            completed_at: new Date().toISOString(),
+            metadata: {
+              promptId,
+              clientId: task.clientId,
+              results: processedFiles
+            }
+          });
+
+        if (error) {
+          console.error('数据库保存失败:', error);
+        } else {
+          console.log('✅ 结果已保存到数据库');
+        }
+      } catch (dbError) {
+        console.error('数据库操作异常:', dbError);
+      }
+    }
+
+    console.log(`🎉 任务完成: ${promptId} -> ${finalVideoUrl}`);
+
+  } catch (error) {
+    console.error('结果处理失败:', error);
+    const task = activeInfiniteTalkTasks.get(promptId);
+    if (task) {
+      task.status = 'failed';
+      task.error = error.message;
+    }
+    throw error;
+  }
+}
+
+// 上传文件到ComfyUI
+app.post('/api/xiangong/comfyui/upload', async (req, res) => {
+  try {
+    const multer = require('multer');
+    const fs = require('fs');
+    const path = require('path');
+    
+    // 配置multer用于处理文件上传
+    const storage = multer.memoryStorage();
+    const upload = multer({ storage }).single('file');
+    
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ error: '文件上传失败: ' + err.message });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ error: '未找到上传文件' });
+      }
+      
+      console.log('📁 上传文件到ComfyUI:', req.file.originalname);
+      
+      // 准备上传到ComfyUI
+      const formData = new FormData();
+      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      formData.append('image', blob, req.file.originalname);
+      
+      const uploadResponse = await fetch(`${XIANGONG_COMFYUI_URL}/upload/image`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`ComfyUI上传失败: ${uploadResponse.status}`);
+      }
+      
+      const result = await uploadResponse.json();
+      console.log('✅ 文件上传成功:', result);
+      
+      res.json({
+        success: true,
+        filename: result.name,
+        subfolder: result.subfolder || '',
+        type: result.type || 'input',
+        message: '文件上传成功'
+      });
+    });
+    
+  } catch (error) {
+    console.error('文件上传失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 查询ComfyUI可用节点类型
+app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
+  try {
+    console.log('🔍 查询ComfyUI节点类型...');
+    
+    const response = await fetch(`${XIANGONG_COMFYUI_URL}/object_info`);
+    if (!response.ok) {
+      throw new Error(`无法获取节点信息: ${response.status}`);
+    }
+    
+    const nodeInfo = await response.json();
+    
+    // 查找TTS和数字人相关节点
+    const ttsNodes = [];
+    const digitalHumanNodes = [];
+    const textInputNodes = [];
+    const videoOutputNodes = [];
+    
+    Object.keys(nodeInfo).forEach(nodeType => {
+      const info = nodeInfo[nodeType];
+      const lowerType = nodeType.toLowerCase();
+      
+      if (lowerType.includes('tts') || lowerType.includes('speech') || lowerType.includes('audio')) {
+        ttsNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+      
+      if (lowerType.includes('infinitetalk') || lowerType.includes('digital') || lowerType.includes('avatar')) {
+        digitalHumanNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+      
+      if (lowerType.includes('text') && info.input?.required?.text) {
+        textInputNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+      
+      if (lowerType.includes('video') || lowerType.includes('save') || lowerType.includes('output')) {
+        videoOutputNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+    });
+    
+    console.log(`✅ 找到节点: ${ttsNodes.length}个TTS, ${digitalHumanNodes.length}个数字人, ${textInputNodes.length}个文本输入`);
+    
+    res.json({
+      success: true,
+      data: {
+        ttsNodes,
+        digitalHumanNodes,
+        textInputNodes,
+        videoOutputNodes,
+        totalNodes: Object.keys(nodeInfo).length
+      },
+      recommendations: {
+        preferredTTS: ttsNodes.length > 0 ? ttsNodes[0].type : null,
+        preferredDigitalHuman: digitalHumanNodes.length > 0 ? digitalHumanNodes[0].type : null,
+        preferredTextInput: textInputNodes.length > 0 ? textInputNodes[0].type : null
+      }
+    });
+    
+  } catch (error) {
+    console.error('节点查询失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 任务状态查询API
+app.get('/api/task/status/:taskId', (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const task = activeInfiniteTalkTasks.get(taskId);
+    
+    if (!task) {
+      return res.status(404).json({
+        status: 'not_found',
+        error: '任务未找到'
+      });
+    }
+
+    res.json({
+      status: task.status,
+      progress: task.progress || 0,
+      videoUrl: task.videoUrl,
+      error: task.error,
+      createdAt: task.createdAt,
+      completedAt: task.completedAt,
+      estimatedTimeRemaining: task.status === 'processing' ? '2-4分钟' : null,
+      debug: {
+        promptId: task.promptId,
+        clientId: task.clientId,
+        wsConnected: task.wsConnected,
+        lastUpdate: task.lastUpdate
+      }
+    });
+    
+  } catch (error) {
+    console.error('状态查询失败:', error);
+    res.status(500).json({
+      status: 'error',
+      error: error.message
+    });
+  }
+});
+
+// 清理完成的任务（每小时运行）
+setInterval(() => {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - 2 * 60 * 60 * 1000); // 2小时前
+  
+  let cleaned = 0;
+  for (const [taskId, task] of activeInfiniteTalkTasks.entries()) {
+    if (task.createdAt < cutoff && (task.status === 'completed' || task.status === 'failed')) {
+      activeInfiniteTalkTasks.delete(taskId);
+      cleaned++;
+    }
+  }
+  
+  if (cleaned > 0) {
+    console.log(`🧹 清理了 ${cleaned} 个已完成的任务`);
+  }
+}, 60 * 60 * 1000); // 每小时执行
+
+// 仙宫云 IndexTTS2 语音合成API
+app.post('/api/xiangong/indextts2', async (req, res) => {
+  try {
+    const { text, speaker_id, language, speed, pitch } = req.body;
+
+    console.log('🔊 仙宫云IndexTTS2请求:', { 
+      textLength: text?.length, 
+      speaker_id, 
+      language, 
+      speed, 
+      pitch 
+    });
+
+    if (!text) {
+      return res.status(400).json({ error: '文本内容不能为空' });
+    }
+
+    if (!XIANGONG_INDEXTTS2_URL) {
+      return res.status(500).json({ error: '仙宫云IndexTTS2服务地址未配置' });
+    }
+
+    // 调用仙宫云API
+    const response = await fetch(`${XIANGONG_INDEXTTS2_URL}/api/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      },
+      body: JSON.stringify({
+        text,
+        speaker_id: speaker_id || 0,
+        language: language || 'zh-CN',
+        speed: speed || 1.0,
+        pitch: pitch || 0.0
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('仙宫云IndexTTS2错误:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: `仙宫云API调用失败: ${errorText}` 
+      });
+    }
+
+    const result = await response.json();
+    console.log('✅ IndexTTS2合成成功:', result);
+
+    res.json({
+      success: true,
+      audioUrl: result.audio_url,
+      audioBase64: result.audio_data,
+      message: '语音合成成功'
+    });
+
+  } catch (error) {
+    console.error('IndexTTS2合成失败:', error);
+    res.status(500).json({ 
+      error: error.message || '语音合成失败' 
+    });
+  }
+});
+
+// 仙宫云服务健康检查
+app.get('/api/xiangong/health', async (req, res) => {
+  try {
+    if (!XIANGONG_INFINITETALK_URL || !XIANGONG_INDEXTTS2_URL) {
+      return res.json({ healthy: false, error: '服务地址未配置' });
+    }
+
+    // 检查InfiniteTalk服务
+    const response = await fetch(`${XIANGONG_INFINITETALK_URL}/health`, {
+      headers: { 'Authorization': `Bearer ${XIANGONG_API_KEY}` }
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      res.json({ 
+        healthy: true, 
+        services: result.available_services || ['infinitetalk', 'indextts2'] 
+      });
+    } else {
+      res.json({ healthy: false, error: `服务不可用 (${response.status})` });
+    }
+  } catch (error) {
+    res.json({ healthy: false, error: error.message });
+  }
+});
 
 // A2E Digital Human Video Generation API
 app.post('/api/digital-human/generate', async (req, res) => {

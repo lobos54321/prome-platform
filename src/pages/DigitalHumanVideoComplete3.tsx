@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { xiangongAPI } from '../lib/xiangongyun-api';
 
 interface TrainingData {
   name: string;
@@ -21,6 +22,7 @@ interface VideoGenerationStatus {
   message: string;
   videoUrl?: string;
   generationId?: string;
+  manualSteps?: string[];
 }
 
 interface DigitalHuman {
@@ -500,56 +502,60 @@ export default function DigitalHumanVideoComplete3() {
         message: '正在克隆声音...'
       });
 
-      // 2. 先进行声音克隆
-      const voiceName = `${trainingData.name}_voice_${Date.now()}`;
-      const voiceCloneResponse = await fetch('/api/voice/clone', {
+      // 2. 使用 Xiangong Cloud 上传训练视频
+      console.log('🎭 使用仙宫云上传训练视频...');
+      const xiangongTrainingResponse = await fetch('/api/xiangong/upload-training-video', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           userId: currentUserId,
-          name: voiceName,
-          voiceUrls: [videoUrl],
-          gender: trainingData.gender || 'male',
-          denoise: true,
-          enhanceVoiceSimilarity: true,
-          model: 'minimax',
+          profileName: trainingData.name,
+          videoUrl: videoUrl,
+          tempVideoFileName: videoUrl.split('/').pop(),
+          gender: trainingData.gender,
           language: trainingData.language
         })
       });
 
-      if (!voiceCloneResponse.ok) {
-        const voiceError = await voiceCloneResponse.json().catch(() => ({}));
-        console.error('❌ Voice cloning failed:', voiceError);
-        throw new Error(voiceError.error || '声音克隆失败');
+      if (!xiangongTrainingResponse.ok) {
+        const xiangongError = await xiangongTrainingResponse.json().catch(() => ({}));
+        console.error('❌ Xiangong training upload failed:', xiangongError);
+        throw new Error(xiangongError.error || '仙宫云训练视频上传失败');
       }
 
-      const voiceResult = await voiceCloneResponse.json();
-      console.log('✅ Voice cloning initiated:', voiceResult);
+      const xiangongResult = await xiangongTrainingResponse.json();
+      console.log('✅ Xiangong training video uploaded:', xiangongResult);
       
-      // 获取声音克隆ID
-      const voiceId = voiceResult.a2eResponse?.data?._id || voiceResult.voiceId;
-      if (!voiceId) {
-        throw new Error('未获取到声音克隆ID');
-      }
-
       setTrainingStatus({
         status: 'training',
         progress: 40,
-        message: '等待声音克隆完成...'
+        message: '数字人特征提取中...'
       });
 
-      // 3. 等待声音克隆完成
-      await waitForVoiceCloning(voiceId);
+      // 如果返回了预览URL，显示预览
+      if (xiangongResult.preview?.url) {
+        console.log('🎭 数字人预览已生成:', xiangongResult.preview.url);
+        // 可以在这里添加预览显示逻辑
+      }
+
+      // 3. 等待特征提取完成（模拟过程）
+      setTimeout(() => {
+        setTrainingStatus({
+          status: 'training',
+          progress: 60,
+          message: '仙宫云数字人克隆中...'
+        });
+      }, 2000);
       
       setTrainingStatus({
         status: 'training',
         progress: 60,
-        message: '正在训练数字人...'
+        message: '仙宫云数字人克隆中...'
       });
 
-      // 4. 使用克隆的声音ID调用A2E训练API
+      // 4. 模拟训练完成（实际上仙宫云会通过ComfyUI异步处理）
       const trainingPayload = {
         userId: currentUserId,
         name: trainingData.name,
@@ -557,11 +563,12 @@ export default function DigitalHumanVideoComplete3() {
         language: trainingData.language,
         videoUrl: videoUrl,
         tempVideoFileName: videoUrl.split('/').pop(),
-        voiceId: voiceId // 使用已验证完成的声音克隆ID
+        profileId: xiangongResult.profileId // 使用仙宫云返回的profileId
       };
 
-      console.log('🚀 Sending training request:', trainingPayload);
+      console.log('🚀 Sending Xiangong training request:', trainingPayload);
       
+      // 这里可以调用一个简化的训练API，主要是保存训练记录
       const response = await fetch('/api/digital-human/train', {
         method: 'POST',
         headers: {
@@ -772,7 +779,7 @@ export default function DigitalHumanVideoComplete3() {
       });
 
       // 模拟生成过程的进度更新
-      await simulateVideoGeneration();
+      await generateDigitalHumanVideo();
 
     } catch (error) {
       console.error('视频生成失败:', error);
@@ -784,38 +791,176 @@ export default function DigitalHumanVideoComplete3() {
     }
   };
 
-  // 模拟视频生成过程
-  const simulateVideoGeneration = async () => {
-    const steps = [
-      { progress: 20, message: '正在分析文案内容...' },
-      { progress: 35, message: '正在加载数字人模型...' },
-      { progress: 50, message: '正在合成语音...' },
-      { progress: 65, message: '正在生成面部动画...' },
-      { progress: 80, message: '正在渲染视频...' },
-      { progress: 95, message: '正在优化输出质量...' }
-    ];
+  // 使用仙宫云InfiniteTalk生成数字人视频
+  const generateDigitalHumanVideo = async () => {
+    setVideoGeneration({
+      status: 'generating',
+      progress: 10,
+      message: '正在连接仙宫云服务...'
+    });
 
-    for (const step of steps) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // 首先检查服务健康状态
+      const healthCheck = await xiangongAPI.healthCheck();
+      if (!healthCheck.healthy) {
+        throw new Error('仙宫云服务暂时不可用，请稍后重试');
+      }
+
       setVideoGeneration({
         status: 'generating',
-        progress: step.progress,
-        message: step.message
+        progress: 20,
+        message: '正在分析文案内容...'
       });
-    }
 
-    // 模拟最终完成
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // 生成模拟视频URL（实际项目中这里会是真实的视频URL）
-    const mockVideoUrl = `https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4`;
-    
-    setVideoGeneration({
-      status: 'completed',
-      progress: 100,
-      message: '视频生成完成！',
-      videoUrl: mockVideoUrl
-    });
+      // 获取当前选中的数字人配置
+      const selectedDigitalHumanData = digitalHumans.find(dh => dh.trainingId === selectedDigitalHuman);
+      
+      // 准备API参数
+      const apiParams = {
+        text: videoScript || copywritingContent,
+        avatar: selectedDigitalHumanData?.name || 'default',
+        voice: 'default', // 使用用户训练的声音
+        emotion: videoOptions.emotion || 'professional',
+        background: '#4F46E5'
+      };
+
+      console.log('🎬 生成数字人视频参数:', apiParams);
+
+      setVideoGeneration({
+        status: 'generating',
+        progress: 30,
+        message: '正在启动数字人服务...'
+      });
+
+      // 调用仙宫云InfiniteTalk API
+      const result = await xiangongAPI.generateDigitalHumanVideo(apiParams);
+
+      console.log('🎭 仙宫云API返回结果:', result);
+
+      if (result.success) {
+        setVideoGeneration({
+          status: 'generating',
+          progress: 50,
+          message: '正在生成数字人视频...'
+        });
+
+        // 如果有taskId，进行轮询检查状态
+        if (result.taskId && !result.videoUrl) {
+          await pollVideoGenerationStatus(result.taskId);
+        } else if (result.videoUrl) {
+          // 直接返回了视频URL
+          setVideoGeneration({
+            status: 'completed',
+            progress: 100,
+            message: '视频生成完成！',
+            videoUrl: result.videoUrl
+          });
+        }
+      } else if (result.temporarySolution) {
+        // 处理临时解决方案 - 显示ComfyUI操作指引
+        setVideoGeneration({
+          status: 'error',
+          progress: 0,
+          message: `需要手动操作ComfyUI: ${result.message}`,
+          generationId: result.comfyuiUrl // 将ComfyUI URL存储在这里以便显示
+        });
+        
+        // 可以在这里显示详细的操作指引
+        console.log('🔗 ComfyUI操作指引:', {
+          url: result.comfyuiUrl,
+          instructions: result.instructions
+        });
+      } else {
+        throw new Error(result.message || '视频生成失败');
+      }
+
+    } catch (error) {
+      console.error('数字人视频生成失败:', error);
+      
+      // 检查是否是实例启动相关的错误
+      const errorMessage = error instanceof Error ? error.message : '视频生成失败，请重试';
+      
+      if (errorMessage.includes('仙宫云不支持API启动实例') || errorMessage.includes('需要手动启动实例')) {
+        setVideoGeneration({
+          status: 'error',
+          progress: 0,
+          message: '🚀 需要手动启动仙宫云实例',
+          manualSteps: [
+            '1. 访问仙宫云控制台: https://xiangongyun.com/console',
+            '2. 找到实例: 3iaszw98tkh12h9x (prome)',
+            '3. 点击启动按钮',
+            '4. 等待实例状态变为running',
+            '5. 刷新页面重试数字人生成'
+          ]
+        });
+      } else if (errorMessage.includes('余额不足') || errorMessage.includes('无法开机')) {
+        setVideoGeneration({
+          status: 'error',
+          progress: 0,
+          message: '💰 仙宫云账户余额不足',
+          manualSteps: [
+            '1. 访问仙宫云控制台: https://xiangongyun.com/console',
+            '2. 充值账户余额',
+            '3. 启动实例: 3iaszw98tkh12h9x (prome)',
+            '4. 等待实例状态变为running',
+            '5. 刷新页面重试数字人生成'
+          ]
+        });
+      } else {
+        setVideoGeneration({
+          status: 'error',
+          progress: 0,
+          message: errorMessage
+        });
+      }
+    }
+  };
+
+  // 轮询视频生成状态
+  const pollVideoGenerationStatus = async (taskId: string) => {
+    const maxRetries = 60; // 最多轮询60次（约10分钟）
+    let retries = 0;
+
+    const poll = async () => {
+      try {
+        const status = await xiangongAPI.getTaskStatus(taskId);
+        
+        setVideoGeneration({
+          status: 'generating',
+          progress: Math.min(50 + (status.progress || 0) / 2, 95),
+          message: `生成进度: ${status.progress || 0}%`
+        });
+
+        if (status.status === 'completed' && status.result) {
+          setVideoGeneration({
+            status: 'completed',
+            progress: 100,
+            message: '视频生成完成！',
+            videoUrl: status.result
+          });
+          return;
+        } else if (status.status === 'failed') {
+          throw new Error(status.error || '视频生成失败');
+        }
+
+        // 继续轮询
+        if (retries < maxRetries) {
+          retries++;
+          setTimeout(poll, 10000); // 每10秒检查一次
+        } else {
+          throw new Error('视频生成超时，请稍后检查');
+        }
+      } catch (error) {
+        console.error('状态检查失败:', error);
+        setVideoGeneration({
+          status: 'error',
+          progress: 0,
+          message: error instanceof Error ? error.message : '状态检查失败'
+        });
+      }
+    };
+
+    poll();
   };
 
 
@@ -1616,6 +1761,36 @@ export default function DigitalHumanVideoComplete3() {
                       }}>
                         {videoGeneration.message}
                       </div>
+                      
+                      {/* 显示手动步骤 */}
+                      {videoGeneration.manualSteps && (
+                        <div style={{ 
+                          textAlign: 'left', 
+                          margin: '1.5rem 0',
+                          padding: '1rem',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '0.5rem',
+                          border: '1px solid #e5e7eb'
+                        }}>
+                          <div style={{ 
+                            fontWeight: '600', 
+                            marginBottom: '0.5rem',
+                            color: '#374151'
+                          }}>
+                            请按以下步骤操作：
+                          </div>
+                          {videoGeneration.manualSteps.map((step, index) => (
+                            <div key={index} style={{ 
+                              marginBottom: '0.25rem',
+                              color: '#6b7280',
+                              fontSize: '0.9rem'
+                            }}>
+                              {step}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       <button
                         onClick={() => {
                           setVideoGeneration({
