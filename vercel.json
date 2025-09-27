@@ -1,31 +1,8 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "dist/**/*",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "server.js",
-      "use": "@vercel/node"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/dist/$1"
-    }
-  ],
-  "functions": {
-    "server.js": {
-      "maxDuration": 60
-    }
-  },
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
