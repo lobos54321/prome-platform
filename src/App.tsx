@@ -57,6 +57,16 @@ const App = () => {
       try {
         console.log('Starting application initialization...');
         
+        // 检查是否是快速启动模式（生产环境）
+        const isProduction = import.meta.env.PROD;
+        const quickStart = import.meta.env.VITE_QUICK_START === 'true' || isProduction;
+        
+        if (quickStart) {
+          console.log('Quick start mode - skipping intensive checks');
+          setIsInitialized(true);
+          return;
+        }
+        
         // Validate environment configuration
         environmentValidator.logValidationResults();
         
@@ -67,13 +77,34 @@ const App = () => {
         
         if (!isTestMode) {
           console.log('Testing database connection...');
-          await databaseTester.testBasicConnection();
+          try {
+            // 设置超时避免卡住
+            await Promise.race([
+              databaseTester.testBasicConnection(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Database test timeout')), 5000)
+              )
+            ]);
+          } catch (error) {
+            console.warn('Database connection test failed or timed out:', error);
+            // 继续初始化，不让数据库问题阻塞应用启动
+          }
         }
         
         console.log('Starting auth initialization...');
-        // 使用同步方法避免时间死区错误
-        await authService.initializeAuth();
-        console.log('Auth initialization completed');
+        try {
+          // 设置超时避免认证初始化卡住
+          await Promise.race([
+            authService.initializeAuth(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Auth initialization timeout')), 8000)
+            )
+          ]);
+          console.log('Auth initialization completed');
+        } catch (error) {
+          console.warn('Auth initialization failed or timed out:', error);
+          // 继续初始化，不让认证问题阻塞应用启动
+        }
         
         // Get initial user state synchronously
         const user = authService.getCurrentUserSync();
