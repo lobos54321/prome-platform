@@ -57,44 +57,43 @@ const App = () => {
       try {
         console.log('Starting application initialization...');
         
-        // 为整个初始化过程添加超时保护
-        await Promise.race([
-          (async () => {
-            // Validate environment configuration
-            environmentValidator.logValidationResults();
-            
-            // Test database connection if not in test mode
-            const isTestMode = import.meta.env.VITE_TEST_MODE === 'true' ||
-                               import.meta.env.VITE_NON_ADMIN_TEST === 'true' ||
-                               import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
-            
-            if (!isTestMode) {
-              console.log('Testing database connection...');
-              try {
-                await databaseTester.testBasicConnection();
-              } catch (dbError) {
-                console.warn('Database connection test failed, continuing...', dbError);
-              }
-            }
-            
-            console.log('Starting auth initialization...');
-            try {
-              await authService.initializeAuth();
-              console.log('Auth initialization completed');
-            } catch (authError) {
-              console.warn('Auth initialization failed, continuing...', authError);
-            }
-            
-            // Get initial user state synchronously
-            const user = authService.getCurrentUserSync();
-            setCurrentUser(user);
-            
-            console.log('✅ Application initialized successfully');
-          })(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Application initialization timeout')), 10000)
-          )
-        ]);
+        // 简化初始化流程 - 只做最关键的步骤
+        console.log('Starting critical initialization...');
+        
+        // 关键步骤1: 环境验证（同步）
+        environmentValidator.logValidationResults();
+        
+        // 关键步骤2: 认证初始化（带超时保护）
+        try {
+          await Promise.race([
+            authService.initializeAuth(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Auth initialization timeout')), 3000)
+            )
+          ]);
+          console.log('Auth initialization completed');
+        } catch (authError) {
+          console.warn('Auth initialization failed, using fallback...', authError);
+        }
+        
+        // 关键步骤3: 获取当前用户状态
+        const user = authService.getCurrentUserSync();
+        setCurrentUser(user);
+        
+        console.log('✅ Critical initialization completed');
+        
+        // 非关键步骤：后台执行数据库连接测试
+        setTimeout(() => {
+          const isTestMode = import.meta.env.VITE_TEST_MODE === 'true' ||
+                           import.meta.env.VITE_NON_ADMIN_TEST === 'true' ||
+                           import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
+          
+          if (!isTestMode) {
+            databaseTester.testBasicConnection().catch(dbError => {
+              console.warn('Background database test failed:', dbError);
+            });
+          }
+        }, 100);
       } catch (error) {
         console.error('Application initialization failed:', error);
         // 确保应用仍能启动，即使初始化失败
