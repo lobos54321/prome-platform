@@ -76,11 +76,8 @@ export default function Register() {
       const user = await authService.register(formData.email, formData.password, formData.name);
       
       if (user) {
-        setDebugInfo('注册成功！正在跳转...');
-        // 给用户一点时间看到成功消息
-        setTimeout(() => {
-          navigate('/services');
-        }, 1000);
+        setDebugInfo('注册成功！请检查您的邮箱并点击验证链接完成账户激活。');
+        // 不自动跳转，让用户手动去验证邮箱
       } else {
         setError('注册失败：无法创建用户账户。请检查邮箱是否已被使用。');
         setDebugInfo('注册返回空用户对象');
