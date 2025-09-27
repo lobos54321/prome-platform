@@ -5,10 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Layout } from './components/layout/Layout';
-import { authService } from './lib/auth';
-import { isDifyEnabled } from './lib/dify-api-client';
-import { environmentValidator } from './lib/environment-validator';
-import { databaseTester } from './lib/database-tester';
 import { User } from './types';
 import { useTranslation } from 'react-i18next';
 import './lib/i18n'; // Initialize i18n
@@ -39,7 +35,6 @@ import DigitalHumanCreation from './pages/DigitalHumanCreation';
 import SystemDiagnostics from './pages/SystemDiagnostics';
 import SessionIdTest from './pages/SessionIdTest';
 import TestWorkflowProgress from './pages/TestWorkflowProgress';
-// import PricingTest from './pages/PricingTest';
 
 import NotFound from './pages/NotFound';
 import AuthCallback from './pages/AuthCallback';
@@ -51,30 +46,10 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { t } = useTranslation();
 
-
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        console.log('Starting application initialization...');
-        
-        // 临时跳过所有检查以解决启动卡住问题
-        console.log('Skipping environment validation and database tests for now...');
-        console.log('Skipping auth initialization for now...');
-        
-        // 临时设置为null，避免调用可能卡住的服务
-        setCurrentUser(null);
-        
-        console.log('✅ Application initialized successfully');
-      } catch (error) {
-        console.error('Application initialization failed:', error);
-        // 不强制登出，可能只是网络问题
-        console.warn('Continuing app initialization despite auth error');
-      } finally {
-        setIsInitialized(true);
-      }
-    };
-
-    initializeApp();
+    // 简化初始化 - 立即设置为已初始化
+    console.log('Simple initialization - skipping all checks');
+    setIsInitialized(true);
   }, []);
 
   // Listen for auth state changes
@@ -94,17 +69,6 @@ const App = () => {
       window.removeEventListener('auth-state-changed', handleAuthStateChange as EventListener);
     };
   }, []);
-
-  // Expose services globally for debugging
-  useEffect(() => {
-    // Make services available globally for console debugging
-    (window as Record<string, unknown>).authService = authService;
-    
-    console.log('[App] Services exposed globally for debugging:');
-    console.log('  - window.authService');
-  }, []);
-
-
 
   if (!isInitialized) {
     return (
@@ -143,12 +107,9 @@ const App = () => {
               <Route path="/n8n-diagnostic" element={<N8nDiagnostic />} />
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
               <Route path="/admin" element={<Admin />} />
-
-
               <Route path="/session-id-test" element={<SessionIdTest />} />
               <Route path="/system-diagnostics" element={<SystemDiagnostics />} />
               <Route path="/test-workflow-progress" element={<TestWorkflowProgress />} />
-              {/* <Route path="/pricing-test" element={<PricingTest />} /> */}
               <Route path="/dify-chat-test" element={<DifyChatTest />} />
               <Route path="/dify-debug" element={<DifyDebugPage />} />
               <Route path="/dify-flow-test" element={<DifyFlowTest />} />
