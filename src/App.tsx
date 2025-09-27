@@ -42,6 +42,7 @@ import TestWorkflowProgress from './pages/TestWorkflowProgress';
 // import PricingTest from './pages/PricingTest';
 
 import NotFound from './pages/NotFound';
+import AuthCallback from './pages/AuthCallback';
 
 const queryClient = new QueryClient();
 
@@ -142,6 +143,7 @@ const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/purchase" element={<Purchase />} />
               <Route path="/dashboard" element={<Dashboard />} />

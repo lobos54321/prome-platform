@@ -5926,7 +5926,7 @@ app.post('/api/xiangong/instance/stop', async (req, res) => {
     const xiangongAPI = 'https://api.xiangongyun.com';
     const instanceId = '3iaszw98tkh12h9x';
     
-    const response = await fetch(`${xiangongAPI}/open/instance/shutdown`, {
+    const response = await fetch(`${xiangongAPI}/open/instance/shutdown_release_gpu`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -6059,10 +6059,25 @@ app.post('/api/xiangong/upload-training-video', async (req, res) => {
       storage: multer.memoryStorage(),
       limits: { fileSize: 100 * 1024 * 1024 }, // 100MB限制
       fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('video/')) {
+        console.log('📁 检测到文件类型:', file.mimetype, '文件名:', file.originalname);
+        const videoMimeTypes = [
+          'video/mp4',
+          'video/quicktime',
+          'video/x-msvideo',
+          'video/webm',
+          'video/ogg',
+          'video/avi',
+          'video/mov',
+          'application/octet-stream' // 有时QuickTime文件会被识别为此类型
+        ];
+        const isVideo = file.mimetype.startsWith('video/') || 
+                       videoMimeTypes.includes(file.mimetype) ||
+                       file.originalname.toLowerCase().match(/\.(mp4|mov|avi|webm|ogg|mkv)$/);
+        
+        if (isVideo) {
           cb(null, true);
         } else {
-          cb(new Error('只支持视频文件'));
+          cb(new Error(`不支持的文件类型: ${file.mimetype}`));
         }
       }
     }).single('video');
@@ -6241,6 +6256,9 @@ const activeInfiniteTalkTasks = new Map();
 app.post('/api/xiangong/infinitetalk', async (req, res) => {
   try {
     const { text, avatar, voice, emotion, background, userId } = req.body;
+
+    // 初始化Supabase客户端
+    const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
     // 跟踪API使用情况，重置自动关机定时器
     updateLastUsage();
