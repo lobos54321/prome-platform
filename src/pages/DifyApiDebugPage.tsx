@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { testDirectDifyAPI } from '@/utils/directDifyTest';
 
 interface DebugTest {
   name: string;
@@ -34,6 +35,8 @@ export default function DifyApiDebugPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<DebugResults | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [directResults, setDirectResults] = useState<any>(null);
+  const [isDirectLoading, setIsDirectLoading] = useState(false);
 
   const runDebugTest = async () => {
     setIsLoading(true);
@@ -65,6 +68,25 @@ export default function DifyApiDebugPage() {
       console.error('Debug test failed:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const runDirectTest = async () => {
+    setIsDirectLoading(true);
+    setError(null);
+    setDirectResults(null);
+
+    try {
+      console.log('🔍 Starting direct Dify API test...');
+      const results = await testDirectDifyAPI();
+      setDirectResults(results);
+      console.log('✅ Direct test completed:', results);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Direct test failed');
+      console.error('❌ Direct test failed:', err);
+    } finally {
+      setIsDirectLoading(false);
     }
   };
 
@@ -126,13 +148,24 @@ export default function DifyApiDebugPage() {
               />
             </div>
             
-            <Button 
-              onClick={runDebugTest} 
-              disabled={isLoading || !testMessage.trim()}
-              className="w-full"
-            >
-              {isLoading ? '🔍 正在测试...' : '🚀 运行Dify API调试测试'}
-            </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button 
+                onClick={runDebugTest} 
+                disabled={isLoading || !testMessage.trim()}
+                className="w-full"
+              >
+                {isLoading ? '🔍 正在测试...' : '🚀 通过代理服务器测试'}
+              </Button>
+              
+              <Button 
+                onClick={runDirectTest} 
+                disabled={isDirectLoading}
+                variant="outline"
+                className="w-full"
+              >
+                {isDirectLoading ? '🔍 直接测试中...' : '🎯 直接调用Dify API'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -145,6 +178,73 @@ export default function DifyApiDebugPage() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {directResults && (
+          <div className="space-y-4">
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader>
+                <CardTitle className="text-blue-800">🎯 直接Dify API调用结果</CardTitle>
+                <CardDescription>
+                  绕过代理服务器，直接调用Dify API的结果
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {directResults.tests?.map((test: any, index: number) => (
+                  <Card key={index} className="mb-4">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm">{test.name}</CardTitle>
+                        <Badge variant={test.success ? "default" : "destructive"}>
+                          {test.success ? '✅ 成功' : '❌ 失败'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {test.success ? (
+                        <div className="space-y-3">
+                          {test.usageAnalysis && (
+                            <>
+                              <h5 className="font-semibold">Usage Analysis:</h5>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>Has Usage: {test.usageAnalysis.hasUsage ? '✅' : '❌'}</div>
+                                <div>Has Tokens: {test.usageAnalysis.hasTokens ? '✅' : '❌'}</div>
+                                <div>Token Value: {test.usageAnalysis.tokenValue}</div>
+                                <div>Price Value: ${test.usageAnalysis.priceValue}</div>
+                              </div>
+                              
+                              {test.usageAnalysis.tokenValue === 0 && (
+                                <div className="text-red-600 bg-red-50 p-2 rounded text-sm">
+                                  ⚠️ 直接调用Dify API也返回0 tokens - 确认Dify配置问题
+                                </div>
+                              )}
+                              
+                              {test.usageAnalysis.tokenValue > 0 && (
+                                <div className="text-green-600 bg-green-50 p-2 rounded text-sm">
+                                  ✅ 直接调用获得了真实token数据 - 代理服务器有问题
+                                </div>
+                              )}
+                            </>
+                          )}
+                          
+                          <details className="mt-3">
+                            <summary className="cursor-pointer font-medium">查看完整响应</summary>
+                            <pre className="text-xs bg-gray-100 p-3 rounded mt-2 overflow-auto max-h-60">
+                              {JSON.stringify(test.data, null, 2)}
+                            </pre>
+                          </details>
+                        </div>
+                      ) : (
+                        <div className="text-red-600">
+                          <strong>错误:</strong> {test.error}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {results && (
@@ -210,25 +310,84 @@ export default function DifyApiDebugPage() {
             {/* 诊断建议 */}
             <Card className="border-yellow-200 bg-yellow-50">
               <CardHeader>
-                <CardTitle className="text-yellow-800">💡 诊断建议</CardTitle>
+                <CardTitle className="text-yellow-800">💡 问题诊断和解决方案</CardTitle>
               </CardHeader>
               <CardContent className="text-yellow-800">
-                <div className="space-y-2">
-                  <p><strong>如果所有测试都显示0 tokens:</strong></p>
-                  <ul className="list-disc list-inside space-y-1 ml-4">
-                    <li>检查Dify控制台中的应用配置</li>
-                    <li>确认LLM节点已正确配置并启用</li>
-                    <li>验证API密钥具有usage统计权限</li>
-                    <li>检查Dify账户余额和计费状态</li>
-                    <li>确认使用正确的应用类型 (Agent vs Chatflow vs Workflow)</li>
-                  </ul>
+                <div className="space-y-4">
                   
-                  <p className="mt-4"><strong>下一步排查:</strong></p>
-                  <ul className="list-disc list-inside space-y-1 ml-4">
-                    <li>登录Dify控制台查看usage统计页面</li>
-                    <li>测试在Dify Web界面中的usage是否正常</li>
-                    <li>联系Dify技术支持确认API配置</li>
-                  </ul>
+                  {/* 根据测试结果提供针对性建议 */}
+                  {directResults && results && (
+                    <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+                      <h4 className="font-semibold text-blue-800 mb-2">🔍 对比分析结果:</h4>
+                      {directResults.tests?.[0]?.usageAnalysis?.tokenValue > 0 ? (
+                        <div className="text-green-700">
+                          <p>✅ <strong>直接调用Dify API有token数据</strong> - 问题在于代理服务器</p>
+                          <p className="text-sm mt-1">建议检查Express服务器的API代理逻辑和响应处理</p>
+                        </div>
+                      ) : (
+                        <div className="text-red-700">
+                          <p>❌ <strong>直接调用Dify API也没有token数据</strong> - 问题在于Dify配置</p>
+                          <p className="text-sm mt-1">需要检查Dify应用本身的配置</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <p><strong>📋 系统性排查清单:</strong></p>
+                    <div className="mt-2 space-y-2">
+                      <details className="border rounded p-2">
+                        <summary className="cursor-pointer font-medium">1. Dify应用配置检查</summary>
+                        <ul className="list-disc list-inside space-y-1 ml-4 mt-2 text-sm">
+                          <li>确认应用类型：Chatbot/Agent/Workflow</li>
+                          <li>检查是否有LLM节点且已正确连接</li>
+                          <li>验证LLM模型是否为付费模型 (非免费模型)</li>
+                          <li>确认模型提供商配置正确</li>
+                        </ul>
+                      </details>
+                      
+                      <details className="border rounded p-2">
+                        <summary className="cursor-pointer font-medium">2. Dify账户设置检查</summary>
+                        <ul className="list-disc list-inside space-y-1 ml-4 mt-2 text-sm">
+                          <li>检查账户余额和credits</li>
+                          <li>验证API密钥权限 (包括usage统计权限)</li>
+                          <li>确认计费设置已启用</li>
+                          <li>检查usage统计功能是否开启</li>
+                        </ul>
+                      </details>
+                      
+                      <details className="border rounded p-2">
+                        <summary className="cursor-pointer font-medium">3. API调用方式检查</summary>
+                        <ul className="list-disc list-inside space-y-1 ml-4 mt-2 text-sm">
+                          <li>确认使用正确的API端点</li>
+                          <li>验证请求头和参数格式</li>
+                          <li>检查是否缺少必要的请求参数</li>
+                          <li>测试不同的response_mode</li>
+                        </ul>
+                      </details>
+                      
+                      <details className="border rounded p-2">
+                        <summary className="cursor-pointer font-medium">4. 代理服务器检查</summary>
+                        <ul className="list-disc list-inside space-y-1 ml-4 mt-2 text-sm">
+                          <li>检查Express代理是否正确转发请求</li>
+                          <li>验证响应数据是否被正确解析</li>
+                          <li>确认没有中间处理导致数据丢失</li>
+                          <li>检查错误处理和fallback逻辑</li>
+                        </ul>
+                      </details>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-orange-50 p-3 rounded border-l-4 border-orange-400">
+                    <h4 className="font-semibold text-orange-800 mb-2">🚀 立即行动建议:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-orange-700 text-sm">
+                      <li>先运行"直接调用Dify API"测试</li>
+                      <li>如果直接调用有数据，重点检查代理服务器</li>
+                      <li>如果直接调用也没数据，重点检查Dify配置</li>
+                      <li>在Dify Web界面测试相同消息的token消耗</li>
+                      <li>对比Web界面和API的usage数据差异</li>
+                    </ol>
+                  </div>
                 </div>
               </CardContent>
             </Card>
