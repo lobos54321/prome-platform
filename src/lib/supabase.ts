@@ -144,18 +144,13 @@ class DatabaseService {
         user = await this.createUserProfileFallback(authData.user.id, email, name);
       }
 
-      // 第三步：注册成功后自动登录建立会话
-      console.log('Auth registration successful, attempting auto-login...');
-      const { data: loginData, error: loginError } = await supabase!.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (loginError) {
-        console.warn('Auto-login failed after registration:', loginError);
-        // 即使自动登录失败，也返回成功（用户可以手动登录）
-      } else {
-        console.log('Auto-login successful after registration');
+      // 第三步：检查邮箱验证状态 - 不自动登录，等待邮箱验证
+      console.log('Registration successful, email verification required');
+      
+      // 检查是否需要邮箱验证
+      if (authData.user && !authData.user.email_confirmed_at) {
+        console.log('Email verification required for user:', authData.user.email);
+        // 不进行自动登录，返回用户信息但不建立会话
       }
 
       console.log('Registration process completed successfully');

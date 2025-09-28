@@ -21,6 +21,7 @@ export default function Register() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -76,8 +77,9 @@ export default function Register() {
       const user = await authService.register(formData.email, formData.password, formData.name);
       
       if (user) {
-        setDebugInfo('注册成功！请检查您的邮箱并点击验证链接完成账户激活。');
-        // 不自动跳转，让用户手动去验证邮箱
+        setRegistrationSuccess(true);
+        setDebugInfo('注册成功！我们已向您的邮箱发送了验证链接，请查收邮件并点击链接完成账户激活。验证成功后即可登录使用。');
+        setError(''); // 清除任何错误信息
       } else {
         setError('注册失败：无法创建用户账户。请检查邮箱是否已被使用。');
         setDebugInfo('注册返回空用户对象');
@@ -108,6 +110,49 @@ export default function Register() {
       setIsLoading(false);
     }
   };
+
+  // 如果注册成功，显示邮箱验证提示
+  if (registrationSuccess) {
+    return (
+      <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1 text-center">
+            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-green-600">注册成功！</CardTitle>
+            <CardDescription>
+              请验证您的邮箱地址
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center space-y-4">
+              <p className="text-gray-600">
+                我们已向 <strong>{formData.email}</strong> 发送了验证邮件
+              </p>
+              <p className="text-sm text-gray-500">
+                请检查您的邮箱（包括垃圾邮件文件夹），点击邮件中的验证链接完成账户激活
+              </p>
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  验证成功后，您将可以登录并获得50积分开始体验我们的服务
+                </AlertDescription>
+              </Alert>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button
+              onClick={() => navigate('/login')}
+              className="w-full"
+            >
+              前往登录页面
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
