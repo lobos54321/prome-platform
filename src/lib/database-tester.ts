@@ -270,11 +270,11 @@ export class DatabaseConnectionTester {
     }
 
     try {
-      // 添加超时机制避免连接测试卡住
+      // 添加超时机制避免连接测试卡住 - 增加超时时间到10秒
       const connectionTest = await Promise.race([
         supabase!.from('users').select('count').limit(1),
         new Promise<{ data: null; error: Error }>((_, reject) => 
-          setTimeout(() => reject(new Error('Database connection timeout')), 3000)
+          setTimeout(() => reject(new Error('Database connection timeout')), 10000)
         )
       ]);
 

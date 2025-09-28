@@ -399,6 +399,13 @@ export function DifyChatInterface({
       console.log('[Chat Debug] 🔄 从数据库加载对话历史...');
       const cloudConversations = await cloudChatHistory.getConversations();
       
+      // 🔧 修复：确保cloudConversations是数组
+      if (!Array.isArray(cloudConversations)) {
+        console.warn('[Chat Debug] ⚠️ cloudConversations不是数组:', cloudConversations);
+        setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
+        return;
+      }
+      
       const convertedConversations: ConversationHistoryItem[] = cloudConversations.map(conv => ({
         id: conv.id,
         title: conv.title,
