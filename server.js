@@ -10,7 +10,7 @@ import multer from 'multer';
 // Load environment variables
 dotenv.config();
 
-// 🔧 启动诊断日志
+// 🔧 启动诊断日志 - 回滚到工作版本
 console.log('🚀 [BOOT 1] Starting server initialization...');
 console.log('🌍 [BOOT ENV]', {
   NODE_VERSION: process.version,
