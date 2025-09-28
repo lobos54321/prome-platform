@@ -355,7 +355,7 @@ export function DifyChatInterface({
           });
           
           // 清除所有localStorage和sessionStorage数据
-          ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_workflow_state', 'dify_session_timestamp'].forEach(key => {
+          ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_workflow_state', 'dify_session_timestamp', 'dify_messages'].forEach(key => {
             localStorage.removeItem(key);
             sessionStorage.removeItem(key);
           });
