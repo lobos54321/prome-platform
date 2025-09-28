@@ -3,8 +3,9 @@
  * 使用Supabase数据库存储和同步聊天历史
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { generateUUID } from './utils';
+import { supabase } from './supabase';
 
 // 数据库表的TypeScript类型定义
 export interface ChatDevice {
@@ -49,15 +50,12 @@ class CloudChatHistoryService {
   private deviceId: string;
 
   constructor() {
-    // 初始化Supabase客户端
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase configuration is missing');
+    // 🔧 修复：使用共享的Supabase实例，避免多实例警告
+    if (!supabase) {
+      throw new Error('Supabase not configured or available');
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseAnonKey);
+    this.supabase = supabase;
     this.deviceId = this.getOrCreateDeviceId();
   }
 

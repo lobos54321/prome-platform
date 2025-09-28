@@ -440,10 +440,63 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       const exchangeRate = await db.getCurrentExchangeRate();
       const pointsToDeduct = Math.round(totalCost * exchangeRate);
 
-      // Validate costs
+      // Enhanced debugging for cost calculation
+      console.log('Cost calculation debug:', {
+        usage_data: {
+          prompt_tokens: usage.prompt_tokens,
+          completion_tokens: usage.completion_tokens, 
+          total_tokens: usage.total_tokens,
+          total_price: usage.total_price,
+          prompt_price: usage.prompt_price,
+          completion_price: usage.completion_price
+        },
+        calculation_results: {
+          inputCost,
+          outputCost, 
+          totalCost,
+          pointsToDeduct,
+          exchangeRate
+        },
+        model_info: {
+          modelName,
+          profitMultiplier
+        }
+      });
+
+      // Validate costs with more detailed error info
       if (totalCost <= 0 || pointsToDeduct <= 0) {
-        console.warn('Invalid cost calculation:', { inputCost, outputCost, totalCost, pointsToDeduct });
-        return { success: false, error: 'Invalid cost calculation' };
+        console.warn('Invalid cost calculation:', { 
+          inputCost, 
+          outputCost, 
+          totalCost, 
+          pointsToDeduct,
+          token_counts: {
+            inputTokens: finalInputTokens,
+            outputTokens: finalOutputTokens,
+            totalTokens: finalTotalTokens
+          },
+          usage_source: usage
+        });
+        
+        // Add fallback minimum cost if tokens exist but cost is 0
+        if (finalTotalTokens > 0) {
+          console.log('Applying minimum cost fallback for non-zero tokens');
+          const minimumCost = 0.0001; // $0.0001 minimum
+          const minimumPoints = Math.round(minimumCost * exchangeRate);
+          if (minimumPoints > 0) {
+            console.log('Using minimum cost:', { minimumCost, minimumPoints });
+            // 🔧 关键修复：实际应用最小费用
+            totalCost = minimumCost;
+            pointsToDeduct = minimumPoints;
+            inputCost = minimumCost * 0.7; // 70% input
+            outputCost = minimumCost * 0.3; // 30% output
+            console.log('✅ Applied minimum cost fallback:', { totalCost, pointsToDeduct });
+          } else {
+            return { success: false, error: 'Invalid cost calculation - even minimum cost resulted in 0 points' };
+          }
+        } else {
+          return { success: false, error: 'Invalid cost calculation - no tokens to process' };
+        }
       }
 
       // ✅ 高成本警告但允许正常计费 - 真实使用就应该正确收费
