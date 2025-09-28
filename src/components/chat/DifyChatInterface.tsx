@@ -872,6 +872,12 @@ export function DifyChatInterface({
                 
                 console.log('[Chat Debug] ✅ 消息历史恢复完成:', restoredMessages.length, '条');
                 setMessages(restoredMessages);
+                
+                // 🔧 关键修复：消息恢复后强制确认conversationId
+                if (storedConversationId && !conversationId) {
+                  console.log('[Chat Debug] 🔧 强制恢复conversationId:', storedConversationId);
+                  setConversationId(storedConversationId);
+                }
               }
             }
             
