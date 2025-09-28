@@ -14,9 +14,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'https://www.prome.live',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       },
     },
   },
