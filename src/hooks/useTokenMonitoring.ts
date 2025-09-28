@@ -306,17 +306,31 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       let totalCost = 0;
 
       // 🔍 检查 Dify usage 数据格式
-      console.log('[Billing] Dify usage data:', {
-        promptTokens: usage.prompt_tokens,
-        completionTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens,
-        promptPrice: usage.prompt_price,
-        completionPrice: usage.completion_price,
-        totalPrice: usage.total_price,
-        currency: usage.currency,
-        extractedFromHeaders: usage.extractedFromHeaders,
-        dataSource: usage.dataSource,
-        modelName: modelName
+      console.log('[Billing] 🚨 DETAILED USAGE DATA ANALYSIS:', {
+        raw_usage_object: usage,
+        all_keys: Object.keys(usage),
+        pricing_fields: {
+          promptTokens: usage.prompt_tokens,
+          completionTokens: usage.completion_tokens,
+          totalTokens: usage.total_tokens,
+          promptPrice: usage.prompt_price,
+          completionPrice: usage.completion_price,
+          totalPrice: usage.total_price,
+          currency: usage.currency
+        },
+        metadata_fields: {
+          extractedFromHeaders: usage.extractedFromHeaders,
+          dataSource: usage.dataSource,
+          model: usage.model
+        },
+        detection_flags: {
+          has_total_price: !!usage.total_price,
+          has_separate_prices: !!(usage.prompt_price && usage.completion_price),
+          has_token_counts: !!(usage.prompt_tokens && usage.completion_tokens),
+          will_use_fallback: !usage.total_price && !(usage.prompt_price && usage.completion_price)
+        },
+        modelName: modelName,
+        timestamp: new Date().toISOString()
       });
 
       // 动态利润比例计算
