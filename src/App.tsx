@@ -29,6 +29,7 @@ import N8nDiagnostic from './pages/N8nDiagnostic';
 import DifyChat from './pages/DifyChat';
 import DifyChatTest from './pages/DifyChatTest';
 import DifyDebugPage from './pages/DifyDebugPage';
+import DifyApiDebugPage from './pages/DifyApiDebugPage';
 import DifyFlowTest from './pages/DifyFlowTest';
 import DigitalHumanVideo from './pages/DigitalHumanVideo';
 import DigitalHumanVideoTest from './pages/DigitalHumanVideoTest';
@@ -211,7 +212,8 @@ const App = () => {
               <Route path="/test-workflow-progress" element={<TestWorkflowProgress />} />
               {/* <Route path="/pricing-test" element={<PricingTest />} /> */}
               <Route path="/dify-chat-test" element={<DifyChatTest />} />
-              <Route path="/dify-debug" element={<DifyDebugPage />} />
+              <Route path="/dify-debug" element={<DifyApiDebugPage />} />
+              <Route path="/dify-debug-old" element={<DifyDebugPage />} />
               <Route path="/dify-flow-test" element={<DifyFlowTest />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

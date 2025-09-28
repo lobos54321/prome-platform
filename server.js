@@ -2521,7 +2521,9 @@ app.post('/api/dify/chat/simple', async (req, res) => {
         query: message,
         user: userIdentifier,
         conversation_id: clientConvId || '', // 空字符串让Dify创建新对话
-        response_mode: 'blocking' // 使用阻塞模式获得简单响应
+        response_mode: 'blocking', // 使用阻塞模式获得简单响应
+        auto_generate_name: false, // 🔧 可能影响usage统计
+        files: [] // 🔧 某些应用可能需要files参数
       }),
     });
 
@@ -2535,6 +2537,58 @@ app.post('/api/dify/chat/simple', async (req, res) => {
     }
 
     const data = await difyResponse.json();
+    
+    // 🔍 CRITICAL DEBUG: 详细分析Dify API响应
+    console.log('🔍 [DIFY API DEBUG] ===== DETAILED RESPONSE ANALYSIS =====');
+    console.log('🔍 [DIFY API DEBUG] Response Status:', difyResponse.status);
+    console.log('🔍 [DIFY API DEBUG] Response Headers:', Object.fromEntries(difyResponse.headers.entries()));
+    console.log('🔍 [DIFY API DEBUG] Full Response Body:', JSON.stringify(data, null, 2));
+    
+    // 分析usage数据结构
+    console.log('🔍 [USAGE DEBUG] Usage Analysis:', {
+      hasData: !!data,
+      hasMetadata: !!data?.metadata,
+      hasUsage: !!data?.metadata?.usage,
+      hasDirectUsage: !!data?.usage,
+      responseKeys: data ? Object.keys(data) : [],
+      metadataKeys: data?.metadata ? Object.keys(data.metadata) : [],
+      usageKeys: data?.metadata?.usage ? Object.keys(data.metadata.usage) : [],
+      usageData: data?.metadata?.usage || data?.usage || 'NO_USAGE_FOUND'
+    });
+    
+    // 检查token数据的具体值
+    if (data?.metadata?.usage) {
+      const usage = data.metadata.usage;
+      console.log('🔍 [TOKEN DEBUG] Token Analysis:', {
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens: usage.total_tokens,
+        prompt_price: usage.prompt_price,
+        completion_price: usage.completion_price,
+        total_price: usage.total_price,
+        currency: usage.currency,
+        allUsageFields: Object.keys(usage)
+      });
+      
+      // 检查是否所有值都是0
+      const allZero = (
+        (!usage.prompt_tokens || usage.prompt_tokens === 0) &&
+        (!usage.completion_tokens || usage.completion_tokens === 0) &&
+        (!usage.total_tokens || usage.total_tokens === 0) &&
+        (!usage.total_price || parseFloat(usage.total_price) === 0)
+      );
+      
+      if (allZero) {
+        console.error('🚨 [CRITICAL] All usage values are ZERO - This is the core problem!');
+        console.error('🚨 [DIAGNOSIS] Possible causes:');
+        console.error('   1. Dify app configuration: LLM nodes not configured correctly');
+        console.error('   2. Dify account: No billing/usage tracking enabled');
+        console.error('   3. API permissions: API key lacks usage access');
+        console.error('   4. App type: Wrong app type (Agent vs Chatflow vs Workflow)');
+        console.error('   5. Cached responses: Dify returning cached results');
+      }
+    }
+    console.log('🔍 [DIFY API DEBUG] ===== END ANALYSIS =====');
     
     console.log('[Simple Chat] Success:', {
       conversationId: data.conversation_id,
@@ -2631,7 +2685,9 @@ app.post('/api/dify/chat', async (req, res) => {
         query: message,
         user: userIdentifier, // ✅ Required user parameter
         conversation_id: isNewConversation ? '' : conversationId, // Empty string for new conversations
-        response_mode: 'blocking'
+        response_mode: 'blocking',
+        auto_generate_name: false, // 🔧 可能影响usage统计
+        files: [] // 🔧 某些应用可能需要files参数
       }),
     });
 
@@ -7516,6 +7572,89 @@ app.post('/api/test-save-conversation', async (req, res) => {
     console.error('❌ TEST SAVE failed:', error);
     res.json({ success: false, error: error.message });
   }
+});
+
+// 🔍 DEBUG ENDPOINT: 测试不同的Dify API调用方式
+app.post('/api/debug/dify-test', async (req, res) => {
+  console.log('🔍 [DEBUG] Starting comprehensive Dify API test...');
+  
+  const testMessage = req.body.message || "Hello, this is a test message to check token usage.";
+  const testUser = `debug-user-${Date.now()}`;
+  
+  const results = {
+    timestamp: new Date().toISOString(),
+    testMessage,
+    testUser,
+    tests: []
+  };
+  
+  // 测试1: 标准chat-messages调用
+  try {
+    console.log('🔍 [TEST 1] Standard chat-messages call...');
+    const test1Response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: testMessage,
+        user: testUser,
+        conversation_id: '',
+        response_mode: 'blocking'
+      })
+    });
+    
+    const test1Data = await test1Response.json();
+    results.tests.push({
+      name: 'Standard chat-messages',
+      status: test1Response.status,
+      success: test1Response.ok,
+      data: test1Data,
+      usageFound: !!(test1Data?.metadata?.usage),
+      tokensFound: !!(test1Data?.metadata?.usage?.total_tokens),
+      tokensValue: test1Data?.metadata?.usage?.total_tokens || 0
+    });
+    
+  } catch (error) {
+    results.tests.push({
+      name: 'Standard chat-messages',
+      success: false,
+      error: error.message
+    });
+  }
+  
+  // 测试2: 检查app参数
+  try {
+    console.log('🔍 [TEST 2] App parameters...');
+    const test2Response = await fetch(`${DIFY_API_URL}/parameters?user=${testUser}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    const test2Data = await test2Response.json();
+    results.tests.push({
+      name: 'App parameters',
+      status: test2Response.status,
+      success: test2Response.ok,
+      data: test2Data
+    });
+    
+  } catch (error) {
+    results.tests.push({
+      name: 'App parameters',
+      success: false,
+      error: error.message
+    });
+  }
+  
+  console.log('🔍 [DEBUG] Test completed, sending results...');
+  console.log('🔍 [DEBUG] Full results:', JSON.stringify(results, null, 2));
+  res.json(results);
 });
 
 console.log('🚀 [BOOT 2] About to start server listening...');
