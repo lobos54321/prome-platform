@@ -5163,6 +5163,27 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// 🔧 版本和配置诊断端点
+app.get('/api/debug/version', (req, res) => {
+  const commitHash = 'a942742-working'; // 当前提交哈希
+  res.json({
+    commitHash,
+    timestamp: new Date().toISOString(),
+    environment: {
+      NODE_VERSION: process.version,
+      SUPABASE_URL: !!SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: !!SUPABASE_SERVICE_ROLE_KEY,
+      DIFY_API_URL: !!DIFY_API_URL,
+      DIFY_API_KEY: !!DIFY_API_KEY
+    },
+    billingStatus: {
+      globalTracker: typeof global.billingTracker !== 'undefined',
+      successfulCalls: global.billingTracker?.successfulCalls || 0,
+      failedCalls: global.billingTracker?.failedCalls || 0
+    }
+  });
+});
+
 // Environment configuration check endpoint for debugging 503 errors
 app.get('/api/env-check', (req, res) => {
   const envCheck = {
