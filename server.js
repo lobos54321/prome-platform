@@ -5155,6 +5155,134 @@ app.get('/api/env-check', (req, res) => {
   res.status(200).json(envCheck);
 });
 
+// Dify API connectivity test endpoint for debugging production issues
+app.get('/api/dify/test-connection', async (req, res) => {
+  const testResult = {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    tests: {}
+  };
+
+  try {
+    // Test 1: Basic configuration check
+    testResult.tests.configuration = {
+      status: 'checking',
+      dify_api_url: DIFY_API_URL || 'MISSING',
+      dify_api_key: DIFY_API_KEY ? 'SET' : 'MISSING'
+    };
+
+    if (!DIFY_API_URL || !DIFY_API_KEY) {
+      testResult.tests.configuration.status = 'failed';
+      testResult.tests.configuration.error = 'Missing required configuration';
+      return res.status(500).json(testResult);
+    }
+    testResult.tests.configuration.status = 'passed';
+
+    // Test 2: DNS and network connectivity
+    testResult.tests.dns_connectivity = {
+      status: 'checking'
+    };
+
+    try {
+      const url = new URL(DIFY_API_URL);
+      const dnsResponse = await fetch(`${url.protocol}//${url.hostname}`, {
+        method: 'GET',
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Prome-Production-Test/1.0'
+        }
+      });
+      testResult.tests.dns_connectivity.status = 'passed';
+      testResult.tests.dns_connectivity.response_status = dnsResponse.status;
+    } catch (error) {
+      testResult.tests.dns_connectivity.status = 'failed';
+      testResult.tests.dns_connectivity.error = error.message;
+      testResult.tests.dns_connectivity.error_code = error.code;
+    }
+
+    // Test 3: Dify API authentication
+    testResult.tests.api_auth = {
+      status: 'checking'
+    };
+
+    try {
+      const authResponse = await fetch(`${DIFY_API_URL}/meta`, {
+        method: 'GET',
+        timeout: 15000,
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Prome-Production-Test/1.0'
+        }
+      });
+
+      testResult.tests.api_auth.status = authResponse.ok ? 'passed' : 'failed';
+      testResult.tests.api_auth.response_status = authResponse.status;
+      testResult.tests.api_auth.response_text = await authResponse.text().then(t => t.substring(0, 200));
+    } catch (error) {
+      testResult.tests.api_auth.status = 'failed';
+      testResult.tests.api_auth.error = error.message;
+      testResult.tests.api_auth.error_code = error.code;
+    }
+
+    // Test 4: Chat endpoint test
+    testResult.tests.chat_endpoint = {
+      status: 'checking'
+    };
+
+    try {
+      const chatTestPayload = {
+        inputs: {},
+        query: "Hello, this is a production connectivity test",
+        response_mode: "blocking",
+        user: `prod-test-${Date.now()}`
+      };
+
+      const chatResponse = await fetch(`${DIFY_API_URL}/chat-messages`, {
+        method: 'POST',
+        timeout: 20000,
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Prome-Production-Test/1.0'
+        },
+        body: JSON.stringify(chatTestPayload)
+      });
+
+      testResult.tests.chat_endpoint.status = chatResponse.ok ? 'passed' : 'failed';
+      testResult.tests.chat_endpoint.response_status = chatResponse.status;
+      
+      if (chatResponse.ok) {
+        const chatData = await chatResponse.json();
+        testResult.tests.chat_endpoint.conversation_id = chatData.conversation_id;
+        testResult.tests.chat_endpoint.message_preview = chatData.answer?.substring(0, 100);
+      } else {
+        testResult.tests.chat_endpoint.error_response = await chatResponse.text().then(t => t.substring(0, 200));
+      }
+    } catch (error) {
+      testResult.tests.chat_endpoint.status = 'failed';
+      testResult.tests.chat_endpoint.error = error.message;
+      testResult.tests.chat_endpoint.error_code = error.code;
+    }
+
+  } catch (error) {
+    testResult.error = error.message;
+  }
+
+  // Determine overall status
+  const allTests = Object.values(testResult.tests);
+  const failedTests = allTests.filter(test => test.status === 'failed');
+  
+  testResult.overall_status = failedTests.length === 0 ? 'healthy' : 'unhealthy';
+  testResult.summary = {
+    total_tests: allTests.length,
+    passed: allTests.filter(test => test.status === 'passed').length,
+    failed: failedTests.length
+  };
+
+  res.status(testResult.overall_status === 'healthy' ? 200 : 500).json(testResult);
+});
+
 // =====================================================
 // Video Credits API Endpoints (MUST BE BEFORE STATIC ROUTES)
 // =====================================================
