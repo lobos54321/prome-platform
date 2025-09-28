@@ -6,7 +6,6 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import * as cheerio from 'cheerio';
 import multer from 'multer';
-import fetch from 'node-fetch';
 
 // Load environment variables
 dotenv.config();
@@ -3380,11 +3379,16 @@ app.post('/api/dify', async (req, res) => {
             }
             
             const effectiveConversationId = finalData.conversation_id || conversationId;
-            const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, finalData.conversation_id, getValidUserId(user));
-            
-            if (conversationCreated !== false) {
-              await saveMessages(supabase, effectiveConversationId, actualMessage, finalData);
-              console.log('✅ Saved streaming conversation to database');
+            try {
+              const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, finalData.conversation_id, getValidUserId(user));
+              
+              if (conversationCreated !== false) {
+                await saveMessages(supabase, effectiveConversationId, actualMessage, finalData);
+                console.log('✅ Saved streaming conversation to database');
+              }
+            } catch (dbError) {
+              console.error('⚠️ Database operation failed in streaming response:', dbError);
+              // Don't let database errors break the stream
             }
           }
           
@@ -3430,22 +3434,28 @@ app.post('/api/dify', async (req, res) => {
 
     // Ensure conversation exists BEFORE saving messages (only for blocking mode)
     if (supabase && data) {
-      // Use Dify's conversation_id as the authoritative source
-      const effectiveConversationId = data.conversation_id || conversationId;
-      
-      // First ensure conversation record exists with Dify's ID as primary
-      const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
-      
-      // Then save messages using Dify's conversation_id only if conversation was successfully created/exists
-      if (conversationCreated !== false) {
-        // Add context truncation note if context was managed
-        if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
-          data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
-        }
+      try {
+        // Use Dify's conversation_id as the authoritative source
+        const effectiveConversationId = data.conversation_id || conversationId;
         
-        await saveMessages(supabase, effectiveConversationId, actualMessage, data);
-      } else {
-        console.error('⚠️ Skipping message save due to conversation creation failure');
+        // First ensure conversation record exists with Dify's ID as primary
+        const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
+        
+        // Then save messages using Dify's conversation_id only if conversation was successfully created/exists
+        if (conversationCreated !== false) {
+          // Add context truncation note if context was managed
+          if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+            data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
+          }
+          
+          await saveMessages(supabase, effectiveConversationId, actualMessage, data);
+        } else {
+          console.error('⚠️ Skipping message save due to conversation creation failure');
+        }
+      } catch (dbError) {
+        console.error('⚠️ Database operation failed after successful Dify API response:', dbError);
+        // Don't let database errors break the successful Dify response
+        // Just log the error and continue
       }
     }
 
@@ -3723,16 +3733,21 @@ app.post('/api/dify/workflow', async (req, res) => {
                     
                     // Save messages to database if we have final data
                     if (finalData && supabase) {
-                      // Ensure conversation exists first
-                      await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
-                      
-                      // Add context truncation note if context was managed
-                      if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
-                        finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+                      try {
+                        // Ensure conversation exists first
+                        await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
+                        
+                        // Add context truncation note if context was managed
+                        if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+                          finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+                        }
+                        
+                        // Then save messages
+                        await saveMessages(supabase, conversationId, actualMessage, finalData);
+                      } catch (dbError) {
+                        console.error('⚠️ Database operation failed in stream [DONE] handler:', dbError);
+                        // Don't let database errors break the stream
                       }
-                      
-                      // Then save messages
-                      await saveMessages(supabase, conversationId, actualMessage, finalData);
                     }
                     
                     res.write('data: [DONE]\n\n');
@@ -3922,16 +3937,21 @@ app.post('/api/dify/workflow', async (req, res) => {
 
         // Ensure conversation exists and save messages
         if (supabase) {
-          // First ensure conversation record exists
-          await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
-          
-          // Add context truncation note if context was managed
-          if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
-            data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || data.data?.outputs?.answer || 'Workflow completed');
+          try {
+            // First ensure conversation record exists
+            await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
+            
+            // Add context truncation note if context was managed
+            if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+              data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || data.data?.outputs?.answer || 'Workflow completed');
+            }
+            
+            // Then save messages
+            await saveMessages(supabase, conversationId, actualMessage, data);
+          } catch (dbError) {
+            console.error('⚠️ Database operation failed after successful Dify Workflow API response:', dbError);
+            // Don't let database errors break the successful Dify response
           }
-          
-          // Then save messages
-          await saveMessages(supabase, conversationId, actualMessage, data);
         }
 
         res.json({
