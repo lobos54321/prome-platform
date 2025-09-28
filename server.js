@@ -5125,6 +5125,36 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Environment configuration check endpoint for debugging 503 errors
+app.get('/api/env-check', (req, res) => {
+  const envCheck = {
+    timestamp: new Date().toISOString(),
+    node_env: process.env.NODE_ENV || 'not_set',
+    dify_config: {
+      api_url: process.env.VITE_DIFY_API_URL ? 'SET' : 'NOT_SET',
+      api_key: process.env.VITE_DIFY_API_KEY ? 'SET' : 'NOT_SET',
+      app_id: process.env.VITE_DIFY_APP_ID ? 'SET' : 'NOT_SET',
+      timeout: process.env.VITE_DIFY_TIMEOUT_MS || 'default',
+      workflow_timeout: process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS || 'default',
+      streaming_timeout: process.env.VITE_DIFY_STREAMING_TIMEOUT_MS || 'default',
+      max_retries: process.env.VITE_DIFY_MAX_RETRIES || 'default'
+    },
+    supabase_config: {
+      url: process.env.VITE_SUPABASE_URL ? 'SET' : 'NOT_SET',
+      anon_key: process.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'NOT_SET',
+      service_role_key: process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT_SET'
+    },
+    computed_values: {
+      DIFY_API_URL: DIFY_API_URL || 'EMPTY',
+      DIFY_API_KEY: DIFY_API_KEY ? 'SET' : 'EMPTY',
+      SUPABASE_URL: SUPABASE_URL || 'EMPTY',
+      SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'EMPTY'
+    }
+  };
+  
+  res.status(200).json(envCheck);
+});
+
 // =====================================================
 // Video Credits API Endpoints (MUST BE BEFORE STATIC ROUTES)
 // =====================================================
