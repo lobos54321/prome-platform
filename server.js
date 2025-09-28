@@ -10,6 +10,26 @@ import multer from 'multer';
 // Load environment variables
 dotenv.config();
 
+// 🔧 启动诊断日志
+console.log('🚀 [BOOT 1] Starting server initialization...');
+console.log('🌍 [BOOT ENV]', {
+  NODE_VERSION: process.version,
+  VITE_DIFY_API_URL: !!process.env.VITE_DIFY_API_URL,
+  VITE_DIFY_API_KEY: !!process.env.VITE_DIFY_API_KEY,
+  NEXT_PUBLIC_DIFY_API_URL: !!process.env.NEXT_PUBLIC_DIFY_API_URL,
+  NEXT_PUBLIC_DIFY_API_KEY: !!process.env.NEXT_PUBLIC_DIFY_API_KEY,
+  VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
+  PORT: process.env.PORT
+});
+
+// 捕获未处理的错误
+process.on('unhandledRejection', (err) => {
+  console.error('❌ [BOOT] UNHANDLED REJECTION:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('❌ [BOOT] UNCAUGHT EXCEPTION:', err);
+});
+
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
@@ -70,8 +90,8 @@ app.use((req, res, next) => {
 });
 
 // Configuration from environment variables
-const DIFY_API_URL = process.env.VITE_DIFY_API_URL || process.env.DIFY_API_URL || '';
-const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.DIFY_API_KEY || '';
+const DIFY_API_URL = process.env.VITE_DIFY_API_URL || process.env.NEXT_PUBLIC_DIFY_API_URL || process.env.DIFY_API_URL || '';
+const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.NEXT_PUBLIC_DIFY_API_KEY || process.env.DIFY_API_KEY || '';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
@@ -157,18 +177,16 @@ const XIANGONG_INDEXTTS2_URL = XIANGONG_COMFYUI_URL;
 
 // Environment validation
 console.log('🚀 Starting Prome Platform server');
-const requiredVars = ['DIFY_API_URL', 'DIFY_API_KEY'];
-const missing = requiredVars.filter(varName => !process.env[`VITE_${varName}`] && !process.env[varName]);
 
-if (missing.length > 0) {
-  console.error('⚠️ WARNING: Missing required environment variables:', missing);
-  console.error('Please set the following environment variables for proper API functionality:');
-  missing.forEach(varName => {
-    console.error(`  - VITE_${varName} or ${varName}`);
+// 检查关键配置是否存在
+if (!DIFY_API_URL || !DIFY_API_KEY) {
+  console.error('❌ [BOOT] Missing Dify configuration:', {
+    DIFY_API_URL: !!DIFY_API_URL,
+    DIFY_API_KEY: !!DIFY_API_KEY
   });
-  console.error('API calls may fail without proper configuration.');
+  console.warn('⚠️ Server will start but Dify features may not work');
 } else {
-  console.log('✅ Dify API environment variables are configured');
+  console.log('✅ [BOOT] Dify configuration found');
 }
 
 // UUID utility functions
@@ -7479,21 +7497,34 @@ app.post('/api/test-save-conversation', async (req, res) => {
   }
 });
 
+console.log('🚀 [BOOT 2] About to start server listening...');
+
 app.listen(port, async () => {
-  console.log(`Server is running on port ${port}`);
+  console.log('✅ [BOOT 3] Server is listening!');
+  console.log(`🌐 Server is running on port ${port}`);
+  
+  console.log('🔍 [BOOT 4] Starting database health check...');
   
   // Perform database health check on startup
   if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
     console.log('🔍 Performing database health check...');
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const isHealthy = await checkDatabaseHealth(supabase);
-    
-    if (!isHealthy) {
-      console.error('⚠️ WARNING: Database is not healthy. Workflows may fail.');
-      console.error('Please ensure database migrations have been run.');
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const isHealthy = await checkDatabaseHealth(supabase);
+      
+      if (!isHealthy) {
+        console.error('⚠️ WARNING: Database is not healthy. Workflows may fail.');
+        console.error('Please ensure database migrations have been run.');
+      } else {
+        console.log('✅ Database health check passed');
+      }
+    } catch (dbError) {
+      console.error('❌ Database health check failed:', dbError);
     }
   } else {
     console.log('⚠️ Supabase not configured - database features disabled');
   }
+  
+  console.log('🎉 [BOOT 5] Server startup complete!');
 });
 
