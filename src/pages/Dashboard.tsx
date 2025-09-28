@@ -265,7 +265,7 @@ export default function Dashboard() {
                     className="h-8 w-8 p-0 hover:bg-green-100 rounded-full"
                     onClick={refreshBalance}
                     disabled={isRefreshingBalance}
-                    title={t('dashboard.refresh_balance', 'Refresh Balance')}
+                    title={t('dashboard.refresh_all_data', 'Refresh All Data')}
                   >
                     <RefreshCw className={`h-4 w-4 text-green-600 ${isRefreshingBalance ? 'animate-spin' : ''}`} />
                   </Button>
@@ -548,7 +548,7 @@ export default function Dashboard() {
                                 {typeof record.tokensUsed === 'number' ? record.tokensUsed.toLocaleString() : ''}
                               </td>
                               <td className="px-6 py-4 font-semibold text-red-600">
-                                -{typeof record.cost === 'number' ? Math.round(record.cost).toLocaleString() : '0'} {t('dashboard.credits', 'credits')}
+                                {typeof record.cost === 'number' ? Math.round(record.cost).toLocaleString() : '0'} {t('dashboard.credits', 'credits')}
                               </td>
                               <td className="px-6 py-4 text-gray-500 text-xs">
                                 {formatDate(record.timestamp)}
