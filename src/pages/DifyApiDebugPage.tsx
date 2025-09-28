@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { testDirectDifyAPI } from '@/utils/directDifyTest';
 import { validateDifyConfig } from '@/utils/difyConfigValidator';
+import { testDifferentHeaders } from '@/utils/difyHeaderTester';
 
 interface DebugTest {
   name: string;
@@ -40,6 +41,8 @@ export default function DifyApiDebugPage() {
   const [isDirectLoading, setIsDirectLoading] = useState(false);
   const [configResults, setConfigResults] = useState<any>(null);
   const [isConfigLoading, setIsConfigLoading] = useState(false);
+  const [headerResults, setHeaderResults] = useState<any>(null);
+  const [isHeaderLoading, setIsHeaderLoading] = useState(false);
 
   const runDebugTest = async () => {
     setIsLoading(true);
@@ -112,6 +115,25 @@ export default function DifyApiDebugPage() {
     }
   };
 
+  const runHeaderTest = async () => {
+    setIsHeaderLoading(true);
+    setError(null);
+    setHeaderResults(null);
+
+    try {
+      console.log('🔍 Starting header combination test...');
+      const results = await testDifferentHeaders();
+      setHeaderResults(results);
+      console.log('✅ Header test completed:', results);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Header test failed');
+      console.error('❌ Header test failed:', err);
+    } finally {
+      setIsHeaderLoading(false);
+    }
+  };
+
   const renderUsageData = (data: any) => {
     if (!data) return <span className="text-gray-500">No data</span>;
     
@@ -170,7 +192,7 @@ export default function DifyApiDebugPage() {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Button 
                 onClick={runConfigValidation} 
                 disabled={isConfigLoading}
@@ -178,6 +200,15 @@ export default function DifyApiDebugPage() {
                 className="w-full"
               >
                 {isConfigLoading ? '🔍 验证中...' : '⚙️ 验证Dify配置'}
+              </Button>
+              
+              <Button 
+                onClick={runHeaderTest} 
+                disabled={isHeaderLoading}
+                variant="outline"
+                className="w-full"
+              >
+                {isHeaderLoading ? '🔍 测试中...' : '📋 测试请求头组合'}
               </Button>
               
               <Button 
@@ -206,6 +237,82 @@ export default function DifyApiDebugPage() {
               <div className="text-red-800">
                 <h3 className="font-semibold">❌ 测试失败</h3>
                 <p className="mt-1">{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {headerResults && (
+          <Card className="border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-green-800">📋 请求头测试结果</CardTitle>
+              <CardDescription>
+                测试不同header组合对token数据的影响
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {headerResults.tests?.map((test: any, index: number) => (
+                  <div key={index} className="border rounded p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">{test.name}</h4>
+                      <div className="flex gap-2">
+                        <Badge variant={test.success ? "default" : "destructive"}>
+                          {test.success ? '✅ 成功' : '❌ 失败'}
+                        </Badge>
+                        {test.success && test.tokenValue > 0 && (
+                          <Badge variant="default" className="bg-green-600">
+                            🎉 有Token数据
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {test.success && (
+                      <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                        <div>Tokens: <span className="font-mono">{test.tokenValue}</span></div>
+                        <div>Price: <span className="font-mono">${test.priceValue}</span></div>
+                      </div>
+                    )}
+                    
+                    <details>
+                      <summary className="cursor-pointer text-sm text-gray-600">查看请求头</summary>
+                      <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto max-h-32">
+                        {JSON.stringify(test.headers, null, 2)}
+                      </pre>
+                    </details>
+                    
+                    {test.success && test.fullResponse && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-sm text-gray-600">查看完整响应</summary>
+                        <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto max-h-40">
+                          {JSON.stringify(test.fullResponse, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                    
+                    {!test.success && (
+                      <div className="text-red-600 text-sm">
+                        <strong>错误:</strong> {test.error}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {/* 成功案例总结 */}
+                {headerResults.tests?.filter((t: any) => t.success && t.tokenValue > 0).length > 0 && (
+                  <div className="bg-green-100 border border-green-300 rounded p-3">
+                    <h4 className="font-semibold text-green-800 mb-2">🎉 找到有效的header配置!</h4>
+                    {headerResults.tests
+                      ?.filter((t: any) => t.success && t.tokenValue > 0)
+                      ?.map((t: any, i: number) => (
+                        <div key={i} className="text-green-700 text-sm">
+                          • <strong>{t.name}</strong>: {t.tokenValue} tokens, ${t.priceValue}
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
