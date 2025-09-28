@@ -50,6 +50,23 @@ export default function TokenDashboard() {
     };
   }, [navigate]);
 
+  // 🔧 修复：监听余额和token使用更新事件，实时刷新数据
+  useEffect(() => {
+    if (!user || !user.id) return;
+
+    const handleBalanceUpdate = () => {
+      console.log('[TokenDashboard] Balance updated, refreshing token usage data...');
+      loadUserData(user.id);
+    };
+
+    // 监听余额更新事件
+    window.addEventListener('balance-updated', handleBalanceUpdate);
+
+    return () => {
+      window.removeEventListener('balance-updated', handleBalanceUpdate);
+    };
+  }, [user]);
+
   const loadUserData = async (userId: string) => {
     try {
       setIsDataLoading(true);

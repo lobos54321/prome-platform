@@ -71,6 +71,35 @@ export default function Dashboard() {
     };
   }, [user]);
 
+  // 🔧 修复：监听余额和token使用更新事件，实时刷新数据
+  useEffect(() => {
+    if (!user || !user.id) return;
+
+    const handleBalanceUpdate = () => {
+      console.log('[Dashboard] Balance updated, refreshing usage data...');
+      // 重新加载usage和billing数据
+      const refreshData = async () => {
+        try {
+          const usage = await servicesAPI.getTokenUsage(user.id);
+          const billing = await servicesAPI.getBillingRecords(user.id);
+          setUsageRecords(Array.isArray(usage) ? usage : []);
+          setBillingRecords(Array.isArray(billing) ? billing : []);
+          console.log('[Dashboard] ✅ Usage data refreshed after balance update');
+        } catch (error) {
+          console.warn('[Dashboard] Failed to refresh usage data:', error);
+        }
+      };
+      refreshData();
+    };
+
+    // 监听余额更新事件
+    window.addEventListener('balance-updated', handleBalanceUpdate);
+
+    return () => {
+      window.removeEventListener('balance-updated', handleBalanceUpdate);
+    };
+  }, [user]);
+
   // Show loading state while checking authentication
   if (isLoading) {
     return (
@@ -139,7 +168,15 @@ export default function Dashboard() {
       setIsRefreshingBalance(true);
       console.log('Manual balance refresh requested...');
       await authService.refreshBalance();
-      console.log('Manual balance refresh completed');
+      
+      // 🔧 修复：同时刷新usage和billing数据
+      console.log('[Dashboard] Refreshing usage data after manual balance refresh...');
+      const usage = await servicesAPI.getTokenUsage(user.id);
+      const billing = await servicesAPI.getBillingRecords(user.id);
+      setUsageRecords(Array.isArray(usage) ? usage : []);
+      setBillingRecords(Array.isArray(billing) ? billing : []);
+      
+      console.log('Manual balance and usage data refresh completed');
     } catch (error) {
       console.error('Failed to refresh balance:', error);
     } finally {
