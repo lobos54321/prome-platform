@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { testDirectDifyAPI } from '@/utils/directDifyTest';
+import { validateDifyConfig } from '@/utils/difyConfigValidator';
 
 interface DebugTest {
   name: string;
@@ -37,6 +38,8 @@ export default function DifyApiDebugPage() {
   const [error, setError] = useState<string | null>(null);
   const [directResults, setDirectResults] = useState<any>(null);
   const [isDirectLoading, setIsDirectLoading] = useState(false);
+  const [configResults, setConfigResults] = useState<any>(null);
+  const [isConfigLoading, setIsConfigLoading] = useState(false);
 
   const runDebugTest = async () => {
     setIsLoading(true);
@@ -87,6 +90,25 @@ export default function DifyApiDebugPage() {
       console.error('❌ Direct test failed:', err);
     } finally {
       setIsDirectLoading(false);
+    }
+  };
+
+  const runConfigValidation = async () => {
+    setIsConfigLoading(true);
+    setError(null);
+    setConfigResults(null);
+
+    try {
+      console.log('🔍 Starting Dify config validation...');
+      const results = await validateDifyConfig();
+      setConfigResults(results);
+      console.log('✅ Config validation completed:', results);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Config validation failed');
+      console.error('❌ Config validation failed:', err);
+    } finally {
+      setIsConfigLoading(false);
     }
   };
 
@@ -148,13 +170,14 @@ export default function DifyApiDebugPage() {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button 
-                onClick={runDebugTest} 
-                disabled={isLoading || !testMessage.trim()}
+                onClick={runConfigValidation} 
+                disabled={isConfigLoading}
+                variant="secondary"
                 className="w-full"
               >
-                {isLoading ? '🔍 正在测试...' : '🚀 通过代理服务器测试'}
+                {isConfigLoading ? '🔍 验证中...' : '⚙️ 验证Dify配置'}
               </Button>
               
               <Button 
@@ -164,6 +187,14 @@ export default function DifyApiDebugPage() {
                 className="w-full"
               >
                 {isDirectLoading ? '🔍 直接测试中...' : '🎯 直接调用Dify API'}
+              </Button>
+              
+              <Button 
+                onClick={runDebugTest} 
+                disabled={isLoading || !testMessage.trim()}
+                className="w-full"
+              >
+                {isLoading ? '🔍 正在测试...' : '🚀 通过代理服务器测试'}
               </Button>
             </div>
           </CardContent>
@@ -175,6 +206,47 @@ export default function DifyApiDebugPage() {
               <div className="text-red-800">
                 <h3 className="font-semibold">❌ 测试失败</h3>
                 <p className="mt-1">{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {configResults && (
+          <Card className="border-purple-200 bg-purple-50">
+            <CardHeader>
+              <CardTitle className="text-purple-800">⚙️ Dify配置验证结果</CardTitle>
+              <CardDescription>
+                环境变量和API配置的详细验证
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><strong>API URL:</strong> {configResults.config?.apiUrl}</div>
+                  <div><strong>App ID:</strong> {configResults.config?.appId}</div>
+                  <div><strong>API Key:</strong> {configResults.config?.apiKey?.substring(0, 12)}...</div>
+                  <div><strong>Enabled:</strong> {configResults.config?.enabled}</div>
+                </div>
+                
+                <Separator />
+                
+                {configResults.tests?.map((test: any, index: number) => (
+                  <div key={index} className="border rounded p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">{test.name}</h4>
+                      <Badge variant={test.success ? "default" : "destructive"}>
+                        {test.success ? '✅ 通过' : '❌ 失败'}
+                      </Badge>
+                    </div>
+                    
+                    <details>
+                      <summary className="cursor-pointer text-sm text-gray-600">查看详细信息</summary>
+                      <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto max-h-40">
+                        {JSON.stringify(test.details, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
