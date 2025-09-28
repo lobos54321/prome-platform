@@ -11,6 +11,7 @@ import { db } from '@/lib/supabase';
 import { ModelConfig } from '@/types';
 import { authService } from '@/lib/auth';
 import { toast } from 'sonner';
+import { DifyApiMonitor } from '@/utils/difyApiMonitor';
 
 export interface TokenUsageEvent {
   modelName: string;
@@ -243,6 +244,88 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
     }
   }, [currentProfitMargin]);
 
+  // 🧠 智能Token估算函数 - 基于消息内容和复杂度
+  const estimateTokensFromMessage = useCallback((conversationId?: string, messageId?: string) => {
+    try {
+      // 🔍 尝试从localStorage获取最近的消息内容
+      let inputText = '';
+      let outputText = '';
+      
+      // 方法1: 从localStorage获取conversation messages
+      const storedMessages = localStorage.getItem('dify_messages');
+      if (storedMessages) {
+        try {
+          const messages = JSON.parse(storedMessages);
+          const lastMessage = messages[messages.length - 1];
+          if (lastMessage) {
+            inputText = lastMessage.query || '';
+            outputText = lastMessage.response || lastMessage.answer || '';
+          }
+        } catch (e) {
+          console.warn('[Estimation] Failed to parse stored messages:', e);
+        }
+      }
+      
+      // 方法2: 如果没有找到存储的消息，使用保守估算
+      if (!inputText && !outputText) {
+        console.log('[Estimation] No message content found, using conservative estimates');
+        return {
+          input: 150,   // 保守估算：用户输入约150 tokens
+          output: 300,  // 保守估算：AI回复约300 tokens  
+          total: 450    // 总计450 tokens
+        };
+      }
+      
+      // 🎯 基于文本长度的Token估算算法
+      const estimateTokensFromText = (text: string): number => {
+        if (!text) return 0;
+        
+        // 中文文本：平均1.5字符=1token，英文：平均4字符=1token
+        const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+        const englishChars = text.length - chineseChars;
+        
+        const chineseTokens = Math.ceil(chineseChars / 1.5);
+        const englishTokens = Math.ceil(englishChars / 4);
+        
+        // 考虑格式化、标点、换行等增加约10%的token
+        const baseTokens = chineseTokens + englishTokens;
+        const formattingOverhead = Math.ceil(baseTokens * 0.1);
+        
+        return baseTokens + formattingOverhead;
+      };
+      
+      const estimatedInput = estimateTokensFromText(inputText);
+      const estimatedOutput = estimateTokensFromText(outputText);
+      const estimatedTotal = estimatedInput + estimatedOutput;
+      
+      console.log('[Estimation] 📊 基于消息内容的Token估算:', {
+        inputText: inputText.substring(0, 100) + (inputText.length > 100 ? '...' : ''),
+        outputText: outputText.substring(0, 100) + (outputText.length > 100 ? '...' : ''),
+        inputChars: inputText.length,
+        outputChars: outputText.length,
+        estimatedInput,
+        estimatedOutput,
+        estimatedTotal,
+        algorithm: '中文1.5字符/token, 英文4字符/token + 10%格式化开销'
+      });
+      
+      return {
+        input: Math.max(estimatedInput, 50),    // 最少50 tokens输入
+        output: Math.max(estimatedOutput, 100), // 最少100 tokens输出
+        total: Math.max(estimatedTotal, 150)    // 最少150 tokens总计
+      };
+      
+    } catch (error) {
+      console.error('[Estimation] Error in intelligent token estimation:', error);
+      // 出错时返回保守估算
+      return {
+        input: 200,   // 保守估算
+        output: 400,  // 保守估算
+        total: 600    // 保守估算
+      };
+    }
+  }, []);
+
   const processTokenUsage = useCallback(async (
     usage: DifyUsage,
     conversationId?: string,
@@ -262,10 +345,10 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
       const outputTokens = parseInt(usage.completion_tokens) || 0;
       const totalTokens = parseInt(usage.total_tokens) || (inputTokens + outputTokens);
       
-      // ✅ 使用原始真实的Token数量（不做人为调整）
-      const finalInputTokens = inputTokens;
-      const finalOutputTokens = outputTokens;
-      const finalTotalTokens = totalTokens;
+      // ✅ 使用原始真实的Token数量（允许后续智能估算修改）
+      let finalInputTokens = inputTokens;
+      let finalOutputTokens = outputTokens;
+      let finalTotalTokens = totalTokens;
       
       // 🔧 修复：如果token数量为0，尝试从其他字段获取
       if (finalTotalTokens === 0) {
@@ -343,6 +426,44 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         modelName: modelName,
         timestamp: new Date().toISOString()
       });
+
+      // 🚨 关键诊断：检查Dify API是否返回有效数据
+      const isAllZero = (
+        (!usage.prompt_tokens || usage.prompt_tokens === 0) &&
+        (!usage.completion_tokens || usage.completion_tokens === 0) &&
+        (!usage.total_tokens || usage.total_tokens === 0) &&
+        (!usage.total_price || parseFloat(usage.total_price.toString()) === 0)
+      );
+
+      if (isAllZero) {
+        console.error('🚨 [CRITICAL] Dify API返回了无效的usage数据 - 所有token和价格都是0:', {
+          issue: 'Dify API未返回真实的token使用数据',
+          possible_causes: [
+            '1. Dify API配置问题 - API密钥权限不足',
+            '2. Dify工作流配置错误 - 未启用token统计',
+            '3. Dify后端问题 - usage统计服务异常',
+            '4. 账户余额不足 - Dify停止了服务',
+            '5. 模型调用失败 - 没有实际消耗token'
+          ],
+          debugging_steps: [
+            '检查Dify控制台的usage统计页面',
+            '验证API密钥是否有pricing权限',
+            '检查工作流是否正确配置了LLM节点',
+            '查看Dify账户余额和计费状态'
+          ],
+          fallback_action: '使用基于消息长度的智能估算'
+        });
+        
+        // 📊 记录到API监控系统用于诊断
+        DifyApiMonitor.logApiCall(
+          'chat-messages',
+          { 'Authorization': 'Bearer ***' }, // 隐藏真实API密钥
+          { status: 'response_received' },
+          usage,
+          conversationId,
+          messageId
+        );
+      }
 
       // 动态利润比例计算
       const profitMultiplier = 1 + (currentProfitMargin / 100);
@@ -439,8 +560,24 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
           totalCost = inputCost + outputCost;
         }
       } else {
-        // 🚨 Fallback: 如果Dify没有返回价格信息，使用估算价格 + 动态利润
-        console.warn(`[Billing] No Dify pricing found, using fallback estimation + ${currentProfitMargin}% profit`);
+        // 🚨 Fallback: 如果Dify没有返回价格信息，使用智能估算
+        console.warn(`[Billing] No Dify pricing found, using intelligent estimation + ${currentProfitMargin}% profit`);
+        
+        if (isAllZero) {
+          // 🎯 智能估算：基于消息内容估算token使用量
+          const estimatedTokens = estimateTokensFromMessage(conversationId, messageId);
+          console.log(`[Billing] 🧠 智能估算结果:`, {
+            estimatedInputTokens: estimatedTokens.input,
+            estimatedOutputTokens: estimatedTokens.output,
+            estimatedTotal: estimatedTokens.total,
+            basis: '基于消息长度和复杂度'
+          });
+          
+          // 更新token数量为估算值
+          finalInputTokens = estimatedTokens.input;
+          finalOutputTokens = estimatedTokens.output; 
+          finalTotalTokens = estimatedTokens.total;
+        }
         
         // 使用保守的估算价格（包含动态利润）
         const fallbackInputPrice = 0.002 * profitMultiplier; // $0.002 + 动态利润
@@ -450,7 +587,10 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
         outputCost = (finalOutputTokens / 1000) * fallbackOutputPrice;
         totalCost = inputCost + outputCost;
         
-        console.log(`[Billing] Using fallback pricing with ${currentProfitMargin}% profit margin applied`);
+        console.log(`[Billing] Using intelligent fallback with ${currentProfitMargin}% profit:`, {
+          estimatedTokens: { input: finalInputTokens, output: finalOutputTokens, total: finalTotalTokens },
+          costs: { input: inputCost, output: outputCost, total: totalCost }
+        });
         
         // 记录到数据库用于后续分析（不影响当前计费）
         try {

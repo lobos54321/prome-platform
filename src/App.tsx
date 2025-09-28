@@ -43,6 +43,7 @@ import TestWorkflowProgress from './pages/TestWorkflowProgress';
 
 import NotFound from './pages/NotFound';
 import AuthCallback from './pages/AuthCallback';
+import { DifyDiagnostics } from './components/dev/DifyDiagnostics';
 
 const queryClient = new QueryClient();
 
@@ -217,6 +218,7 @@ const App = () => {
             </Routes>
           </Layout>
         </BrowserRouter>
+        <DifyDiagnostics />
       </TooltipProvider>
     </QueryClientProvider>
   );
