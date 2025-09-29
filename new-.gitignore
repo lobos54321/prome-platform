@@ -1,0 +1,71 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime and cache
+.cache/
+.tmp/
+.temp/
+
+# Coverage and testing
+coverage/
+.coverage/
+.nyc_output/
+.jest/
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Deployment
+.vercel/
+.netlify/
+.firebase/
+
+# Local development
+.local/
+.dev/
+
+# Package manager lockfiles (keep pnpm-lock.yaml, ignore others)
+package-lock.json
+yarn.lock
+
+# TypeScript cache
+*.tsbuildinfo
