@@ -7,25 +7,19 @@ WORKDIR /app
 # Copy package files first to leverage Docker layer caching
 COPY package*.json ./
 
-# Install pnpm globally first
-RUN npm install -g pnpm
-
-# Force install ALL dependencies regardless of NODE_ENV
-RUN NODE_ENV= pnpm install --include=dev
+# Install pnpm globally and production dependencies (now includes build tools)
+RUN npm install -g pnpm && pnpm install --prod
 
 # Copy source code
 COPY . .
 
-# Build the application (this needs devDependencies like vite)
+# Build the application
 RUN pnpm run build
-
-# Clean up devDependencies after build to reduce image size
-RUN pnpm prune --prod
 
 # Expose port
 EXPOSE 8080
 
-# Set environment to production AFTER build
+# Set environment to production
 ENV NODE_ENV=production
 ENV PORT=8080
 
