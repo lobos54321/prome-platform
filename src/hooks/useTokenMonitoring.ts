@@ -603,7 +603,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
 
       // Get current exchange rate
       const exchangeRate = await db.getCurrentExchangeRate();
-      const pointsToDeduct = Math.round(totalCost * exchangeRate);
+      let pointsToDeduct = Math.round(totalCost * exchangeRate);
 
       // Enhanced debugging for cost calculation
       console.log('Cost calculation debug:', {
