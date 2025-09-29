@@ -443,26 +443,28 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
             '2. Dify工作流配置错误 - 未启用token统计',
             '3. Dify后端问题 - usage统计服务异常',
             '4. 账户余额不足 - Dify停止了服务',
-            '5. 模型调用失败 - 没有实际消耗token'
+            '5. 模型调用失败 - 没有实际消耗token',
+            '6. 🔍 STREAMING模式问题 - 响应头数据提取失败'
           ],
           debugging_steps: [
             '检查Dify控制台的usage统计页面',
             '验证API密钥是否有pricing权限',
             '检查工作流是否正确配置了LLM节点',
-            '查看Dify账户余额和计费状态'
+            '查看Dify账户余额和计费状态',
+            '🔍 检查服务器响应头是否包含x-usage-*-tokens字段'
           ],
-          fallback_action: '使用基于消息长度的智能估算'
+          fallback_action: '🚫 用户要求找到真实数据，不使用最小费用fallback',
+          real_usage_data: usage,
+          conversation_context: { conversationId, messageId, modelName },
+          debug_action: '停止计费，等待真实token数据'
         });
         
-        // 📊 记录到API监控系统用于诊断
-        DifyApiMonitor.logApiCall(
-          'chat-messages',
-          { 'Authorization': 'Bearer ***' }, // 隐藏真实API密钥
-          { status: 'response_received' },
-          usage,
-          conversationId,
-          messageId
-        );
+        // 🚫 用户明确要求：不使用最小费用，必须找到真实usage数据
+        setState(prev => ({ ...prev, isProcessing: false, error: 'Dify API返回0 tokens - 需要找到真实usage数据，拒绝使用fallback最小费用' }));
+        return { 
+          success: false, 
+          error: 'Dify API返回0 tokens，用户要求使用真实数据而非fallback最小费用。请检查Dify配置和响应头数据提取。' 
+        };
       }
 
       // 动态利润比例计算

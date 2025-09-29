@@ -3154,13 +3154,28 @@ app.post('/api/dify', async (req, res) => {
           const modelHeader = response.headers.get('x-dify-model');
           const requestIdHeader = response.headers.get('x-dify-request-id');
           
-          console.log('[Server Generic] 响应头元数据检查:', {
+          // 🔍 详细诊断：记录所有响应头
+          const allHeadersForDebug = {};
+          response.headers.forEach((value, key) => {
+            allHeadersForDebug[key] = value;
+          });
+          
+          console.log('[Server Generic] 🚨 完整响应头诊断 (寻找真实token数据):', {
             'x-usage-input-tokens': inputTokensHeader,
             'x-usage-output-tokens': outputTokensHeader,
             'x-dify-model': modelHeader,
             'x-dify-request-id': requestIdHeader,
             hasTokenStats: !!(inputTokensHeader && outputTokensHeader),
-            hasModelInfo: !!modelHeader
+            hasModelInfo: !!modelHeader,
+            allHeaders: allHeadersForDebug,
+            // 检查其他可能的token字段
+            possibleTokenHeaders: {
+              'x-usage-tokens': response.headers.get('x-usage-tokens'),
+              'usage-tokens': response.headers.get('usage-tokens'),
+              'tokens-used': response.headers.get('tokens-used'),
+              'x-token-usage': response.headers.get('x-token-usage'),
+              'x-tokens': response.headers.get('x-tokens')
+            }
           });
           
           const metadata = {
@@ -3289,6 +3304,23 @@ app.post('/api/dify', async (req, res) => {
           // 修复：无论是否收到[DONE]标记，只要有usage数据就发送增强信息
           if ((streamEnded || bodyUsageData) && (responseHeaderMetadata?.headerTokenStats || bodyUsageData)) {
             console.log('[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息');
+            
+            // 🚨 详细诊断：记录所有可用的token数据源
+            console.log('[Server] 🔍 TOKEN数据源详细分析:', {
+              streamEnded,
+              hasHeaderTokenStats: !!responseHeaderMetadata?.headerTokenStats,
+              hasBodyUsageData: !!bodyUsageData,
+              headerTokenStats: responseHeaderMetadata?.headerTokenStats,
+              bodyUsageData,
+              timestamp: new Date().toISOString(),
+              analysis: {
+                'header数据是否为0': responseHeaderMetadata?.headerTokenStats ? 
+                  (responseHeaderMetadata.headerTokenStats.total_tokens === 0) : 'N/A',
+                'body数据是否为0': bodyUsageData ? 
+                  (bodyUsageData.total_tokens === 0 && bodyUsageData.total_price === 0) : 'N/A',
+                'Dify是否真的没有消耗token': '需要检查Dify控制台'
+              }
+            });
             
             // 创建混合的usage数据
             let combinedUsage = null;
