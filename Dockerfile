@@ -6,16 +6,18 @@ WORKDIR /app
 
 # Copy package files first to leverage Docker layer caching
 COPY package*.json ./
-COPY .npmrc ./
 
-# Install dependencies with production-optimized settings
-RUN npm ci --only=production --prefer-offline --no-audit --cache .npm
+# Install pnpm globally and all dependencies (including devDependencies for build)
+RUN npm install -g pnpm && pnpm install
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application (this needs devDependencies like vite)
+RUN pnpm run build
+
+# Clean up devDependencies after build to reduce image size
+RUN pnpm prune --prod
 
 # Expose port
 EXPOSE 8080
