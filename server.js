@@ -4777,12 +4777,25 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           billing_source: 'STREAM_FALLBACK'
         };
         
-        // 🔧 BILLING: 处理积分扣除（现在有fallback usage数据了）
-        const billingInfo = await handleTokenBilling(finalData, req.body.user, 'STREAM_FALLBACK');
+        // 🔧 关键修复：优先使用响应头的真实token数据
+        if (headerMetadata && headerMetadata.headerTokenStats) {
+          console.log('✅ [STREAM-HEADERS] Using real token data from Dify API response headers');
+          finalData.metadata.usage = {
+            total_tokens: headerMetadata.headerTokenStats.total_tokens,
+            prompt_tokens: headerMetadata.headerTokenStats.prompt_tokens,
+            completion_tokens: headerMetadata.headerTokenStats.completion_tokens,
+            extractedFromHeaders: true,
+            dataSource: 'response_headers'
+          };
+          console.log('🎯 [STREAM-HEADERS] Real token usage:', finalData.metadata.usage);
+        }
         
-        // 🔧 关键修复：为fallback billing也发送balance_updated事件
+        // 🔧 BILLING: 处理积分扣除（优先使用真实token数据）
+        const billingInfo = await handleTokenBilling(finalData, req.body.user, headerMetadata?.headerTokenStats ? 'STREAM_HEADERS' : 'STREAM_FALLBACK');
+        
+        // 🔧 关键修复：发送balance_updated事件到前端
         if (billingInfo && billingInfo.newBalance !== null && billingInfo.success) {
-          console.log(`🔥 [STREAM-FALLBACK] Sending balance update to frontend: ${billingInfo.newBalance}`);
+          console.log(`🔥 [STREAM-BILLING] Sending balance update to frontend: ${billingInfo.newBalance}`);
           res.write(`data: ${JSON.stringify({
             event: 'balance_updated',
             data: {
@@ -4790,7 +4803,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
               pointsDeducted: billingInfo.points,
               tokens: billingInfo.tokens,
               cost: billingInfo.cost,
-              source: 'STREAM_FALLBACK'
+              source: headerMetadata?.headerTokenStats ? 'REAL_HEADERS' : 'FALLBACK'
             }
           })}\n\n`);
         }
@@ -4833,8 +4846,24 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
               answer: actualAnswer,
               conversation_id: completeResponse.conversation_id,
               message_id: completeResponse.message_id,
-              metadata: completeResponse.metadata
+              metadata: completeResponse.metadata || {}
             };
+            
+            // 🔧 关键修复：检查并使用响应头的真实token数据
+            if (headerMetadata && headerMetadata.headerTokenStats) {
+              console.log('✅ [JSON-HEADERS] Using real token data from Dify API response headers');
+              finalData.metadata.usage = {
+                total_tokens: headerMetadata.headerTokenStats.total_tokens,
+                prompt_tokens: headerMetadata.headerTokenStats.prompt_tokens,
+                completion_tokens: headerMetadata.headerTokenStats.completion_tokens,
+                extractedFromHeaders: true,
+                dataSource: 'response_headers'
+              };
+              console.log('🎯 [JSON-HEADERS] Real token usage:', finalData.metadata.usage);
+            }
+            
+            // 🔧 BILLING: 处理积分扣除（优先使用真实token数据）
+            const billingInfo = await handleTokenBilling(finalData, req.body.user, headerMetadata?.headerTokenStats ? 'JSON_HEADERS' : 'JSON_FALLBACK');
             
             // Convert to proper streaming format for frontend
             // Send message chunks using the parsed answer
@@ -4855,8 +4884,23 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
               event: 'message_end',
               conversation_id: completeResponse.conversation_id,
               message_id: completeResponse.message_id,
-              metadata: completeResponse.metadata
+              metadata: finalData.metadata
             })}\n\n`);
+            
+            // 🔧 关键修复：发送balance_updated事件到前端
+            if (billingInfo && billingInfo.newBalance !== null && billingInfo.success) {
+              console.log(`🔥 [JSON-BILLING] Sending balance update to frontend: ${billingInfo.newBalance}`);
+              res.write(`data: ${JSON.stringify({
+                event: 'balance_updated',
+                data: {
+                  newBalance: billingInfo.newBalance,
+                  pointsDeducted: billingInfo.points,
+                  tokens: billingInfo.tokens,
+                  cost: billingInfo.cost,
+                  source: headerMetadata?.headerTokenStats ? 'REAL_HEADERS' : 'FALLBACK'
+                }
+              })}\n\n`);
+            }
             
             // Save messages to database
             await ensureConversationExists(supabase, conversationId, completeResponse.conversation_id, getValidUserId(req.body.user));
@@ -5097,9 +5141,25 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     }
 
     const data = await response.json();
+    
+    // 🎯 关键改进：提取响应头中的真实token数据
+    const headerMetadata = extractMetadataFromHeaders(response);
+    if (headerMetadata && headerMetadata.headerTokenStats) {
+      console.log('✅ [BLOCKING-HEADERS] Using real token data from Dify API response headers');
+      // 确保data有metadata结构
+      if (!data.metadata) data.metadata = {};
+      data.metadata.usage = {
+        total_tokens: headerMetadata.headerTokenStats.total_tokens,
+        prompt_tokens: headerMetadata.headerTokenStats.prompt_tokens,
+        completion_tokens: headerMetadata.headerTokenStats.completion_tokens,
+        extractedFromHeaders: true,
+        dataSource: 'response_headers'
+      };
+      console.log('🎯 [BLOCKING-HEADERS] Real token usage:', data.metadata.usage);
+    }
 
     // 🔧 BILLING: 处理积分扣除
-    let billingInfo = await handleTokenBilling(data, req.body.user, 'CONVERSATION');
+    let billingInfo = await handleTokenBilling(data, req.body.user, headerMetadata?.headerTokenStats ? 'BLOCKING_HEADERS' : 'BLOCKING_CONVERSATION');
     
     // 🚨 CRITICAL FIX: 如果CONVERSATION billing失败，强制执行fallback billing
     if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
