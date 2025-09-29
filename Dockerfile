@@ -7,6 +7,9 @@ WORKDIR /app
 # Copy package files first to leverage Docker layer caching
 COPY package*.json ./
 
+# Temporarily unset NODE_ENV to ensure devDependencies are installed
+ENV NODE_ENV=
+
 # Install pnpm globally and all dependencies (including devDependencies for build)
 RUN npm install -g pnpm && pnpm install
 
@@ -22,7 +25,7 @@ RUN pnpm prune --prod
 # Expose port
 EXPOSE 8080
 
-# Set environment to production
+# Set environment to production AFTER build
 ENV NODE_ENV=production
 ENV PORT=8080
 
