@@ -7,11 +7,11 @@ WORKDIR /app
 # Copy package files first to leverage Docker layer caching
 COPY package*.json ./
 
-# Temporarily unset NODE_ENV to ensure devDependencies are installed
-ENV NODE_ENV=
+# Install pnpm globally first
+RUN npm install -g pnpm
 
-# Install pnpm globally and all dependencies (including devDependencies for build)
-RUN npm install -g pnpm && pnpm install
+# Force install ALL dependencies regardless of NODE_ENV
+RUN NODE_ENV= pnpm install --include=dev
 
 # Copy source code
 COPY . .
