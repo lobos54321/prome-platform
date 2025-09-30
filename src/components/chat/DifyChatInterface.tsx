@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock, MessageSquare, X, Trash2, Cloud, Wifi, WifiOff, Code, FileText, Database, Settings, Users, MessageCircle, Zap, Cpu, Globe, RefreshCw } from 'lucide-react';
 import { cn, isValidUUID, generateUUID } from '@/lib/utils';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
@@ -194,12 +194,31 @@ export function DifyChatInterface({
     return extractedModel;
   };
   
-  // Token monitoring for balance deduction
-  const { processTokenUsage } = useTokenMonitoring();
-  
-  // 🔧 修复：安全的用户ID初始化
+  // 🔧 修复：安全的用户ID初始化 - 移到最前面
   const [userId, setUserId] = useState<string>('');
   const [isUserIdReady, setIsUserIdReady] = useState(false);
+  
+  // Token monitoring for balance deduction - 包含智能计费处理
+  const { processTokenUsage, handleIntelligentBilling } = useTokenMonitoring();
+  
+  // 🎯 智能计费包装函数 - 自动处理Dify API响应或usage对象
+  const processTokenBilling = useCallback(async (responseOrUsage: any, conversationId?: string, messageId?: string, modelName?: string) => {
+    try {
+      // 如果传入的是完整的Dify响应对象
+      if (responseOrUsage.answer || responseOrUsage.metadata) {
+        console.log('[Smart Billing] 🎯 使用智能计费处理完整响应');
+        return await handleIntelligentBilling(responseOrUsage, userId, 'WORKFLOW');
+      }
+      // 如果传入的是usage对象
+      else {
+        console.log('[Smart Billing] 🔧 回退到标准计费处理');
+        return await processTokenUsage(responseOrUsage, conversationId, messageId, modelName || 'dify-native');
+      }
+    } catch (error) {
+      console.error('[Smart Billing] ❌ 计费处理错误:', error);
+      return { success: false, error: error.message };
+    }
+  }, [handleIntelligentBilling, processTokenUsage, userId]);
   
   // 🆕 痛点分支管理
   const {
@@ -2421,30 +2440,26 @@ export function DifyChatInterface({
         responseKeys: Object.keys(data)
       });
 
-      if (data.metadata?.usage) {
-      console.log('[Token] ✅ Processing blocking API token usage:', data.metadata.usage);
+      // 🎯 使用智能计费处理 - 解决Dify控制台有记录但API响应usage为0的问题
+      console.log('[Smart Billing] 🔍 检查blocking API响应进行智能计费处理...');
       try {
-        // 异步处理token使用，不阻塞UI
-        processTokenUsage(
-          data.metadata.usage,
+        // 使用新的智能计费函数处理整个响应
+        processTokenBilling(
+          data, // 传入完整响应而不只是usage
           data.conversation_id as string,
           data.message_id as string,
-          // 🔍 使用专用提取函数获取模型名称
           extractModelFromResponse(data, 'blocking_api') || 'dify-blocking'
         ).then(result => {
           if (result.success) {
-            console.log('[Token] ✅ Successfully processed blocking API token usage:', result.newBalance);
+            console.log('[Smart Billing] ✅ 智能计费处理成功:', result.newBalance);
           } else {
-            console.warn('[Token] ❌ Failed to process blocking API token usage:', result.error);
+            console.warn('[Smart Billing] ❌ 智能计费处理失败:', result.error);
           }
         }).catch(error => {
-          console.error('[Token] ❌ Error processing blocking API token usage:', error);
+          console.error('[Smart Billing] ❌ 智能计费处理错误:', error);
         });
       } catch (tokenError) {
-        console.error('[Token] ❌ Error preparing blocking API token usage:', tokenError);
-      }
-      } else {
-        console.warn('[Token] ⚠️ No usage data found in blocking API response - credits will not be deducted!');
+        console.error('[Smart Billing] ❌ 智能计费准备错误:', tokenError);
       }
     }
   };

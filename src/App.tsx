@@ -35,7 +35,6 @@ import DigitalHumanVideo from './pages/DigitalHumanVideo';
 import DigitalHumanVideoTest from './pages/DigitalHumanVideoTest';
 import DigitalHumanVideoSimple from './pages/DigitalHumanVideoSimple';
 import DigitalHumanVideoComplete3 from './pages/DigitalHumanVideoComplete3';
-import DigitalHumanCreation from './pages/DigitalHumanCreation';
 
 import SystemDiagnostics from './pages/SystemDiagnostics';
 import SessionIdTest from './pages/SessionIdTest';
@@ -44,7 +43,6 @@ import TestWorkflowProgress from './pages/TestWorkflowProgress';
 
 import NotFound from './pages/NotFound';
 import AuthCallback from './pages/AuthCallback';
-import { DifyDiagnostics } from './components/dev/DifyDiagnostics';
 
 const queryClient = new QueryClient();
 
@@ -199,7 +197,6 @@ const App = () => {
               <Route path="/chat/dify" element={<DifyChat />} />
               <Route path="/chat/n8n" element={<N8nChat />} />
               <Route path="/digital-human-video" element={<DigitalHumanVideoComplete3 />} />
-              <Route path="/digital-human-creation" element={<DigitalHumanCreation />} />
               <Route path="/digital-human-video-original" element={<DigitalHumanVideo />} />
               <Route path="/n8n-test" element={<N8nTest />} />
               <Route path="/n8n-diagnostic" element={<N8nDiagnostic />} />
@@ -220,7 +217,6 @@ const App = () => {
             </Routes>
           </Layout>
         </BrowserRouter>
-        <DifyDiagnostics />
       </TooltipProvider>
     </QueryClientProvider>
   );

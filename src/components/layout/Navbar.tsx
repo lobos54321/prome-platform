@@ -95,7 +95,6 @@ export function Navbar() {
               <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">{t('nav.dashboard', 'Dashboard')}</Link>
               <Link to="/chat/dify" className="text-gray-600 hover:text-gray-900">Deep-Copywriting</Link>
               <Link to="/chat/n8n" className="text-gray-600 hover:text-gray-900">Auto-Video</Link>
-              <Link to="/digital-human-creation" className="text-gray-600 hover:text-gray-900">数字人创建</Link>
             </>
           )}
           
@@ -131,10 +130,6 @@ export function Navbar() {
                 <DropdownMenuItem onClick={() => navigate('/chat/n8n')}>
                   <Video className="mr-2 h-4 w-4" />
                   Auto-Video
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/digital-human-creation')}>
-                  <User className="mr-2 h-4 w-4" />
-                  创建数字人
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/token-dashboard')}>
                   <Activity className="mr-2 h-4 w-4" />

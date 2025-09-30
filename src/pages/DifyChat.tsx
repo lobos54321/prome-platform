@@ -36,6 +36,9 @@ export default function DifyChat() {
   const [user, setUser] = useState<User | null>(null);
   const [service, setService] = useState<Service | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // 🚧 开发中遮罩开关 - 设置为 false 可显示完整界面
+  const showUnderDevelopmentOverlay = true;
 
   useEffect(() => {
     const loadUserAndService = async () => {
@@ -294,6 +297,33 @@ export default function DifyChat() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 relative overflow-hidden">
+      {/* 🚧 开发中遮罩层 */}
+      {showUnderDevelopmentOverlay && (
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 z-50 flex items-center justify-center p-8">
+          <div className="max-w-2xl w-full">
+            <div className="text-center mb-8">
+              <div className="text-6xl mb-6">🚧</div>
+              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                Deep-Copywriting
+              </h1>
+              <p className="text-xl text-gray-600 mb-8">深度专业性个人IP文案</p>
+            </div>
+            
+            <Alert className="bg-yellow-50 border-yellow-200 shadow-lg">
+              <AlertDescription className="text-center text-yellow-800 font-medium text-lg py-4">
+                🚧 该功能正在开发中，即将上线<br/>
+                Under Development, Coming Soon
+              </AlertDescription>
+            </Alert>
+
+            <div className="mt-8 text-center text-gray-500 text-sm">
+              <p>我们正在努力完善这个功能</p>
+              <p>敬请期待！</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Kusama dots pattern */}
       <div 
         className="absolute inset-0 opacity-15"
