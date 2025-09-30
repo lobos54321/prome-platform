@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, MessageCircle, Video } from 'lucide-react';
+import { ArrowRight, MessageCircle, Video, X } from 'lucide-react';
 import { authService } from '@/lib/auth';
 import { User } from '@/types';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ export default function Home() {
   const { t } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -203,11 +204,55 @@ export default function Home() {
 
               {/* Automated Video - Kusama Organic Style */}
               <div className="group relative transform hover:scale-105 transition-all duration-500">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-100/50 to-pink-50/50 rounded-3xl -rotate-2 group-hover:-rotate-3 transition-transform duration-300"></div>
+                {/* Video Preview Circle - Clickable */}
+                <div className="flex flex-col items-center mb-8 relative z-20">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Video button clicked!');
+                      setShowVideoModal(true);
+                    }}
+                    className="relative z-30 group/preview transform hover:scale-110 transition-all duration-300 cursor-pointer bg-transparent border-0 outline-none focus:outline-none"
+                  >
+                    {/* Kusama floating dots around circle */}
+                    <div className="absolute -top-4 -right-4 w-8 h-8 bg-orange-400 rounded-full animate-pulse"></div>
+                    <div className="absolute -top-2 right-12 w-6 h-6 bg-pink-400 rounded-full animate-pulse delay-300"></div>
+                    <div className="absolute top-16 -left-6 w-7 h-7 bg-green-400 rounded-full animate-pulse delay-500"></div>
+                    <div className="absolute bottom-8 right-16 w-5 h-5 bg-blue-400 rounded-full animate-pulse delay-700"></div>
+                    
+                    {/* Main circle with gradient border and video inside */}
+                    <div className="relative w-48 h-48">
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full animate-pulse"></div>
+                      <div className="absolute inset-3 rounded-full overflow-hidden shadow-lg group-hover/preview:shadow-2xl transition-all">
+                        <video 
+                          className="w-full h-full object-cover pointer-events-none"
+                          muted
+                          loop
+                          playsInline
+                          autoPlay
+                        >
+                          <source src="/videos/product-demo.mp4" type="video/mp4" />
+                        </video>
+                        {/* Play overlay icon */}
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center group-hover/preview:bg-black/30 transition-all pointer-events-none">
+                          <div className="bg-white/90 rounded-full p-4 shadow-xl">
+                            <Video className="h-8 w-8 text-purple-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                  
+                  <p className="mt-4 text-sm font-medium text-gray-700">{t('home.video_demo_label')}</p>
+                </div>
+                
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-100/50 to-pink-50/50 rounded-3xl -rotate-2 group-hover:-rotate-3 transition-transform duration-300 pointer-events-none"></div>
                 
                 {/* Kusama dots overlay for this card */}
                 <div 
-                  className="absolute inset-0 rounded-3xl opacity-20"
+                  className="absolute inset-0 rounded-3xl opacity-20 pointer-events-none"
                   style={{
                     backgroundImage: `
                       radial-gradient(circle at 30% 70%, #A855F7 3px, transparent 3px),
@@ -218,23 +263,9 @@ export default function Home() {
                 ></div>
                 
                 <div className="relative bg-white/95 backdrop-blur-sm rounded-3xl p-12 shadow-2xl hover:shadow-3xl transition-all duration-300">
-                  {/* Kusama-inspired organic icon */}
-                  <div className="relative w-28 h-28 mx-auto mb-8">
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full group-hover:animate-pulse"></div>
-                    <div className="absolute inset-3 bg-white rounded-full flex items-center justify-center shadow-inner">
-                      <Video className="h-12 w-12 text-purple-600" />
-                    </div>
-                    
-                    {/* Organic floating dots */}
-                    <div className="absolute -top-4 -right-2 w-7 h-7 bg-orange-400 rounded-full animate-pulse"></div>
-                    <div className="absolute -bottom-2 -left-4 w-5 h-5 bg-green-400 rounded-full animate-pulse delay-500"></div>
-                    <div className="absolute top-0 -right-7 w-4 h-4 bg-red-400 rounded-full animate-bounce delay-1000"></div>
-                    <div className="absolute -bottom-4 right-1 w-3 h-3 bg-blue-400 rounded-full animate-pulse delay-700"></div>
-                  </div>
-                  
-                  <h3 className="text-4xl font-bold text-gray-900 mb-6">Automated Video</h3>
+                  <h3 className="text-4xl font-bold text-gray-900 mb-6">{t('home.automated_video')}</h3>
                   <p className="text-gray-600 mb-10 text-lg leading-relaxed">
-                    Automated video content creation and editing with infinite creative possibilities
+                    {t('home.automated_video_desc')}
                   </p>
                   
                   <Button 
@@ -271,6 +302,39 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div 
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowVideoModal(false)}
+        >
+          <div 
+            className="relative w-full max-w-md bg-white rounded-lg overflow-hidden shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute top-2 right-2 z-10 bg-white hover:bg-gray-100 rounded-full p-1 shadow transition-all"
+            >
+              <X className="h-4 w-4 text-gray-600" />
+            </button>
+            
+            <video 
+              className="w-full aspect-video"
+              controls
+              autoPlay
+            >
+              <source src="/videos/product-demo.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+            
+            <div className="px-3 py-2 bg-gradient-to-br from-purple-50 to-pink-50 border-t border-purple-100">
+              <p className="text-xs font-medium text-gray-700">{t('home.video_demo_label')}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CTA Section for non-logged users */}
       {!user && (
