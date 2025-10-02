@@ -38,7 +38,7 @@ export default function DifyChat() {
   const [isLoading, setIsLoading] = useState(true);
   
   // 🚧 开发中遮罩开关 - 设置为 false 可显示完整界面
-  const showUnderDevelopmentOverlay = true;
+  const showUnderDevelopmentOverlay = false;
 
   useEffect(() => {
     const loadUserAndService = async () => {
