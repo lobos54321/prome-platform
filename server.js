@@ -37,7 +37,7 @@ const imageUpload = multer({
   }
 });
 
-// Video upload configuration
+// Video upload configuration  
 const videoUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -132,207 +132,6 @@ app.get('/api/video-result/check/:sessionId', (req, res) => {
       success: true,
       result: null
     });
-  }
-});
-
-// Image upload API endpoint
-app.post('/api/upload-image', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '没有收到图片文件' 
-      });
-    }
-
-    // 验证API Key
-    if (!process.env.IMGBB_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        error: '图片上传服务未配置，请尝试使用图片链接方式'
-      });
-    }
-
-    console.log('📤 Image upload request:', req.file.originalname, req.file.size, 'bytes');
-
-    // 转换为base64
-    const base64Image = req.file.buffer.toString('base64');
-
-    // 使用ImgBB API上传
-    const formData = new URLSearchParams();
-    formData.append('image', base64Image);
-
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      }
-    });
-
-    const result = await response.json();
-
-    if (result.success && result.data && result.data.url) {
-      console.log('✅ ImgBB upload successful:', result.data.url);
-      res.json({
-        success: true,
-        imageUrl: result.data.url,
-        message: '图片上传成功！'
-      });
-    } else {
-      throw new Error('ImgBB API返回错误: ' + (result.error?.message || '未知错误'));
-    }
-
-  } catch (error) {
-    console.error('❌ Image upload failed:', error);
-    res.status(500).json({
-      success: false,
-      error: '服务器错误。请尝试使用图片链接方式'
-    });
-  }
-});
-
-// Get user balance for video generation (credits-based system)
-app.get('/api/video/balance/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    
-    if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Database not configured' });
-    }
-    
-    // Convert user ID to valid UUID format if needed
-    const validUserId = getValidUserId(userId);
-    console.log('🔄 Video balance check: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
-    const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
-    
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('id', validUserId)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching user balance:', error);
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Balance field stores credits directly
-    const credits = user.balance || 0;
-    res.json({ balance: user.balance || 0, credits });
-  } catch (error) {
-    console.error('Balance check error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Check if user has enough credits for video generation
-app.post('/api/video/check-balance', async (req, res) => {
-  try {
-    const { userId, credits } = req.body;
-    
-    if (!userId || !credits) {
-      return res.status(400).json({ error: 'Missing userId or credits' });
-    }
-    
-    if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Database not configured' });
-    }
-    
-    // Convert user ID to valid UUID format if needed
-    const validUserId = getValidUserId(userId);
-    console.log('🔄 Video check-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
-    const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
-    
-    // Get user balance
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('id', validUserId)
-      .single();
-    
-    if (error) {
-      console.error('Error checking user balance:', error);
-      return res.status(500).json({ error: 'Failed to check balance' });
-    }
-    
-    const hasEnough = (user.balance || 0) >= credits;
-    res.json({ hasEnoughCredits: hasEnough });
-  } catch (error) {
-    console.error('Balance check error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Reserve credits for video generation
-app.post('/api/video/reserve-balance', async (req, res) => {
-  try {
-    const { userId, credits, sessionId, duration, metadata = {} } = req.body;
-    
-    if (!userId || !credits || !sessionId) {
-      return res.status(400).json({ error: 'Missing required parameters' });
-    }
-    
-    if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Database not configured' });
-    }
-    
-    // Convert user ID to valid UUID format if needed
-    const validUserId = getValidUserId(userId);
-    console.log('🔄 Video reserve-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
-    const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
-    
-    // Get current balance
-    const { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('id', validUserId)
-      .single();
-    
-    if (fetchError || !user) {
-      console.error('Error fetching user:', fetchError);
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    const currentBalance = user.balance || 0;
-    
-    if (currentBalance < credits) {
-      return res.status(400).json({ error: 'Insufficient balance' });
-    }
-    
-    // Deduct credits
-    const newBalance = currentBalance - credits;
-    
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ balance: newBalance })
-      .eq('id', validUserId);
-    
-    if (updateError) {
-      console.error('Error updating balance:', updateError);
-      return res.status(500).json({ error: 'Failed to reserve balance' });
-    }
-    
-    console.log('💰 Credits reserved:', {
-      validUserId,
-      credits,
-      sessionId,
-      previousBalance: currentBalance,
-      newBalance: newBalance
-    });
-    
-    res.json({
-      success: true,
-      sessionId,
-      deductedCredits: credits,
-      remainingCredits: newBalance
-    });
-  } catch (error) {
-    console.error('Balance reserve error:', error);
-    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1628,6 +1427,205 @@ app.get('/api/config/status', async (req, res) => {
     }
   });
 });
+
+// ==================== VIDEO API ROUTES ====================
+
+// Image upload endpoint for video creation
+app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '没有收到图片文件' 
+      });
+    }
+
+    // 验证API Key
+    if (!process.env.IMGBB_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: '图片上传服务未配置，请尝试使用图片链接方式'
+      });
+    }
+
+    console.log('📤 Image upload request:', req.file.originalname, req.file.size, 'bytes');
+
+    // 转换为base64
+    const base64Image = req.file.buffer.toString('base64');
+
+    // 使用ImgBB API上传
+    const formData = new URLSearchParams();
+    formData.append('image', base64Image);
+
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }
+    });
+
+    const result = await response.json();
+
+    if (result.success && result.data && result.data.url) {
+      console.log('✅ ImgBB upload successful:', result.data.url);
+      res.json({
+        success: true,
+        imageUrl: result.data.url,
+        message: '图片上传成功！'
+      });
+    } else {
+      throw new Error('ImgBB API返回错误: ' + (result.error?.message || '未知错误'));
+    }
+
+  } catch (error) {
+    console.error('❌ Image upload failed:', error);
+    res.status(500).json({
+      success: false,
+      error: '服务器错误。请尝试使用图片链接方式'
+    });
+  }
+});
+
+// Get user balance for video generation
+app.get('/api/video/balance/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' });
+    }
+    
+    // Convert user ID to valid UUID format if needed
+    const validUserId = getValidUserId(userId);
+    console.log('🔄 Video balance check: Original userId:', userId, '→ Valid UUID:', validUserId);
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('id', validUserId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user balance:', error);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const credits = user.balance || 0;
+    res.json({ balance: user.balance || 0, credits });
+  } catch (error) {
+    console.error('Balance check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Check if user has enough credits
+app.post('/api/video/check-balance', async (req, res) => {
+  try {
+    const { userId, credits } = req.body;
+    
+    if (!userId || !credits) {
+      return res.status(400).json({ error: 'Missing userId or credits' });
+    }
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' });
+    }
+    
+    const validUserId = getValidUserId(userId);
+    console.log('🔄 Video check-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('id', validUserId)
+      .single();
+    
+    if (error) {
+      console.error('Error checking user balance:', error);
+      return res.status(500).json({ error: 'Failed to check balance' });
+    }
+    
+    const hasEnough = (user.balance || 0) >= credits;
+    res.json({ hasEnoughCredits: hasEnough });
+  } catch (error) {
+    console.error('Balance check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Reserve credits for video generation
+app.post('/api/video/reserve-balance', async (req, res) => {
+  try {
+    const { userId, credits, sessionId, duration, metadata = {} } = req.body;
+    
+    if (!userId || !credits || !sessionId) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' });
+    }
+    
+    const validUserId = getValidUserId(userId);
+    console.log('🔄 Video reserve-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('id', validUserId)
+      .single();
+    
+    if (fetchError || !user) {
+      console.error('Error fetching user:', fetchError);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const currentBalance = user.balance || 0;
+    
+    if (currentBalance < credits) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+    
+    const newBalance = currentBalance - credits;
+    
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ balance: newBalance })
+      .eq('id', validUserId);
+    
+    if (updateError) {
+      console.error('Error updating balance:', updateError);
+      return res.status(500).json({ error: 'Failed to reserve balance' });
+    }
+    
+    console.log('💰 Credits reserved:', {
+      validUserId,
+      credits,
+      sessionId,
+      previousBalance: currentBalance,
+      newBalance: newBalance
+    });
+    
+    res.json({
+      success: true,
+      sessionId,
+      deductedCredits: credits,
+      remainingCredits: newBalance
+    });
+  } catch (error) {
+    console.error('Balance reserve error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== DIFY CHAT API ROUTES ====================
 
 // Dify chat proxy API (generic endpoint without conversationId - for backward compatibility)
 app.post('/api/dify', async (req, res) => {
