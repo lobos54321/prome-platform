@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, RotateCcw, Bot, User, Play, CheckCircle, AlertCircle, Clock, MessageSquare, X, Trash2, Cloud, Wifi, WifiOff, Code, FileText, Database, Settings, Users, MessageCircle, Zap, Cpu, Globe, RefreshCw } from 'lucide-react';
 import { cn, isValidUUID, generateUUID } from '@/lib/utils';
 import { useTokenMonitoring } from '@/hooks/useTokenMonitoring';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { usePainPointBranches } from '../../hooks/usePainPointBranches';
 import { PainPointTabNavigation } from './PainPointTabNavigation';
 import { PainPointBranchContent } from './PainPointBranchContent';
+import { useTranslation } from 'react-i18next';
 
 interface Message {
   id: string;
@@ -97,6 +98,7 @@ export function DifyChatInterface({
   enableRetry = true,
   user
 }: DifyChatInterfaceProps) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -194,31 +196,12 @@ export function DifyChatInterface({
     return extractedModel;
   };
   
-  // 🔧 修复：安全的用户ID初始化 - 移到最前面
+  // Token monitoring for balance deduction
+  const { processTokenUsage } = useTokenMonitoring();
+  
+  // 🔧 修复：安全的用户ID初始化
   const [userId, setUserId] = useState<string>('');
   const [isUserIdReady, setIsUserIdReady] = useState(false);
-  
-  // Token monitoring for balance deduction - 包含智能计费处理
-  const { processTokenUsage, handleIntelligentBilling } = useTokenMonitoring();
-  
-  // 🎯 智能计费包装函数 - 自动处理Dify API响应或usage对象
-  const processTokenBilling = useCallback(async (responseOrUsage: any, conversationId?: string, messageId?: string, modelName?: string) => {
-    try {
-      // 如果传入的是完整的Dify响应对象
-      if (responseOrUsage.answer || responseOrUsage.metadata) {
-        console.log('[Smart Billing] 🎯 使用智能计费处理完整响应');
-        return await handleIntelligentBilling(responseOrUsage, userId, 'WORKFLOW');
-      }
-      // 如果传入的是usage对象
-      else {
-        console.log('[Smart Billing] 🔧 回退到标准计费处理');
-        return await processTokenUsage(responseOrUsage, conversationId, messageId, modelName || 'dify-native');
-      }
-    } catch (error) {
-      console.error('[Smart Billing] ❌ 计费处理错误:', error);
-      return { success: false, error: error.message };
-    }
-  }, [handleIntelligentBilling, processTokenUsage, userId]);
   
   // 🆕 痛点分支管理
   const {
@@ -246,7 +229,14 @@ export function DifyChatInterface({
     isCloudSyncEnabled: true,
     syncStatus: 'idle'
   });
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(() => {
+    // 从 localStorage 恢复历史记录面板状态
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dify_show_history');
+      return saved === 'true';
+    }
+    return false;
+  });
   const [migrationStatus, setMigrationStatus] = useState<{
     needsMigration: boolean;
     isChecking: boolean;
@@ -374,7 +364,7 @@ export function DifyChatInterface({
           });
           
           // 清除所有localStorage和sessionStorage数据
-          ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_workflow_state', 'dify_session_timestamp', 'dify_messages'].forEach(key => {
+          ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_workflow_state', 'dify_session_timestamp'].forEach(key => {
             localStorage.removeItem(key);
             sessionStorage.removeItem(key);
           });
@@ -417,13 +407,6 @@ export function DifyChatInterface({
       
       console.log('[Chat Debug] 🔄 从数据库加载对话历史...');
       const cloudConversations = await cloudChatHistory.getConversations();
-      
-      // 🔧 修复：确保cloudConversations是数组
-      if (!Array.isArray(cloudConversations)) {
-        console.warn('[Chat Debug] ⚠️ cloudConversations不是数组:', cloudConversations);
-        setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
-        return;
-      }
       
       const convertedConversations: ConversationHistoryItem[] = cloudConversations.map(conv => ({
         id: conv.id,
@@ -898,12 +881,6 @@ export function DifyChatInterface({
                 
                 console.log('[Chat Debug] ✅ 消息历史恢复完成:', restoredMessages.length, '条');
                 setMessages(restoredMessages);
-                
-                // 🔧 关键修复：消息恢复后强制确认conversationId
-                if (storedConversationId && !conversationId) {
-                  console.log('[Chat Debug] 🔧 强制恢复conversationId:', storedConversationId);
-                  setConversationId(storedConversationId);
-                }
               }
             }
             
@@ -1579,28 +1556,12 @@ export function DifyChatInterface({
 
               // 🔧 修复：处理JSON响应中的usage信息（积分扣除的关键修复）
               if (parsed.metadata?.usage && !tokenUsageProcessed) {
-                console.log('[Token] ✅ Processing JSON response token usage:', parsed.metadata.usage);
+                console.log('[Token] ✅ Received token usage data (already processed by backend):', parsed.metadata.usage);
                 tokenUsageProcessed = true; // 标记已处理，避免重复计费
                 
-                try {
-                  // 异步处理token使用，不阻塞UI
-                  processTokenUsage(
-                    parsed.metadata.usage,
-                    parsed.conversation_id,
-                    parsed.message_id || `json_response_${Date.now()}`,
-                    extractModelFromResponse(parsed, 'json_blocking') || 'dify-blocking'
-                  ).then(result => {
-                    if (result.success) {
-                      console.log('[Token] ✅ Successfully processed JSON response token usage:', result.newBalance);
-                    } else {
-                      console.warn('[Token] ❌ Failed to process JSON response token usage:', result.error);
-                    }
-                  }).catch(error => {
-                    console.error('[Token] ❌ Error processing JSON response token usage:', error);
-                  });
-                } catch (tokenError) {
-                  console.error('[Token] ❌ Error preparing JSON response token usage:', tokenError);
-                }
+                // 🔧 修复：后端已经处理积分扣除并发送balance_updated事件
+                // 前端只需要监听balance_updated事件，不需要再次调用processTokenUsage
+                console.log('[Token] Backend handles billing - frontend only listens to balance_updated event');
               }
               
               // 🎯 处理工作流开始事件 - 预先显示所有节点
@@ -1969,25 +1930,8 @@ export function DifyChatInterface({
                       console.log('[Token] ✅ Processing enhanced token usage (headers + body combined):', parsed.data.usage);
                       tokenUsageProcessed = true; // 标记已处理，避免重复计费
                       
-                      try {
-                        // 使用结合响应头准确token数量和响应体价格信息的数据进行计费
-                        processTokenUsage(
-                          parsed.data.usage,
-                          parsed.conversation_id,
-                          parsed.message_id || `enhanced_${Date.now()}`,
-                          parsed.data.usage.model || extractModelFromResponse(parsed, 'enhanced_combined') || 'dify-chatflow'
-                        ).then(result => {
-                          if (result.success) {
-                            console.log('[Token] ✅ Successfully processed enhanced token usage:', result.newBalance);
-                          } else {
-                            console.warn('[Token] ❌ Failed to process enhanced token usage:', result.error);
-                          }
-                        }).catch(error => {
-                          console.error('[Token] ❌ Error processing enhanced token usage:', error);
-                        });
-                      } catch (tokenError) {
-                        console.error('[Token] ❌ Error preparing enhanced token usage:', tokenError);
-                      }
+                      // 🔧 修复：后端已处理计费，前端不重复处理
+                      console.log('[Token] Enhanced usage data received (already processed by backend):', parsed.data.usage);
                     } else {
                       console.log('[Token] ℹ️ Enhanced token usage already processed or no usage data available');
                     }
@@ -2000,25 +1944,8 @@ export function DifyChatInterface({
                       console.log('[Token] ✅ Processing server-extracted token usage (from Dify response headers):', parsed.data.usage);
                       tokenUsageProcessed = true; // 标记已处理，避免重复计费
                       
-                      try {
-                        // 使用从响应头提取的真实token数据进行计费
-                        processTokenUsage(
-                          parsed.data.usage,
-                          parsed.conversation_id,
-                          parsed.message_id || `server_extracted_${Date.now()}`,
-                          extractModelFromResponse(parsed, 'server_headers') || 'dify-chatflow'
-                        ).then(result => {
-                          if (result.success) {
-                            console.log('[Token] ✅ Successfully processed server-extracted token usage:', result.newBalance);
-                          } else {
-                            console.warn('[Token] ❌ Failed to process server-extracted token usage:', result.error);
-                          }
-                        }).catch(error => {
-                          console.error('[Token] ❌ Error processing server-extracted token usage:', error);
-                        });
-                      } catch (tokenError) {
-                        console.error('[Token] ❌ Error preparing server-extracted token usage:', tokenError);
-                      }
+                      // 🔧 修复：后端已处理计费，前端不重复处理
+                      console.log('[Token] Server-extracted usage data received (already processed by backend):', parsed.data.usage);
                     } else {
                       console.log('[Token] ℹ️ Server-extracted token usage already processed or no usage data available');
                     }
@@ -2147,7 +2074,8 @@ export function DifyChatInterface({
                     if (parsed.data && parsed.data.outputs && parsed.data.outputs.answer) {
                       console.log('[Chat Debug] Workflow finished with answer:', parsed.data.outputs.answer.length, 'chars');
                       finalResponse = parsed.data.outputs.answer; // ChatFlow的答案在data.outputs.answer中
-                      messageEndReceived = true; // 标记消息完成
+                      // ⚠️ 不要在这里设置messageEndReceived = true，因为后续还有message_end事件包含真实token usage
+                      // messageEndReceived = true; // 标记消息完成
                       
                       // 🎯 修复：如果workflow_finished包含usage数据，立即处理token计费
                       // 这确保最后节点的积分扣除不会被遗漏
@@ -2440,26 +2368,30 @@ export function DifyChatInterface({
         responseKeys: Object.keys(data)
       });
 
-      // 🎯 使用智能计费处理 - 解决Dify控制台有记录但API响应usage为0的问题
-      console.log('[Smart Billing] 🔍 检查blocking API响应进行智能计费处理...');
+      if (data.metadata?.usage) {
+      console.log('[Token] ✅ Processing blocking API token usage:', data.metadata.usage);
       try {
-        // 使用新的智能计费函数处理整个响应
-        processTokenBilling(
-          data, // 传入完整响应而不只是usage
+        // 异步处理token使用，不阻塞UI
+        processTokenUsage(
+          data.metadata.usage,
           data.conversation_id as string,
           data.message_id as string,
+          // 🔍 使用专用提取函数获取模型名称
           extractModelFromResponse(data, 'blocking_api') || 'dify-blocking'
         ).then(result => {
           if (result.success) {
-            console.log('[Smart Billing] ✅ 智能计费处理成功:', result.newBalance);
+            console.log('[Token] ✅ Successfully processed blocking API token usage:', result.newBalance);
           } else {
-            console.warn('[Smart Billing] ❌ 智能计费处理失败:', result.error);
+            console.warn('[Token] ❌ Failed to process blocking API token usage:', result.error);
           }
         }).catch(error => {
-          console.error('[Smart Billing] ❌ 智能计费处理错误:', error);
+          console.error('[Token] ❌ Error processing blocking API token usage:', error);
         });
       } catch (tokenError) {
-        console.error('[Smart Billing] ❌ 智能计费准备错误:', tokenError);
+        console.error('[Token] ❌ Error preparing blocking API token usage:', tokenError);
+      }
+      } else {
+        console.warn('[Token] ⚠️ No usage data found in blocking API response - credits will not be deducted!');
       }
     }
   };

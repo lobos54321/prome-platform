@@ -26,26 +26,51 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
   
   useEffect(() => {
     const currentUser = authService.getCurrentUserSync();
+    
+    // 🔧 验证用户ID格式，如果不是UUID则清除缓存
+    if (currentUser && currentUser.id) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(currentUser.id)) {
+        // 防止无限循环：检查是否已经标记过
+        const alreadyClearing = sessionStorage.getItem('clearing-invalid-user');
+        if (alreadyClearing) {
+          console.log('Already clearing invalid user, skipping...');
+          return;
+        }
+        
+        console.error('⚠️ Invalid user ID detected in PointsDisplay:', currentUser.id);
+        console.log('Clearing invalid cache and forcing re-login...');
+        
+        // 标记正在清除
+        sessionStorage.setItem('clearing-invalid-user', 'true');
+        
+        // 清除所有缓存
+        localStorage.clear();
+        
+        // 强制登出
+        authService.forceLogout();
+        
+        // 重定向到登录页（不使用 window.location.href，使用 replace）
+        window.location.replace('/login');
+        
+        return; // 阻止继续执行
+      }
+    }
+    
     setUser(currentUser);
 
     // Load exchange rate
     loadExchangeRate();
 
-    // Force refresh balance from database if user exists and balance is 0
-    // This handles the cache invalidation issue
-    if (currentUser && currentUser.id && currentUser.balance === 0) {
-      console.log('User balance is 0, checking if refresh is needed...');
+    // 🔧 从数据库刷新余额，确保显示最新数据
+    if (currentUser && currentUser.id) {
+      console.log('PointsDisplay initialized, refreshing balance from database...', {
+        userId: currentUser.id,
+        cachedBalance: currentUser.balance
+      });
       
-      // For the specific problematic user, always refresh
-      if (currentUser.id === '9dee4891-89a6-44ee-8fe8-69097846e97d') {
-        console.log('Problematic user detected, forcing balance refresh...');
-        refreshBalanceFromDatabase();
-      } else {
-        // For other users, refresh after a short delay to avoid blocking UI
-        setTimeout(() => {
-          refreshBalanceFromDatabase();
-        }, 1000);
-      }
+      // 立即刷新余额（不延迟，确保新打开页面时能立即显示正确余额）
+      refreshBalanceFromDatabase();
     }
 
     // 监听认证状态变化
@@ -221,9 +246,9 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
                   <span className="text-lg font-semibold">
                     {pointsValue.toLocaleString()}
                   </span>
-                  <span className="text-sm text-gray-500">{t('billing.points', 'points')}</span>
+                  <span className="text-sm text-gray-500">{t('billing.points')}</span>
                   {isPotentialCacheIssue && (
-                    <AlertCircle className="h-4 w-4 text-amber-500" title={t('dashboard.refresh_balance', 'Refresh Balance')} />
+                    <AlertCircle className="h-4 w-4 text-amber-500" title={t('dashboard.refresh_balance')} />
                   )}
                   {showDetails && (
                     <Button
@@ -232,7 +257,7 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
                       className="h-6 w-6 p-0"
                       onClick={refreshBalanceFromDatabase}
                       disabled={isRefreshingBalance}
-                      title={t('dashboard.refresh_balance', 'Refresh Balance')}
+                      title={t('dashboard.refresh_balance')}
                     >
                       <RefreshCw className={`h-3 w-3 ${isRefreshingBalance ? 'animate-spin' : ''}`} />
                     </Button>
@@ -242,7 +267,7 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
                   <div className="flex items-center space-x-1 text-sm text-gray-500">
                     <DollarSign className="h-3 w-3" />
                     <span>
-                      {isLoadingRate ? t('common.loading', 'Loading...') : `≈ $${usdEquivalent.toFixed(4)}`}
+                      {isLoadingRate ? t('common.loading') : `≈ $${usdEquivalent.toFixed(4)}`}
                     </span>
                   </div>
                 )}
@@ -269,7 +294,7 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
         
         {showDetails && pointsHistory.length > 0 && (
           <div className="mt-3 pt-3 border-t">
-            <div className="text-xs text-gray-500 mb-2">{t('dashboard.recent_usage', 'Recent Usage')}</div>
+            <div className="text-xs text-gray-500 mb-2">{t('token_dashboard.recent_usage_records')}</div>
             <div className="space-y-1">
               {pointsHistory.slice(0, 3).map((record, index) => (
                 <div key={index} className="flex justify-between items-center text-xs">
@@ -290,7 +315,7 @@ export default function PointsDisplay({ className = '', showDetails = true }: Po
             <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
               <div className="flex items-center space-x-1">
                 <AlertCircle className="h-3 w-3" />
-                <span>{t('dashboard.refresh_balance', 'Refresh Balance')}</span>
+                <span>{t('dashboard.refresh_balance')} - {t('common.loading')}</span>
               </div>
             </div>
           </div>
