@@ -1,0 +1,17 @@
+
+> prome@0.0.0 dev
+> vite
+
+Re-optimizing dependencies because lockfile has changed
+Port 5173 is in use, trying another one...
+Port 5174 is in use, trying another one...
+Port 5175 is in use, trying another one...
+
+  VITE v5.4.19  ready in 1502 ms
+
+  ➜  Local:   http://localhost:5176/
+  ➜  Network: use --host to expose
+12:52:07 PM [vite] hmr update /src/pages/DifyChat.tsx, /src/index.css
+12:52:07 PM [vite] hmr update /src/pages/DifyChat.tsx, /src/index.css
+12:58:54 PM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+12:59:02 PM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css

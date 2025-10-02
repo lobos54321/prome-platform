@@ -1,0 +1,140 @@
+[dotenv@17.2.1] injecting env (24) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+🚀 Starting Prome Platform server
+✅ Dify API environment variables are configured
+Server is running on port 8080
+🔍 Performing database health check...
+✅ Database health check passed - all required tables exist
+🔄 Video balance check: Original userId: 9dee4891-89a6-44ee-8fe8-69097846e97d → Valid UUID: 9dee4891-89a6-44ee-8fe8-69097846e97d
+🔍 Image extraction request for: https://www.amazon.com/dp/B08N5WRWNW
+🔍 Processing fresh request for: https://www.amazon.com/dp/B08N5WRWNW
+🌐 Using platform-specific headers for: www.amazon.com
+🎯 Amazon page detected - using specialized extraction
+🎯 Using quality threshold: 0, found 0 images
+🔍 Found 0 total images for URL: https://www.amazon.com/dp/B08N5WRWNW
+📊 All images with scores (top 10):
+✅ Extracted 0 high-quality images from https://www.amazon.com/dp/B08N5WRWNW
+📊 Quality filter: 0 total -> 0 high-quality (score > 100)
+🔍 Image extraction request for: https://www.amazon.com.au/Tresemm%C3%A9-Moisture-Shampoo-Vitamin-Jojoba/dp/B09TL6X795
+🔍 Processing fresh request for: https://www.amazon.com.au/Tresemm%C3%A9-Moisture-Shampoo-Vitamin-Jojoba/dp/B09TL6X795
+🌐 Using platform-specific headers for: www.amazon.com.au
+🎯 Amazon page detected - using specialized extraction
+🔍 Amazon image found via #landingImage: https://m.media-amazon.com/images/I/619EVV01D-L._AC_SY300_SX300_QL70_ML2_.jpg... (score: 965)
+🔍 Amazon image found via .a-dynamic-image: https://images-fe.ssl-images-amazon.com/images/I/619EVV01D-L._AC_UL116_SR116,116... (score: 1165)
+🔍 Amazon image found via .a-dynamic-image: https://images-fe.ssl-images-amazon.com/images/I/61kWxMgXyFL._AC_UL116_SR116,116... (score: 1165)
+🔍 Amazon image found via .a-dynamic-image: https://images-fe.ssl-images-amazon.com/images/I/71iE-FERIqL._AC_UL116_SR116,116... (score: 1165)
+🔍 Amazon image found via .a-button-thumbnail img: https://m.media-amazon.com/images/I/31-GHWBrwQL._AC_US40_.jpg... (score: 765)
+🔍 Amazon image found via .a-button-thumbnail img: https://m.media-amazon.com/images/I/41PVsCXWwWL._AC_US40_.jpg... (score: 765)
+🔍 Amazon image found via .a-button-thumbnail img: https://m.media-amazon.com/images/I/411NokYR36L._AC_US40_.jpg... (score: 765)
+🔍 Amazon image found via .a-button-thumbnail img: https://m.media-amazon.com/images/I/416N5CkNcrL._AC_US40_.jpg... (score: 765)
+🔍 Amazon image found via .a-button-thumbnail img: https://m.media-amazon.com/images/I/41K+2NxuNaL._AC_US40_.jpg... (score: 765)
+🔍 Amazon image found via .a-button-thumbnail img: https://m.media-amazon.com/images/I/41XcXQDWtjL._AC_US40_.jpg... (score: 765)
+🔍 Amazon image found via .a-button-thumbnail img: https://m.media-amazon.com/images/I/411KcueL4VL.SS40_BG85,85,85_BR-120_PKdp-play... (score: 500)
+🔍 Amazon image found via .a-button-thumbnail img: https://images-na.ssl-images-amazon.com/images/G/01/x-locale/common/transparent-... (score: 600)
+🔍 Amazon image found via #imageBlock img: https://images-na.ssl-images-amazon.com/images/G/01/x-locale/common/grey-pixel.g... (score: 500)
+🎯 Using quality threshold: 100, found 4 images
+🎯 Amazon图片ID: 619EVV01D-L
+📊 尝试多个URL版本:
+   1. https://m.media-amazon.com/images/I/619EVV01D-L.jpg
+   2. https://images-na.ssl-images-amazon.com/images/I/619EVV01D-L.jpg
+   3. https://m.media-amazon.com/images/I/619EVV01D-L._SL1600_.jpg
+   4. https://m.media-amazon.com/images/I/619EVV01D-L._SX679_.jpg
+   5. https://m.media-amazon.com/images/I/619EVV01D-L._AC_SX679_.jpg
+   6. https://images-fe.ssl-images-amazon.com/images/I/619EVV01D-L._SL3000_.jpg
+   7. https://images-fe.ssl-images-amazon.com/images/I/619EVV01D-L.jpg
+🔄 Converting image: https://images-fe.ssl-images-amazon.com/images/I/619EVV01D-L._AC_UL116_SR116,116_.jpg...
+   ➡️ High-res: https://m.media-amazon.com/images/I/619EVV01D-L.jpg...
+🧪 正在测试Amazon图片ID 619EVV01D-L 的多个版本...
+🎯 Amazon图片ID: 61kWxMgXyFL
+📊 尝试多个URL版本:
+   1. https://m.media-amazon.com/images/I/61kWxMgXyFL.jpg
+   2. https://images-na.ssl-images-amazon.com/images/I/61kWxMgXyFL.jpg
+   3. https://m.media-amazon.com/images/I/61kWxMgXyFL._SL1600_.jpg
+   4. https://m.media-amazon.com/images/I/61kWxMgXyFL._SX679_.jpg
+   5. https://m.media-amazon.com/images/I/61kWxMgXyFL._AC_SX679_.jpg
+   6. https://images-fe.ssl-images-amazon.com/images/I/61kWxMgXyFL._SL3000_.jpg
+   7. https://images-fe.ssl-images-amazon.com/images/I/61kWxMgXyFL.jpg
+🔄 Converting image: https://images-fe.ssl-images-amazon.com/images/I/61kWxMgXyFL._AC_UL116_SR116,116_.jpg...
+   ➡️ High-res: https://m.media-amazon.com/images/I/61kWxMgXyFL.jpg...
+🧪 正在测试Amazon图片ID 61kWxMgXyFL 的多个版本...
+🎯 Amazon图片ID: 71iE-FERIqL
+📊 尝试多个URL版本:
+   1. https://m.media-amazon.com/images/I/71iE-FERIqL.jpg
+   2. https://images-na.ssl-images-amazon.com/images/I/71iE-FERIqL.jpg
+   3. https://m.media-amazon.com/images/I/71iE-FERIqL._SL1600_.jpg
+   4. https://m.media-amazon.com/images/I/71iE-FERIqL._SX679_.jpg
+   5. https://m.media-amazon.com/images/I/71iE-FERIqL._AC_SX679_.jpg
+   6. https://images-fe.ssl-images-amazon.com/images/I/71iE-FERIqL._SL3000_.jpg
+   7. https://images-fe.ssl-images-amazon.com/images/I/71iE-FERIqL.jpg
+🔄 Converting image: https://images-fe.ssl-images-amazon.com/images/I/71iE-FERIqL._AC_UL116_SR116,116_.jpg...
+   ➡️ High-res: https://m.media-amazon.com/images/I/71iE-FERIqL.jpg...
+🧪 正在测试Amazon图片ID 71iE-FERIqL 的多个版本...
+🎯 Amazon图片ID: 619EVV01D-L
+📊 尝试多个URL版本:
+   1. https://m.media-amazon.com/images/I/619EVV01D-L.jpg
+   2. https://images-na.ssl-images-amazon.com/images/I/619EVV01D-L.jpg
+   3. https://m.media-amazon.com/images/I/619EVV01D-L._SL1600_.jpg
+   4. https://m.media-amazon.com/images/I/619EVV01D-L._SX679_.jpg
+   5. https://m.media-amazon.com/images/I/619EVV01D-L._AC_SX679_.jpg
+   6. https://m.media-amazon.com/images/I/619EVV01D-L._SL3000_.jpg
+   7. https://m.media-amazon.com/images/I/619EVV01D-L.jpg
+🔄 Converting image: https://m.media-amazon.com/images/I/619EVV01D-L._AC_SY300_SX300_QL70_ML2_.jpg...
+   ➡️ High-res: https://m.media-amazon.com/images/I/619EVV01D-L.jpg...
+🧪 正在测试Amazon图片ID 619EVV01D-L 的多个版本...
+✅ Amazon图片版本 1 可用: https://m.media-amazon.com/images/I/61kWxMgXyFL.jpg...
+✅ Amazon图片版本 1 可用: https://m.media-amazon.com/images/I/71iE-FERIqL.jpg...
+✅ Amazon图片版本 1 可用: https://m.media-amazon.com/images/I/619EVV01D-L.jpg...
+✅ Amazon图片版本 1 可用: https://m.media-amazon.com/images/I/619EVV01D-L.jpg...
+🔍 Found 20 total images for URL: https://www.amazon.com.au/Tresemm%C3%A9-Moisture-Shampoo-Vitamin-Jojoba/dp/B09TL6X795
+📊 All images with scores (top 10):
+  1. Score: 1165
+     URL: https://images-fe.ssl-images-amazon.com/images/I/619EVV01D-L._AC_UL116_SR116,116_.jpg
+     Alt: ""
+     Class: "a-dynamic-image p13n-sc-dynamic-image p13n-product-image"
+
+  2. Score: 1165
+     URL: https://images-fe.ssl-images-amazon.com/images/I/61kWxMgXyFL._AC_UL116_SR116,116_.jpg
+     Alt: "Dove Triple Hydrate Body Wash 1 L"
+     Class: "a-dynamic-image p13n-sc-dynamic-image p13n-product-image"
+
+  3. Score: 1165
+     URL: https://images-fe.ssl-images-amazon.com/images/I/71iE-FERIqL._AC_UL116_SR116,116_.jpg
+     Alt: "Quilton 3-Ply Toilet Tissue 48 Pack (1 x 48 Rolls)"
+     Class: "a-dynamic-image p13n-sc-dynamic-image p13n-product-image"
+
+  4. Score: 965
+     URL: https://m.media-amazon.com/images/I/619EVV01D-L._AC_SY300_SX300_QL70_ML2_.jpg
+     Alt: "Tresemme Moisture Rich Shampoo 940 mL"
+     Class: "a-dynamic-image"
+
+  5. Score: 765
+     URL: https://m.media-amazon.com/images/I/31-GHWBrwQL._AC_US40_.jpg
+     Alt: ""
+     Class: ""
+
+  6. Score: 765
+     URL: https://m.media-amazon.com/images/I/41PVsCXWwWL._AC_US40_.jpg
+     Alt: ""
+     Class: ""
+
+  7. Score: 765
+     URL: https://m.media-amazon.com/images/I/411NokYR36L._AC_US40_.jpg
+     Alt: ""
+     Class: ""
+
+  8. Score: 765
+     URL: https://m.media-amazon.com/images/I/416N5CkNcrL._AC_US40_.jpg
+     Alt: ""
+     Class: ""
+
+  9. Score: 765
+     URL: https://m.media-amazon.com/images/I/41K+2NxuNaL._AC_US40_.jpg
+     Alt: ""
+     Class: ""
+
+  10. Score: 765
+     URL: https://m.media-amazon.com/images/I/41XcXQDWtjL._AC_US40_.jpg
+     Alt: ""
+     Class: ""
+
+✅ Extracted 4 high-quality images from https://www.amazon.com.au/Tresemm%C3%A9-Moisture-Shampoo-Vitamin-Jojoba/dp/B09TL6X795
+📊 Quality filter: 20 total -> 4 high-quality (score > 100)
