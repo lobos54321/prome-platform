@@ -250,6 +250,38 @@ export function DifyChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 🆕 生成用户专属的localStorage键名（用于数据隔离）
+  const getUserStorageKey = (baseKey: string): string => {
+    // 如果有认证用户，使用用户ID；否则使用设备ID
+    const userIdentifier = user?.id || cloudChatHistory.getDeviceId();
+    return `${baseKey}_${userIdentifier}`;
+  };
+
+  // 🆕 清理旧用户的localStorage数据（在用户切换时调用）
+  const clearUserLocalStorage = () => {
+    if (typeof window === 'undefined') return;
+    
+    console.log('[Chat Debug] 🧹 清理当前用户的localStorage数据');
+    
+    // 清理所有Dify相关的键
+    const keysToClean = ['dify_messages', 'dify_conversation_id', 'dify_workflow_state', 'dify_user_id', 'dify_session_timestamp', 'dify_last_real_activity', 'dify_conversation_id_streaming', 'dify_last_visit'];
+    
+    keysToClean.forEach(key => {
+      // 清理通用键（不带用户ID后缀的）
+      localStorage.removeItem(key);
+      console.log('[Chat Debug]   ✓ 已清理:', key);
+      
+      // 清理带用户ID后缀的键（如果存在）
+      const userKey = getUserStorageKey(key);
+      if (userKey !== key) {
+        localStorage.removeItem(userKey);
+        console.log('[Chat Debug]   ✓ 已清理:', userKey);
+      }
+    });
+    
+    console.log('[Chat Debug] ✅ localStorage清理完成');
+  };
+
   // 🔧 新增：调试工具函数
   const debugWorkflowStatus = () => {
     if (typeof window !== 'undefined') {
@@ -406,7 +438,21 @@ export function DifyChatInterface({
       }
       
       console.log('[Chat Debug] 🔄 从数据库加载对话历史...');
-      const cloudConversations = await cloudChatHistory.getConversations();
+      const cloudConversations = await cloudChatHistory.getAllConversations();
+      
+      console.log('[Chat Debug] 📦 原始云端数据:', cloudConversations);
+      
+      // 🔧 确保返回的是数组
+      if (!Array.isArray(cloudConversations)) {
+        console.warn('[Chat Debug] ⚠️ getAllConversations返回非数组，使用空数组');
+        setChatHistory(prev => ({
+          ...prev,
+          conversations: [],
+          syncStatus: 'idle',
+          lastSyncTime: now
+        }));
+        return;
+      }
       
       const convertedConversations: ConversationHistoryItem[] = cloudConversations.map(conv => ({
         id: conv.id,
@@ -760,6 +806,40 @@ export function DifyChatInterface({
       if (typeof window === 'undefined') return;
 
       try {
+        // 🔥 关键修复：用户切换时清理旧用户的localStorage数据
+        // 检查当前localStorage中的user_id是否与当前登录用户匹配
+        const storedUserId = localStorage.getItem('dify_user_id');
+        const currentUserId = user?.id || cloudChatHistory.getDeviceId();
+        
+        if (storedUserId && storedUserId !== currentUserId) {
+          console.log('[Chat Debug] 🔄 检测到用户切换，清理旧用户数据');
+          console.log('[Chat Debug] 旧用户ID:', storedUserId);
+          console.log('[Chat Debug] 新用户ID:', currentUserId);
+          
+          // 清理旧用户的localStorage数据
+          clearUserLocalStorage();
+          
+          // 清空当前消息和状态
+          setMessages([]);
+          setConversationId('');
+          setWorkflowState({
+            isWorkflow: false,
+            nodes: [],
+            completedNodes: 0
+          });
+        }
+        
+        // 🆕 设置当前用户ID到cloudChatHistory（用于数据隔离）
+        if (user?.id) {
+          cloudChatHistory.setUserId(user.id);
+          localStorage.setItem('dify_user_id', user.id);
+          console.log('[Chat Debug] ✅ 已设置用户ID到云端历史服务:', user.id);
+        } else {
+          cloudChatHistory.setUserId(null);
+          localStorage.setItem('dify_user_id', currentUserId);
+          console.log('[Chat Debug] ⚠️ 未登录用户，使用设备ID隔离:', currentUserId);
+        }
+        
         // 检查是否需要迁移
         const migrationInfo = await chatHistoryMigration.getMigrationStatus();
         
@@ -783,7 +863,7 @@ export function DifyChatInterface({
     };
 
     initializeCloudHistory();
-  }, []);
+  }, [user?.id]); // 🆕 当用户登录/登出时重新初始化
 
   // 🔧 修复：添加页面刷新前和组件卸载时保存对话历史
   // 🔧 修复：只在真正关闭浏览器时保存，页面刷新不保存（避免重复记录）
@@ -1001,8 +1081,27 @@ export function DifyChatInterface({
   // 🔧 添加备用消息恢复机制 - 确保无论何种情况都能恢复历史
   useEffect(() => {
     // 早期检查并恢复消息历史（备用机制）
+    // 🔥 关键修复：验证localStorage中的消息是否属于当前用户
     const storedMessages = localStorage.getItem('dify_messages');
+    const storedUserId = localStorage.getItem('dify_user_id');
+    const currentUserId = user?.id || cloudChatHistory.getDeviceId();
+    
     if (storedMessages && messages.length === 0) {
+      // 🔥 检查localStorage中的user_id是否匹配当前用户
+      if (storedUserId !== currentUserId) {
+        console.log('[Chat Debug] 🚫 [备用机制] 检测到用户不匹配，跳过恢复');
+        console.log('[Chat Debug] localStorage中的user_id:', storedUserId);
+        console.log('[Chat Debug] 当前user_id:', currentUserId);
+        
+        // 清理旧用户的localStorage数据
+        localStorage.removeItem('dify_messages');
+        localStorage.removeItem('dify_conversation_id');
+        localStorage.removeItem('dify_workflow_state');
+        
+        // 不恢复消息，继续显示欢迎消息
+        return;
+      }
+      
       try {
         const parsedMessages = JSON.parse(storedMessages);
         if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
@@ -1014,7 +1113,7 @@ export function DifyChatInterface({
           );
           
           if (nonWelcomeMessages.length > 0) {
-            console.log('[Chat Debug] 🔄 [备用机制] 恢复消息历史:', nonWelcomeMessages.length, '条消息');
+            console.log('[Chat Debug] 🔄 [备用机制] 恢复消息历史:', nonWelcomeMessages.length, '条消息 (user_id:', currentUserId, ')');
             const restoredMessages = nonWelcomeMessages.map((msg: any) => ({
               ...msg,
               timestamp: new Date(msg.timestamp)

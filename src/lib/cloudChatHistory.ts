@@ -48,6 +48,7 @@ export interface ConversationWithMessages extends ChatConversation {
 class CloudChatHistoryService {
   private supabase: SupabaseClient;
   private deviceId: string;
+  private userId: string | null = null; // 🆕 添加用户ID属性
 
   constructor() {
     // 🔧 修复：使用共享的Supabase实例，避免多实例警告
@@ -57,6 +58,38 @@ class CloudChatHistoryService {
 
     this.supabase = supabase;
     this.deviceId = this.getOrCreateDeviceId();
+    this.userId = this.getCurrentUserId(); // 🆕 初始化用户ID
+  }
+  
+  /**
+   * 🆕 获取当前登录用户ID
+   */
+  private getCurrentUserId(): string | null {
+    if (typeof window === 'undefined') return null;
+    
+    // 🔧 修复：从localStorage的currentUser对象中获取用户ID
+    try {
+      const currentUserStr = localStorage.getItem('currentUser');
+      if (currentUserStr) {
+        const currentUser = JSON.parse(currentUserStr);
+        if (currentUser?.id) {
+          console.log('[CloudChatHistory] 使用认证用户ID:', currentUser.id);
+          return currentUser.id;
+        }
+      }
+    } catch (error) {
+      console.warn('[CloudChatHistory] 解析currentUser失败:', error);
+    }
+    
+    return null; // 未登录用户
+  }
+  
+  /**
+   * 🆕 设置当前用户ID（登录/登出时调用）
+   */
+  public setUserId(userId: string | null): void {
+    this.userId = userId;
+    console.log('[CloudChatHistory] 用户ID已更新:', userId || '未登录');
   }
 
   /**
@@ -210,6 +243,7 @@ class CloudChatHistoryService {
     
     const conversationData = {
       device_id: this.deviceId,
+      user_id: this.userId, // 🆕 添加用户ID用于数据隔离
       title,
       dify_conversation_id: difyConversationId,
       message_count: messages.length,
@@ -311,21 +345,38 @@ class CloudChatHistoryService {
     
     const offset = page * limit;
     
-    // 先获取总数
-    const { count } = await this.supabase
+    // 🆕 构建查询条件 - 优先使用用户ID，未登录用户使用设备ID
+    const queryBuilder = this.supabase
       .from('chat_conversations')
-      .select('id', { count: 'exact', head: true })
-      .eq('device_id', this.deviceId);
+      .select('id', { count: 'exact', head: true });
     
+    if (this.userId) {
+      // 已登录用户：只查询该用户的对话
+      queryBuilder.eq('user_id', this.userId);
+      console.log('[CloudChatHistory] 查询用户对话，user_id:', this.userId);
+    } else {
+      // 未登录用户：使用设备ID查询，且user_id必须为null
+      queryBuilder.eq('device_id', this.deviceId).is('user_id', null);
+      console.log('[CloudChatHistory] 查询匿名对话，device_id:', this.deviceId);
+    }
+    
+    const { count } = await queryBuilder;
     const total = count || 0;
     
-    // 获取分页数据
-    const { data, error } = await this.supabase
+    // 🆕 获取分页数据 - 使用相同的过滤条件
+    const dataQueryBuilder = this.supabase
       .from('chat_conversations')
       .select('*')
-      .eq('device_id', this.deviceId)
       .order('updated_at', { ascending: false })
       .range(offset, offset + limit - 1);
+    
+    if (this.userId) {
+      dataQueryBuilder.eq('user_id', this.userId);
+    } else {
+      dataQueryBuilder.eq('device_id', this.deviceId).is('user_id', null);
+    }
+    
+    const { data, error } = await dataQueryBuilder;
 
     if (error) {
       throw new Error(`Failed to fetch conversations: ${error.message}`);
@@ -333,6 +384,18 @@ class CloudChatHistoryService {
 
     const conversations = data || [];
     const hasMore = offset + conversations.length < total;
+    
+    console.log(`[CloudChatHistory] 加载了 ${conversations.length} 个对话 (总计: ${total})`);
+    
+    // 🔍 调试：显示加载的对话的user_id
+    if (conversations.length > 0) {
+      console.log('[CloudChatHistory] 📋 加载的对话详情:', conversations.map(c => ({
+        id: c.id,
+        title: c.title,
+        user_id: c.user_id,
+        device_id: c.device_id
+      })));
+    }
     
     return {
       conversations,
