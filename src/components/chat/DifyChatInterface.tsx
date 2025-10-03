@@ -881,6 +881,32 @@ export function DifyChatInterface({
                 
                 console.log('[Chat Debug] ✅ 消息历史恢复完成:', restoredMessages.length, '条');
                 setMessages(restoredMessages);
+                
+                // 🆕 关键修复：页面刷新后立即将当前对话同步到云端
+                // 避免刷新后历史记录面板显示为空
+                setTimeout(async () => {
+                  try {
+                    console.log('[Chat Debug] 💾 页面刷新后自动保存当前对话到云端...');
+                    
+                    // 生成对话标题
+                    const title = restoredMessages.find(m => m.role === 'user')?.content.slice(0, 50) || '未命名对话';
+                    
+                    // 保存到云端（saveConversation会自动处理重复检测）
+                    const conversationId = await cloudChatHistory.saveConversation(
+                      title,
+                      restoredMessages,
+                      storedWorkflowState ? JSON.parse(storedWorkflowState) : undefined,
+                      storedConversationId || undefined
+                    );
+                    
+                    console.log('[Chat Debug] ✅ 当前对话已同步到云端，ID:', conversationId);
+                    
+                    // 刷新云端对话列表
+                    await loadCloudConversations(true);
+                  } catch (error) {
+                    console.warn('[Chat Debug] ⚠️ 保存当前对话到云端失败:', error);
+                  }
+                }, 1000); // 1秒后执行，避免阻塞页面加载
               }
             }
             

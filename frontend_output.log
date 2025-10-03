@@ -15,3 +15,6 @@ Port 5175 is in use, trying another one...
 12:52:07 PM [vite] hmr update /src/pages/DifyChat.tsx, /src/index.css
 12:58:54 PM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
 12:59:02 PM [vite] hmr update /src/components/ui/PointsDisplay.tsx, /src/index.css
+11:41:14 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+11:41:14 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
+11:51:52 AM [vite] hmr update /src/components/chat/DifyChatInterface.tsx, /src/index.css
