@@ -25,9 +25,14 @@
   <meta property="og:description" content="Feed your feed to your AI, and let it feed you" />
   <meta property="og:type" content="website" />
 
-  <!-- Reddit Pixel -->
+  <!-- Reddit Pixel (Production Only) -->
   <script>
-  !function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);rdt('init','a2_hs1sha77iwfy');rdt('track', 'PageVisit');
+  // Only load Reddit Pixel in production (not localhost)
+  if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+    !function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);rdt('init','a2_hs1sha77iwfy');rdt('track', 'PageVisit');
+  } else {
+    console.log('[Dev Mode] Reddit Pixel disabled on localhost');
+  }
   </script>
   <!-- DO NOT MODIFY UNLESS TO REPLACE A USER IDENTIFIER -->
   <!-- End Reddit Pixel -->
