@@ -43,6 +43,7 @@ import TestWorkflowProgress from './pages/TestWorkflowProgress';
 
 import NotFound from './pages/NotFound';
 import AuthCallback from './pages/AuthCallback';
+import XiaohongshuAutomationPage from './pages/XiaohongshuAutomationPage';
 
 const queryClient = new QueryClient();
 
@@ -213,6 +214,7 @@ const App = () => {
               <Route path="/dify-debug-old" element={<DifyDebugPage />} />
               <Route path="/dify-flow-test" element={<DifyFlowTest />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/xiaohongshu" element={<XiaohongshuAutomationPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
