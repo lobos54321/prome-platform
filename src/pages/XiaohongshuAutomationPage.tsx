@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSupabase } from '@/hooks/useSupabase';
+import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,7 @@ interface PerformanceStats {
 
 const XiaohongshuAutomationPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, supabase } = useSupabase();
+  const { user, isLoading: authLoading } = useAuth();
 
   // 状态管理
   const [loading, setLoading] = useState(true);
@@ -71,6 +71,9 @@ const XiaohongshuAutomationPage: React.FC = () => {
 
   // 检查用户认证
   useEffect(() => {
+    // 等待认证加载完成
+    if (authLoading) return;
+
     if (!user) {
       toast.error('请先登录');
       navigate('/login');
@@ -78,7 +81,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
     }
 
     initializeAutomation();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   // 初始化小红书自动化状态
   const initializeAutomation = async () => {
@@ -275,7 +278,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [automationStatus.isRunning]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
