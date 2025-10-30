@@ -88,14 +88,19 @@ const XiaohongshuAutomationPage: React.FC = () => {
     try {
       setLoading(true);
 
+      console.log('🔍 检查小红书自动化状态，用户ID:', user.id);
+
       // 检查小红书登录状态
       const loginStatus = await xiaohongshuApi.checkLoginStatus(user.id);
+      console.log('📱 小红书登录状态:', loginStatus);
 
       // 检查是否有配置
       const configStatus = await xiaohongshuApi.getConfiguration(user.id);
+      console.log('⚙️ 配置状态:', configStatus);
 
       // 获取运营状态
       const runningStatus = await xiaohongshuApi.getAutomationStatus(user.id);
+      console.log('🤖 运营状态:', runningStatus);
 
       setAutomationStatus({
         isLoggedIn: loginStatus.logged_in,
