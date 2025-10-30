@@ -47,6 +47,8 @@ const XiaohongshuAutomationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [xiaohongshuUserId, setXiaohongshuUserId] = useState<string>('');
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [isShowingQR, setIsShowingQR] = useState(false);
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus>({
     isRunning: false,
     isLoggedIn: false,
@@ -160,26 +162,38 @@ const XiaohongshuAutomationPage: React.FC = () => {
     }
   };
 
-  // 小红书登录
+  // 小红书登录 - 使用二维码
   const handleXHSLogin = async () => {
-    try {
-      const loginUrl = 'https://www.xiaohongshu.com/login';
-      const loginWindow = window.open(loginUrl, 'xhsLogin', 'width=400,height=600');
+    if (!xiaohongshuUserId) {
+      toast.error('用户ID未初始化，请刷新页面重试');
+      return;
+    }
 
-      if (!loginWindow) {
-        toast.error('弹窗被拦截，请手动打开小红书登录页面');
-        return;
+    try {
+      console.log('🔍 开始获取小红书登录二维码...');
+
+      // 获取二维码
+      const qrData = await xiaohongshuApi.getLoginQRCode(xiaohongshuUserId);
+      console.log('📱 二维码数据:', qrData);
+
+      if (!qrData.qrCodeUrl) {
+        throw new Error('未获取到二维码');
       }
 
-      // 轮询检查登录状态
+      setQrCodeUrl(qrData.qrCodeUrl);
+      setIsShowingQR(true);
+      toast.success('请使用小红书APP扫描二维码登录');
+
+      // 开始轮询检查登录状态
       const checkInterval = setInterval(async () => {
         try {
           const status = await xiaohongshuApi.checkLoginStatus(xiaohongshuUserId);
+          console.log('🔍 登录状态检查:', status);
+
           if (status.logged_in) {
             clearInterval(checkInterval);
-            if (!loginWindow.closed) {
-              loginWindow.close();
-            }
+            setIsShowingQR(false);
+            setQrCodeUrl('');
             setAutomationStatus(prev => ({ ...prev, isLoggedIn: true }));
             toast.success('小红书账号绑定成功！');
           }
@@ -188,14 +202,19 @@ const XiaohongshuAutomationPage: React.FC = () => {
         }
       }, 3000);
 
-      // 10分钟后停止检查
+      // 5分钟后停止检查
       setTimeout(() => {
         clearInterval(checkInterval);
-      }, 600000);
+        if (isShowingQR) {
+          setIsShowingQR(false);
+          setQrCodeUrl('');
+          toast.warning('登录超时，请重新尝试');
+        }
+      }, 300000);
 
     } catch (error) {
-      console.error('启动登录失败:', error);
-      toast.error('启动登录失败，请重试');
+      console.error('获取二维码失败:', error);
+      toast.error('获取二维码失败，请重试');
     }
   };
 
@@ -650,6 +669,55 @@ const XiaohongshuAutomationPage: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 二维码登录模态框 */}
+      {isShowingQR && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-96 max-w-sm mx-4">
+            <CardHeader>
+              <CardTitle className="text-center">扫码登录小红书</CardTitle>
+              <CardDescription className="text-center">
+                请使用小红书APP扫描下方二维码完成账号绑定
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              {qrCodeUrl ? (
+                <div className="space-y-4">
+                  <div className="flex justify-center">
+                    <img
+                      src={qrCodeUrl}
+                      alt="小红书登录二维码"
+                      className="w-48 h-48 border border-gray-200 rounded-lg"
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <div>📱 打开小红书APP</div>
+                    <div>📷 扫描上方二维码</div>
+                    <div>✅ 确认登录授权</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p>正在生成二维码...</p>
+                </div>
+              )}
+              <div className="mt-4 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsShowingQR(false);
+                    setQrCodeUrl('');
+                  }}
+                  className="w-full"
+                >
+                  取消登录
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
