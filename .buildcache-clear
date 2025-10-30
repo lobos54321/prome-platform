@@ -1,5 +1,0 @@
-CACHE_CLEAR_REQUIRED=true
-BUILD_FROM_SCRATCH=true
-IGNORE_GIT_CHECKOUT=true
-TIMESTAMP=2024-10-30T18:36:00Z
-REASON=Force rebuild after rollback to commit e2bdc17
