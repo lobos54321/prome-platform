@@ -49,6 +49,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
   const [xiaohongshuUserId, setXiaohongshuUserId] = useState<string>('');
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isShowingQR, setIsShowingQR] = useState(false);
+  const [qrLoginPolling, setQrLoginPolling] = useState<NodeJS.Timeout | null>(null);
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus>({
     isRunning: false,
     isLoggedIn: false,
@@ -162,7 +163,43 @@ const XiaohongshuAutomationPage: React.FC = () => {
     }
   };
 
-  // 小红书登录 - 使用二维码
+  // 停止二维码登录轮询
+  const stopQRLoginPolling = () => {
+    if (qrLoginPolling) {
+      clearInterval(qrLoginPolling);
+      setQrLoginPolling(null);
+    }
+  };
+
+  // 开始二维码登录轮询
+  const startQRLoginPolling = () => {
+    stopQRLoginPolling(); // 先清除可能存在的定时器
+
+    const interval = setInterval(async () => {
+      try {
+        console.log('🔍 轮询检查登录状态...');
+        const result = await xiaohongshuApi.checkLoginStatus(xiaohongshuUserId);
+
+        if (result.logged_in === true) {
+          console.log('✅ 登录成功！');
+          stopQRLoginPolling();
+
+          setTimeout(() => {
+            setIsShowingQR(false);
+            setQrCodeUrl('');
+            setAutomationStatus(prev => ({ ...prev, isLoggedIn: true }));
+            toast.success('小红书账号绑定成功！');
+          }, 1500);
+        }
+      } catch (error) {
+        console.error('轮询登录状态失败:', error);
+      }
+    }, 3000); // 每3秒检查一次
+
+    setQrLoginPolling(interval);
+  };
+
+  // 小红书自动登录 - 与原始页面保持一致
   const handleXHSLogin = async () => {
     if (!xiaohongshuUserId) {
       toast.error('用户ID未初始化，请刷新页面重试');
@@ -170,52 +207,39 @@ const XiaohongshuAutomationPage: React.FC = () => {
     }
 
     try {
-      console.log('🔍 开始获取小红书登录二维码...');
+      console.log('🚀 启动自动登录...');
 
-      // 获取二维码
-      const qrData = await xiaohongshuApi.getLoginQRCode(xiaohongshuUserId);
-      console.log('📱 二维码数据:', qrData);
+      // 显示二维码弹窗
+      setIsShowingQR(true);
+      setQrCodeUrl('');
+      toast.info('正在生成二维码...');
 
-      if (!qrData.qrCodeUrl) {
+      // 调用自动登录API - 使用正确的API
+      const result = await xiaohongshuApi.startAutoLogin(xiaohongshuUserId);
+      console.log('自动登录响应:', result);
+
+      if (result.qrcode_url) {
+        setQrCodeUrl(result.qrcode_url);
+        toast.success('请使用小红书APP扫描二维码登录');
+
+        // 开始轮询检查登录状态
+        startQRLoginPolling();
+      } else {
         throw new Error('未获取到二维码');
       }
 
-      setQrCodeUrl(qrData.qrCodeUrl);
-      setIsShowingQR(true);
-      toast.success('请使用小红书APP扫描二维码登录');
-
-      // 开始轮询检查登录状态
-      const checkInterval = setInterval(async () => {
-        try {
-          const status = await xiaohongshuApi.checkLoginStatus(xiaohongshuUserId);
-          console.log('🔍 登录状态检查:', status);
-
-          if (status.logged_in) {
-            clearInterval(checkInterval);
-            setIsShowingQR(false);
-            setQrCodeUrl('');
-            setAutomationStatus(prev => ({ ...prev, isLoggedIn: true }));
-            toast.success('小红书账号绑定成功！');
-          }
-        } catch (error) {
-          console.error('检查登录状态失败:', error);
-        }
-      }, 3000);
-
-      // 5分钟后停止检查
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        if (isShowingQR) {
-          setIsShowingQR(false);
-          setQrCodeUrl('');
-          toast.warning('登录超时，请重新尝试');
-        }
-      }, 300000);
-
     } catch (error) {
-      console.error('获取二维码失败:', error);
+      console.error('自动登录失败:', error);
+      setIsShowingQR(false);
       toast.error('获取二维码失败，请重试');
     }
+  };
+
+  // 关闭二维码弹窗
+  const closeQRModal = () => {
+    setIsShowingQR(false);
+    setQrCodeUrl('');
+    stopQRLoginPolling();
   };
 
   // 提交配置并启动自动运营
@@ -316,6 +340,13 @@ const XiaohongshuAutomationPage: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [automationStatus.isRunning]);
+
+  // 组件卸载时清理轮询
+  useEffect(() => {
+    return () => {
+      stopQRLoginPolling();
+    };
+  }, []);
 
   if (loading || authLoading) {
     return (
@@ -705,10 +736,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
               <div className="mt-4 pt-4 border-t">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setIsShowingQR(false);
-                    setQrCodeUrl('');
-                  }}
+                  onClick={closeQRModal}
                   className="w-full"
                 >
                   取消登录

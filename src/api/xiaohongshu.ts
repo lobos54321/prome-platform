@@ -120,17 +120,21 @@ class XiaohongshuApiService {
     return response.data || { logged_in: false };
   }
 
-  // 获取小红书登录二维码
-  async getLoginQRCode(userId: string): Promise<{qrCodeUrl: string, loginId: string}> {
-    const response = await this.request<ApiResponse<{qrCodeUrl: string, loginId: string}>>(
-      `/api/v1/login/qrcode?userId=${userId}`
+  // 获取小红书登录二维码 - 修正API路径
+  async startAutoLogin(userId: string): Promise<{qrcode_url: string}> {
+    const response = await this.request<ApiResponse<{qrcode_url: string}>>(
+      `/agent/xiaohongshu/auto-login`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      }
     );
 
     if (!response.success) {
-      throw new Error(response.error || '获取二维码失败');
+      throw new Error(response.error || '启动自动登录失败');
     }
 
-    return response.data || { qrCodeUrl: '', loginId: '' };
+    return response.data || { qrcode_url: '' };
   }
 
   // 小红书登出
