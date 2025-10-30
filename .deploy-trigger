@@ -1,6 +1,6 @@
-# Deployment Trigger - Thu Oct 30 19:36:00 CST 2025
+# Deployment Trigger - Thu Oct 30 19:41:00 CST 2025
 # This file triggers Zeabur to redeploy after rollback to ed1699d6bdaf9bc06ac5484337ee8a3371d927f4
-# Timestamp: 2025-10-30T11:35:52.101Z
-# Action: Force redeployment of rolled-back version with Xiaohongshu QR login fixes
-# Update: Clear Zeabur cache - use buildCommand, not Dockerfile
-# Important: This deployment uses zeabur.json buildCommand, NOT Docker build
+# Timestamp: 2025-10-30T11:41:30.617Z
+# Action: Force redeployment with complete Dockerfile
+# Update: Restored proper multi-stage Dockerfile for Zeabur deployment
+# Build: Docker multi-stage build with production optimization
