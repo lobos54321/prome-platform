@@ -46,6 +46,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
   // 状态管理
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [xiaohongshuUserId, setXiaohongshuUserId] = useState<string>('');
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus>({
     isRunning: false,
     isLoggedIn: false,
@@ -83,23 +84,35 @@ const XiaohongshuAutomationPage: React.FC = () => {
     initializeAutomation();
   }, [user, authLoading, navigate]);
 
+  // 生成稳定的小红书用户ID
+  const generateXiaohongshuUserId = (supabaseId: string): string => {
+    // 使用Supabase ID的hash生成稳定的用户ID
+    const cleanId = supabaseId.replace(/-/g, '').substring(0, 16);
+    return `user_${cleanId}_prome`;
+  };
+
   // 初始化小红书自动化状态
   const initializeAutomation = async () => {
     try {
       setLoading(true);
 
-      console.log('🔍 检查小红书自动化状态，用户ID:', user.id);
+      // 生成兼容后端的用户ID格式
+      const userId = generateXiaohongshuUserId(user.id);
+      setXiaohongshuUserId(userId);
+      console.log('🔍 检查小红书自动化状态');
+      console.log('📝 Supabase UUID:', user.id);
+      console.log('📝 小红书用户ID:', userId);
 
       // 检查小红书登录状态
-      const loginStatus = await xiaohongshuApi.checkLoginStatus(user.id);
+      const loginStatus = await xiaohongshuApi.checkLoginStatus(userId);
       console.log('📱 小红书登录状态:', loginStatus);
 
       // 检查是否有配置
-      const configStatus = await xiaohongshuApi.getConfiguration(user.id);
+      const configStatus = await xiaohongshuApi.getConfiguration(userId);
       console.log('⚙️ 配置状态:', configStatus);
 
       // 获取运营状态
-      const runningStatus = await xiaohongshuApi.getAutomationStatus(user.id);
+      const runningStatus = await xiaohongshuApi.getAutomationStatus(userId);
       console.log('🤖 运营状态:', runningStatus);
 
       setAutomationStatus({
@@ -127,8 +140,9 @@ const XiaohongshuAutomationPage: React.FC = () => {
 
   // 加载运营数据
   const loadPerformanceData = async () => {
+    if (!xiaohongshuUserId) return;
     try {
-      const stats = await xiaohongshuApi.getPerformanceStats(user.id);
+      const stats = await xiaohongshuApi.getPerformanceStats(xiaohongshuUserId);
       setPerformanceStats(stats);
     } catch (error) {
       console.error('加载运营数据失败:', error);
@@ -137,8 +151,9 @@ const XiaohongshuAutomationPage: React.FC = () => {
 
   // 加载活动记录
   const loadActivities = async () => {
+    if (!xiaohongshuUserId) return;
     try {
-      const activityData = await xiaohongshuApi.getActivities(user.id);
+      const activityData = await xiaohongshuApi.getActivities(xiaohongshuUserId);
       setActivities(activityData);
     } catch (error) {
       console.error('加载活动记录失败:', error);
@@ -159,7 +174,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
       // 轮询检查登录状态
       const checkInterval = setInterval(async () => {
         try {
-          const status = await xiaohongshuApi.checkLoginStatus(user.id);
+          const status = await xiaohongshuApi.checkLoginStatus(xiaohongshuUserId);
           if (status.logged_in) {
             clearInterval(checkInterval);
             if (!loginWindow.closed) {
@@ -196,7 +211,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
 
       const config = {
         ...userConfig,
-        userId: user.id
+        userId: xiaohongshuUserId
       };
 
       // 保存配置并启动自动运营
@@ -226,11 +241,11 @@ const XiaohongshuAutomationPage: React.FC = () => {
   const handleToggleAutomation = async () => {
     try {
       if (automationStatus.isRunning) {
-        await xiaohongshuApi.pauseAutomation(user.id);
+        await xiaohongshuApi.pauseAutomation(xiaohongshuUserId);
         setAutomationStatus(prev => ({ ...prev, isRunning: false }));
         toast.success('自动运营已暂停');
       } else {
-        await xiaohongshuApi.resumeAutomation(user.id);
+        await xiaohongshuApi.resumeAutomation(xiaohongshuUserId);
         setAutomationStatus(prev => ({ ...prev, isRunning: true }));
         toast.success('自动运营已恢复');
       }
@@ -247,7 +262,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
     }
 
     try {
-      await xiaohongshuApi.resetConfiguration(user.id);
+      await xiaohongshuApi.resetConfiguration(xiaohongshuUserId);
 
       setAutomationStatus(prev => ({
         ...prev,
