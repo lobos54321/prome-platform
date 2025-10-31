@@ -43,6 +43,8 @@ import TestWorkflowProgress from './pages/TestWorkflowProgress';
 
 import NotFound from './pages/NotFound';
 import AuthCallback from './pages/AuthCallback';
+import XiaohongshuMarketing from './pages/XiaohongshuMarketing';
+import XiaohongshuAutomation from './pages/XiaohongshuAutomation';
 
 const queryClient = new QueryClient();
 
@@ -201,6 +203,8 @@ const App = () => {
               <Route path="/n8n-test" element={<N8nTest />} />
               <Route path="/n8n-diagnostic" element={<N8nDiagnostic />} />
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
+              <Route path="/xiaohongshu-old" element={<XiaohongshuMarketing />} />
+              <Route path="/xiaohongshu" element={<XiaohongshuAutomation />} />
               <Route path="/admin" element={<Admin />} />
 
 
