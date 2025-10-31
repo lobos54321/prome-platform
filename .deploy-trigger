@@ -1,0 +1,5 @@
+# Deployment Trigger - Thu Oct 30 23:27:00 CST 2025
+# This file triggers Zeabur to redeploy after rollback to ed1699d6bdaf9bc06ac5484337ee8a3371d927f4
+# Timestamp: 2025-10-30T23:27:52.345Z
+# Action: Fix Node.js version compatibility - upgrade to Node.js 20
+# Fix: Resolve "ReferenceError: File is not defined" by using Node.js 20+ (required by Supabase)

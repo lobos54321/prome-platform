@@ -217,6 +217,7 @@ const App = () => {
               <Route path="/dify-debug-old" element={<DifyDebugPage />} />
               <Route path="/dify-flow-test" element={<DifyFlowTest />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/xiaohongshu" element={<XiaohongshuAutomationPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
