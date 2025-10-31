@@ -136,6 +136,64 @@ export default function XiaohongshuAutomation() {
     }
   };
 
+  const handleReconfigure = async () => {
+    if (!confirm('确定要重新配置吗？这将停止当前的自动运营并清除所有数据。')) {
+      return;
+    }
+
+    try {
+      if (supabaseUuid && xhsUserId) {
+        // 调用后端API清除服务器端数据
+        await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
+      }
+
+      // 重置状态
+      setUserProfile(null);
+      setAutomationStatus(null);
+      setContentStrategy(null);
+      setWeeklyPlan(null);
+      setCurrentStep('config');
+    } catch (err) {
+      console.error('Reconfigure error:', err);
+      setError('重新配置失败，请刷新页面重试');
+    }
+  };
+
+  const handleLogout = async () => {
+    if (!confirm('确定要退出登录吗？这将清除所有本地数据和服务器端运营配置。')) {
+      return;
+    }
+
+    try {
+      // 清除服务器端数据
+      if (supabaseUuid && xhsUserId) {
+        await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
+      }
+
+      // 清除本地存储
+      localStorage.removeItem('xhs_logged_in');
+      localStorage.removeItem('lastLogoutTime');
+      localStorage.setItem('lastLogoutTime', Date.now().toString());
+
+      // 重置所有状态
+      setUserProfile(null);
+      setAutomationStatus(null);
+      setContentStrategy(null);
+      setWeeklyPlan(null);
+      setCurrentStep('login');
+
+      alert('已退出登录！\n\n⚠️ 为确保数据完全清理，系统将禁止新登录60秒。');
+      
+      // 刷新页面
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (err) {
+      console.error('Logout error:', err);
+      setError('退出登录失败，请刷新页面重试');
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -202,6 +260,8 @@ export default function XiaohongshuAutomation() {
               contentStrategy={contentStrategy}
               weeklyPlan={weeklyPlan}
               onRefresh={handleRefresh}
+              onReconfigure={handleReconfigure}
+              onLogout={handleLogout}
             />
           )}
         </div>

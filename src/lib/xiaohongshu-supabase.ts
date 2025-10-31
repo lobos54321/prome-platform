@@ -223,6 +223,43 @@ export class XiaohongshuSupabaseService {
 
     return data || [];
   }
+
+  // ============================================
+  // 数据清除
+  // ============================================
+
+  async clearUserData(supabaseUuid: string): Promise<void> {
+    try {
+      // 清除自动化状态
+      await supabase
+        .from('xhs_automation_status')
+        .delete()
+        .eq('supabase_uuid', supabaseUuid);
+
+      // 清除内容策略
+      await supabase
+        .from('xhs_content_strategies')
+        .delete()
+        .eq('supabase_uuid', supabaseUuid);
+
+      // 清除周计划
+      await supabase
+        .from('xhs_weekly_plans')
+        .delete()
+        .eq('supabase_uuid', supabaseUuid);
+
+      // 清除活动日志
+      await supabase
+        .from('xhs_activity_logs')
+        .delete()
+        .eq('supabase_uuid', supabaseUuid);
+
+      console.log('✅ User data cleared successfully');
+    } catch (error) {
+      console.error('Error clearing user data:', error);
+      throw new Error('Failed to clear user data');
+    }
+  }
 }
 
 // 导出单例

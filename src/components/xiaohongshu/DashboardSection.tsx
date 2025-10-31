@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Settings, LogOut } from 'lucide-react';
 import { StatusCard } from './StatusCard';
 import { StrategyCard } from './StrategyCard';
 import { WeeklyPlanCard } from './WeeklyPlanCard';
@@ -16,6 +16,8 @@ interface DashboardSectionProps {
   contentStrategy: ContentStrategy | null;
   weeklyPlan: WeeklyPlan | null;
   onRefresh: () => void;
+  onReconfigure?: () => void;
+  onLogout?: () => void;
 }
 
 export function DashboardSection({
@@ -25,6 +27,8 @@ export function DashboardSection({
   contentStrategy: initialStrategy,
   weeklyPlan: initialPlan,
   onRefresh,
+  onReconfigure,
+  onLogout,
 }: DashboardSectionProps) {
   const [status, setStatus] = useState<AutomationStatus | null>(initialStatus);
   const [strategy, setStrategy] = useState<ContentStrategy | null>(initialStrategy);
@@ -103,6 +107,38 @@ export function DashboardSection({
 
   return (
     <div className="space-y-6">
+      {/* 顶部操作按钮栏 */}
+      <div className="flex items-center justify-between bg-white rounded-lg p-4 shadow-sm">
+        <div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            🤖 自动运营进行中
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">系统正在为您自动管理小红书内容</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {onReconfigure && (
+            <Button
+              onClick={onReconfigure}
+              variant="outline"
+              size="sm"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              重新配置
+            </Button>
+          )}
+          {onLogout && (
+            <Button
+              onClick={onLogout}
+              variant="destructive"
+              size="sm"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              退出登录
+            </Button>
+          )}
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
