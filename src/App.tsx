@@ -44,6 +44,9 @@ import TestWorkflowProgress from './pages/TestWorkflowProgress';
 import NotFound from './pages/NotFound';
 import AuthCallback from './pages/AuthCallback';
 import XiaohongshuAutomation from './pages/XiaohongshuAutomation';
+import XiaohongshuMarketing from './pages/XiaohongshuMarketing';
+import XiaohongshuAutoManager from './pages/XiaohongshuAutoManager';
+>>>>>>> c09f7d2 (✨ 添加完整的小红书自动运营管理页面)
 
 const queryClient = new QueryClient();
 
@@ -202,7 +205,9 @@ const App = () => {
               <Route path="/n8n-test" element={<N8nTest />} />
               <Route path="/n8n-diagnostic" element={<N8nDiagnostic />} />
               <Route path="/ai-content/:serviceId" element={<AIContentGeneration />} />
-              <Route path="/xiaohongshu" element={<XiaohongshuAutomation />} />
+              <Route path="/xiaohongshu" element={<XiaohongshuAutoManager />} />
+              <Route path="/xiaohongshu-old" element={<XiaohongshuAutomation />} />
+              <Route path="/xiaohongshu-api" element={<XiaohongshuMarketing />} />
               <Route path="/admin" element={<Admin />} />
 
 
