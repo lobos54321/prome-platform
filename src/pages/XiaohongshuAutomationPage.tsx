@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, CheckCircle, Loader2, Settings, BarChart3, Calendar, Users } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle, Loader2, Settings, BarChart3, Calendar, Users, WifiOff, Database } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { xiaohongshuApi } from '@/api/xiaohongshu';
+import { xiaohongshuDb } from '@/lib/xiaohongshu-db';
 import { toast } from 'sonner';
 
 interface UserConfig {
@@ -39,6 +40,12 @@ interface PerformanceStats {
   engagementRate: number;
 }
 
+interface BackendHealth {
+  available: boolean;
+  lastChecked?: Date;
+  error?: string;
+}
+
 const XiaohongshuAutomationPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
@@ -50,6 +57,9 @@ const XiaohongshuAutomationPage: React.FC = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isShowingQR, setIsShowingQR] = useState(false);
   const [qrLoginPolling, setQrLoginPolling] = useState<NodeJS.Timeout | null>(null);
+  const [backendHealth, setBackendHealth] = useState<BackendHealth>({
+    available: false,
+  });
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus>({
     isRunning: false,
     isLoggedIn: false,
@@ -94,50 +104,157 @@ const XiaohongshuAutomationPage: React.FC = () => {
     return `user_${cleanId}_prome`;
   };
 
+  // 检查后端健康状态
+  const checkBackendHealth = async (): Promise<boolean> => {
+    try {
+      const isHealthy = await xiaohongshuApi.healthCheck();
+      setBackendHealth({
+        available: isHealthy,
+        lastChecked: new Date(),
+      });
+      return isHealthy;
+    } catch (error) {
+      console.error('Backend health check failed:', error);
+      setBackendHealth({
+        available: false,
+        lastChecked: new Date(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return false;
+    }
+  };
+
   // 初始化小红书自动化状态
   const initializeAutomation = async () => {
+    if (!user) return;
+
     try {
       setLoading(true);
 
       // 生成兼容后端的用户ID格式
       const userId = generateXiaohongshuUserId(user.id);
       setXiaohongshuUserId(userId);
-      console.log('🔍 检查小红书自动化状态');
+      console.log('🔍 初始化小红书自动化');
       console.log('📝 Supabase UUID:', user.id);
       console.log('📝 小红书用户ID:', userId);
 
-      // 检查小红书登录状态
-      const loginStatus = await xiaohongshuApi.checkLoginStatus(userId);
-      console.log('📱 小红书登录状态:', loginStatus);
+      // 创建或获取用户映射
+      await xiaohongshuDb.getOrCreateUserMapping(user.id, userId);
+      console.log('✅ 用户映射已创建/获取');
 
-      // 检查是否有配置
-      const configStatus = await xiaohongshuApi.getConfiguration(userId);
-      console.log('⚙️ 配置状态:', configStatus);
-
-      // 获取运营状态
-      const runningStatus = await xiaohongshuApi.getAutomationStatus(userId);
-      console.log('🤖 运营状态:', runningStatus);
-
-      setAutomationStatus({
-        isLoggedIn: loginStatus.logged_in,
-        hasConfig: !!configStatus.strategy,
-        isRunning: runningStatus.isRunning,
-        lastActivity: runningStatus.lastActivity,
-        uptime: runningStatus.uptime || 0
+      // 记录初始化活动
+      await xiaohongshuDb.logActivity({
+        supabase_uuid: user.id,
+        xhs_user_id: userId,
+        activity_type: 'system',
+        message: '初始化小红书自动化系统',
       });
 
-      // 如果有配置，加载配置和数据
-      if (configStatus.strategy) {
-        setUserConfig(configStatus.strategy);
-        await loadPerformanceData();
-        await loadActivities();
+      // 检查后端健康状态
+      const isBackendHealthy = await checkBackendHealth();
+
+      if (!isBackendHealthy) {
+        toast.warning('后端服务暂时不可用，将使用本地模式', {
+          description: '部分功能可能受限，但您可以查看和编辑配置',
+        });
       }
+
+      // 从数据库加载状态
+      const dbStatus = await xiaohongshuDb.getAutomationStatus(user.id);
+      const dbProfile = await xiaohongshuDb.getUserProfile(user.id);
+
+      // 如果后端可用，尝试获取实时状态
+      if (isBackendHealthy) {
+        try {
+          const loginStatus = await xiaohongshuApi.checkLoginStatus(userId);
+          const configStatus = await xiaohongshuApi.getConfiguration(userId);
+          const runningStatus = await xiaohongshuApi.getAutomationStatus(userId);
+
+          // 更新状态到数据库
+          await xiaohongshuDb.upsertAutomationStatus({
+            supabase_uuid: user.id,
+            xhs_user_id: userId,
+            is_logged_in: loginStatus.logged_in,
+            has_config: !!configStatus.strategy,
+            is_running: runningStatus.isRunning,
+            last_activity: runningStatus.lastActivity,
+            uptime_seconds: runningStatus.uptime || 0,
+          });
+
+          setAutomationStatus({
+            isLoggedIn: loginStatus.logged_in,
+            hasConfig: !!configStatus.strategy,
+            isRunning: runningStatus.isRunning,
+            lastActivity: runningStatus.lastActivity,
+            uptime: runningStatus.uptime || 0,
+          });
+
+          if (configStatus.strategy) {
+            setUserConfig(configStatus.strategy);
+          }
+        } catch (error) {
+          console.warn('获取后端状态失败，使用数据库状态:', error);
+          // 使用数据库状态作为后备
+          if (dbStatus) {
+            setAutomationStatus({
+              isLoggedIn: dbStatus.is_logged_in || false,
+              hasConfig: dbStatus.has_config || false,
+              isRunning: dbStatus.is_running || false,
+              lastActivity: dbStatus.last_activity,
+              uptime: dbStatus.uptime_seconds || 0,
+            });
+          }
+        }
+      } else {
+        // 后端不可用，使用数据库状态
+        if (dbStatus) {
+          setAutomationStatus({
+            isLoggedIn: dbStatus.is_logged_in || false,
+            hasConfig: dbStatus.has_config || false,
+            isRunning: false, // 后端不可用时强制为false
+            lastActivity: dbStatus.last_activity,
+            uptime: dbStatus.uptime_seconds || 0,
+          });
+        }
+      }
+
+      // 加载用户配置
+      if (dbProfile) {
+        setUserConfig({
+          productName: dbProfile.product_name,
+          targetAudience: dbProfile.target_audience || '',
+          marketingGoal: (dbProfile.marketing_goal as any) || 'brand',
+          postFrequency: (dbProfile.post_frequency as any) || 'daily',
+          brandStyle: (dbProfile.brand_style as any) || 'warm',
+          reviewMode: (dbProfile.review_mode as any) || 'auto',
+        });
+      }
+
+      // 加载活动记录
+      await loadActivitiesFromDb();
 
     } catch (error) {
       console.error('初始化失败:', error);
-      toast.error('初始化小红书自动化失败');
+      toast.error('初始化小红书自动化失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 从数据库加载活动记录
+  const loadActivitiesFromDb = async () => {
+    if (!user) return;
+    try {
+      const logs = await xiaohongshuDb.getRecentActivities(user.id, 20);
+      const formattedActivities = logs.map(log => ({
+        message: log.message,
+        timestamp: new Date(log.created_at!).toLocaleString('zh-CN'),
+      }));
+      setActivities(formattedActivities);
+    } catch (error) {
+      console.error('加载活动记录失败:', error);
     }
   };
 
@@ -206,6 +323,13 @@ const XiaohongshuAutomationPage: React.FC = () => {
       return;
     }
 
+    if (!backendHealth.available) {
+      toast.error('后端服务不可用', {
+        description: '请先确保后端服务正常运行后再尝试登录',
+      });
+      return;
+    }
+
     try {
       console.log('🚀 启动自动登录...');
 
@@ -227,11 +351,12 @@ const XiaohongshuAutomationPage: React.FC = () => {
       } else {
         throw new Error('未获取到二维码');
       }
-
     } catch (error) {
       console.error('自动登录失败:', error);
       setIsShowingQR(false);
-      toast.error('获取二维码失败，请重试');
+      toast.error('获取二维码失败，请重试', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
     }
   };
 
@@ -244,6 +369,7 @@ const XiaohongshuAutomationPage: React.FC = () => {
 
   // 提交配置并启动自动运营
   const handleSubmitConfig = async () => {
+    if (!user) return;
     if (!userConfig.productName.trim()) {
       toast.error('请填写产品/服务信息');
       return;
@@ -252,29 +378,100 @@ const XiaohongshuAutomationPage: React.FC = () => {
     try {
       setSubmitting(true);
 
-      const config = {
-        ...userConfig,
-        userId: xiaohongshuUserId
-      };
+      // 保存配置到数据库
+      await xiaohongshuDb.upsertUserProfile({
+        supabase_uuid: user.id,
+        xhs_user_id: xiaohongshuUserId,
+        product_name: userConfig.productName,
+        target_audience: userConfig.targetAudience,
+        marketing_goal: userConfig.marketingGoal,
+        post_frequency: userConfig.postFrequency,
+        brand_style: userConfig.brandStyle,
+        review_mode: userConfig.reviewMode,
+      });
 
-      // 保存配置并启动自动运营
-      await xiaohongshuApi.startAutomation(config);
+      // 记录活动
+      await xiaohongshuDb.logActivity({
+        supabase_uuid: user.id,
+        xhs_user_id: xiaohongshuUserId,
+        activity_type: 'config',
+        message: `配置已保存：${userConfig.productName}`,
+        metadata: userConfig,
+      });
 
-      setAutomationStatus(prev => ({
-        ...prev,
-        hasConfig: true,
-        isRunning: true
-      }));
+      // 如果后端可用，尝试启动自动运营
+      if (backendHealth.available) {
+        try {
+          const config = {
+            ...userConfig,
+            userId: xiaohongshuUserId,
+          };
 
-      toast.success('自动运营已启动！');
+          await xiaohongshuApi.startAutomation(config);
 
-      // 开始加载运营数据
-      await loadPerformanceData();
-      await loadActivities();
+          // 更新状态到数据库
+          await xiaohongshuDb.upsertAutomationStatus({
+            supabase_uuid: user.id,
+            xhs_user_id: xiaohongshuUserId,
+            has_config: true,
+            is_running: true,
+          });
 
+          setAutomationStatus(prev => ({
+            ...prev,
+            hasConfig: true,
+            isRunning: true,
+          }));
+
+          toast.success('配置已保存并启动自动运营！');
+
+          // 开始加载运营数据
+          await loadPerformanceData();
+          await loadActivitiesFromDb();
+        } catch (error) {
+          console.error('启动自动运营失败:', error);
+          toast.warning('配置已保存，但启动自动运营失败', {
+            description: '您可以稍后在后端恢复时重试',
+          });
+
+          // 更新本地状态
+          await xiaohongshuDb.upsertAutomationStatus({
+            supabase_uuid: user.id,
+            xhs_user_id: xiaohongshuUserId,
+            has_config: true,
+            is_running: false,
+          });
+
+          setAutomationStatus(prev => ({
+            ...prev,
+            hasConfig: true,
+            isRunning: false,
+          }));
+        }
+      } else {
+        // 后端不可用，只保存配置
+        await xiaohongshuDb.upsertAutomationStatus({
+          supabase_uuid: user.id,
+          xhs_user_id: xiaohongshuUserId,
+          has_config: true,
+          is_running: false,
+        });
+
+        setAutomationStatus(prev => ({
+          ...prev,
+          hasConfig: true,
+          isRunning: false,
+        }));
+
+        toast.success('配置已保存！', {
+          description: '后端服务恢复后即可启动自动运营',
+        });
+      }
     } catch (error) {
-      console.error('启动自动运营失败:', error);
-      toast.error('启动自动运营失败，请重试');
+      console.error('保存配置失败:', error);
+      toast.error('保存配置失败，请重试', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -367,6 +564,36 @@ const XiaohongshuAutomationPage: React.FC = () => {
           <h1 className="text-3xl font-bold mb-2">🤖 小红书全自动运营系统</h1>
           <p className="text-muted-foreground">一次设置，终身自动 - 让AI为你打理一切</p>
         </div>
+
+        {/* Backend Health Status */}
+        {!backendHealth.available && (
+          <Alert className="mb-6" variant="destructive">
+            <WifiOff className="h-4 w-4" />
+            <AlertTitle>后端服务暂时不可用</AlertTitle>
+            <AlertDescription>
+              无法连接到小红书自动化服务器。您仍可以配置和保存设置，服务恢复后可以启动自动运营。
+              <div className="mt-2 flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={checkBackendHealth}
+                  className="text-xs"
+                >
+                  重新检测
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Database Status */}
+        <Alert className="mb-6" variant="default">
+          <Database className="h-4 w-4" />
+          <AlertTitle>数据持久化已启用</AlertTitle>
+          <AlertDescription>
+            您的配置和活动记录将自动保存到数据库，确保数据安全可靠。
+          </AlertDescription>
+        </Alert>
 
         <div className="space-y-6">
           {/* 步骤1：小红书账号绑定 */}
