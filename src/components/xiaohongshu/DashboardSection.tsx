@@ -145,6 +145,51 @@ export function DashboardSection({
     alert('数据分析功能开发中...');
   };
 
+  const handleApprovePost = async (postId: string) => {
+    if (!confirm('确认批准发布此内容？')) {
+      return;
+    }
+
+    try {
+      // 调用批准发布API
+      const response = await xiaohongshuAPI.approvePost(xhsUserId, postId);
+      if (response.success) {
+        alert('✅ 内容已批准发布！');
+        await fetchData(); // 刷新数据
+      } else {
+        alert('批准失败：' + (response.error || '未知错误'));
+      }
+    } catch (error: any) {
+      console.error('批准发布失败:', error);
+      alert('批准失败：' + error.message);
+    }
+  };
+
+  const handleEditPost = (postId: string) => {
+    alert('修改功能开发中...\n\n将在未来版本中支持：\n- 修改标题和文案\n- 调整发布时间\n- 更换图片');
+  };
+
+  const handleRegeneratePost = async (postId: string) => {
+    if (!confirm('确认重新生成此内容？当前内容将被替换。')) {
+      return;
+    }
+
+    try {
+      alert('🔄 正在重新生成内容...\n\n这可能需要1-2分钟，请稍候。');
+      // 调用重新生成API
+      const response = await xiaohongshuAPI.regeneratePost(xhsUserId, postId);
+      if (response.success) {
+        alert('✅ 内容已重新生成！');
+        await fetchData(); // 刷新数据
+      } else {
+        alert('重新生成失败：' + (response.error || '未知错误'));
+      }
+    } catch (error: any) {
+      console.error('重新生成失败:', error);
+      alert('重新生成失败：' + error.message);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 顶部操作按钮栏 */}
@@ -220,7 +265,12 @@ export function DashboardSection({
 
           {/* 次要数据卡片网格 */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <ContentPreviewCard content={nextContent} />
+            <ContentPreviewCard 
+              content={nextContent}
+              onApprove={handleApprovePost}
+              onEdit={handleEditPost}
+              onRegenerate={handleRegeneratePost}
+            />
             <ReadyQueueCard queue={readyQueue} />
             <PerformanceCard data={performanceData} />
           </div>

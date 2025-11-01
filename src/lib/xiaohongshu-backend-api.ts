@@ -205,6 +205,46 @@ export class XiaohongshuBackendAPI {
       return false;
     }
   }
+
+  /**
+   * 批准发布内容
+   */
+  async approvePost(userId: string, postId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/approve/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ postId }),
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * 重新生成内容
+   */
+  async regeneratePost(userId: string, postId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/regenerate/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ postId }),
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
 }
 
 // 导出单例

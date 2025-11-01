@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Image as ImageIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Clock, Image as ImageIcon, Check, Edit, RefreshCw } from 'lucide-react';
 
 interface ContentPreviewCardProps {
   content?: {
+    id?: string;
     title: string;
     content: string;
     scheduledTime: string;
@@ -11,9 +13,12 @@ interface ContentPreviewCardProps {
     imageUrls?: string[];
     hashtags?: string[];
   } | null;
+  onApprove?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onRegenerate?: (id: string) => void;
 }
 
-export function ContentPreviewCard({ content }: ContentPreviewCardProps) {
+export function ContentPreviewCard({ content, onApprove, onEdit, onRegenerate }: ContentPreviewCardProps) {
   if (!content) {
     return (
       <Card>
@@ -78,6 +83,42 @@ export function ContentPreviewCard({ content }: ContentPreviewCardProps) {
           <Clock className="w-4 h-4" />
           <span>{content.scheduledTime}</span>
           <Badge variant="outline">{content.type}</Badge>
+        </div>
+
+        {/* 操作按钮 */}
+        <div className="flex gap-2 pt-4 border-t">
+          {onApprove && (
+            <Button
+              onClick={() => content.id && onApprove(content.id)}
+              className="flex-1 bg-green-500 hover:bg-green-600"
+              size="sm"
+            >
+              <Check className="w-4 h-4 mr-1" />
+              批准发布
+            </Button>
+          )}
+          {onEdit && (
+            <Button
+              onClick={() => content.id && onEdit(content.id)}
+              variant="outline"
+              className="flex-1"
+              size="sm"
+            >
+              <Edit className="w-4 h-4 mr-1" />
+              修改
+            </Button>
+          )}
+          {onRegenerate && (
+            <Button
+              onClick={() => content.id && onRegenerate(content.id)}
+              variant="outline"
+              className="flex-1"
+              size="sm"
+            >
+              <RefreshCw className="w-4 h-4 mr-1" />
+              重新生成
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
