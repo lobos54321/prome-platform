@@ -308,6 +308,12 @@ export function DashboardSection({
             🤖 自动运营进行中
           </h2>
           <p className="text-sm text-gray-600 mt-1">系统正在为您自动管理小红书内容</p>
+          {(!status || !strategy || !plan) && (
+            <p className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+              <span className="inline-block animate-spin">⏳</span>
+              内容生成中，首次启动需要2-5分钟，系统每10秒自动刷新，最长等待16分钟...
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {onReconfigure && (
