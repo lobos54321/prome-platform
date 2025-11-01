@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings, LogOut } from 'lucide-react';
+import { RefreshCw, Settings, LogOut, Pause, FileText, Target, TrendingUp } from 'lucide-react';
 import { StatusCard } from './StatusCard';
 import { StrategyCard } from './StrategyCard';
 import { WeeklyPlanCard } from './WeeklyPlanCard';
+import { ContentPreviewCard } from './ContentPreviewCard';
+import { ReadyQueueCard } from './ReadyQueueCard';
+import { PerformanceCard } from './PerformanceCard';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
 import type { AutomationStatus, ContentStrategy, WeeklyPlan } from '@/types/xiaohongshu';
@@ -35,6 +38,11 @@ export function DashboardSection({
   const [plan, setPlan] = useState<WeeklyPlan | null>(initialPlan);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  // 新增状态
+  const [nextContent, setNextContent] = useState<any>(null);
+  const [readyQueue, setReadyQueue] = useState<any[]>([]);
+  const [performanceData, setPerformanceData] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -57,7 +65,6 @@ export function DashboardSection({
         setStrategy(strategyRes.data);
         await xiaohongshuSupabase.saveContentStrategy({
           supabase_uuid: supabaseUuid,
-          xhs_user_id: xhsUserId,
           ...strategyRes.data,
         });
       }
@@ -66,7 +73,6 @@ export function DashboardSection({
         setPlan(planRes.data);
         await xiaohongshuSupabase.saveWeeklyPlan({
           supabase_uuid: supabaseUuid,
-          xhs_user_id: xhsUserId,
           ...planRes.data,
         });
       }
@@ -83,13 +89,15 @@ export function DashboardSection({
   };
 
   useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchData();
-      }
-    }, 5000);
+      fetchData();
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [autoRefresh, fetchData]);
@@ -104,6 +112,38 @@ export function DashboardSection({
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [autoRefresh, fetchData]);
+
+  // 处理下一篇内容预览和待发布队列
+  useEffect(() => {
+    if (plan && plan.tasks && plan.tasks.length > 0) {
+      const upcoming = plan.tasks.find((t: any) => t.status === 'pending' || t.status === 'ready');
+      setNextContent(upcoming || plan.tasks[0]);
+      
+      const ready = plan.tasks.filter((t: any) => t.status === 'ready' || t.status === 'pending');
+      setReadyQueue(ready.map((t: any, i: number) => ({
+        id: t.id || i.toString(),
+        title: t.title,
+        scheduledTime: t.scheduled_time || t.scheduledTime,
+        status: t.status
+      })));
+    }
+  }, [plan]);
+
+  const handlePause = () => {
+    alert('暂停功能开发中...');
+  };
+
+  const handleViewPending = () => {
+    alert('待发内容功能开发中...');
+  };
+
+  const handleAdjustStrategy = () => {
+    alert('调整策略功能开发中...');
+  };
+
+  const handleViewAnalytics = () => {
+    alert('数据分析功能开发中...');
+  };
 
   return (
     <div className="space-y-6">
@@ -171,12 +211,61 @@ export function DashboardSection({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* 主要数据卡片网格 */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
             <StatusCard status={status} />
-            <div className="md:col-span-2 lg:col-span-2 space-y-6">
-              <StrategyCard strategy={strategy} />
-              <WeeklyPlanCard weeklyPlan={plan} />
-            </div>
+            <StrategyCard strategy={strategy} />
+            <WeeklyPlanCard weeklyPlan={plan} />
+          </div>
+
+          {/* 次要数据卡片网格 */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <ContentPreviewCard content={nextContent} />
+            <ReadyQueueCard queue={readyQueue} />
+            <PerformanceCard data={performanceData} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 控制面板 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">⚙️ 控制面板</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-4 gap-4">
+            <Button
+              onClick={handlePause}
+              variant="secondary"
+              className="w-full"
+            >
+              <Pause className="h-4 w-4 mr-2" />
+              暂停
+            </Button>
+            <Button
+              onClick={handleViewPending}
+              variant="secondary"
+              className="w-full"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              待发内容
+            </Button>
+            <Button
+              onClick={handleAdjustStrategy}
+              variant="secondary"
+              className="w-full"
+            >
+              <Target className="h-4 w-4 mr-2" />
+              调整策略
+            </Button>
+            <Button
+              onClick={handleViewAnalytics}
+              variant="secondary"
+              className="w-full"
+            >
+              <TrendingUp className="h-4 w-4 mr-2" />
+              数据分析
+            </Button>
           </div>
         </CardContent>
       </Card>
