@@ -12,10 +12,11 @@ export class UserMappingService {
   
   /**
    * 生成小红书用户ID
-   * 格式：user_{前16位UUID}_prome
+   * 格式：user_{前14位UUID}_prome
+   * 注意：使用14位是为了与后端历史数据保持一致
    */
   private generateXhsUserId(supabaseUuid: string): string {
-    const cleanId = supabaseUuid.replace(/-/g, '').substring(0, 16);
+    const cleanId = supabaseUuid.replace(/-/g, '').substring(0, 14);
     return `user_${cleanId}_prome`;
   }
 
