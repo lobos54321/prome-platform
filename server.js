@@ -4,17 +4,43 @@ import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import multer from 'multer';
 import * as cheerio from 'cheerio';
+import multer from 'multer';
 
 // Load environment variables
 dotenv.config();
+
+// 🔧 启动诊断日志 - 回滚到工作版本
+console.log('🚀 [BOOT 1] Starting server initialization...');
+console.log('🌍 [BOOT ENV]', {
+  NODE_VERSION: process.version,
+  VITE_DIFY_API_URL: !!process.env.VITE_DIFY_API_URL,
+  VITE_DIFY_API_KEY: !!process.env.VITE_DIFY_API_KEY,
+  NEXT_PUBLIC_DIFY_API_URL: !!process.env.NEXT_PUBLIC_DIFY_API_URL,
+  NEXT_PUBLIC_DIFY_API_KEY: !!process.env.NEXT_PUBLIC_DIFY_API_KEY,
+  VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
+  PORT: process.env.PORT
+});
+
+// 捕获未处理的错误
+process.on('unhandledRejection', (err) => {
+  console.error('❌ [BOOT] UNHANDLED REJECTION:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('❌ [BOOT] UNCAUGHT EXCEPTION:', err);
+});
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
 const app = express();
 const port = process.env.PORT || 8080;
+
+// In-memory storage for digital humans (should be replaced with database in production)
+const digitalHumansStorage = {};
+
+// Temporary storage for mapping training IDs to temp file names for cleanup
+const tempFileCleanupMap = {};
 
 // 初始化 Stripe，确保 Zeabur 或本地 .env 设置了 STRIPE_SECRET_KEY
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -37,7 +63,7 @@ const imageUpload = multer({
   }
 });
 
-// Video upload configuration  
+// Video upload configuration
 const videoUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -52,7 +78,7 @@ const videoUpload = multer({
   }
 });
 
-// Alias for backward compatibility
+// General upload configuration (for backward compatibility)
 const upload = imageUpload;
 
 // 🔍 DEBUG: Log all incoming requests to identify routing
@@ -63,98 +89,104 @@ app.use((req, res, next) => {
   next();
 });
 
-// 内存存储视频结果（生产环境建议使用Redis）
-const videoResults = new Map();
-
-// 视频结果接收端点 - 供N8n工作流3回调使用
-app.post('/api/video-result', (req, res) => {
-  console.log('📥 N8n工作流3回调 - 视频结果:', req.body);
-  
-  const { sessionId, videoUrl, status, timestamp } = req.body;
-  
-  // 验证必填字段
-  if (!sessionId || !videoUrl) {
-    console.error('❌ 缺少必填字段:', req.body);
-    return res.status(400).json({ 
-      error: 'Missing required fields: sessionId, videoUrl' 
-    });
-  }
-
-  // 存储视频结果
-  const result = {
-    sessionId,
-    videoUrl,
-    status,
-    timestamp: timestamp || new Date().toISOString(),
-    receivedAt: Date.now()
-  };
-  
-  videoResults.set(sessionId, result);
-  
-  // 5分钟后自动清理
-  setTimeout(() => {
-    if (videoResults.has(sessionId)) {
-      console.log('🧹 清理过期的视频结果:', sessionId);
-      videoResults.delete(sessionId);
-    }
-  }, 5 * 60 * 1000);
-  
-  console.log('✅ 视频结果已存储:', {
-    sessionId,
-    videoUrl: videoUrl.substring(0, 50) + '...',
-    status
-  });
-  
-  res.json({ 
-    success: true, 
-    message: 'Video result received and stored successfully',
-    sessionId: sessionId
-  });
-});
-
-// 前端轮询检查端点
-app.get('/api/video-result/check/:sessionId', (req, res) => {
-  const { sessionId } = req.params;
-  
-  const result = videoResults.get(sessionId);
-  
-  if (result) {
-    console.log('✅ 返回视频结果给前端:', sessionId);
-    // 返回结果后立即清理
-    videoResults.delete(sessionId);
-    
-    res.json({
-      success: true,
-      result: result
-    });
-  } else {
-    res.json({
-      success: true,
-      result: null
-    });
-  }
-});
-
 // Configuration from environment variables
-const DIFY_API_URL = process.env.VITE_DIFY_API_URL || process.env.DIFY_API_URL || '';
-const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.DIFY_API_KEY || '';
+const DIFY_API_URL = process.env.VITE_DIFY_API_URL || process.env.NEXT_PUBLIC_DIFY_API_URL || process.env.DIFY_API_URL || '';
+const DIFY_API_KEY = process.env.VITE_DIFY_API_KEY || process.env.NEXT_PUBLIC_DIFY_API_KEY || process.env.DIFY_API_KEY || '';
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+// 仙宫云API配置
+const XIANGONG_API_KEY = process.env.VITE_XIANGONG_API_KEY || 'miv4n5hh6313imnijhgqpzqbb0at3xxlm2l24x7r';
+// ComfyUI集成了InfiniteTalk和IndexTTS2，运行在8188端口
+const XIANGONG_COMFYUI_URL = process.env.VITE_XIANGONG_COMFYUI_URL || 'https://3iaszw98tkh12h9x-8188.container.x-gpu.com';
+const XIANGONG_INFINITETALK_URL = XIANGONG_COMFYUI_URL;
+
+// 仙宫云实例使用跟踪
+let lastApiCallTime = null;
+let autoShutdownTimer = null;
+const IDLE_TIMEOUT_MINUTES = 20; // 20分钟闲置自动关机
+
+// 更新最后使用时间的函数
+function updateLastUsage() {
+  lastApiCallTime = new Date();
+  console.log(`📱 更新API使用时间: ${lastApiCallTime.toISOString()}`);
+  
+  // 重置自动关机定时器
+  resetAutoShutdownTimer();
+}
+
+// 重置自动关机定时器
+function resetAutoShutdownTimer() {
+  // 清除之前的定时器
+  if (autoShutdownTimer) {
+    clearTimeout(autoShutdownTimer);
+  }
+  
+  // 设置新的定时器：20分钟后自动关机
+  autoShutdownTimer = setTimeout(async () => {
+    try {
+      console.log(`⏰ ${IDLE_TIMEOUT_MINUTES}分钟无活动，开始自动关机...`);
+      
+      // 首先检查实例状态
+      const statusResponse = await fetch('http://localhost:8080/api/xiangong/instance/status');
+      if (statusResponse.ok) {
+        const statusResult = await statusResponse.json();
+        
+        if (statusResult.success && statusResult.data.status === 'running') {
+          console.log('🔄 实例正在运行，执行自动关机...');
+          
+          // 调用关机API
+          const shutdownResponse = await fetch('http://localhost:8080/api/xiangong/instance/stop', {
+            method: 'POST'
+          });
+          
+          if (shutdownResponse.ok) {
+            const shutdownResult = await shutdownResponse.json();
+            console.log('✅ 自动关机成功:', shutdownResult);
+          } else {
+            console.error('❌ 自动关机失败:', await shutdownResponse.text());
+          }
+        } else {
+          console.log(`ℹ️ 实例状态为 ${statusResult.data.status}，无需关机`);
+        }
+      } else {
+        console.error('❌ 无法获取实例状态，跳过自动关机');
+      }
+    } catch (error) {
+      console.error('❌ 自动关机过程出错:', error);
+    }
+  }, IDLE_TIMEOUT_MINUTES * 60 * 1000); // 转换为毫秒
+  
+  console.log(`⏱️ 自动关机定时器已设置：${IDLE_TIMEOUT_MINUTES}分钟后执行`);
+}
+
+// 检查闲置时间的函数
+function checkIdleTime() {
+  if (!lastApiCallTime) {
+    return;
+  }
+  
+  const now = new Date();
+  const idleMinutes = (now - lastApiCallTime) / (1000 * 60);
+  
+  console.log(`📊 当前闲置时间: ${idleMinutes.toFixed(1)} 分钟`);
+  
+  return idleMinutes;
+}
+const XIANGONG_INDEXTTS2_URL = XIANGONG_COMFYUI_URL;
+
 // Environment validation
 console.log('🚀 Starting Prome Platform server');
-const requiredVars = ['DIFY_API_URL', 'DIFY_API_KEY'];
-const missing = requiredVars.filter(varName => !process.env[`VITE_${varName}`] && !process.env[varName]);
 
-if (missing.length > 0) {
-  console.error('⚠️ WARNING: Missing required environment variables:', missing);
-  console.error('Please set the following environment variables for proper API functionality:');
-  missing.forEach(varName => {
-    console.error(`  - VITE_${varName} or ${varName}`);
+// 检查关键配置是否存在
+if (!DIFY_API_URL || !DIFY_API_KEY) {
+  console.error('❌ [BOOT] Missing Dify configuration:', {
+    DIFY_API_URL: !!DIFY_API_URL,
+    DIFY_API_KEY: !!DIFY_API_KEY
   });
-  console.error('API calls may fail without proper configuration.');
+  console.warn('⚠️ Server will start but Dify features may not work');
 } else {
-  console.log('✅ Dify API environment variables are configured');
+  console.log('✅ [BOOT] Dify configuration found');
 }
 
 // UUID utility functions
@@ -694,743 +726,42 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
   }
 }
 
-// 🔧 全局billing监控
-if (!global.billingTracker) {
-  global.billingTracker = {
-    totalCalls: 0,
-    successfulCalls: 0,
-    failedCalls: 0,
-    emergencyFallbacks: 0,
-    callHistory: []
-  };
-}
+// 内存存储视频结果（生产环境建议使用Redis）
+const videoResults = new Map();
 
-// 🔧 UNIFIED BILLING: 统一的积分扣除函数
-async function handleTokenBilling(responseData, user, endpoint = 'unknown', options = {}) {
-  const { emergencyFallback = false, headerMetadata = null } = options;
+// 视频结果接收端点 - 供N8n工作流3回调使用
+app.post('/api/video-result', (req, res) => {
+  console.log('📥 N8n工作流3回调 - 视频结果:', req.body);
   
-  // 🔧 全局tracking：记录每次billing调用
-  global.billingTracker.totalCalls++;
-  if (emergencyFallback) {
-    global.billingTracker.emergencyFallbacks++;
+  const { sessionId, videoUrl, status, timestamp } = req.body;
+  
+  // 验证必填字段
+  if (!sessionId || !videoUrl) {
+    console.error('❌ 缺少必填字段 sessionId 或 videoUrl');
+    return res.status(400).json({ 
+      error: 'Missing required fields: sessionId, videoUrl' 
+    });
   }
   
-  const callId = `${endpoint}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-  console.log(`🎯 [BILLING-TRACKER] Call #${global.billingTracker.totalCalls}: ${callId}`);
-  console.log(`🔍 [BILLING-${endpoint}] Checking data sources:`, {
-    hasResponseData: !!responseData,
-    hasHeaderMetadata: !!headerMetadata,
-    hasMetadata: !!(responseData?.metadata),
-    hasUsage: !!(responseData?.metadata?.usage), 
-    hasTotalTokens: !!(responseData?.metadata?.usage?.total_tokens),
-    hasUsageField: !!(responseData?.usage), // 检查直接在responseData下的usage字段
-    hasHeaderUsage: !!(headerMetadata?.usage),
-    headerModel: headerMetadata?.model || 'unknown'
+  // 存储结果
+  videoResults.set(sessionId, {
+    sessionId,
+    videoUrl,
+    status: status || 'completed',
+    timestamp: timestamp || new Date().toISOString(),
+    receivedAt: new Date().toISOString()
   });
-
-  // 🔧 增强条件检查：支持多种数据结构
-  let totalTokens = null;
-  let actualCost = null;
-  let usage = null;
-  let modelName = null;
-
-  // 🎯 优先级1: 检查响应头中的token数据（最可靠）
-  if (headerMetadata?.usage && headerMetadata.usage.total_tokens > 0) {
-    usage = headerMetadata.usage;
-    totalTokens = usage.total_tokens;
-    actualCost = Number(usage.total_price || (totalTokens * 0.000002175));
-    modelName = headerMetadata.model;
-    console.log(`✅ [BILLING-${endpoint}] Found usage in RESPONSE HEADERS (priority source)`);
-    console.log(`📊 [BILLING-${endpoint}] Header data: ${totalTokens} tokens, model: ${modelName}`);
-  }
-  // 优先级2: 检查 metadata.usage (标准位置)
-  else if (responseData?.metadata?.usage?.total_tokens) {
-    usage = responseData.metadata.usage;
-    totalTokens = usage.total_tokens;
-    actualCost = Number(usage.total_price || (totalTokens * 0.000002175));
-    console.log(`✅ [BILLING-${endpoint}] Found usage in metadata.usage`);
-  }
-  // 优先级3: 检查直接在responseData下的usage字段
-  else if (responseData?.usage?.total_tokens) {
-    usage = responseData.usage;
-    totalTokens = usage.total_tokens;
-    actualCost = Number(usage.total_price || (totalTokens * 0.000002175));
-    console.log(`✅ [BILLING-${endpoint}] Found usage in responseData.usage`);
-  }
-  // 优先级4: 最后的fallback：如果没有usage但有其他token相关字段
-  else if (responseData && (responseData.token_usage || responseData.tokens)) {
-    const tokens = responseData.token_usage?.total_tokens || responseData.tokens || 100; // fallback默认值
-    totalTokens = tokens;
-    actualCost = tokens * 0.000002175; // 使用默认价格
-    console.log(`⚠️ [BILLING-${endpoint}] Using fallback token calculation: ${tokens} tokens`);
-  }
-
-  if (totalTokens && totalTokens > 0) {
-    // 🔧 CORRECT FORMULA: (Dify USD成本 × 1.25利润率 × 汇率) = 积分
-    const PROFIT_MARGIN = 1.25; // 25%利润
-    const EXCHANGE_RATE = 10000; // 1 USD = 10000 积分
-    const pointsToDeduct = Math.ceil(actualCost * PROFIT_MARGIN * EXCHANGE_RATE);
-    
-    // 🔧 Emergency fallback特殊标记
-    if (emergencyFallback) {
-      console.log(`🚨 [BILLING-${endpoint}] EMERGENCY FALLBACK billing: ${totalTokens} tokens`);
-      console.log(`⚠️ [BILLING-${endpoint}] This billing was triggered by context management failure`);
-    } else {
-      console.log(`💰 [BILLING-${endpoint}] Multi-node LLM: ${totalTokens} tokens`);
-    }
-    console.log(`💰 [COST-${endpoint}] Dify成本: $${actualCost.toFixed(6)} → +25%利润 → ×${EXCHANGE_RATE}汇率 = ${pointsToDeduct} 积分`);
-    
-    const userId = getValidUserId(user);
-    
-    // 🔧 IMPLEMENT ACTUAL POINTS DEDUCTION
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    if (supabaseClient && userId) {
-      try {
-        // First check current balance
-        const { data: userBalance, error: balanceError } = await supabaseClient
-          .from('users')
-          .select('balance')
-          .eq('id', userId)
-          .single();
-          
-        if (balanceError) {
-          console.log(`⚠️  [BILLING-${endpoint}] User not found in database: ${userId}`);
-          
-          // 🔧 新策略：为临时用户创建游客记录，或跳过计费但记录使用
-          console.log(`💡 [BILLING-${endpoint}] Creating guest user session for: ${userId}`);
-          
-          // 临时方案：不扣除积分，但记录使用情况
-          console.log(`⚠️  [BILLING-${endpoint}] Guest user - no points deducted, usage recorded only`);
-          
-          // 在内存中记录guest用户余额
-          if (!global.guestBalances) {
-            global.guestBalances = new Map();
-          }
-          
-          const currentGuestBalance = global.guestBalances.get(userId) || 10000;
-          const newGuestBalance = Math.max(0, currentGuestBalance - pointsToDeduct);
-          global.guestBalances.set(userId, newGuestBalance);
-          
-          console.log(`📝 [BILLING-${endpoint}] Guest balance updated: ${currentGuestBalance} → ${newGuestBalance} (memory only)`);
-          
-          // 🔧 更新全局统计
-          global.billingTracker.successfulCalls++;
-          global.billingTracker.callHistory.push({
-            callId,
-            endpoint,
-            tokens: totalTokens,
-            points: pointsToDeduct,
-            success: true,
-            isGuest: true,
-            emergencyFallback,
-            timestamp: new Date().toISOString()
-          });
-          
-          console.log(`✅ [BILLING-TRACKER] Success #${global.billingTracker.successfulCalls}: ${callId}`);
-          
-          return {
-            tokens: totalTokens,
-            points: pointsToDeduct,
-            cost: actualCost.toFixed(6),
-            newBalance: newGuestBalance,
-            success: true,
-            isGuest: true,
-            emergencyFallback
-          };
-        } else {
-          const currentBalance = userBalance.balance || 0;
-          const newBalance = Math.max(0, currentBalance - pointsToDeduct);
-          
-          // Update user balance
-          const { error: updateError } = await supabaseClient
-            .from('users')
-            .update({ 
-              balance: newBalance
-            })
-            .eq('id', userId);
-            
-          if (updateError) {
-            console.error(`❌ [BILLING-${endpoint}] Failed to deduct points: ${updateError.message}`);
-            
-            // 🔧 更新失败统计
-            global.billingTracker.failedCalls++;
-            global.billingTracker.callHistory.push({
-              callId,
-              endpoint,
-              tokens: totalTokens,
-              points: pointsToDeduct,
-              success: false,
-              error: 'DATABASE_UPDATE_ERROR',
-              emergencyFallback,
-              timestamp: new Date().toISOString()
-            });
-            
-            console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - DATABASE_UPDATE_ERROR`);
-            
-            return {
-              tokens: totalTokens,
-              points: pointsToDeduct,
-              cost: actualCost.toFixed(6),
-              newBalance: currentBalance, // 失败时返回原余额
-              success: false,
-              emergencyFallback
-            };
-          } else {
-            console.log(`✅ [BILLING-${endpoint}] Deducted ${pointsToDeduct} points. Balance: ${currentBalance} → ${newBalance}`);
-            
-            // 🔧 更新全局统计
-            global.billingTracker.successfulCalls++;
-            global.billingTracker.callHistory.push({
-              callId,
-              endpoint,
-              tokens: totalTokens,
-              points: pointsToDeduct,
-              success: true,
-              isGuest: false,
-              emergencyFallback,
-              balanceChange: `${currentBalance} → ${newBalance}`,
-              timestamp: new Date().toISOString()
-            });
-            
-            console.log(`✅ [BILLING-TRACKER] Success #${global.billingTracker.successfulCalls}: ${callId}`);
-            
-            return {
-              tokens: totalTokens,
-              points: pointsToDeduct,
-              cost: actualCost.toFixed(6),
-              newBalance: newBalance, // 🔧 关键修复：返回更新后的余额
-              success: true,
-              emergencyFallback
-            };
-          }
-        }
-      } catch (dbError) {
-        console.error(`❌ [BILLING-${endpoint}] Database error: ${dbError.message}`);
-        
-        // 🔧 更新失败统计
-        global.billingTracker.failedCalls++;
-        global.billingTracker.callHistory.push({
-          callId,
-          endpoint,
-          tokens: totalTokens,
-          points: pointsToDeduct,
-          success: false,
-          error: 'DATABASE_CONNECTION_ERROR',
-          emergencyFallback,
-          timestamp: new Date().toISOString()
-        });
-        
-        console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - DATABASE_CONNECTION_ERROR`);
-        
-        return {
-          tokens: totalTokens,
-          points: pointsToDeduct,
-          cost: actualCost.toFixed(6),
-          newBalance: null, // 数据库错误时无法获取余额
-          success: false,
-          emergencyFallback
-        };
-      }
-    } else {
-      console.log(`⚠️  [BILLING-${endpoint}] Cannot deduct points - missing database or userId`);
-      
-      // 🔧 更新失败统计
-      global.billingTracker.failedCalls++;
-      global.billingTracker.callHistory.push({
-        callId,
-        endpoint,
-        tokens: totalTokens,
-        points: pointsToDeduct,
-        success: false,
-        error: 'MISSING_DATABASE_OR_USER',
-        emergencyFallback,
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - MISSING_DATABASE_OR_USER`);
-      
-      return {
-        tokens: totalTokens,
-        points: pointsToDeduct,
-        cost: actualCost.toFixed(6),
-        newBalance: null, // 无法访问数据库
-        success: false,
-        emergencyFallback
-      };
-    }
-  } else {
-    // 🚨 没有找到任何token使用信息 - 这可能导致计费遗漏！
-    console.error(`🚨 [BILLING-${endpoint}] NO TOKEN USAGE DATA FOUND! This interaction will not be billed!`);
-    console.error(`🚨 [BILLING-${endpoint}] responseData structure:`, JSON.stringify(responseData, null, 2));
-    
-    // 记录这次遗漏，用于调试和审计
-    console.error(`🚨 [BILLING-${endpoint}] POTENTIAL BILLING LOSS - endpoint: ${endpoint}, user: ${getValidUserId(user)}, timestamp: ${new Date().toISOString()}`);
-    
-    // 🔧 更新失败统计
-    global.billingTracker.failedCalls++;
-    global.billingTracker.callHistory.push({
-      callId,
-      endpoint,
-      tokens: 0,
-      points: 0,
-      success: false,
-      error: 'NO_TOKEN_DATA',
-      emergencyFallback,
-      timestamp: new Date().toISOString()
-    });
-    
-    console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - NO_TOKEN_DATA`);
-    
-    return {
-      tokens: 0,
-      points: 0,
-      cost: '0',
-      newBalance: null,
-      success: false,
-      error: 'NO_TOKEN_DATA',
-      endpoint: endpoint,
-      emergencyFallback
-    };
-  }
   
-  return null;
-}
-
-// 🔧 BILLING监控API端点
-app.get('/api/billing/stats', (req, res) => {
-  if (!global.billingTracker) {
-    return res.json({
-      error: 'Billing tracker not initialized',
-      stats: null
-    });
-  }
-
-  const tracker = global.billingTracker;
-  const successRate = tracker.totalCalls > 0 ? 
-    ((tracker.successfulCalls / tracker.totalCalls) * 100).toFixed(2) : '0.00';
+  console.log('✅ 视频结果已保存:', sessionId);
   
-  const stats = {
-    totalCalls: tracker.totalCalls,
-    successfulCalls: tracker.successfulCalls,
-    failedCalls: tracker.failedCalls,
-    emergencyFallbacks: tracker.emergencyFallbacks,
-    successRate: `${successRate}%`,
-    recentHistory: tracker.callHistory.slice(-10), // 最近10次记录
-    summary: {
-      status: tracker.failedCalls === 0 ? 'HEALTHY' : tracker.failedCalls > tracker.successfulCalls ? 'CRITICAL' : 'WARNING',
-      lastCall: tracker.callHistory.length > 0 ? tracker.callHistory[tracker.callHistory.length - 1].timestamp : null,
-      uptime: new Date().toISOString()
-    }
-  };
-
-  console.log(`📊 [BILLING-STATS] Stats requested:`, {
-    totalCalls: stats.totalCalls,
-    successRate: stats.successRate,
-    status: stats.summary.status
-  });
-
-  res.json(stats);
-});
-
-// 🔧 新增：纯聊天模式端点 - 专门处理简单对话而非工作流
-app.post('/api/dify/chat/simple', async (req, res) => {
-  const { message, conversationId: clientConvId, userId } = req.body;
-
-  console.log('[Simple Chat] Processing chat request:', {
-    messagePreview: message?.substring(0, 50) + '...',
-    conversationId: clientConvId,
-    userId: userId
-  });
-
-  if (!DIFY_API_URL || !DIFY_API_KEY) {
-    return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
-  }
-
-  // Generate or get user ID
-  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
-  
-  // Get or create conversation ID
-  let conversationId = clientConvId;
-  if (!conversationId || !isValidUUID(conversationId)) {
-    conversationId = generateUUID();
-    console.log('[Simple Chat] Generated new conversation ID:', conversationId);
-  }
-
-  try {
-    // 🔧 关键修复：使用chat-messages端点而不是workflows/run
-    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DIFY_API_KEY}`,
-        'Content-Type': 'application/json',
-        'X-Dify-Version': '1.9.1', // Enable experimental token stats
-      },
-      body: JSON.stringify({
-        inputs: {}, // 🔧 DIFY需要inputs参数
-        query: message,
-        user: userIdentifier,
-        conversation_id: clientConvId || '', // 空字符串让Dify创建新对话
-        response_mode: 'blocking' // 使用阻塞模式获得简单响应
-      }),
-    });
-
-    if (!difyResponse.ok) {
-      const error = await difyResponse.json();
-      console.error('[Simple Chat] Dify API error:', error);
-      return res.status(difyResponse.status).json({
-        error: error.message || 'Dify API error',
-        type: 'dify_api_error'
-      });
-    }
-
-    const data = await difyResponse.json();
-    
-    console.log('[Simple Chat] Success:', {
-      conversationId: data.conversation_id,
-      answerLength: data.answer?.length || 0,
-      messageId: data.message_id
-    });
-
-    // 🔧 BILLING: 处理积分扣除
-    let billingInfo = await handleTokenBilling(data, userId, 'SIMPLE');
-    
-    // 🚨 CRITICAL FIX: 如果SIMPLE billing失败，强制执行fallback billing
-    if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
-      console.error(`🚨 [CRITICAL] Primary billing failed for SIMPLE, executing emergency billing!`);
-      
-      // 创建强制billing数据
-      const emergencyTokens = Math.max(150, Math.ceil((message?.length || 0) / 3));
-      const emergencyData = {
-        answer: 'Emergency billing data',
-        conversation_id: 'emergency-simple-' + Date.now(),
-        message_id: generateUUID(),
-        metadata: {
-          usage: {
-            total_tokens: emergencyTokens,
-            prompt_tokens: Math.ceil(emergencyTokens * 0.4),
-            completion_tokens: Math.ceil(emergencyTokens * 0.6),
-            total_price: emergencyTokens * 0.000002175
-          }
-        },
-        billing_source: 'EMERGENCY_FORCED_BILLING'
-      };
-      
-      billingInfo = await handleTokenBilling(emergencyData, userId, 'EMERGENCY_SIMPLE', {
-        emergencyFallback: true
-      });
-      
-      console.log(`🔧 [EMERGENCY] Forced SIMPLE billing result:`, billingInfo);
-    }
-
-    // 返回简化的响应格式
-    return res.status(200).json({
-      answer: data.answer || '抱歉，我无法理解您的问题。',
-      conversation_id: data.conversation_id,
-      message_id: data.message_id,
-      conversationId: data.conversation_id, // 兼容前端
-      userId: userIdentifier,
-      metadata: {
-        usage: data.metadata?.usage,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-  } catch (error) {
-    console.error('[Simple Chat] API error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      type: 'server_error'
-    });
-  }
-});
-
-// NEW SIMPLIFIED DIFY CHAT ENDPOINT - Memory-based conversation management
-app.post('/api/dify/chat', async (req, res) => {
-  const { message, conversationId: clientConvId, userId } = req.body;
-
-  // Generate or get user ID
-  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
-  
-  // Get or create conversation ID
-  let conversationId = clientConvId;
-  let isNewConversation = false;
-  
-  if (!conversationId) {
-    conversationId = generateUUID();
-    isNewConversation = true;
-  }
-
-  // Get conversation state from memory store
-  const conversationState = conversationStore.get(conversationId) || {
-    conversationId,
-    userId: userIdentifier,
-  };
-
-  try {
-    // Call Dify API
-    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${DIFY_API_KEY}`,
-        'Content-Type': 'application/json',
-        'X-Dify-Version': '1.9.1', // Enable experimental token stats
-      },
-      body: JSON.stringify({
-        inputs: {}, // 🔧 DIFY需要inputs参数
-        query: message,
-        user: userIdentifier, // ✅ Required user parameter
-        conversation_id: isNewConversation ? '' : conversationId, // Empty string for new conversations
-        response_mode: 'blocking'
-      }),
-    });
-
-    if (!difyResponse.ok) {
-      const error = await difyResponse.json();
-      console.error('Dify API error:', error);
-      return res.status(difyResponse.status).json(error);
-    }
-
-    const data = await difyResponse.json();
-    
-    // 🔧 BILLING: 处理积分扣除
-    let billingInfo = await handleTokenBilling(data, userIdentifier, 'CHAT');
-    
-    // 🚨 CRITICAL FIX: 如果CHAT billing失败，强制执行fallback billing
-    if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
-      console.error(`🚨 [CRITICAL] Primary billing failed for CHAT, executing emergency billing!`);
-      
-      // 创建强制billing数据
-      const emergencyTokens = Math.max(160, Math.ceil((message?.length || 0) / 3));
-      const emergencyData = {
-        answer: 'Emergency billing data',
-        conversation_id: 'emergency-chat-' + Date.now(),
-        message_id: generateUUID(),
-        metadata: {
-          usage: {
-            total_tokens: emergencyTokens,
-            prompt_tokens: Math.ceil(emergencyTokens * 0.4),
-            completion_tokens: Math.ceil(emergencyTokens * 0.6),
-            total_price: emergencyTokens * 0.000002175
-          }
-        },
-        billing_source: 'EMERGENCY_FORCED_BILLING'
-      };
-      
-      billingInfo = await handleTokenBilling(emergencyData, userIdentifier, 'EMERGENCY_CHAT', {
-        emergencyFallback: true
-      });
-      
-      console.log(`🔧 [EMERGENCY] Forced CHAT billing result:`, billingInfo);
-    }
-    
-    // Update conversation state in memory store
-    conversationStore.set(data.conversation_id || conversationId, {
-      ...conversationState,
-      conversationId: data.conversation_id || conversationId,
-      nodeStatus: data.metadata?.node_status, // Save node status
-    });
-
-    // Return response
-    return res.status(200).json({
-      ...data,
-      conversationId: data.conversation_id || conversationId,
-      userId: userIdentifier,
-    });
-
-  } catch (error) {
-    console.error('API error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// MOCK ENDPOINT FOR TESTING - When Dify API is not accessible
-app.post('/api/dify/chat/mock', async (req, res) => {
-  const { message, conversationId: clientConvId, userId } = req.body;
-  
-  // Generate or get user ID
-  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
-  
-  // Get or create conversation ID
-  let conversationId = clientConvId;
-  if (!conversationId) {
-    conversationId = generateUUID();
-  }
-
-  // Mock response that demonstrates the fixed structure
-  const mockResponse = {
-    conversation_id: conversationId,
-    message_id: `msg-${generateUUID()}`,
-    answer: `Mock response to: "${message}". This demonstrates that the user parameter issue is fixed and memory-based conversation management is working.`,
-    metadata: {
-      usage: {
-        prompt_tokens: 20,
-        completion_tokens: 30,
-        total_tokens: 50
-      },
-      node_status: 'completed'
-    },
-    conversationId: conversationId,
-    userId: userIdentifier,
-    created_at: Date.now()
-  };
-
-  // 🔧 BILLING: 处理积分扣除 (Mock endpoint)
-  let billingInfo = await handleTokenBilling(mockResponse, userIdentifier, 'MOCK');
-  
-  // 🚨 CRITICAL FIX: 如果MOCK billing失败，强制执行fallback billing
-  if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
-    console.error(`🚨 [CRITICAL] Primary billing failed for MOCK, executing emergency billing!`);
-    
-    // 创建强制billing数据
-    const emergencyTokens = Math.max(100, Math.ceil((message?.length || 0) / 4));
-    const emergencyMockResponse = {
-      answer: 'Emergency billing data',
-      conversation_id: 'emergency-mock-' + Date.now(),
-      message_id: generateUUID(),
-      metadata: {
-        usage: {
-          total_tokens: emergencyTokens,
-          prompt_tokens: Math.ceil(emergencyTokens * 0.3),
-          completion_tokens: Math.ceil(emergencyTokens * 0.7),
-          total_price: emergencyTokens * 0.000002175
-        }
-      },
-      billing_source: 'EMERGENCY_FORCED_BILLING'
-    };
-    
-    billingInfo = await handleTokenBilling(emergencyMockResponse, userIdentifier, 'EMERGENCY_MOCK', {
-      emergencyFallback: true
-    });
-    
-    console.log(`🔧 [EMERGENCY] Forced MOCK billing result:`, billingInfo);
-  }
-
-  // Store in memory (simulate the real endpoint behavior)
-  conversationStore.set(conversationId, {
-    conversationId,
-    userId: userIdentifier,
-    nodeStatus: 'completed'
-  });
-
-  console.log(`✅ Mock response generated for user ${userIdentifier}, conversation ${conversationId}`);
-  
-  res.json(mockResponse);
-});
-
-// Context status endpoint - 让前端可以检查对话的token状态
-app.get('/api/dify/:conversationId/context-status', async (req, res) => {
-  const { conversationId } = req.params;
-  
-  try {
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.json({ 
-        error: 'Database not configured',
-        hasContext: false 
-      });
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    // 获取对话历史
-    const { data: messages, error } = await supabase
-      .from('messages')
-      .select('content, created_at')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      return res.status(500).json({ error: 'Failed to fetch conversation history' });
-    }
-
-    if (!messages || messages.length === 0) {
-      return res.json({
-        hasContext: false,
-        totalTokens: 0,
-        messageCount: 0,
-        riskLevel: 'none'
-      });
-    }
-
-    // 计算总token数
-    let totalTokens = 0;
-    messages.forEach(msg => {
-      totalTokens += estimateTokens(msg.content || '');
-    });
-
-    const DIFY_TOKEN_LIMIT = 8192;
-    const riskLevel = totalTokens > DIFY_TOKEN_LIMIT * 0.9 ? 'high' : 
-                     totalTokens > DIFY_TOKEN_LIMIT * 0.7 ? 'medium' : 'low';
-
-    let suggestion = null;
-    if (riskLevel === 'high') {
-      suggestion = '建议开始新对话以避免输出被截断';
-    } else if (riskLevel === 'medium') {
-      suggestion = '即将达到上下文限制，复杂回答可能被截断';
-    }
-
-    res.json({
-      hasContext: true,
-      totalTokens,
-      messageCount: messages.length,
-      riskLevel,
-      suggestion,
-      tokenLimit: DIFY_TOKEN_LIMIT,
-      utilizationPercent: Math.round((totalTokens / DIFY_TOKEN_LIMIT) * 100)
-    });
-
-  } catch (error) {
-    console.error('Context status check error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Configuration debug endpoint
-app.get('/api/config/status', async (req, res) => {
-  // Initialize Supabase for health check
-  let supabase = null;
-  let databaseHealthy = false;
-  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-    supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    databaseHealthy = await checkDatabaseHealth(supabase);
-  }
-
-  res.json({
-    environment_configured: {
-      dify_api_url: !!(DIFY_API_URL),
-      dify_api_key: !!(DIFY_API_KEY),
-      supabase_url: !!(SUPABASE_URL),
-      supabase_service_key: !!(SUPABASE_SERVICE_ROLE_KEY)
-    },
-    database_health: {
-      configured: !!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY),
-      healthy: databaseHealthy,
-      required_tables: ['conversations', 'messages']
-    },
-    api_endpoints: {
-      chat: '/api/dify',
-      workflow: '/api/dify/workflow',
-      streaming_chat: '/api/dify/:conversationId/stream',
-      blocking_chat: '/api/dify/:conversationId'
-    },
-    timeouts: {
-      default_timeout_ms: DEFAULT_TIMEOUT,
-      workflow_timeout_ms: WORKFLOW_TIMEOUT,
-      streaming_timeout_ms: STREAMING_TIMEOUT,
-      max_retries: MAX_RETRIES
-    }
+  res.json({ 
+    success: true, 
+    message: 'Video result received successfully',
+    sessionId: sessionId
   });
 });
 
-// ==================== VIDEO API ROUTES ====================
-
-// Image upload endpoint for video creation
+// Image upload endpoint
 app.post('/api/upload-image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -1444,11 +775,12 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
     if (!process.env.IMGBB_API_KEY) {
       return res.status(500).json({
         success: false,
-        error: '图片上传服务未配置，请尝试使用图片链接方式'
+        error: '图片上传服务未配置'
       });
     }
 
     console.log('📤 Image upload request:', req.file.originalname, req.file.size, 'bytes');
+    console.log('🔑 Using ImgBB API Key:', process.env.IMGBB_API_KEY);
 
     // 转换为base64
     const base64Image = req.file.buffer.toString('base64');
@@ -1482,148 +814,168 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
     console.error('❌ Image upload failed:', error);
     res.status(500).json({
       success: false,
-      error: '服务器错误。请尝试使用图片链接方式'
+      error: error.message || '图片上传失败'
     });
   }
 });
 
-// Get user balance for video generation
-app.get('/api/video/balance/:userId', async (req, res) => {
+// Video upload endpoint (temporary storage for A2E training)
+app.post('/api/upload/video', videoUpload.single('video'), async (req, res) => {
   try {
-    const { userId } = req.params;
-    
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Database not configured' });
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '没有收到视频文件' 
+      });
     }
-    
-    // Convert user ID to valid UUID format if needed
-    const validUserId = getValidUserId(userId);
-    console.log('🔄 Video balance check: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('id', validUserId)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching user balance:', error);
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    const credits = user.balance || 0;
-    res.json({ balance: user.balance || 0, credits });
-  } catch (error) {
-    console.error('Balance check error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
-// Check if user has enough credits
-app.post('/api/video/check-balance', async (req, res) => {
-  try {
-    const { userId, credits } = req.body;
     
-    if (!userId || !credits) {
-      return res.status(400).json({ error: 'Missing userId or credits' });
-    }
-    
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Database not configured' });
-    }
-    
-    const validUserId = getValidUserId(userId);
-    console.log('🔄 Video check-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('id', validUserId)
-      .single();
-    
-    if (error) {
-      console.error('Error checking user balance:', error);
-      return res.status(500).json({ error: 'Failed to check balance' });
-    }
-    
-    const hasEnough = (user.balance || 0) >= credits;
-    res.json({ hasEnoughCredits: hasEnough });
-  } catch (error) {
-    console.error('Balance check error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+    // Initialize Supabase client with service role key for storage access
+    const supabase = createClient(
+      process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+    );
 
-// Reserve credits for video generation
-app.post('/api/video/reserve-balance', async (req, res) => {
-  try {
-    const { userId, credits, sessionId, duration, metadata = {} } = req.body;
-    
-    if (!userId || !credits || !sessionId) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    console.log('📹 Video upload request:', req.file.originalname, req.file.size, 'bytes');
+
+    // Generate unique filename with timestamp
+    const fileName = `temp-${Date.now()}-${req.file.originalname}`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('digital-human-videos')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false
+      });
+
+    if (error) {
+      console.error('❌ Supabase storage upload error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '视频上传失败: ' + error.message
+      });
     }
-    
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Database not configured' });
-    }
-    
-    const validUserId = getValidUserId(userId);
-    console.log('🔄 Video reserve-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    const { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('id', validUserId)
-      .single();
-    
-    if (fetchError || !user) {
-      console.error('Error fetching user:', fetchError);
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    const currentBalance = user.balance || 0;
-    
-    if (currentBalance < credits) {
-      return res.status(400).json({ error: 'Insufficient balance' });
-    }
-    
-    const newBalance = currentBalance - credits;
-    
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ balance: newBalance })
-      .eq('id', validUserId);
-    
-    if (updateError) {
-      console.error('Error updating balance:', updateError);
-      return res.status(500).json({ error: 'Failed to reserve balance' });
-    }
-    
-    console.log('💰 Credits reserved:', {
-      validUserId,
-      credits,
-      sessionId,
-      previousBalance: currentBalance,
-      newBalance: newBalance
-    });
-    
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('digital-human-videos')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Video uploaded to Supabase Storage:', publicUrl);
+
+    // Auto-delete after 30 minutes (cleanup for failed/abandoned training sessions)
+    setTimeout(async () => {
+      try {
+        await supabase.storage.from('digital-human-videos').remove([fileName]);
+        console.log(`🗑️ Auto-deleted temp video: ${fileName}`);
+      } catch (deleteError) {
+        console.error('⚠️ Failed to auto-delete temp video:', deleteError);
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+
     res.json({
       success: true,
-      sessionId,
-      deductedCredits: credits,
-      remainingCredits: newBalance
+      videoUrl: publicUrl,
+      fileName: fileName,
+      message: '视频上传成功！'
     });
+
   } catch (error) {
-    console.error('Balance reserve error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Video upload failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '视频上传失败'
+    });
   }
 });
+
+// Image upload endpoint (temporary storage for A2E training)
+app.post('/api/upload/image', imageUpload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '没有收到图片文件' 
+      });
+    }
+
+    
+    // Initialize Supabase client with service role key for storage access
+    const supabase = createClient(
+      process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+    );
+
+    console.log('🖼️ Image upload request:', req.file.originalname, req.file.size, 'bytes');
+
+    // Generate unique filename with timestamp
+    const fileName = `temp-image-${Date.now()}-${req.file.originalname}`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('digital-human-videos')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false
+      });
+
+    if (error) {
+      console.error('❌ Supabase image storage upload error:', error);
+      return res.status(500).json({
+        success: false,
+        error: '图片上传失败: ' + error.message
+      });
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('digital-human-videos')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Image uploaded to Supabase Storage:', publicUrl);
+
+    // Auto-delete after 30 minutes (cleanup for failed/abandoned training sessions)
+    setTimeout(async () => {
+      try {
+        await supabase.storage.from('digital-human-videos').remove([fileName]);
+        console.log(`🗑️ Auto-deleted temp image: ${fileName}`);
+      } catch (deleteError) {
+        console.error('⚠️ Failed to auto-delete temp image:', deleteError);
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+
+    res.json({
+      success: true,
+      url: publicUrl,
+      fileName: fileName,
+      message: '图片上传成功！'
+    });
+
+  } catch (error) {
+    console.error('❌ Image upload failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '图片上传失败'
+    });
+  }
+});
+
+// Simple in-memory cache for image extraction (5 minute TTL)
+const imageCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Clean up expired cache entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of imageCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      imageCache.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
+// Image extraction from web pages endpoint
 app.post('/api/extract-images', async (req, res) => {
   const { pageUrl } = req.body;
   
@@ -2755,7 +2107,888 @@ function isValidImageUrl(url) {
   }
 }
 
-// ==================== DIFY CHAT API ROUTES ====================
+// 调试端点 - 查看所有存储的视频结果
+app.get('/api/video-result/debug', (req, res) => {
+  console.log('🔍 调试：当前存储的视频结果:', videoResults);
+  const allResults = Array.from(videoResults.entries()).map(([key, value]) => ({
+    sessionId: key,
+    ...value
+  }));
+  res.json({ 
+    success: true,
+    count: videoResults.size,
+    results: allResults
+  });
+});
+
+// 前端轮询检查端点
+app.get('/api/video-result/check/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  
+  console.log('🔍 轮询检查 sessionId:', sessionId);
+  console.log('🗄️ 当前存储的所有 sessionId:', Array.from(videoResults.keys()));
+  
+  const result = videoResults.get(sessionId);
+  
+  if (result) {
+    console.log('🎉 找到视频结果:', sessionId);
+    // 返回结果后清理存储
+    videoResults.delete(sessionId);
+    res.json({ 
+      success: true, 
+      result: result 
+    });
+  } else {
+    console.log('❌ 未找到视频结果:', sessionId);
+    res.json({ 
+      success: false, 
+      message: 'No result found yet' 
+    });
+  }
+});
+// 🔧 全局billing监控
+if (!global.billingTracker) {
+  global.billingTracker = {
+    totalCalls: 0,
+    successfulCalls: 0,
+    failedCalls: 0,
+    emergencyFallbacks: 0,
+    callHistory: []
+  };
+}
+
+// 🔧 UNIFIED BILLING: 统一的积分扣除函数
+async function handleTokenBilling(responseData, user, endpoint = 'unknown', options = {}) {
+  const { emergencyFallback = false } = options;
+  
+  // 🔧 全局tracking：记录每次billing调用
+  global.billingTracker.totalCalls++;
+  if (emergencyFallback) {
+    global.billingTracker.emergencyFallbacks++;
+  }
+  
+  const callId = `${endpoint}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  console.log(`🎯 [BILLING-TRACKER] Call #${global.billingTracker.totalCalls}: ${callId}`);
+  console.log(`🔍 [BILLING-${endpoint}] Checking responseData structure:`, {
+    hasResponseData: !!responseData,
+    hasMetadata: !!(responseData?.metadata),
+    hasUsage: !!(responseData?.metadata?.usage), 
+    hasTotalTokens: !!(responseData?.metadata?.usage?.total_tokens),
+    hasUsageField: !!(responseData?.usage), // 检查直接在responseData下的usage字段
+    responseDataKeys: responseData ? Object.keys(responseData) : [],
+    metadataKeys: responseData?.metadata ? Object.keys(responseData.metadata) : [],
+    usageKeys: responseData?.metadata?.usage ? Object.keys(responseData.metadata.usage) : []
+  });
+
+  // 🔧 增强条件检查：支持多种数据结构
+  let totalTokens = null;
+  let actualCost = null;
+  let usage = null;
+
+  // 检查 metadata.usage (标准位置)
+  if (responseData?.metadata?.usage?.total_tokens) {
+    usage = responseData.metadata.usage;
+    totalTokens = usage.total_tokens;
+    actualCost = Number(usage.total_price || (totalTokens * 0.000002175));
+    console.log(`✅ [BILLING-${endpoint}] Found usage in metadata.usage`);
+  }
+  // 检查直接在responseData下的usage字段
+  else if (responseData?.usage?.total_tokens) {
+    usage = responseData.usage;
+    totalTokens = usage.total_tokens;
+    actualCost = Number(usage.total_price || (totalTokens * 0.000002175));
+    console.log(`✅ [BILLING-${endpoint}] Found usage in responseData.usage`);
+  }
+  // 最后的fallback：如果没有usage但有其他token相关字段
+  else if (responseData && (responseData.token_usage || responseData.tokens)) {
+    const tokens = responseData.token_usage?.total_tokens || responseData.tokens || 100; // fallback默认值
+    totalTokens = tokens;
+    actualCost = tokens * 0.000002175; // 使用默认价格
+    console.log(`⚠️ [BILLING-${endpoint}] Using fallback token calculation: ${tokens} tokens`);
+  }
+
+  if (totalTokens && totalTokens > 0) {
+    const pointsToDeduct = Math.ceil(actualCost * 10000); // 🔧 CORRECT FORMULA: 美金成本 × 10000 = 积分
+    
+    // 🔧 Emergency fallback特殊标记
+    if (emergencyFallback) {
+      console.log(`🚨 [BILLING-${endpoint}] EMERGENCY FALLBACK billing: ${totalTokens} tokens`);
+      console.log(`⚠️ [BILLING-${endpoint}] This billing was triggered by context management failure`);
+    } else {
+      console.log(`💰 [BILLING-${endpoint}] Multi-node LLM: ${totalTokens} tokens`);
+    }
+    console.log(`💰 [COST-${endpoint}] Actual cost: $${actualCost.toFixed(6)} = ${pointsToDeduct} points`);
+    
+    const userId = getValidUserId(user);
+    
+    // 🔧 IMPLEMENT ACTUAL POINTS DEDUCTION
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    if (supabaseClient && userId) {
+      try {
+        // First check current balance
+        const { data: userBalance, error: balanceError } = await supabaseClient
+          .from('users')
+          .select('balance')
+          .eq('id', userId)
+          .single();
+          
+        if (balanceError) {
+          console.log(`⚠️  [BILLING-${endpoint}] User not found in database: ${userId}`);
+          
+          // 🔧 新策略：为临时用户创建游客记录，或跳过计费但记录使用
+          console.log(`💡 [BILLING-${endpoint}] Creating guest user session for: ${userId}`);
+          
+          // 临时方案：不扣除积分，但记录使用情况
+          console.log(`⚠️  [BILLING-${endpoint}] Guest user - no points deducted, usage recorded only`);
+          
+          // 在内存中记录guest用户余额
+          if (!global.guestBalances) {
+            global.guestBalances = new Map();
+          }
+          
+          const currentGuestBalance = global.guestBalances.get(userId) || 10000;
+          const newGuestBalance = Math.max(0, currentGuestBalance - pointsToDeduct);
+          global.guestBalances.set(userId, newGuestBalance);
+          
+          console.log(`📝 [BILLING-${endpoint}] Guest balance updated: ${currentGuestBalance} → ${newGuestBalance} (memory only)`);
+          
+          // 🔧 更新全局统计
+          global.billingTracker.successfulCalls++;
+          global.billingTracker.callHistory.push({
+            callId,
+            endpoint,
+            tokens: totalTokens,
+            points: pointsToDeduct,
+            success: true,
+            isGuest: true,
+            emergencyFallback,
+            timestamp: new Date().toISOString()
+          });
+          
+          console.log(`✅ [BILLING-TRACKER] Success #${global.billingTracker.successfulCalls}: ${callId}`);
+          
+          return {
+            tokens: totalTokens,
+            points: pointsToDeduct,
+            cost: actualCost.toFixed(6),
+            newBalance: newGuestBalance,
+            success: true,
+            isGuest: true,
+            emergencyFallback
+          };
+        } else {
+          const currentBalance = userBalance.balance || 0;
+          const newBalance = Math.max(0, currentBalance - pointsToDeduct);
+          
+          // Update user balance
+          const { error: updateError } = await supabaseClient
+            .from('users')
+            .update({ 
+              balance: newBalance
+            })
+            .eq('id', userId);
+            
+          if (updateError) {
+            console.error(`❌ [BILLING-${endpoint}] Failed to deduct points: ${updateError.message}`);
+            
+            // 🔧 更新失败统计
+            global.billingTracker.failedCalls++;
+            global.billingTracker.callHistory.push({
+              callId,
+              endpoint,
+              tokens: totalTokens,
+              points: pointsToDeduct,
+              success: false,
+              error: 'DATABASE_UPDATE_ERROR',
+              emergencyFallback,
+              timestamp: new Date().toISOString()
+            });
+            
+            console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - DATABASE_UPDATE_ERROR`);
+            
+            return {
+              tokens: totalTokens,
+              points: pointsToDeduct,
+              cost: actualCost.toFixed(6),
+              newBalance: currentBalance, // 失败时返回原余额
+              success: false,
+              emergencyFallback
+            };
+          } else {
+            console.log(`✅ [BILLING-${endpoint}] Deducted ${pointsToDeduct} points. Balance: ${currentBalance} → ${newBalance}`);
+            
+            // 🔧 更新全局统计
+            global.billingTracker.successfulCalls++;
+            global.billingTracker.callHistory.push({
+              callId,
+              endpoint,
+              tokens: totalTokens,
+              points: pointsToDeduct,
+              success: true,
+              isGuest: false,
+              emergencyFallback,
+              balanceChange: `${currentBalance} → ${newBalance}`,
+              timestamp: new Date().toISOString()
+            });
+            
+            console.log(`✅ [BILLING-TRACKER] Success #${global.billingTracker.successfulCalls}: ${callId}`);
+            
+            return {
+              tokens: totalTokens,
+              points: pointsToDeduct,
+              cost: actualCost.toFixed(6),
+              newBalance: newBalance, // 🔧 关键修复：返回更新后的余额
+              success: true,
+              emergencyFallback
+            };
+          }
+        }
+      } catch (dbError) {
+        console.error(`❌ [BILLING-${endpoint}] Database error: ${dbError.message}`);
+        
+        // 🔧 更新失败统计
+        global.billingTracker.failedCalls++;
+        global.billingTracker.callHistory.push({
+          callId,
+          endpoint,
+          tokens: totalTokens,
+          points: pointsToDeduct,
+          success: false,
+          error: 'DATABASE_CONNECTION_ERROR',
+          emergencyFallback,
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - DATABASE_CONNECTION_ERROR`);
+        
+        return {
+          tokens: totalTokens,
+          points: pointsToDeduct,
+          cost: actualCost.toFixed(6),
+          newBalance: null, // 数据库错误时无法获取余额
+          success: false,
+          emergencyFallback
+        };
+      }
+    } else {
+      console.log(`⚠️  [BILLING-${endpoint}] Cannot deduct points - missing database or userId`);
+      
+      // 🔧 更新失败统计
+      global.billingTracker.failedCalls++;
+      global.billingTracker.callHistory.push({
+        callId,
+        endpoint,
+        tokens: totalTokens,
+        points: pointsToDeduct,
+        success: false,
+        error: 'MISSING_DATABASE_OR_USER',
+        emergencyFallback,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - MISSING_DATABASE_OR_USER`);
+      
+      return {
+        tokens: totalTokens,
+        points: pointsToDeduct,
+        cost: actualCost.toFixed(6),
+        newBalance: null, // 无法访问数据库
+        success: false,
+        emergencyFallback
+      };
+    }
+  } else {
+    // 🚨 没有找到任何token使用信息 - 这可能导致计费遗漏！
+    console.error(`🚨 [BILLING-${endpoint}] NO TOKEN USAGE DATA FOUND! This interaction will not be billed!`);
+    console.error(`🚨 [BILLING-${endpoint}] responseData structure:`, JSON.stringify(responseData, null, 2));
+    
+    // 记录这次遗漏，用于调试和审计
+    console.error(`🚨 [BILLING-${endpoint}] POTENTIAL BILLING LOSS - endpoint: ${endpoint}, user: ${getValidUserId(user)}, timestamp: ${new Date().toISOString()}`);
+    
+    // 🔧 更新失败统计
+    global.billingTracker.failedCalls++;
+    global.billingTracker.callHistory.push({
+      callId,
+      endpoint,
+      tokens: 0,
+      points: 0,
+      success: false,
+      error: 'NO_TOKEN_DATA',
+      emergencyFallback,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - NO_TOKEN_DATA`);
+    
+    return {
+      tokens: 0,
+      points: 0,
+      cost: '0',
+      newBalance: null,
+      success: false,
+      error: 'NO_TOKEN_DATA',
+      endpoint: endpoint,
+      emergencyFallback
+    };
+  }
+  
+  return null;
+}
+
+// 🔧 BILLING监控API端点
+app.get('/api/billing/stats', (req, res) => {
+  if (!global.billingTracker) {
+    return res.json({
+      error: 'Billing tracker not initialized',
+      stats: null
+    });
+  }
+
+  const tracker = global.billingTracker;
+  const successRate = tracker.totalCalls > 0 ? 
+    ((tracker.successfulCalls / tracker.totalCalls) * 100).toFixed(2) : '0.00';
+  
+  const stats = {
+    totalCalls: tracker.totalCalls,
+    successfulCalls: tracker.successfulCalls,
+    failedCalls: tracker.failedCalls,
+    emergencyFallbacks: tracker.emergencyFallbacks,
+    successRate: `${successRate}%`,
+    recentHistory: tracker.callHistory.slice(-10), // 最近10次记录
+    summary: {
+      status: tracker.failedCalls === 0 ? 'HEALTHY' : tracker.failedCalls > tracker.successfulCalls ? 'CRITICAL' : 'WARNING',
+      lastCall: tracker.callHistory.length > 0 ? tracker.callHistory[tracker.callHistory.length - 1].timestamp : null,
+      uptime: new Date().toISOString()
+    }
+  };
+
+  console.log(`📊 [BILLING-STATS] Stats requested:`, {
+    totalCalls: stats.totalCalls,
+    successRate: stats.successRate,
+    status: stats.summary.status
+  });
+
+  res.json(stats);
+});
+
+// 🔧 全局billing监控
+if (!global.billingTracker) {
+  global.billingTracker = {
+    totalCalls: 0,
+    successfulCalls: 0,
+    failedCalls: 0,
+    emergencyFallbacks: 0,
+    callHistory: []
+  };
+}
+
+// 🔧 新增：纯聊天模式端点 - 专门处理简单对话而非工作流
+app.post('/api/dify/chat/simple', async (req, res) => {
+  const { message, conversationId: clientConvId, userId } = req.body;
+
+  console.log('[Simple Chat] Processing chat request:', {
+    messagePreview: message?.substring(0, 50) + '...',
+    conversationId: clientConvId,
+    userId: userId
+  });
+
+  if (!DIFY_API_URL || !DIFY_API_KEY) {
+    return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
+  }
+
+  // Generate or get user ID
+  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
+  
+  // Get or create conversation ID
+  let conversationId = clientConvId;
+  if (!conversationId || !isValidUUID(conversationId)) {
+    conversationId = generateUUID();
+    console.log('[Simple Chat] Generated new conversation ID:', conversationId);
+  }
+
+  try {
+    // 🔧 关键修复：使用chat-messages端点而不是workflows/run
+    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {}, // 🔧 DIFY需要inputs参数
+        query: message,
+        user: userIdentifier,
+        conversation_id: clientConvId || '', // 空字符串让Dify创建新对话
+        response_mode: 'blocking', // 使用阻塞模式获得简单响应
+        auto_generate_name: false, // 🔧 可能影响usage统计
+        files: [] // 🔧 某些应用可能需要files参数
+      }),
+    });
+
+    if (!difyResponse.ok) {
+      const error = await difyResponse.json();
+      console.error('[Simple Chat] Dify API error:', error);
+      return res.status(difyResponse.status).json({
+        error: error.message || 'Dify API error',
+        type: 'dify_api_error'
+      });
+    }
+
+    const data = await difyResponse.json();
+    
+    // 🔍 CRITICAL DEBUG: 详细分析Dify API响应
+    console.log('🔍 [DIFY API DEBUG] ===== DETAILED RESPONSE ANALYSIS =====');
+    console.log('🔍 [DIFY API DEBUG] Response Status:', difyResponse.status);
+    console.log('🔍 [DIFY API DEBUG] Response Headers:', Object.fromEntries(difyResponse.headers.entries()));
+    console.log('🔍 [DIFY API DEBUG] Full Response Body:', JSON.stringify(data, null, 2));
+    
+    // 分析usage数据结构
+    console.log('🔍 [USAGE DEBUG] Usage Analysis:', {
+      hasData: !!data,
+      hasMetadata: !!data?.metadata,
+      hasUsage: !!data?.metadata?.usage,
+      hasDirectUsage: !!data?.usage,
+      responseKeys: data ? Object.keys(data) : [],
+      metadataKeys: data?.metadata ? Object.keys(data.metadata) : [],
+      usageKeys: data?.metadata?.usage ? Object.keys(data.metadata.usage) : [],
+      usageData: data?.metadata?.usage || data?.usage || 'NO_USAGE_FOUND'
+    });
+    
+    // 检查token数据的具体值
+    if (data?.metadata?.usage) {
+      const usage = data.metadata.usage;
+      console.log('🔍 [TOKEN DEBUG] Token Analysis:', {
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens: usage.total_tokens,
+        prompt_price: usage.prompt_price,
+        completion_price: usage.completion_price,
+        total_price: usage.total_price,
+        currency: usage.currency,
+        allUsageFields: Object.keys(usage)
+      });
+      
+      // 检查是否所有值都是0
+      const allZero = (
+        (!usage.prompt_tokens || usage.prompt_tokens === 0) &&
+        (!usage.completion_tokens || usage.completion_tokens === 0) &&
+        (!usage.total_tokens || usage.total_tokens === 0) &&
+        (!usage.total_price || parseFloat(usage.total_price) === 0)
+      );
+      
+      if (allZero) {
+        console.error('🚨 [CRITICAL] All usage values are ZERO - This is the core problem!');
+        console.error('🚨 [DIAGNOSIS] Possible causes:');
+        console.error('   1. Dify app configuration: LLM nodes not configured correctly');
+        console.error('   2. Dify account: No billing/usage tracking enabled');
+        console.error('   3. API permissions: API key lacks usage access');
+        console.error('   4. App type: Wrong app type (Agent vs Chatflow vs Workflow)');
+        console.error('   5. Cached responses: Dify returning cached results');
+      }
+    }
+    console.log('🔍 [DIFY API DEBUG] ===== END ANALYSIS =====');
+    
+    console.log('[Simple Chat] Success:', {
+      conversationId: data.conversation_id,
+      answerLength: data.answer?.length || 0,
+      messageId: data.message_id
+    });
+
+    // 🔧 BILLING: 处理积分扣除
+    let billingInfo = await handleTokenBilling(data, userId, 'SIMPLE');
+    
+    // 🚨 CRITICAL FIX: 如果SIMPLE billing失败，强制执行fallback billing
+    if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
+      console.error(`🚨 [CRITICAL] Primary billing failed for SIMPLE, executing emergency billing!`);
+      
+      // 创建强制billing数据
+      const emergencyTokens = Math.max(150, Math.ceil((message?.length || 0) / 3));
+      const emergencyData = {
+        answer: 'Emergency billing data',
+        conversation_id: 'emergency-simple-' + Date.now(),
+        message_id: generateUUID(),
+        metadata: {
+          usage: {
+            total_tokens: emergencyTokens,
+            prompt_tokens: Math.ceil(emergencyTokens * 0.4),
+            completion_tokens: Math.ceil(emergencyTokens * 0.6),
+            total_price: emergencyTokens * 0.000002175
+          }
+        },
+        billing_source: 'EMERGENCY_FORCED_BILLING'
+      };
+      
+      billingInfo = await handleTokenBilling(emergencyData, userId, 'EMERGENCY_SIMPLE', {
+        emergencyFallback: true
+      });
+      
+      console.log(`🔧 [EMERGENCY] Forced SIMPLE billing result:`, billingInfo);
+    }
+
+    // 返回简化的响应格式
+    return res.status(200).json({
+      answer: data.answer || '抱歉，我无法理解您的问题。',
+      conversation_id: data.conversation_id,
+      message_id: data.message_id,
+      conversationId: data.conversation_id, // 兼容前端
+      userId: userIdentifier,
+      metadata: {
+        usage: data.metadata?.usage,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('[Simple Chat] API error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      type: 'server_error'
+    });
+  }
+});
+
+// NEW SIMPLIFIED DIFY CHAT ENDPOINT - Memory-based conversation management
+app.post('/api/dify/chat', async (req, res) => {
+  const { message, conversationId: clientConvId, userId } = req.body;
+
+  // Generate or get user ID
+  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
+  
+  // Get or create conversation ID
+  let conversationId = clientConvId;
+  let isNewConversation = false;
+  
+  if (!conversationId) {
+    conversationId = generateUUID();
+    isNewConversation = true;
+  }
+
+  // Get conversation state from memory store
+  const conversationState = conversationStore.get(conversationId) || {
+    conversationId,
+    userId: userIdentifier,
+  };
+
+  try {
+    // Call Dify API with enhanced payload to trigger LLM nodes
+    const difyPayload = {
+      inputs: {}, // 🔧 DIFY需要inputs参数
+      query: message,
+      user: userIdentifier, // ✅ Required user parameter
+      conversation_id: isNewConversation ? '' : conversationId, // Empty string for new conversations
+      response_mode: 'blocking',
+      auto_generate_name: true, // 🔧 修改为true以可能触发usage统计
+      files: [] // 🔧 某些应用可能需要files参数
+    };
+
+    console.log(`[Dify API] Calling with payload:`, {
+      ...difyPayload,
+      query_preview: message?.substring(0, 50) + '...'
+    });
+
+    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(difyPayload),
+    });
+
+    if (!difyResponse.ok) {
+      const error = await difyResponse.json();
+      console.error('Dify API error:', error);
+      return res.status(difyResponse.status).json(error);
+    }
+
+    const data = await difyResponse.json();
+    
+    // 🔍 Enhanced logging for token analysis
+    console.log(`[Token Analysis] Response analysis:`, {
+      conversation_id: data.conversation_id,
+      has_usage: !!data.metadata?.usage,
+      usage_tokens: data.metadata?.usage?.total_tokens || 0,
+      usage_price: data.metadata?.usage?.total_price || 0,
+      answer_preview: data.answer?.substring(0, 100) + '...',
+      response_contains_completeness: data.answer?.includes('COMPLETENESS'),
+      node_status: data.metadata?.node_status
+    });
+
+    // 🚀 Workflow Enhancement: Auto-trigger LLM nodes if needed
+    let finalData = data;
+    
+    // Check if we need to trigger LLM processing for workflow completion
+    if (data.metadata?.usage?.total_tokens === 0 && data.answer?.includes('COMPLETENESS: 4')) {
+      console.log(`[Workflow] Detected completion trigger, attempting to auto-trigger LLM node...`);
+      
+      try {
+        const llmTriggerPayload = {
+          ...difyPayload,
+          query: '开始生成痛点', // Trigger phrase for LLM processing
+          conversation_id: data.conversation_id || conversationId
+        };
+        
+        console.log(`[LLM Trigger] Sending trigger request...`);
+        
+        const llmResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${DIFY_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(llmTriggerPayload),
+        });
+        
+        if (llmResponse.ok) {
+          const llmData = await llmResponse.json();
+          console.log(`[LLM Trigger] Success! Tokens: ${llmData.metadata?.usage?.total_tokens || 0}`);
+          
+          // Use LLM response if it has actual token usage
+          if (llmData.metadata?.usage?.total_tokens > 0) {
+            finalData = llmData;
+            console.log(`🎉 [LLM Trigger] Successfully triggered LLM processing with ${llmData.metadata.usage.total_tokens} tokens!`);
+          }
+        }
+      } catch (llmError) {
+        console.warn(`[LLM Trigger] Failed to auto-trigger:`, llmError.message);
+      }
+    }
+    
+    // 🔧 BILLING: 处理积分扣除
+    let billingInfo = await handleTokenBilling(finalData, userIdentifier, 'CHAT');
+    
+    // 🚨 CRITICAL FIX: 如果CHAT billing失败，强制执行fallback billing
+    if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
+      console.error(`🚨 [CRITICAL] Primary billing failed for CHAT, executing emergency billing!`);
+      
+      // 创建强制billing数据
+      const emergencyTokens = Math.max(160, Math.ceil((message?.length || 0) / 3));
+      const emergencyData = {
+        answer: 'Emergency billing data',
+        conversation_id: 'emergency-chat-' + Date.now(),
+        message_id: generateUUID(),
+        metadata: {
+          usage: {
+            total_tokens: emergencyTokens,
+            prompt_tokens: Math.ceil(emergencyTokens * 0.4),
+            completion_tokens: Math.ceil(emergencyTokens * 0.6),
+            total_price: emergencyTokens * 0.000002175
+          }
+        },
+        billing_source: 'EMERGENCY_FORCED_BILLING'
+      };
+      
+      billingInfo = await handleTokenBilling(emergencyData, userIdentifier, 'EMERGENCY_CHAT', {
+        emergencyFallback: true
+      });
+      
+      console.log(`🔧 [EMERGENCY] Forced CHAT billing result:`, billingInfo);
+    }
+    
+    // Update conversation state in memory store
+    conversationStore.set(finalData.conversation_id || conversationId, {
+      ...conversationState,
+      conversationId: finalData.conversation_id || conversationId,
+      nodeStatus: finalData.metadata?.node_status, // Save node status
+    });
+
+    // Return enhanced response
+    return res.status(200).json({
+      ...finalData,
+      conversationId: finalData.conversation_id || conversationId,
+      userId: userIdentifier,
+    });
+
+  } catch (error) {
+    console.error('API error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// MOCK ENDPOINT FOR TESTING - When Dify API is not accessible
+app.post('/api/dify/chat/mock', async (req, res) => {
+  const { message, conversationId: clientConvId, userId } = req.body;
+  
+  // Generate or get user ID
+  const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
+  
+  // Get or create conversation ID
+  let conversationId = clientConvId;
+  if (!conversationId) {
+    conversationId = generateUUID();
+  }
+
+  // Mock response that demonstrates the fixed structure
+  const mockResponse = {
+    conversation_id: conversationId,
+    message_id: `msg-${generateUUID()}`,
+    answer: `Mock response to: "${message}". This demonstrates that the user parameter issue is fixed and memory-based conversation management is working.`,
+    metadata: {
+      usage: {
+        prompt_tokens: 20,
+        completion_tokens: 30,
+        total_tokens: 50
+      },
+      node_status: 'completed'
+    },
+    conversationId: conversationId,
+    userId: userIdentifier,
+    created_at: Date.now()
+  };
+
+  // 🔧 BILLING: 处理积分扣除 (Mock endpoint)
+  let billingInfo = await handleTokenBilling(mockResponse, userIdentifier, 'MOCK');
+  
+  // 🚨 CRITICAL FIX: 如果MOCK billing失败，强制执行fallback billing
+  if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
+    console.error(`🚨 [CRITICAL] Primary billing failed for MOCK, executing emergency billing!`);
+    
+    // 创建强制billing数据
+    const emergencyTokens = Math.max(100, Math.ceil((message?.length || 0) / 4));
+    const emergencyMockResponse = {
+      answer: 'Emergency billing data',
+      conversation_id: 'emergency-mock-' + Date.now(),
+      message_id: generateUUID(),
+      metadata: {
+        usage: {
+          total_tokens: emergencyTokens,
+          prompt_tokens: Math.ceil(emergencyTokens * 0.3),
+          completion_tokens: Math.ceil(emergencyTokens * 0.7),
+          total_price: emergencyTokens * 0.000002175
+        }
+      },
+      billing_source: 'EMERGENCY_FORCED_BILLING'
+    };
+    
+    billingInfo = await handleTokenBilling(emergencyMockResponse, userIdentifier, 'EMERGENCY_MOCK', {
+      emergencyFallback: true
+    });
+    
+    console.log(`🔧 [EMERGENCY] Forced MOCK billing result:`, billingInfo);
+  }
+
+  // Store in memory (simulate the real endpoint behavior)
+  conversationStore.set(conversationId, {
+    conversationId,
+    userId: userIdentifier,
+    nodeStatus: 'completed'
+  });
+
+  console.log(`✅ Mock response generated for user ${userIdentifier}, conversation ${conversationId}`);
+  
+  res.json(mockResponse);
+});
+
+// Context status endpoint - 让前端可以检查对话的token状态
+app.get('/api/dify/:conversationId/context-status', async (req, res) => {
+  const { conversationId } = req.params;
+  
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.json({ 
+        error: 'Database not configured',
+        hasContext: false 
+      });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // 获取对话历史
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('content, created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch conversation history' });
+    }
+
+    if (!messages || messages.length === 0) {
+      return res.json({
+        hasContext: false,
+        totalTokens: 0,
+        messageCount: 0,
+        riskLevel: 'none'
+      });
+    }
+
+    // 计算总token数
+    let totalTokens = 0;
+    messages.forEach(msg => {
+      totalTokens += estimateTokens(msg.content || '');
+    });
+
+    const DIFY_TOKEN_LIMIT = 8192;
+    const riskLevel = totalTokens > DIFY_TOKEN_LIMIT * 0.9 ? 'high' : 
+                     totalTokens > DIFY_TOKEN_LIMIT * 0.7 ? 'medium' : 'low';
+
+    let suggestion = null;
+    if (riskLevel === 'high') {
+      suggestion = '建议开始新对话以避免输出被截断';
+    } else if (riskLevel === 'medium') {
+      suggestion = '即将达到上下文限制，复杂回答可能被截断';
+    }
+
+    res.json({
+      hasContext: true,
+      totalTokens,
+      messageCount: messages.length,
+      riskLevel,
+      suggestion,
+      tokenLimit: DIFY_TOKEN_LIMIT,
+      utilizationPercent: Math.round((totalTokens / DIFY_TOKEN_LIMIT) * 100)
+    });
+
+  } catch (error) {
+    console.error('Context status check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Configuration debug endpoint
+app.get('/api/config/status', async (req, res) => {
+  // Initialize Supabase for health check
+  let supabase = null;
+  let databaseHealthy = false;
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    databaseHealthy = await checkDatabaseHealth(supabase);
+  }
+
+  res.json({
+    environment_configured: {
+      dify_api_url: !!(DIFY_API_URL),
+      dify_api_key: !!(DIFY_API_KEY),
+      supabase_url: !!(SUPABASE_URL),
+      supabase_service_key: !!(SUPABASE_SERVICE_ROLE_KEY)
+    },
+    database_health: {
+      configured: !!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY),
+      healthy: databaseHealthy,
+      required_tables: ['conversations', 'messages']
+    },
+    api_endpoints: {
+      chat: '/api/dify',
+      workflow: '/api/dify/workflow',
+      streaming_chat: '/api/dify/:conversationId/stream',
+      blocking_chat: '/api/dify/:conversationId'
+    },
+    timeouts: {
+      default_timeout_ms: DEFAULT_TIMEOUT,
+      workflow_timeout_ms: WORKFLOW_TIMEOUT,
+      streaming_timeout_ms: STREAMING_TIMEOUT,
+      max_retries: MAX_RETRIES
+    }
+  });
+});
 
 // Dify chat proxy API (generic endpoint without conversationId - for backward compatibility)
 app.post('/api/dify', async (req, res) => {
@@ -2917,7 +3150,6 @@ app.post('/api/dify', async (req, res) => {
           headers: {
             'Authorization': `Bearer ${DIFY_API_KEY}`,
             'Content-Type': 'application/json',
-            'X-Dify-Version': '1.9.1',
           },
           body: JSON.stringify(requestBody),
         },
@@ -3068,7 +3300,7 @@ app.post('/api/dify', async (req, res) => {
               buffer = buffer.substring(lineEndIndex + 1);
               
               if (line.startsWith('data: ')) {
-                let data = line.substring(6).trim();
+                const data = line.substring(6).trim();
                 
                 if (data === '[DONE]') {
                   console.log('🔚 Streaming ended with [DONE]');
@@ -3084,40 +3316,10 @@ app.post('/api/dify', async (req, res) => {
                     finalData = parsed;
                   }
                   
-                  // 🎯 提取node_finished事件中的execution_metadata（真实token数据位置）
-                  if (parsed.event === 'node_finished' && parsed.data?.execution_metadata) {
-                    const execMeta = parsed.data.execution_metadata;
-                    if (execMeta.total_tokens > 0) {
-                      if (!bodyUsageData) {
-                        bodyUsageData = {
-                          total_tokens: 0,
-                          total_price: "0.0",
-                          prompt_tokens: 0,
-                          completion_tokens: 0
-                        };
-                      }
-                      // 累加每个节点的token使用
-                      bodyUsageData.total_tokens += execMeta.total_tokens;
-                      bodyUsageData.total_price = String(parseFloat(bodyUsageData.total_price || 0) + parseFloat(execMeta.total_price || 0));
-                      console.log(`[Server] 💰 从node_finished提取token: +${execMeta.total_tokens} tokens, $${execMeta.total_price} (累计: ${bodyUsageData.total_tokens} tokens)`);
-                    }
-                  }
-                  
                   // 🎯 提取响应体中的usage信息（包含价格）
                   if (parsed.event === 'message_end' && parsed.metadata?.usage) {
-                    // 如果message_end有usage且不为0，使用它；否则保留从node_finished累加的数据
-                    if (parsed.metadata.usage.total_tokens > 0) {
-                      bodyUsageData = parsed.metadata.usage;
-                      console.log('[Server] 📊 从message_end提取usage信息: token统计和价格数据已获取');
-                    } else if (bodyUsageData && bodyUsageData.total_tokens > 0) {
-                      console.log(`[Server] ✅ message_end的usage为0，使用从node_finished累加的数据: ${bodyUsageData.total_tokens} tokens`);
-                      // 🎯 CRITICAL FIX: 在转发给前端之前，用累加的数据覆盖message_end的零值usage
-                      parsed.metadata.usage = bodyUsageData;
-                      data = JSON.stringify(parsed);
-                      console.log(`[Server] ✅ 已将累加的usage覆盖到message_end事件中，准备转发给前端`);
-                    } else {
-                      console.log('[Server] ⚠️ message_end和node_finished都没有token数据');
-                    }
+                    bodyUsageData = parsed.metadata.usage;
+                    console.log('[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取');
                   }
                   
                   // Forward the streaming data to client
@@ -3245,15 +3447,6 @@ app.post('/api/dify', async (req, res) => {
             console.log(`🔧 [EMERGENCY-BILLING] Created fallback finalData with ${estimatedTokens} tokens`);
           }
 
-          // 🎯 CRITICAL FIX: 用从node_finished累加的usage数据覆盖message_end的0值usage
-          if (finalData && bodyUsageData && bodyUsageData.total_tokens > 0) {
-            if (!finalData.metadata) {
-              finalData.metadata = {};
-            }
-            finalData.metadata.usage = bodyUsageData;
-            console.log(`✅ [BILLING-FIX] 用从node_finished累加的usage覆盖finalData: ${bodyUsageData.total_tokens} tokens, $${bodyUsageData.total_price}`);
-          }
-
           // Save to database if we have final data
           if (finalData && supabase) {
             // 🔧 BILLING: 处理积分扣除
@@ -3266,8 +3459,7 @@ app.post('/api/dify', async (req, res) => {
               billingSource: finalData?.billing_source || 'NORMAL'
             });
             let billingInfo = await handleTokenBilling(finalData, user, 'WORKFLOW_STREAM', {
-              emergencyFallback: requestBody?.emergency_fallback || false,
-              headerMetadata: responseHeaderMetadata
+              emergencyFallback: requestBody?.emergency_fallback || false
             });
             
             // 🚨 CRITICAL FIX: 如果billing失败，强制执行fallback billing
@@ -3319,11 +3511,16 @@ app.post('/api/dify', async (req, res) => {
             }
             
             const effectiveConversationId = finalData.conversation_id || conversationId;
-            const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, finalData.conversation_id, getValidUserId(user));
-            
-            if (conversationCreated !== false) {
-              await saveMessages(supabase, effectiveConversationId, actualMessage, finalData);
-              console.log('✅ Saved streaming conversation to database');
+            try {
+              const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, finalData.conversation_id, getValidUserId(user));
+              
+              if (conversationCreated !== false) {
+                await saveMessages(supabase, effectiveConversationId, actualMessage, finalData);
+                console.log('✅ Saved streaming conversation to database');
+              }
+            } catch (dbError) {
+              console.error('⚠️ Database operation failed in streaming response:', dbError);
+              // Don't let database errors break the stream
             }
           }
           
@@ -3369,22 +3566,28 @@ app.post('/api/dify', async (req, res) => {
 
     // Ensure conversation exists BEFORE saving messages (only for blocking mode)
     if (supabase && data) {
-      // Use Dify's conversation_id as the authoritative source
-      const effectiveConversationId = data.conversation_id || conversationId;
-      
-      // First ensure conversation record exists with Dify's ID as primary
-      const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
-      
-      // Then save messages using Dify's conversation_id only if conversation was successfully created/exists
-      if (conversationCreated !== false) {
-        // Add context truncation note if context was managed
-        if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
-          data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
-        }
+      try {
+        // Use Dify's conversation_id as the authoritative source
+        const effectiveConversationId = data.conversation_id || conversationId;
         
-        await saveMessages(supabase, effectiveConversationId, actualMessage, data);
-      } else {
-        console.error('⚠️ Skipping message save due to conversation creation failure');
+        // First ensure conversation record exists with Dify's ID as primary
+        const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
+        
+        // Then save messages using Dify's conversation_id only if conversation was successfully created/exists
+        if (conversationCreated !== false) {
+          // Add context truncation note if context was managed
+          if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+            data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
+          }
+          
+          await saveMessages(supabase, effectiveConversationId, actualMessage, data);
+        } else {
+          console.error('⚠️ Skipping message save due to conversation creation failure');
+        }
+      } catch (dbError) {
+        console.error('⚠️ Database operation failed after successful Dify API response:', dbError);
+        // Don't let database errors break the successful Dify response
+        // Just log the error and continue
       }
     }
 
@@ -3425,9 +3628,7 @@ app.post('/api/dify', async (req, res) => {
       hasTokens: !!(responseData?.metadata?.usage?.total_tokens),
       tokensValue: responseData?.metadata?.usage?.total_tokens
     });
-    let billingInfo = await handleTokenBilling(responseData, user, 'DIFY_GENERIC', {
-      headerMetadata: headerMetadata
-    });
+    let billingInfo = await handleTokenBilling(responseData, user, 'DIFY_GENERIC');
 
     // 🚨 CRITICAL FIX: 如果blocking模式billing失败，强制执行fallback billing
     if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
@@ -3618,7 +3819,6 @@ app.post('/api/dify/workflow', async (req, res) => {
           let fullAnswer = '';
           let finalData = null;
           let currentConversationId = null; // Track conversation_id from DIFY response
-          let accumulatedUsage = null; // 累加从node_finished提取的token数据
 
           try {
             while (true) {
@@ -3665,16 +3865,21 @@ app.post('/api/dify/workflow', async (req, res) => {
                     
                     // Save messages to database if we have final data
                     if (finalData && supabase) {
-                      // Ensure conversation exists first
-                      await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
-                      
-                      // Add context truncation note if context was managed
-                      if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
-                        finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+                      try {
+                        // Ensure conversation exists first
+                        await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
+                        
+                        // Add context truncation note if context was managed
+                        if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+                          finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
+                        }
+                        
+                        // Then save messages
+                        await saveMessages(supabase, conversationId, actualMessage, finalData);
+                      } catch (dbError) {
+                        console.error('⚠️ Database operation failed in stream [DONE] handler:', dbError);
+                        // Don't let database errors break the stream
                       }
-                      
-                      // Then save messages
-                      await saveMessages(supabase, conversationId, actualMessage, finalData);
                     }
                     
                     res.write('data: [DONE]\n\n');
@@ -3700,25 +3905,6 @@ app.post('/api/dify/workflow', async (req, res) => {
                       });
                     }
 
-                    // 🎯 提取node_finished事件中的execution_metadata（真实token数据位置）
-                    if (parsed.event === 'node_finished' && parsed.data?.execution_metadata) {
-                      const execMeta = parsed.data.execution_metadata;
-                      if (execMeta.total_tokens > 0) {
-                        if (!accumulatedUsage) {
-                          accumulatedUsage = {
-                            total_tokens: 0,
-                            total_price: "0.0",
-                            prompt_tokens: 0,
-                            completion_tokens: 0
-                          };
-                        }
-                        // 累加每个节点的token使用
-                        accumulatedUsage.total_tokens += execMeta.total_tokens;
-                        accumulatedUsage.total_price = String(parseFloat(accumulatedUsage.total_price || 0) + parseFloat(execMeta.total_price || 0));
-                        console.log(`[Workflow] 💰 从node_finished提取token: +${execMeta.total_tokens} tokens, $${execMeta.total_price} (累计: ${accumulatedUsage.total_tokens} tokens)`);
-                      }
-                    }
-                    
                     // Collect answer content and final data
                     if (parsed.event === 'message' && parsed.answer) {
                       fullAnswer += parsed.answer;
@@ -3765,22 +3951,12 @@ app.post('/api/dify/workflow', async (req, res) => {
                       }
                       
                       // Also check message_end events for usage data
-                      if (parsed.event === 'message_end') {
-                        if (parsed.metadata && parsed.metadata.usage && parsed.metadata.usage.total_tokens > 0) {
-                          console.log('💰 [STREAMING] Found usage data in message_end event:', JSON.stringify(parsed.metadata.usage));
-                          finalData.metadata = {
-                            ...finalData.metadata,
-                            usage: parsed.metadata.usage
-                          };
-                        } else if (accumulatedUsage && accumulatedUsage.total_tokens > 0) {
-                          console.log(`✅ [STREAMING] message_end的usage为0，使用从node_finished累加的数据: ${accumulatedUsage.total_tokens} tokens`);
-                          finalData.metadata = {
-                            ...finalData.metadata,
-                            usage: accumulatedUsage
-                          };
-                        } else {
-                          console.log('⚠️ [STREAMING] message_end和node_finished都没有token数据');
-                        }
+                      if (parsed.event === 'message_end' && parsed.metadata && parsed.metadata.usage) {
+                        console.log('💰 [STREAMING] Found usage data in message_end event:', JSON.stringify(parsed.metadata.usage));
+                        finalData.metadata = {
+                          ...finalData.metadata,
+                          usage: parsed.metadata.usage
+                        };
                       }
                     }
 
@@ -3893,16 +4069,21 @@ app.post('/api/dify/workflow', async (req, res) => {
 
         // Ensure conversation exists and save messages
         if (supabase) {
-          // First ensure conversation record exists
-          await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
-          
-          // Add context truncation note if context was managed
-          if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
-            data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || data.data?.outputs?.answer || 'Workflow completed');
+          try {
+            // First ensure conversation record exists
+            await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
+            
+            // Add context truncation note if context was managed
+            if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
+              data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || data.data?.outputs?.answer || 'Workflow completed');
+            }
+            
+            // Then save messages
+            await saveMessages(supabase, conversationId, actualMessage, data);
+          } catch (dbError) {
+            console.error('⚠️ Database operation failed after successful Dify Workflow API response:', dbError);
+            // Don't let database errors break the successful Dify response
           }
-          
-          // Then save messages
-          await saveMessages(supabase, conversationId, actualMessage, data);
         }
 
         res.json({
@@ -3977,8 +4158,7 @@ app.post('/api/dify/:conversationId/regenerate-painpoints', async (req, res) => 
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${DIFY_API_KEY}`,
-          'Content-Type': 'application/json',
-          'X-Dify-Version': '1.9.1'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(regenerateRequestBody)
       },
@@ -4120,8 +4300,7 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${DIFY_API_KEY}`,
-          'Content-Type': 'application/json',
-          'X-Dify-Version': '1.9.1'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
       },
@@ -4475,7 +4654,6 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     let fullAnswer = '';
     let finalData = null;
     let currentConversationId = null; // Track conversation_id from DIFY response
-    const savedHeaderMetadata = headerMetadata; // 保存响应头元数据供后续billing使用
 
     try {
       let allChunks = '';
@@ -4658,9 +4836,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
         };
         
         // 🔧 BILLING: 处理积分扣除（现在有fallback usage数据了）
-        const billingInfo = await handleTokenBilling(finalData, req.body.user, 'STREAM_FALLBACK', {
-          headerMetadata: savedHeaderMetadata
-        });
+        const billingInfo = await handleTokenBilling(finalData, req.body.user, 'STREAM_FALLBACK');
         
         // 🔧 关键修复：为fallback billing也发送balance_updated事件
         if (billingInfo && billingInfo.newBalance !== null && billingInfo.success) {
@@ -5101,6 +5277,2329 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// 🔧 版本和配置诊断端点
+app.get('/api/debug/version', (req, res) => {
+  const commitHash = 'a942742-working'; // 当前提交哈希
+  res.json({
+    commitHash,
+    timestamp: new Date().toISOString(),
+    environment: {
+      NODE_VERSION: process.version,
+      SUPABASE_URL: !!SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: !!SUPABASE_SERVICE_ROLE_KEY,
+      DIFY_API_URL: !!DIFY_API_URL,
+      DIFY_API_KEY: !!DIFY_API_KEY
+    },
+    billingStatus: {
+      globalTracker: typeof global.billingTracker !== 'undefined',
+      successfulCalls: global.billingTracker?.successfulCalls || 0,
+      failedCalls: global.billingTracker?.failedCalls || 0
+    }
+  });
+});
+
+// Environment configuration check endpoint for debugging 503 errors
+app.get('/api/env-check', (req, res) => {
+  const envCheck = {
+    timestamp: new Date().toISOString(),
+    node_env: process.env.NODE_ENV || 'not_set',
+    dify_config: {
+      api_url: process.env.VITE_DIFY_API_URL ? 'SET' : 'NOT_SET',
+      api_key: process.env.VITE_DIFY_API_KEY ? 'SET' : 'NOT_SET',
+      app_id: process.env.VITE_DIFY_APP_ID ? 'SET' : 'NOT_SET',
+      timeout: process.env.VITE_DIFY_TIMEOUT_MS || 'default',
+      workflow_timeout: process.env.VITE_DIFY_WORKFLOW_TIMEOUT_MS || 'default',
+      streaming_timeout: process.env.VITE_DIFY_STREAMING_TIMEOUT_MS || 'default',
+      max_retries: process.env.VITE_DIFY_MAX_RETRIES || 'default'
+    },
+    supabase_config: {
+      url: process.env.VITE_SUPABASE_URL ? 'SET' : 'NOT_SET',
+      anon_key: process.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'NOT_SET',
+      service_role_key: process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT_SET'
+    },
+    computed_values: {
+      DIFY_API_URL: DIFY_API_URL || 'EMPTY',
+      DIFY_API_KEY: DIFY_API_KEY ? 'SET' : 'EMPTY',
+      SUPABASE_URL: SUPABASE_URL || 'EMPTY',
+      SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'EMPTY'
+    }
+  };
+  
+  res.status(200).json(envCheck);
+});
+
+// Dify API connectivity test endpoint for debugging production issues
+app.get('/api/dify/test-connection', async (req, res) => {
+  const testResult = {
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    tests: {}
+  };
+
+  try {
+    // Test 1: Basic configuration check
+    testResult.tests.configuration = {
+      status: 'checking',
+      dify_api_url: DIFY_API_URL || 'MISSING',
+      dify_api_key: DIFY_API_KEY ? 'SET' : 'MISSING'
+    };
+
+    if (!DIFY_API_URL || !DIFY_API_KEY) {
+      testResult.tests.configuration.status = 'failed';
+      testResult.tests.configuration.error = 'Missing required configuration';
+      return res.status(500).json(testResult);
+    }
+    testResult.tests.configuration.status = 'passed';
+
+    // Test 2: DNS and network connectivity
+    testResult.tests.dns_connectivity = {
+      status: 'checking'
+    };
+
+    try {
+      const url = new URL(DIFY_API_URL);
+      const dnsResponse = await fetch(`${url.protocol}//${url.hostname}`, {
+        method: 'GET',
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Prome-Production-Test/1.0'
+        }
+      });
+      testResult.tests.dns_connectivity.status = 'passed';
+      testResult.tests.dns_connectivity.response_status = dnsResponse.status;
+    } catch (error) {
+      testResult.tests.dns_connectivity.status = 'failed';
+      testResult.tests.dns_connectivity.error = error.message;
+      testResult.tests.dns_connectivity.error_code = error.code;
+    }
+
+    // Test 3: Dify API authentication
+    testResult.tests.api_auth = {
+      status: 'checking'
+    };
+
+    try {
+      const authResponse = await fetch(`${DIFY_API_URL}/meta`, {
+        method: 'GET',
+        timeout: 15000,
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Prome-Production-Test/1.0'
+        }
+      });
+
+      testResult.tests.api_auth.status = authResponse.ok ? 'passed' : 'failed';
+      testResult.tests.api_auth.response_status = authResponse.status;
+      testResult.tests.api_auth.response_text = await authResponse.text().then(t => t.substring(0, 200));
+    } catch (error) {
+      testResult.tests.api_auth.status = 'failed';
+      testResult.tests.api_auth.error = error.message;
+      testResult.tests.api_auth.error_code = error.code;
+    }
+
+    // Test 4: Chat endpoint test
+    testResult.tests.chat_endpoint = {
+      status: 'checking'
+    };
+
+    try {
+      const chatTestPayload = {
+        inputs: {},
+        query: "Hello, this is a production connectivity test",
+        response_mode: "blocking",
+        user: `prod-test-${Date.now()}`
+      };
+
+      const chatResponse = await fetch(`${DIFY_API_URL}/chat-messages`, {
+        method: 'POST',
+        timeout: 20000,
+        headers: {
+          'Authorization': `Bearer ${DIFY_API_KEY}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Prome-Production-Test/1.0'
+        },
+        body: JSON.stringify(chatTestPayload)
+      });
+
+      testResult.tests.chat_endpoint.status = chatResponse.ok ? 'passed' : 'failed';
+      testResult.tests.chat_endpoint.response_status = chatResponse.status;
+      
+      if (chatResponse.ok) {
+        const chatData = await chatResponse.json();
+        testResult.tests.chat_endpoint.conversation_id = chatData.conversation_id;
+        testResult.tests.chat_endpoint.message_preview = chatData.answer?.substring(0, 100);
+      } else {
+        testResult.tests.chat_endpoint.error_response = await chatResponse.text().then(t => t.substring(0, 200));
+      }
+    } catch (error) {
+      testResult.tests.chat_endpoint.status = 'failed';
+      testResult.tests.chat_endpoint.error = error.message;
+      testResult.tests.chat_endpoint.error_code = error.code;
+    }
+
+  } catch (error) {
+    testResult.error = error.message;
+  }
+
+  // Determine overall status
+  const allTests = Object.values(testResult.tests);
+  const failedTests = allTests.filter(test => test.status === 'failed');
+  
+  testResult.overall_status = failedTests.length === 0 ? 'healthy' : 'unhealthy';
+  testResult.summary = {
+    total_tests: allTests.length,
+    passed: allTests.filter(test => test.status === 'passed').length,
+    failed: failedTests.length
+  };
+
+  res.status(testResult.overall_status === 'healthy' ? 200 : 500).json(testResult);
+});
+
+// =====================================================
+// Video Credits API Endpoints (MUST BE BEFORE STATIC ROUTES)
+// =====================================================
+
+// Check user balance for video generation
+app.get('/api/video/balance/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' });
+    }
+    
+    // Convert user ID to valid UUID format if needed
+    const validUserId = getValidUserId(userId);
+    console.log('🔄 Video balance check: Original userId:', userId, '→ Valid UUID:', validUserId);
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('id', validUserId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user balance:', error);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Balance field stores credits directly
+    const credits = user.balance || 0;
+    res.json({ balance: user.balance || 0, credits });
+  } catch (error) {
+    console.error('Balance check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Check if user has enough credits for video generation
+app.post('/api/video/check-balance', async (req, res) => {
+  try {
+    const { userId, credits } = req.body;
+    
+    if (!userId || !credits) {
+      return res.status(400).json({ error: 'Missing userId or credits' });
+    }
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' });
+    }
+    
+    // Convert user ID to valid UUID format if needed
+    const validUserId = getValidUserId(userId);
+    console.log('🔄 Video check-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Use credits directly (no USD conversion for auto-video)
+    const { data: hasEnough, error } = await supabase.rpc('check_user_credits_for_video', {
+      user_uuid: validUserId,
+      required_credits: credits
+    });
+    
+    if (error) {
+      console.error('Error checking user balance:', error);
+      return res.status(500).json({ error: 'Failed to check balance' });
+    }
+    
+    res.json({ hasEnoughCredits: hasEnough });
+  } catch (error) {
+    console.error('Balance check error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Reserve credits for video generation
+app.post('/api/video/reserve-balance', async (req, res) => {
+  try {
+    const { userId, credits, sessionId, duration, metadata = {} } = req.body;
+    
+    if (!userId || !credits || !sessionId) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Database not configured' });
+    }
+    
+    // Convert user ID to valid UUID format if needed
+    const validUserId = getValidUserId(userId);
+    console.log('🔄 Video reserve-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Use credits directly (no USD conversion for auto-video)
+    console.log('💰 Attempting to reserve credits:', {
+      validUserId,
+      credits,
+      sessionId,
+      duration: duration || 8
+    });
+    
+    const { data: success, error: reserveError } = await supabase.rpc('reserve_credits_for_video', {
+      user_uuid: validUserId,
+      credits_amount: credits,
+      session_id_param: sessionId,
+      duration_param: duration || 8,
+      metadata_param: metadata
+    });
+    
+    console.log('💰 Reserve credits result:', { success, reserveError });
+    
+    if (reserveError || !success) {
+      console.error('Error reserving balance for video:', reserveError);
+      return res.status(400).json({ error: 'Insufficient balance or reservation failed' });
+    }
+    
+    // Get updated balance (balance field stores credits directly)
+    const { data: user } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('id', validUserId)
+      .single();
+    
+    const remainingCredits = user?.balance || 0;
+    
+    res.json({
+      success: true,
+      sessionId,
+      deductedCredits: credits,
+      remainingCredits
+    });
+  } catch (error) {
+    console.error('Balance reserve error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// A2E Digital Human Training API
+app.post('/api/digital-human/train', async (req, res) => {
+  try {
+    const { 
+      userId, 
+      name,
+      videoUrl,
+      tempVideoFileName, // Filename of temporarily uploaded video for cleanup
+      gender = 'female',
+      language = 'zh',
+      voiceId // 克隆的声音ID
+    } = req.body;
+
+    console.log('🎭 Digital human training request:', { 
+      userId, 
+      name,
+      gender,
+      language,
+      hasVideo: !!videoUrl,
+      hasVoiceId: !!voiceId
+    });
+
+    // Validate required parameters (imageUrl is now optional, videoUrl is required per A2E API docs)
+    if (!userId || !name || !videoUrl) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters: userId, name, videoUrl' 
+      });
+    }
+
+    const A2E_API_KEY = process.env.A2E_API_KEY;
+    const A2E_API_URL = process.env.A2E_API_URL || 'https://video.a2e.ai';
+
+    if (!A2E_API_KEY) {
+      console.log('⚠️ A2E API Key not configured, using mock response');
+      
+      // Clean up temporary video file in mock mode too
+      if (tempVideoFileName) {
+        try {
+                const supabase = createClient(
+            process.env.VITE_SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+          );
+          
+          await supabase.storage.from('digital-human-videos').remove([tempVideoFileName]);
+          console.log(`🗑️ Mock training started, cleaned up temp video: ${tempVideoFileName}`);
+        } catch (cleanupError) {
+          console.error('⚠️ Failed to cleanup temp video file in mock mode:', cleanupError);
+        }
+      }
+      
+      // Return mock training response
+      const mockTrainingId = `twin_${userId}_${Date.now()}`;
+      return res.json({
+        success: true,
+        trainingId: mockTrainingId,
+        status: 'training',
+        message: 'Digital human training started (simulated)',
+        estimatedTime: '5-10 minutes'
+      });
+    }
+
+    // Call real A2E training API with updated parameters per latest documentation
+    const trainingPayload = {
+      name,
+      video_url: videoUrl,
+      gender,
+      isTranscoding: true,
+      skipPreview: false, // Ensure preview is generated
+      isSilent: false // Ensure voice is enabled in preview
+    };
+
+    // Add language parameter
+    trainingPayload.language = language;
+    
+    // Add voice ID if provided (cloned voice)
+    if (voiceId) {
+      trainingPayload.voice_id = voiceId;
+      trainingPayload.hasVoiceClone = true; // 明确标记使用声音克隆
+      trainingPayload.hasVideoClone = false; // 只使用声音克隆，不使用视频克隆
+      console.log('🎤 Using cloned voice ID:', voiceId);
+    }
+
+    console.log('📤 Sending training request to A2E:', trainingPayload);
+
+    const response = await fetch(`${A2E_API_URL}/api/v1/userVideoTwin/startTraining`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${A2E_API_KEY}`
+      },
+      body: JSON.stringify(trainingPayload)
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.message || 'A2E training request failed');
+    }
+
+    console.log('✅ A2E training response:', result);
+
+    // Store temp file info for later cleanup (don't delete immediately as A2E needs to download it)
+    if (tempVideoFileName && result.data?._id) {
+      tempFileCleanupMap[result.data._id] = tempVideoFileName;
+      console.log(`📌 Keeping temp video for A2E download: ${tempVideoFileName} (training ID: ${result.data._id})`);
+    }
+
+    res.json({
+      success: true,
+      trainingId: result.data?._id || `twin_${Date.now()}`, // Use _id from A2E response
+      status: 'training',
+      message: result.message || 'Training started successfully',
+      estimatedTime: '5-10 minutes',
+      a2eResponse: result
+    });
+
+  } catch (error) {
+    console.error('Digital human training error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error during training',
+      details: error.message 
+    });
+  }
+});
+
+// Check digital human training status
+app.get('/api/digital-human/status/:trainingId', async (req, res) => {
+  try {
+    const { trainingId } = req.params;
+    
+    console.log('🔍 Checking A2E training status:', trainingId);
+
+    const A2E_API_KEY = process.env.A2E_API_KEY;
+    const A2E_API_URL = process.env.A2E_API_URL || 'https://video.a2e.ai';
+
+    if (!A2E_API_KEY) {
+      // Return mock status for development
+      return res.json({
+        success: true,
+        status: 'completed',
+        previewUrl: 'https://example.com/preview.mp4',
+        imageResultUrl: 'https://example.com/result.jpg',
+        trainingData: {
+          _id: trainingId,
+          current_status: 'completed',
+          preview_result_url: 'https://example.com/preview.mp4',
+          image_result_url: 'https://example.com/result.jpg'
+        }
+      });
+    }
+
+    const response = await fetch(`${A2E_API_URL}/api/v1/userVideoTwin/${trainingId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${A2E_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to get training status');
+    }
+
+    console.log('✅ A2E training status response:', result);
+
+    // Check if training is completed or failed and clean up temp file
+    const currentStatus = result.data?.current_status;
+    if ((currentStatus === 'completed' || currentStatus === 'failed') && tempFileCleanupMap[trainingId]) {
+      const tempFileName = tempFileCleanupMap[trainingId];
+      
+      try {
+        const supabase = createClient(
+          process.env.VITE_SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+        );
+        
+        await supabase.storage.from('digital-human-videos').remove([tempFileName]);
+        delete tempFileCleanupMap[trainingId]; // Remove from cleanup map
+        console.log(`🗑️ Training ${currentStatus}, cleaned up temp video: ${tempFileName}`);
+      } catch (cleanupError) {
+        console.error('⚠️ Failed to cleanup temp video file:', cleanupError);
+      }
+    }
+
+    res.json({
+      success: true,
+      status: currentStatus || 'unknown',
+      previewUrl: result.data?.preview_result_url || null,
+      imageResultUrl: result.data?.image_result_url || null,
+      trainingData: result.data
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to check training status:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to check training status',
+      details: error.toString()
+    });
+  }
+});
+
+// Get user's trained digital humans
+app.get('/api/digital-human/list/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    console.log('📋 Fetching digital humans for user:', userId);
+
+    // Query localStorage-like storage in memory (for now)
+    // In production, this should be stored in a database
+    const userDigitalHumans = digitalHumansStorage[userId] || [];
+
+    console.log('✅ Found digital humans:', userDigitalHumans.length);
+
+    res.json({
+      success: true,
+      digitalHumans: userDigitalHumans
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to fetch digital humans:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to fetch digital humans',
+      details: error.toString()
+    });
+  }
+});
+
+// Save trained digital human
+app.post('/api/digital-human/save', async (req, res) => {
+  try {
+    const { 
+      userId, 
+      trainingId,
+      name,
+      gender,
+      status,
+      previewUrl,
+      imageResultUrl,
+      trainingData 
+    } = req.body;
+    
+    console.log('💾 Saving digital human:', { userId, trainingId, name, status });
+
+    // Initialize user storage if not exists
+    if (!digitalHumansStorage[userId]) {
+      digitalHumansStorage[userId] = [];
+    }
+
+    // Check if digital human already exists
+    const existingIndex = digitalHumansStorage[userId].findIndex(dh => dh.trainingId === trainingId);
+    
+    const digitalHuman = {
+      trainingId,
+      name,
+      gender,
+      status,
+      previewUrl,
+      imageResultUrl,
+      trainingData,
+      createdAt: existingIndex >= 0 ? digitalHumansStorage[userId][existingIndex].createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      // Update existing
+      digitalHumansStorage[userId][existingIndex] = digitalHuman;
+      console.log('✅ Updated existing digital human');
+    } else {
+      // Add new
+      digitalHumansStorage[userId].push(digitalHuman);
+      console.log('✅ Added new digital human');
+    }
+
+    res.json({
+      success: true,
+      digitalHuman,
+      total: digitalHumansStorage[userId].length
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to save digital human:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to save digital human',
+      details: error.toString()
+    });
+  }
+});
+
+// Video proxy endpoint to handle CORS issues
+app.get('/api/video-proxy', async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url) {
+      return res.status(400).json({ error: 'Missing video URL parameter' });
+    }
+
+    console.log('🎬 Proxying video:', url);
+
+    // Use node's built-in http/https modules for better streaming control
+    const https = await import('https');
+    const http = await import('http');
+    const urlModule = await import('url');
+    
+    const parsedUrl = urlModule.default.parse(url);
+    const isHttps = parsedUrl.protocol === 'https:';
+    const client = isHttps ? https.default : http.default;
+
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (isHttps ? 443 : 80),
+      path: parsedUrl.path,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; VideoProxy/1.0)',
+        ...req.headers.range ? { 'Range': req.headers.range } : {}
+      }
+    };
+
+    const proxyReq = client.request(options, (proxyRes) => {
+      // Set response headers
+      res.set({
+        'Content-Type': 'video/mp4',
+        'Accept-Ranges': 'bytes',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Range, Content-Range',
+        'Cache-Control': 'public, max-age=3600'
+      });
+
+      // Copy status code and relevant headers from the original response
+      res.status(proxyRes.statusCode);
+      
+      if (proxyRes.headers['content-length']) {
+        res.set('Content-Length', proxyRes.headers['content-length']);
+      }
+      
+      if (proxyRes.headers['content-range']) {
+        res.set('Content-Range', proxyRes.headers['content-range']);
+      }
+
+      // Pipe the response directly
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (error) => {
+      console.error('❌ Proxy request error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to proxy video' });
+      }
+    });
+
+    proxyReq.end();
+    
+  } catch (error) {
+    console.error('❌ Video proxy error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to proxy video' });
+    }
+  }
+});
+
+// Audio proxy endpoint for A2E voice cloning access
+app.get('/api/audio-proxy', async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url) {
+      return res.status(400).json({ error: 'URL parameter required' });
+    }
+
+    console.log('🎵 Audio proxy request for A2E:', url);
+    
+    const https = await import('https');
+    const http = await import('http');
+    const urlModule = await import('url');
+    
+    const parsedUrl = urlModule.default.parse(url);
+    const isHttps = parsedUrl.protocol === 'https:';
+    const client = isHttps ? https.default : http.default;
+
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (isHttps ? 443 : 80),
+      path: parsedUrl.path,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; AudioProxy/1.0 for A2E)',
+        'Accept': 'audio/*,video/*,*/*'
+      }
+    };
+
+    const proxyReq = client.request(options, (proxyRes) => {
+      console.log('🎵 Audio proxy response status:', proxyRes.statusCode);
+      
+      // Set appropriate headers for audio/video content
+      res.set({
+        'Content-Type': proxyRes.headers['content-type'] || 'video/mp4',
+        'Content-Length': proxyRes.headers['content-length'],
+        'Accept-Ranges': 'bytes',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Range, Content-Range, User-Agent'
+      });
+      
+      res.status(proxyRes.statusCode);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (error) => {
+      console.error('❌ Audio proxy request error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to fetch audio' });
+      }
+    });
+
+    proxyReq.end();
+  } catch (error) {
+    console.error('❌ Audio proxy error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to proxy audio' });
+    }
+  }
+});
+
+// A2E Voice Cloning API
+app.post('/api/voice/clone', async (req, res) => {
+  try {
+    const { 
+      userId,
+      trainingId,
+      name,
+      voiceUrls,
+      gender = 'male',
+      denoise = true,
+      enhanceVoiceSimilarity = true,
+      model = 'minimax',
+      language = 'zh'
+    } = req.body;
+
+    console.log('🎤 Voice cloning request:', { 
+      userId, 
+      trainingId,
+      name, 
+      voiceUrls: voiceUrls?.length, 
+      gender, 
+      denoise, 
+      model, 
+      language 
+    });
+
+    // Validate required parameters
+    if (!userId || !name || !voiceUrls || voiceUrls.length === 0) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters: userId, name, voiceUrls' 
+      });
+    }
+
+    // Get A2E API configuration
+    const A2E_API_KEY = process.env.A2E_API_KEY;
+    const A2E_API_URL = process.env.A2E_API_URL || 'https://video.a2e.ai';
+
+    if (!A2E_API_KEY) {
+      console.log('⚠️ A2E API Key not configured for voice cloning');
+      return res.status(400).json({ error: 'A2E API not configured' });
+    }
+
+    // Try direct Supabase URLs first (they should be publicly accessible)
+    console.log('🔗 Using direct Supabase URLs for A2E access:', voiceUrls);
+
+    // A2E Voice Cloning API request
+    const voicePayload = {
+      name,
+      voice_urls: voiceUrls, // Use direct Supabase URLs
+      gender,
+      denoise,
+      enhance_voice_similarity: enhanceVoiceSimilarity,
+      model,
+      language
+    };
+
+    console.log('🔗 Using direct Supabase URLs for A2E access:', voiceUrls);
+
+    console.log('🔄 Sending voice cloning request to A2E:', {
+      ...voicePayload,
+      voice_urls: voicePayload.voice_urls.map(url => url.substring(0, 100) + '...')
+    });
+
+    const response = await fetch(`${A2E_API_URL}/api/v1/userVoice/training`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${A2E_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(voicePayload)
+    });
+
+    const result = await response.json();
+    console.log('✅ A2E voice cloning response:', result);
+
+    if (!response.ok) {
+      throw new Error(`A2E API error: ${result.message || response.statusText}`);
+    }
+
+    if (result.code !== 0) {
+      throw new Error(`A2E voice cloning failed: ${result.message}`);
+    }
+
+    // Save voice training info
+    const voiceTraining = {
+      userId,
+      trainingId,
+      voiceId: result.data?._id || `voice-${Date.now()}`,
+      name,
+      gender,
+      model,
+      language,
+      status: 'training',
+      voiceUrls,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Store voice training info in memory (should be database in production)
+    if (!digitalHumansStorage[userId]) {
+      digitalHumansStorage[userId] = [];
+    }
+
+    // Update the corresponding digital human with voice info
+    const digitalHuman = digitalHumansStorage[userId].find(dh => dh.trainingId === trainingId);
+    if (digitalHuman) {
+      digitalHuman.voiceCloning = voiceTraining;
+      console.log('✅ Added voice cloning info to digital human:', trainingId);
+    }
+
+    res.json({
+      success: true,
+      voiceTraining,
+      a2eResponse: result
+    });
+
+  } catch (error) {
+    console.error('❌ Voice cloning error:', error);
+    res.status(500).json({
+      error: error.message || 'Voice cloning failed',
+      details: error.toString()
+    });
+  }
+});
+
+// A2E Voice Cloning Status API
+app.get('/api/voice/status/:voiceId', async (req, res) => {
+  try {
+    const { voiceId } = req.params;
+    
+    console.log('🔍 Checking voice cloning status:', voiceId);
+    
+    const A2E_API_KEY = process.env.A2E_API_KEY;
+    const A2E_API_URL = process.env.A2E_API_URL;
+    
+    if (!A2E_API_KEY || !A2E_API_URL) {
+      console.log('⚠️ A2E API Key not configured for voice status check');
+      return res.status(400).json({ error: 'A2E API not configured' });
+    }
+
+    const response = await fetch(`${A2E_API_URL}/api/v1/userVoice/${voiceId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${A2E_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const result = await response.json();
+    console.log('✅ A2E voice status response:', result);
+
+    if (!response.ok) {
+      throw new Error(`A2E API error: ${result.message || response.statusText}`);
+    }
+
+    if (result.code !== 0) {
+      throw new Error(`A2E voice status failed: ${result.message}`);
+    }
+
+    // Return status info
+    res.json({
+      success: true,
+      status: result.data?.current_status || 'unknown',
+      data: result.data
+    });
+
+  } catch (error) {
+    console.error('❌ Voice status error:', error);
+    res.status(500).json({
+      error: error.message || 'Voice status check failed',
+      details: error.toString()
+    });
+  }
+});
+
+
+// 仙宫云实例管理API
+app.post('/api/xiangong/instance/start', async (req, res) => {
+  try {
+    console.log('🚀 启动仙宫云实例请求');
+    
+    const xiangongAPI = 'https://api.xiangongyun.com';
+    const instanceId = '3iaszw98tkh12h9x';
+    
+    // 使用官方文档的正确端点: /open/instance/boot
+    console.log('🔍 使用官方API端点: /open/instance/boot');
+    
+    const response = await fetch(`${xiangongAPI}/open/instance/boot`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      },
+      body: JSON.stringify({
+        id: instanceId,
+        gpu_count: 1  // 使用1个GPU
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ 实例启动命令发送成功');
+      console.log('📊 响应结果:', result);
+      
+      return res.json({
+        success: true,
+        message: '实例启动命令已发送，请等待实例启动',
+        data: result
+      });
+    }
+
+    const errorText = await response.text();
+    console.error('❌ 实例启动失败:', response.status, errorText);
+    
+    return res.status(response.status).json({ 
+      error: `实例启动失败: ${errorText}`,
+      statusCode: response.status
+    });
+    
+  } catch (error) {
+    console.error('启动实例错误:', error);
+    res.status(500).json({ 
+      error: error.message || '启动实例失败' 
+    });
+  }
+});
+
+app.post('/api/xiangong/instance/stop', async (req, res) => {
+  try {
+    console.log('⏸️ 停止仙宫云实例请求');
+    
+    const xiangongAPI = 'https://api.xiangongyun.com';
+    const instanceId = '3iaszw98tkh12h9x';
+    
+    const response = await fetch(`${xiangongAPI}/open/instance/shutdown_release_gpu`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      },
+      body: JSON.stringify({
+        id: instanceId
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('停止实例失败:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: `停止实例失败: ${errorText}` 
+      });
+    }
+
+    const result = await response.json();
+    console.log('✅ 实例停止成功:', result);
+
+    res.json({
+      success: true,
+      message: '实例停止成功',
+      data: result
+    });
+
+  } catch (error) {
+    console.error('停止实例失败:', error);
+    res.status(500).json({ 
+      error: error.message || '停止实例失败' 
+    });
+  }
+});
+
+// 获取自动关机状态API
+app.get('/api/xiangong/auto-shutdown/status', async (req, res) => {
+  try {
+    const now = new Date();
+    let idleMinutes = 0;
+    let remainingMinutes = IDLE_TIMEOUT_MINUTES;
+    
+    if (lastApiCallTime) {
+      idleMinutes = (now - lastApiCallTime) / (1000 * 60);
+      remainingMinutes = Math.max(0, IDLE_TIMEOUT_MINUTES - idleMinutes);
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        autoShutdownEnabled: true,
+        timeoutMinutes: IDLE_TIMEOUT_MINUTES,
+        lastApiCall: lastApiCallTime,
+        currentIdleMinutes: parseFloat(idleMinutes.toFixed(1)),
+        remainingMinutes: parseFloat(remainingMinutes.toFixed(1)),
+        willShutdownAt: lastApiCallTime ? new Date(lastApiCallTime.getTime() + IDLE_TIMEOUT_MINUTES * 60 * 1000) : null
+      }
+    });
+  } catch (error) {
+    console.error('获取自动关机状态失败:', error);
+    res.status(500).json({ 
+      error: error.message || '获取自动关机状态失败' 
+    });
+  }
+});
+
+app.get('/api/xiangong/instance/status', async (req, res) => {
+  try {
+    console.log('🔍 获取仙宫云实例状态');
+    
+    const xiangongAPI = 'https://api.xiangongyun.com';
+    const instanceId = '3iaszw98tkh12h9x';
+    
+    // 使用单个实例API获取状态
+    const response = await fetch(`${xiangongAPI}/open/instance/${instanceId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('获取实例状态失败:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: `获取实例状态失败: ${errorText}` 
+      });
+    }
+
+    const instance = await response.json();
+    console.log('✅ 获取实例状态成功');
+    console.log('📊 实例信息:', instance);
+    
+    if (!instance || !instance.data) {
+      return res.status(404).json({ error: '实例不存在或数据格式错误' });
+    }
+    
+    const instanceData = instance.data;
+    console.log(`实例状态: ${instanceData.status}`);
+
+    res.json({
+      success: true,
+      message: '获取实例状态成功',
+      data: {
+        status: instanceData.status,
+        id: instanceData.id,
+        name: instanceData.name,
+        gpu_model: instanceData.gpu_model,
+        start_timestamp: instanceData.start_timestamp,
+        stop_timestamp: instanceData.stop_timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error('获取实例状态失败:', error);
+    res.status(500).json({ 
+      error: error.message || '获取实例状态失败' 
+    });
+  }
+});
+
+// 数字人视频上传和特征提取API
+app.post('/api/xiangong/upload-training-video', async (req, res) => {
+  try {
+    // 跟踪API使用情况，重置自动关机定时器
+    updateLastUsage();
+    
+    // 使用已经配置好的videoUpload中间件
+    const upload = multer({ 
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 100 * 1024 * 1024 }, // 100MB限制
+      fileFilter: (req, file, cb) => {
+        console.log('📁 检测到文件类型:', file.mimetype, '文件名:', file.originalname);
+        const videoMimeTypes = [
+          'video/mp4',
+          'video/quicktime',
+          'video/x-msvideo',
+          'video/webm',
+          'video/ogg',
+          'video/avi',
+          'video/mov',
+          'application/octet-stream' // 有时QuickTime文件会被识别为此类型
+        ];
+        const isVideo = file.mimetype.startsWith('video/') || 
+                       videoMimeTypes.includes(file.mimetype) ||
+                       file.originalname.toLowerCase().match(/\.(mp4|mov|avi|webm|ogg|mkv)$/);
+        
+        if (isVideo) {
+          cb(null, true);
+        } else {
+          cb(new Error(`不支持的文件类型: ${file.mimetype}`));
+        }
+      }
+    }).single('video');
+
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ 
+          success: false, 
+          error: err.message 
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '未找到视频文件' 
+        });
+      }
+
+      const { userId } = req.body;
+      const videoFilename = `training_video_${userId}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
+
+      console.log('📹 接收训练视频:', {
+        filename: req.file.originalname,
+        size: req.file.size,
+        userId
+      });
+
+      // 上传到ComfyUI
+      const formData = new FormData();
+      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      formData.append('image', blob, videoFilename);
+
+      const uploadResponse = await fetch(`${XIANGONG_COMFYUI_URL}/upload/image`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`ComfyUI上传失败: ${uploadResponse.status}`);
+      }
+
+      const uploadResult = await uploadResponse.json();
+      
+      // 保存用户数字人信息到数据库
+      if (supabase) {
+        const { error } = await supabase
+          .from('digital_human_profiles')
+          .upsert({
+            user_id: userId,
+            training_video_filename: uploadResult.name,
+            training_video_path: uploadResult.subfolder || '',
+            status: 'uploaded',
+            created_at: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('数据库保存失败:', error);
+        }
+      }
+
+      // 保存数字人档案到数据库，不强制生成预览
+      console.log('📁 保存数字人档案到数据库...');
+      
+      res.json({
+        success: true,
+        message: '数字人训练视频上传成功',
+        profileId: userId,
+        videoInfo: {
+          filename: uploadResult.name,
+          subfolder: uploadResult.subfolder || '',
+          size: req.file.size
+        },
+        note: '数字人档案已创建，可以开始生成个性化视频。预览功能依赖于ComfyUI服务状态。'
+      });
+    });
+
+  } catch (error) {
+    console.error('视频上传失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 可选的数字人预览生成API
+app.post('/api/xiangong/generate-preview', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    console.log('🎭 开始生成数字人预览...');
+    
+    // 获取用户档案
+    let userProfile = null;
+    if (supabase && userId) {
+      const { data, error } = await supabase
+        .from('digital_human_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      if (error || !data) {
+        return res.status(404).json({
+          success: false,
+          error: '用户数字人档案不存在'
+        });
+      }
+      
+      userProfile = data;
+    }
+    
+    if (!userProfile?.training_video_filename) {
+      return res.status(400).json({
+        success: false,
+        error: '用户尚未上传训练视频'
+      });
+    }
+
+    // 尝试生成预览
+    const workflowData = {
+      prompt: {
+        "1": {
+          "inputs": {
+            "text": "您好，我是您的专属数字人。",
+            "speaker_audio": userProfile.training_video_filename,
+            "output_filename": `preview_${userId}_${Date.now()}`
+          },
+          "class_type": "IndexTTS2_Basic"
+        },
+        "2": {
+          "inputs": {
+            "audio": ["1", 0],
+            "reference_video": userProfile.training_video_filename,
+            "text": "您好，我是您的专属数字人。",
+            "emotion": "neutral"
+          },
+          "class_type": "InfiniteTalk"
+        }
+      }
+    };
+
+    const workflowResponse = await fetch(`${XIANGONG_COMFYUI_URL}/prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workflowData)
+    });
+
+    if (!workflowResponse.ok) {
+      throw new Error(`ComfyUI请求失败: ${workflowResponse.status}`);
+    }
+
+    const workflowResult = await workflowResponse.json();
+    
+    res.json({
+      success: true,
+      message: '预览生成任务已提交',
+      taskId: workflowResult.prompt_id,
+      note: '预览生成需要1-3分钟，请稍后查看结果'
+    });
+
+  } catch (error) {
+    console.error('预览生成失败:', error);
+    res.status(500).json({
+      success: false,
+      error: `预览生成失败: ${error.message}`,
+      note: 'ComfyUI服务可能不可用，但不影响正常的视频生成功能'
+    });
+  }
+});
+
+// 仙宫云 InfiniteTalk 个性化数字人视频生成API (智能启动)
+// 存储进行中的任务状态
+const activeInfiniteTalkTasks = new Map();
+
+app.post('/api/xiangong/infinitetalk', async (req, res) => {
+  try {
+    const { text, avatar, voice, emotion, background, userId } = req.body;
+
+    // 初始化Supabase客户端
+    const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
+
+    // 跟踪API使用情况，重置自动关机定时器
+    updateLastUsage();
+
+    console.log('🎬 仙宫云InfiniteTalk请求:', { 
+      textLength: text?.length, 
+      avatar, 
+      voice, 
+      emotion, 
+      background,
+      userId 
+    });
+
+    if (!text) {
+      return res.status(400).json({ error: '文本内容不能为空' });
+    }
+
+    // 首先确保实例正在运行
+    console.log('🔄 检查实例状态...');
+    const statusResponse = await fetch('http://localhost:8080/api/xiangong/instance/status');
+    
+    let needsStart = true;
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      if (statusData.success && statusData.data.status === 'running') {
+        needsStart = false;
+        console.log('✅ 实例已运行');
+      }
+    }
+
+    if (needsStart) {
+      console.log('🚀 自动启动实例...');
+      const startResponse = await fetch('http://localhost:8080/api/xiangong/instance/start', {
+        method: 'POST'
+      });
+      
+      if (!startResponse.ok) {
+        throw new Error('无法启动实例');
+      }
+      
+      // 等待实例启动
+      console.log('⏳ 等待实例启动...');
+      await new Promise(resolve => setTimeout(resolve, 30000)); // 等待30秒
+    }
+
+    if (!XIANGONG_COMFYUI_URL) {
+      return res.status(500).json({ error: '仙宫云ComfyUI服务地址未配置' });
+    }
+
+    // 生成唯一客户端ID和任务ID
+    const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const taskId = `infinitetalk_${Date.now()}`;
+    
+    console.log('🎬 准备InfiniteTalk工作流...');
+    
+    // 首先获取用户的数字人配置文件
+    let userProfile = null;
+    if (supabase && userId) {
+      try {
+        const { data, error } = await supabase
+          .from('digital_human_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+        
+        if (!error && data) {
+          userProfile = data;
+          console.log('✅ 找到用户数字人配置:', userProfile.training_video_filename);
+        }
+      } catch (dbError) {
+        console.log('⚠️ 用户数字人配置查询失败:', dbError.message);
+      }
+    }
+
+    // 创建个性化数字人工作流
+    const workflowData = {
+      prompt: {
+        // IndexTTS2 声音克隆节点
+        "1": {
+          "inputs": {
+            "text": text,
+            "speaker_audio": userProfile?.training_video_filename || "唐曾的声音.WAV", // 使用用户训练视频或默认音频
+            "output_filename": `tts_${userId}_${Date.now()}`
+          },
+          "class_type": "IndexTTS2_Basic",
+          "_meta": {
+            "title": "个性化语音合成"
+          }
+        },
+        // InfiniteTalk 数字人生成节点 (待配置)
+        "2": {
+          "inputs": {
+            "audio": ["1", 0], // 从TTS获取音频
+            "reference_video": userProfile?.training_video_filename || "example.png", // 用户训练视频
+            "text": text,
+            "emotion": emotion || "neutral"
+          },
+          "class_type": "InfiniteTalk", // 这个可能需要调整为实际的节点名
+          "_meta": {
+            "title": "个性化数字人生成"
+          }
+        }
+      },
+      client_id: clientId
+    };
+    
+    console.log('🚀 提交ComfyUI工作流...');
+    const response = await fetch(`${XIANGONG_COMFYUI_URL}/prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(workflowData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('ComfyUI API错误:', response.status, errorText);
+      
+      // 智能错误分析和临时解决方案
+      let errorAnalysis = '工作流提交失败';
+      let suggestions = [];
+      
+      if (errorText.includes('IndexTTS2')) {
+        errorAnalysis = 'IndexTTS2节点配置问题';
+        suggestions.push('检查IndexTTS2模型是否正确加载');
+      } else if (errorText.includes('InfiniteTalk')) {
+        errorAnalysis = 'InfiniteTalk节点配置问题';
+        suggestions.push('检查InfiniteTalk模型是否正确加载');
+      }
+      
+      console.log('🔗 提供ComfyUI直接访问方案');
+      return res.json({
+        success: false,
+        error: errorAnalysis,
+        message: '数字人API集成正在优化中，请使用直接访问方案',
+        temporarySolution: {
+          comfyuiUrl: `${XIANGONG_COMFYUI_URL}`,
+          instructions: [
+            '1. 点击上方链接访问ComfyUI界面',
+            '2. 加载 "InfiniteTalk数字人-indexTTS驱动" 工作流',
+            '3. 在文本输入节点中输入下方内容',
+            '4. 点击Queue Prompt开始生成',
+            '5. 生成完成后查看输出文件夹中的视频'
+          ],
+          inputText: text,
+          debug: {
+            apiError: errorText.substring(0, 500),
+            suggestions,
+            clientId,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    }
+
+    const result = await response.json();
+    const promptId = result.prompt_id;
+    
+    console.log('✅ ComfyUI工作流提交成功:', { promptId, clientId });
+
+    // 存储任务状态
+    activeInfiniteTalkTasks.set(promptId, {
+      taskId,
+      promptId,
+      clientId,
+      userId,
+      text,
+      status: 'submitted',
+      createdAt: new Date(),
+      progress: 0
+    });
+
+    // 启动WebSocket监控（异步）
+    startInfiniteTalkMonitoring(promptId, clientId, userId).catch(error => {
+      console.error('WebSocket监控启动失败:', error);
+    });
+
+    res.json({
+      success: true,
+      taskId: promptId,
+      message: '数字人视频生成任务已提交',
+      estimatedTime: '3-5分钟',
+      comfyuiUrl: `${XIANGONG_COMFYUI_URL}`,
+      debug: {
+        promptId,
+        clientId
+      }
+    });
+
+  } catch (error) {
+    console.error('InfiniteTalk生成失败:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message || '数字人视频生成失败' 
+    });
+  }
+});
+
+// WebSocket监控InfiniteTalk任务进度
+async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
+  try {
+    console.log(`🔗 启动WebSocket监控: ${promptId}`);
+    
+    const WebSocket = require('ws');
+    const wsUrl = XIANGONG_COMFYUI_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws';
+    
+    const ws = new WebSocket(`${wsUrl}?clientId=${clientId}`);
+    let heartbeatInterval;
+
+    ws.on('open', () => {
+      console.log(`✅ WebSocket连接成功: ${promptId}`);
+      
+      // 发送心跳包
+      heartbeatInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.ping();
+        }
+      }, 30000);
+      
+      // 更新任务状态
+      const task = activeInfiniteTalkTasks.get(promptId);
+      if (task) {
+        task.status = 'processing';
+        task.wsConnected = true;
+      }
+    });
+
+    ws.on('message', async (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log(`📨 ComfyUI消息 [${promptId}]:`, message.type);
+
+        const task = activeInfiniteTalkTasks.get(promptId);
+        if (!task) return;
+
+        if (message.type === 'progress' && message.data.prompt_id === promptId) {
+          const progress = Math.round((message.data.value / message.data.max) * 100);
+          console.log(`⏳ 进度更新: ${progress}% (${message.data.value}/${message.data.max})`);
+          
+          task.progress = progress;
+          task.status = 'processing';
+          task.lastUpdate = new Date();
+        }
+
+        if (message.type === 'executing' && message.data.prompt_id === promptId) {
+          if (message.data.node === null) {
+            console.log('✅ 工作流执行完成，获取结果...');
+            
+            try {
+              // 获取并处理结果
+              const results = await getInfiniteTalkResults(promptId);
+              await processInfiniteTalkResults(promptId, results, userId);
+              
+            } catch (error) {
+              console.error('结果处理失败:', error);
+              task.status = 'failed';
+              task.error = error.message;
+            }
+            
+            ws.close();
+          }
+        }
+
+        if (message.type === 'execution_error' && message.data.prompt_id === promptId) {
+          console.error('❌ 执行错误:', message.data);
+          task.status = 'failed';
+          task.error = message.data.exception_message || '执行失败';
+          ws.close();
+        }
+
+      } catch (error) {
+        console.error('WebSocket消息处理错误:', error);
+      }
+    });
+
+    ws.on('error', (error) => {
+      console.error(`❌ WebSocket错误 [${promptId}]:`, error.message);
+      const task = activeInfiniteTalkTasks.get(promptId);
+      if (task) {
+        task.wsError = error.message;
+      }
+    });
+
+    ws.on('close', () => {
+      console.log(`🔌 WebSocket连接关闭: ${promptId}`);
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      
+      const task = activeInfiniteTalkTasks.get(promptId);
+      if (task) {
+        task.wsConnected = false;
+      }
+    });
+
+    // 30分钟超时保护
+    setTimeout(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        console.log(`⏰ WebSocket超时关闭: ${promptId}`);
+        ws.close();
+        
+        const task = activeInfiniteTalkTasks.get(promptId);
+        if (task && task.status !== 'completed') {
+          task.status = 'timeout';
+          task.error = '任务执行超时';
+        }
+      }
+    }, 30 * 60 * 1000); // 30分钟
+
+  } catch (error) {
+    console.error('WebSocket监控启动失败:', error);
+    const task = activeInfiniteTalkTasks.get(promptId);
+    if (task) {
+      task.status = 'failed';
+      task.error = 'WebSocket监控失败: ' + error.message;
+    }
+  }
+}
+
+// 获取InfiniteTalk任务结果
+async function getInfiniteTalkResults(promptId) {
+  console.log(`🔍 获取任务结果: ${promptId}`);
+  
+  const historyResponse = await fetch(`${XIANGONG_COMFYUI_URL}/history/${promptId}`);
+  if (!historyResponse.ok) {
+    throw new Error(`无法获取任务历史: ${historyResponse.status}`);
+  }
+  
+  const history = await historyResponse.json();
+  const promptHistory = history[promptId];
+  
+  if (!promptHistory || !promptHistory.outputs) {
+    throw new Error('任务历史中未找到输出结果');
+  }
+
+  const outputs = promptHistory.outputs;
+  const results = [];
+
+  // 遍历所有输出节点，查找视频和图像文件
+  Object.keys(outputs).forEach(nodeId => {
+    const nodeOutputs = outputs[nodeId];
+    
+    // 查找视频输出
+    if (nodeOutputs.gifs) { // ComfyUI视频通常保存为gif
+      nodeOutputs.gifs.forEach(gif => {
+        results.push({
+          type: 'video',
+          filename: gif.filename,
+          subfolder: gif.subfolder || '',
+          type_folder: gif.type || 'output',
+          nodeId: nodeId
+        });
+      });
+    }
+    
+    if (nodeOutputs.videos) {
+      nodeOutputs.videos.forEach(video => {
+        results.push({
+          type: 'video',
+          filename: video.filename,
+          subfolder: video.subfolder || '',
+          type_folder: video.type || 'output',
+          nodeId: nodeId
+        });
+      });
+    }
+    
+    // 查找图像序列
+    if (nodeOutputs.images) {
+      nodeOutputs.images.forEach(image => {
+        results.push({
+          type: 'image',
+          filename: image.filename,
+          subfolder: image.subfolder || '',
+          type_folder: image.type || 'output',
+          nodeId: nodeId
+        });
+      });
+    }
+  });
+
+  console.log(`✅ 找到 ${results.length} 个输出文件`);
+  return results;
+}
+
+// 处理InfiniteTalk结果
+async function processInfiniteTalkResults(promptId, results, userId) {
+  try {
+    const task = activeInfiniteTalkTasks.get(promptId);
+    if (!task) {
+      throw new Error('任务状态未找到');
+    }
+
+    console.log(`🎬 处理视频结果: ${results.length} 个文件`);
+    
+    let finalVideoUrl = null;
+    const processedFiles = [];
+
+    for (const result of results) {
+      if (result.type === 'video') {
+        // 构建下载URL
+        const downloadUrl = `${XIANGONG_COMFYUI_URL}/view?filename=${encodeURIComponent(result.filename)}&subfolder=${encodeURIComponent(result.subfolder)}&type=${result.type_folder}`;
+        
+        console.log('📥 下载视频文件:', result.filename);
+        const videoResponse = await fetch(downloadUrl);
+        
+        if (!videoResponse.ok) {
+          console.error('视频下载失败:', downloadUrl);
+          continue;
+        }
+
+        const videoBuffer = await videoResponse.arrayBuffer();
+        
+        // 生成唯一文件名
+        const videoFilename = `infinitetalk_${promptId}_${Date.now()}.${result.filename.split('.').pop()}`;
+        
+        // 上传到Supabase存储
+        if (supabase) {
+          console.log('☁️ 上传视频到Supabase...');
+          const { data, error } = await supabase.storage
+            .from('digital-human-videos')
+            .upload(videoFilename, videoBuffer, {
+              contentType: result.filename.endsWith('.mp4') ? 'video/mp4' : 'image/gif'
+            });
+
+          if (error) {
+            console.error('Supabase上传失败:', error);
+            continue;
+          }
+
+          // 获取公共URL
+          const { data: urlData } = supabase.storage
+            .from('digital-human-videos')
+            .getPublicUrl(videoFilename);
+
+          finalVideoUrl = urlData.publicUrl;
+          console.log('✅ 视频上传成功:', finalVideoUrl);
+        } else {
+          // 如果没有Supabase，使用ComfyUI直接链接
+          finalVideoUrl = downloadUrl;
+          console.log('⚠️ 使用ComfyUI直接链接:', finalVideoUrl);
+        }
+
+        processedFiles.push({
+          type: 'video',
+          url: finalVideoUrl,
+          filename: result.filename,
+          size: videoBuffer.byteLength
+        });
+        
+        break; // 只处理第一个视频文件
+      }
+    }
+
+    // 更新任务状态
+    task.status = 'completed';
+    task.completedAt = new Date();
+    task.results = processedFiles;
+    task.videoUrl = finalVideoUrl;
+    task.progress = 100;
+
+    // 保存到数据库
+    if (supabase && userId) {
+      try {
+        const { error } = await supabase
+          .from('digital_human_videos')
+          .insert({
+            task_id: promptId,
+            user_id: userId,
+            text_content: task.text,
+            video_url: finalVideoUrl,
+            status: 'completed',
+            created_at: task.createdAt.toISOString(),
+            completed_at: new Date().toISOString(),
+            metadata: {
+              promptId,
+              clientId: task.clientId,
+              results: processedFiles
+            }
+          });
+
+        if (error) {
+          console.error('数据库保存失败:', error);
+        } else {
+          console.log('✅ 结果已保存到数据库');
+        }
+      } catch (dbError) {
+        console.error('数据库操作异常:', dbError);
+      }
+    }
+
+    console.log(`🎉 任务完成: ${promptId} -> ${finalVideoUrl}`);
+
+  } catch (error) {
+    console.error('结果处理失败:', error);
+    const task = activeInfiniteTalkTasks.get(promptId);
+    if (task) {
+      task.status = 'failed';
+      task.error = error.message;
+    }
+    throw error;
+  }
+}
+
+// 上传文件到ComfyUI
+app.post('/api/xiangong/comfyui/upload', async (req, res) => {
+  try {
+    const multer = require('multer');
+    const fs = require('fs');
+    const path = require('path');
+    
+    // 配置multer用于处理文件上传
+    const storage = multer.memoryStorage();
+    const upload = multer({ storage }).single('file');
+    
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ error: '文件上传失败: ' + err.message });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ error: '未找到上传文件' });
+      }
+      
+      console.log('📁 上传文件到ComfyUI:', req.file.originalname);
+      
+      // 准备上传到ComfyUI
+      const formData = new FormData();
+      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      formData.append('image', blob, req.file.originalname);
+      
+      const uploadResponse = await fetch(`${XIANGONG_COMFYUI_URL}/upload/image`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`ComfyUI上传失败: ${uploadResponse.status}`);
+      }
+      
+      const result = await uploadResponse.json();
+      console.log('✅ 文件上传成功:', result);
+      
+      res.json({
+        success: true,
+        filename: result.name,
+        subfolder: result.subfolder || '',
+        type: result.type || 'input',
+        message: '文件上传成功'
+      });
+    });
+    
+  } catch (error) {
+    console.error('文件上传失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 查询ComfyUI可用节点类型
+app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
+  try {
+    console.log('🔍 查询ComfyUI节点类型...');
+    
+    const response = await fetch(`${XIANGONG_COMFYUI_URL}/object_info`);
+    if (!response.ok) {
+      throw new Error(`无法获取节点信息: ${response.status}`);
+    }
+    
+    const nodeInfo = await response.json();
+    
+    // 查找TTS和数字人相关节点
+    const ttsNodes = [];
+    const digitalHumanNodes = [];
+    const textInputNodes = [];
+    const videoOutputNodes = [];
+    
+    Object.keys(nodeInfo).forEach(nodeType => {
+      const info = nodeInfo[nodeType];
+      const lowerType = nodeType.toLowerCase();
+      
+      if (lowerType.includes('tts') || lowerType.includes('speech') || lowerType.includes('audio')) {
+        ttsNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+      
+      if (lowerType.includes('infinitetalk') || lowerType.includes('digital') || lowerType.includes('avatar')) {
+        digitalHumanNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+      
+      if (lowerType.includes('text') && info.input?.required?.text) {
+        textInputNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+      
+      if (lowerType.includes('video') || lowerType.includes('save') || lowerType.includes('output')) {
+        videoOutputNodes.push({
+          type: nodeType,
+          category: info.category,
+          inputs: Object.keys(info.input?.required || {}),
+          outputs: info.output || []
+        });
+      }
+    });
+    
+    console.log(`✅ 找到节点: ${ttsNodes.length}个TTS, ${digitalHumanNodes.length}个数字人, ${textInputNodes.length}个文本输入`);
+    
+    res.json({
+      success: true,
+      data: {
+        ttsNodes,
+        digitalHumanNodes,
+        textInputNodes,
+        videoOutputNodes,
+        totalNodes: Object.keys(nodeInfo).length
+      },
+      recommendations: {
+        preferredTTS: ttsNodes.length > 0 ? ttsNodes[0].type : null,
+        preferredDigitalHuman: digitalHumanNodes.length > 0 ? digitalHumanNodes[0].type : null,
+        preferredTextInput: textInputNodes.length > 0 ? textInputNodes[0].type : null
+      }
+    });
+    
+  } catch (error) {
+    console.error('节点查询失败:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// 任务状态查询API
+app.get('/api/task/status/:taskId', (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const task = activeInfiniteTalkTasks.get(taskId);
+    
+    if (!task) {
+      return res.status(404).json({
+        status: 'not_found',
+        error: '任务未找到'
+      });
+    }
+
+    res.json({
+      status: task.status,
+      progress: task.progress || 0,
+      videoUrl: task.videoUrl,
+      error: task.error,
+      createdAt: task.createdAt,
+      completedAt: task.completedAt,
+      estimatedTimeRemaining: task.status === 'processing' ? '2-4分钟' : null,
+      debug: {
+        promptId: task.promptId,
+        clientId: task.clientId,
+        wsConnected: task.wsConnected,
+        lastUpdate: task.lastUpdate
+      }
+    });
+    
+  } catch (error) {
+    console.error('状态查询失败:', error);
+    res.status(500).json({
+      status: 'error',
+      error: error.message
+    });
+  }
+});
+
+// 清理完成的任务（每小时运行）
+setInterval(() => {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - 2 * 60 * 60 * 1000); // 2小时前
+  
+  let cleaned = 0;
+  for (const [taskId, task] of activeInfiniteTalkTasks.entries()) {
+    if (task.createdAt < cutoff && (task.status === 'completed' || task.status === 'failed')) {
+      activeInfiniteTalkTasks.delete(taskId);
+      cleaned++;
+    }
+  }
+  
+  if (cleaned > 0) {
+    console.log(`🧹 清理了 ${cleaned} 个已完成的任务`);
+  }
+}, 60 * 60 * 1000); // 每小时执行
+
+// 仙宫云 IndexTTS2 语音合成API
+app.post('/api/xiangong/indextts2', async (req, res) => {
+  try {
+    const { text, speaker_id, language, speed, pitch } = req.body;
+
+    console.log('🔊 仙宫云IndexTTS2请求:', { 
+      textLength: text?.length, 
+      speaker_id, 
+      language, 
+      speed, 
+      pitch 
+    });
+
+    if (!text) {
+      return res.status(400).json({ error: '文本内容不能为空' });
+    }
+
+    if (!XIANGONG_INDEXTTS2_URL) {
+      return res.status(500).json({ error: '仙宫云IndexTTS2服务地址未配置' });
+    }
+
+    // 调用仙宫云API
+    const response = await fetch(`${XIANGONG_INDEXTTS2_URL}/api/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${XIANGONG_API_KEY}`,
+      },
+      body: JSON.stringify({
+        text,
+        speaker_id: speaker_id || 0,
+        language: language || 'zh-CN',
+        speed: speed || 1.0,
+        pitch: pitch || 0.0
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('仙宫云IndexTTS2错误:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: `仙宫云API调用失败: ${errorText}` 
+      });
+    }
+
+    const result = await response.json();
+    console.log('✅ IndexTTS2合成成功:', result);
+
+    res.json({
+      success: true,
+      audioUrl: result.audio_url,
+      audioBase64: result.audio_data,
+      message: '语音合成成功'
+    });
+
+  } catch (error) {
+    console.error('IndexTTS2合成失败:', error);
+    res.status(500).json({ 
+      error: error.message || '语音合成失败' 
+    });
+  }
+});
+
+// 仙宫云服务健康检查
+app.get('/api/xiangong/health', async (req, res) => {
+  try {
+    if (!XIANGONG_INFINITETALK_URL || !XIANGONG_INDEXTTS2_URL) {
+      return res.json({ healthy: false, error: '服务地址未配置' });
+    }
+
+    // 检查InfiniteTalk服务
+    const response = await fetch(`${XIANGONG_INFINITETALK_URL}/health`, {
+      headers: { 'Authorization': `Bearer ${XIANGONG_API_KEY}` }
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      res.json({ 
+        healthy: true, 
+        services: result.available_services || ['infinitetalk', 'indextts2'] 
+      });
+    } else {
+      res.json({ healthy: false, error: `服务不可用 (${response.status})` });
+    }
+  } catch (error) {
+    res.json({ healthy: false, error: error.message });
+  }
+});
+
+// A2E Digital Human Video Generation API
+app.post('/api/digital-human/generate', async (req, res) => {
+  try {
+    const { 
+      userId, 
+      trainingId,
+      textScript, 
+      voiceModel = 'minimax', 
+      emotion = 'professional',
+      language = 'zh-CN',
+      duration = 60,
+      credits 
+    } = req.body;
+
+    console.log('🎬 Digital human video generation request:', { 
+      userId, 
+      textLength: textScript?.length, 
+      voiceModel, 
+      emotion, 
+      language, 
+      duration, 
+      credits 
+    });
+
+    // Validate required parameters
+    if (!userId || !imageUrl || !textScript) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters: userId, imageUrl, textScript' 
+      });
+    }
+
+    // Check if user has sufficient credits
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      
+      // Check user balance
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('balance')
+        .eq('id', userId)
+        .single();
+
+      if (userError || !userData) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (userData.balance < credits) {
+        return res.status(400).json({ 
+          error: `Insufficient credits. Required: ${credits}, Available: ${userData.balance}` 
+        });
+      }
+
+      // Deduct credits
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ balance: userData.balance - credits })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Error deducting credits:', updateError);
+        return res.status(500).json({ error: 'Failed to deduct credits' });
+      }
+
+      console.log('✅ Credits deducted successfully:', { userId, credits, remainingBalance: userData.balance - credits });
+    }
+
+    // For MVP, we'll simulate A2E API call
+    // In production, you would integrate with actual A2E API
+    console.log('🎥 Simulating A2E API call...');
+    
+    // Simulate processing time
+    const processingDelay = Math.random() * 2000 + 1000; // 1-3 seconds
+    await new Promise(resolve => setTimeout(resolve, processingDelay));
+
+    // For now, return a mock video URL
+    // In production, this would be the actual A2E API response
+    const mockVideoUrl = `https://mock-a2e-cdn.com/videos/${userId}_${Date.now()}.mp4`;
+    
+    console.log('✅ Digital human video generated (simulated):', mockVideoUrl);
+
+    res.json({
+      success: true,
+      videoUrl: mockVideoUrl,
+      status: 'completed',
+      message: 'Digital human video generated successfully (simulated)',
+      metadata: {
+        userId,
+        voiceModel,
+        emotion,
+        language,
+        duration,
+        creditsUsed: credits,
+        generatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Digital human video generation error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error during video generation',
+      details: error.message 
+    });
+  }
+});
+
+// A2E API Integration Helper Functions (for future implementation)
+// These functions will be implemented when integrating with actual A2E API
+
+async function uploadImageToA2E(imageUrl, a2eApiKey) {
+  // TODO: Implement actual A2E image upload
+  // const formData = new FormData();
+  // const response = await fetch(imageUrl);
+  // const buffer = await response.buffer();
+  // formData.append('file', buffer, 'image.jpg');
+  
+  // const uploadResponse = await fetch('https://api.a2e.ai/upload', {
+  //   method: 'POST',
+  //   headers: {
+  //     'Authorization': `Bearer ${a2eApiKey}`
+  //   },
+  //   body: formData
+  // });
+  
+  // return await uploadResponse.json();
+  console.log('📤 A2E Image upload (simulated)');
+  return { url: imageUrl };
+}
+
+async function generateA2EVideo(params, a2eApiKey) {
+  // TODO: Implement actual A2E video generation
+  // const { imageUrl, textScript, voiceModel, emotion, language } = params;
+  
+  // const payload = {
+  //   image_url: imageUrl,
+  //   text: textScript,
+  //   voice_model: voiceModel,
+  //   emotion: emotion,
+  //   language: language
+  // };
+
+  // const response = await fetch('https://api.a2e.ai/generate/avatar', {
+  //   method: 'POST',
+  //   headers: {
+  //     'Authorization': `Bearer ${a2eApiKey}`,
+  //     'Content-Type': 'application/json'
+  //   },
+  //   body: JSON.stringify(payload)
+  // });
+
+  // return await response.json();
+  console.log('🎬 A2E Video generation (simulated)');
+  return { task_id: `task_${Date.now()}` };
+}
+
+async function checkA2EVideoStatus(taskId, a2eApiKey) {
+  // TODO: Implement actual A2E status checking
+  // const response = await fetch(`https://api.a2e.ai/task/${taskId}`, {
+  //   headers: {
+  //     'Authorization': `Bearer ${a2eApiKey}`
+  //   }
+  // });
+  
+  // return await response.json();
+  console.log('🔍 A2E Status check (simulated)');
+  return { status: 'completed', result_url: `https://mock-a2e-cdn.com/videos/${taskId}.mp4` };
+}
+
+// Video completion webhook
+app.post('/api/video/webhook/complete', async (req, res) => {
+  try {
+    const { sessionId, finalvideourl, status = 'completed' } = req.body;
+    
+    console.log('🎬 Video webhook callback received:', { sessionId, finalvideourl, status });
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Missing sessionId' });
+    }
+    
+    // Store result in memory for polling (backwards compatibility)
+    videoResults.set(sessionId, {
+      sessionId,
+      videoUrl: finalvideourl,
+      status: status,
+      timestamp: new Date().toISOString(),
+      receivedAt: new Date().toISOString()
+    });
+    
+    console.log('✅ Video result stored in memory for polling:', sessionId);
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.log('⚠️ Database not configured, only storing in memory');
+      res.json({ success: true, message: 'Video status updated in memory' });
+      return;
+    }
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Complete video generation using existing balance system
+    const { data: success, error: completeError } = await supabase.rpc('complete_video_generation', {
+      session_id_param: sessionId,
+      final_status: status,
+      video_url_param: finalvideourl
+    });
+    
+    if (completeError || !success) {
+      console.error('Error completing video generation:', completeError);
+      return res.status(500).json({ error: 'Failed to complete video generation' });
+    }
+    
+    console.log('✅ Video webhook processing completed (both memory and database updated)');
+    res.json({ success: true, message: 'Video status updated' });
+  } catch (error) {
+    console.error('Video webhook error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // 静态文件服务
 app.use(express.static(path.join(dirname, 'dist')));
 
@@ -5133,20 +7632,117 @@ app.post('/api/test-save-conversation', async (req, res) => {
   }
 });
 
+// 🔍 DEBUG ENDPOINT: 测试不同的Dify API调用方式
+app.post('/api/debug/dify-test', async (req, res) => {
+  console.log('🔍 [DEBUG] Starting comprehensive Dify API test...');
+  
+  const testMessage = req.body.message || "Hello, this is a test message to check token usage.";
+  const testUser = `debug-user-${Date.now()}`;
+  
+  const results = {
+    timestamp: new Date().toISOString(),
+    testMessage,
+    testUser,
+    tests: []
+  };
+  
+  // 测试1: 标准chat-messages调用
+  try {
+    console.log('🔍 [TEST 1] Standard chat-messages call...');
+    const test1Response = await fetch(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: testMessage,
+        user: testUser,
+        conversation_id: '',
+        response_mode: 'blocking'
+      })
+    });
+    
+    const test1Data = await test1Response.json();
+    results.tests.push({
+      name: 'Standard chat-messages',
+      status: test1Response.status,
+      success: test1Response.ok,
+      data: test1Data,
+      usageFound: !!(test1Data?.metadata?.usage),
+      tokensFound: !!(test1Data?.metadata?.usage?.total_tokens),
+      tokensValue: test1Data?.metadata?.usage?.total_tokens || 0
+    });
+    
+  } catch (error) {
+    results.tests.push({
+      name: 'Standard chat-messages',
+      success: false,
+      error: error.message
+    });
+  }
+  
+  // 测试2: 检查app参数
+  try {
+    console.log('🔍 [TEST 2] App parameters...');
+    const test2Response = await fetch(`${DIFY_API_URL}/parameters?user=${testUser}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    const test2Data = await test2Response.json();
+    results.tests.push({
+      name: 'App parameters',
+      status: test2Response.status,
+      success: test2Response.ok,
+      data: test2Data
+    });
+    
+  } catch (error) {
+    results.tests.push({
+      name: 'App parameters',
+      success: false,
+      error: error.message
+    });
+  }
+  
+  console.log('🔍 [DEBUG] Test completed, sending results...');
+  console.log('🔍 [DEBUG] Full results:', JSON.stringify(results, null, 2));
+  res.json(results);
+});
+
+console.log('🚀 [BOOT 2] About to start server listening...');
+
 app.listen(port, async () => {
-  console.log(`Server is running on port ${port}`);
+  console.log('✅ [BOOT 3] Server is listening!');
+  console.log(`🌐 Server is running on port ${port}`);
+  
+  console.log('🔍 [BOOT 4] Starting database health check...');
   
   // Perform database health check on startup
   if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
     console.log('🔍 Performing database health check...');
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const isHealthy = await checkDatabaseHealth(supabase);
-    
-    if (!isHealthy) {
-      console.error('⚠️ WARNING: Database is not healthy. Workflows may fail.');
-      console.error('Please ensure database migrations have been run.');
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const isHealthy = await checkDatabaseHealth(supabase);
+      
+      if (!isHealthy) {
+        console.error('⚠️ WARNING: Database is not healthy. Workflows may fail.');
+        console.error('Please ensure database migrations have been run.');
+      } else {
+        console.log('✅ Database health check passed');
+      }
+    } catch (dbError) {
+      console.error('❌ Database health check failed:', dbError);
     }
   } else {
     console.log('⚠️ Supabase not configured - database features disabled');
   }
+  
+  console.log('🎉 [BOOT 5] Server startup complete!');
 });
+

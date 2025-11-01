@@ -326,6 +326,66 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
     }
   }, []);
 
+  // 🎯 智能计费处理函数 - 解决Dify控制台记录与API响应差异
+  const handleIntelligentBilling = useCallback(async (
+    difyResponse: any,
+    userId: string,
+    serviceType: string
+  ) => {
+    const usage = difyResponse.metadata?.usage;
+    
+    // 检查API usage是否为空或0
+    const isUsageEmpty = !usage || usage.total_tokens === 0;
+    
+    if (isUsageEmpty) {
+      console.log('[Intelligent Billing] 🔍 API usage为0，启用智能计费策略...');
+      
+      // 基于响应内容长度和复杂度估算token使用
+      const responseLength = difyResponse.answer?.length || 0;
+      const isComplexResponse = difyResponse.answer?.includes('pain_point') || 
+                               difyResponse.answer?.includes('COMPLETENESS') ||
+                               difyResponse.answer?.includes('{');
+      
+      // 智能估算token数量
+      let estimatedTokens = Math.max(50, Math.ceil(responseLength / 4)); // 基础：4字符=1token
+      
+      if (isComplexResponse) {
+        estimatedTokens = Math.ceil(estimatedTokens * 1.5); // 复杂响应+50%
+      }
+      
+      if (serviceType === 'WORKFLOW') {
+        estimatedTokens = Math.ceil(estimatedTokens * 2); // 工作流加倍
+      }
+      
+      // 创建智能usage对象
+      const intelligentUsage = {
+        prompt_tokens: Math.ceil(estimatedTokens * 0.3),
+        completion_tokens: Math.ceil(estimatedTokens * 0.7),
+        total_tokens: estimatedTokens,
+        total_price: estimatedTokens * 0.000002, // GPT-3.5价格
+        currency: 'USD',
+        intelligent_estimation: true,
+        original_response_length: responseLength,
+        estimation_reason: isComplexResponse ? 'complex_workflow_response' : 'standard_response'
+      };
+      
+      console.log('[Intelligent Billing] 📊 智能估算结果:', {
+        originalUsage: usage,
+        estimatedUsage: intelligentUsage,
+        responseAnalysis: {
+          length: responseLength,
+          isComplex: isComplexResponse,
+          serviceType
+        }
+      });
+      
+      return await processTokenUsage(intelligentUsage, userId, serviceType);
+    }
+    
+    // 如果有真实usage数据，直接使用
+    return await processTokenUsage(usage, userId, serviceType);
+  }, []);
+
   const processTokenUsage = useCallback(async (
     usage: DifyUsage,
     conversationId?: string,
@@ -822,6 +882,7 @@ export function useTokenMonitoring(): UseTokenMonitoringReturn {
   return {
     state,
     processTokenUsage,
+    handleIntelligentBilling,
     clearError,
     reset
   };
