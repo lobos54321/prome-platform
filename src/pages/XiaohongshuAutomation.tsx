@@ -80,14 +80,31 @@ export default function XiaohongshuAutomation() {
           
           if (hasBackendData) {
             console.log('✅ 后端有数据！切换到Dashboard');
-            // 后端有数据，更新state并显示Dashboard
+            // 🔥 后端有数据，直接显示Dashboard，不管Supabase中是否有profile
             if (strategyRes.success && strategyRes.data) {
               setContentStrategy(strategyRes.data);
             }
             if (planRes.success && planRes.data) {
               setWeeklyPlan(planRes.data);
             }
+            
+            // 🔥 强制显示dashboard - 因为后端是唯一数据源
             setCurrentStep('dashboard');
+            
+            // 🔥 如果Supabase没有profile，创建一个虚拟profile以满足UI需要
+            if (!profile) {
+              console.log('📝 创建虚拟profile以支持Dashboard显示');
+              setUserProfile({
+                supabase_uuid: user.id,
+                xhs_user_id: userId,
+                product_name: '未配置', // 从后端数据推断或使用默认值
+                product_description: '',
+                target_audience: '',
+                brand_tone: '',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+            }
           } else {
             console.log('⚠️ 后端无数据，显示配置页面');
             // 后端也没数据
