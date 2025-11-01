@@ -59,13 +59,53 @@ export default function XiaohongshuAutomation() {
       setUserProfile(profile);
       setAutomationStatus(status);
 
+      // 🔥 修复：检查后端是否有数据，即使Supabase中没有is_running状态
+      // 因为后端重启后可能从文件恢复了数据，但Supabase状态未同步
       if (status?.is_running) {
+        // Supabase显示正在运行，直接加载Dashboard
         setCurrentStep('dashboard');
-        await loadDashboardData(user.id, userId); // 传入 userId
-      } else if (profile) {
-        setCurrentStep('config');
+        await loadDashboardData(user.id, userId);
       } else {
-        setCurrentStep('login');
+        // Supabase没有运行状态，尝试从后端API检查是否有历史数据
+        console.log('📊 Supabase无运行状态，检查后端是否有数据...');
+        
+        try {
+          // 尝试获取后端数据
+          const [strategyRes, planRes] = await Promise.all([
+            xiaohongshuAPI.getContentStrategy(userId).catch(() => ({ success: false })),
+            xiaohongshuAPI.getWeeklyPlan(userId).catch(() => ({ success: false })),
+          ]);
+          
+          const hasBackendData = (strategyRes.success && strategyRes.data) || (planRes.success && planRes.data);
+          
+          if (hasBackendData) {
+            console.log('✅ 后端有数据！切换到Dashboard');
+            // 后端有数据，更新state并显示Dashboard
+            if (strategyRes.success && strategyRes.data) {
+              setContentStrategy(strategyRes.data);
+            }
+            if (planRes.success && planRes.data) {
+              setWeeklyPlan(planRes.data);
+            }
+            setCurrentStep('dashboard');
+          } else {
+            console.log('⚠️ 后端无数据，显示配置页面');
+            // 后端也没数据
+            if (profile) {
+              setCurrentStep('config');
+            } else {
+              setCurrentStep('login');
+            }
+          }
+        } catch (err) {
+          console.error('检查后端数据失败:', err);
+          // 出错时按原逻辑处理
+          if (profile) {
+            setCurrentStep('config');
+          } else {
+            setCurrentStep('login');
+          }
+        }
       }
     } catch (err) {
       console.error('Initialize page error:', err);
