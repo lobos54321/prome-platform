@@ -54,30 +54,57 @@ export function DashboardSection({
 
       if (statusRes.data) {
         setStatus(statusRes.data);
-        await xiaohongshuSupabase.saveAutomationStatus({
+        // 只保存符合AutomationStatus类型的字段
+        const statusToSave = {
           supabase_uuid: supabaseUuid,
           xhs_user_id: xhsUserId,
-          ...statusRes.data,
+          is_running: statusRes.data.is_running || false,
+          is_logged_in: statusRes.data.is_logged_in || false,
+          has_config: statusRes.data.has_config || false,
+          last_activity: statusRes.data.last_activity || null,
+          uptime_seconds: statusRes.data.uptime_seconds || 0,
+          next_scheduled_task: statusRes.data.next_scheduled_task || null,
+        };
+        await xiaohongshuSupabase.saveAutomationStatus(statusToSave).catch(err => {
+          console.warn('Save status failed:', err);
         });
       }
 
       if (strategyRes.data) {
         setStrategy(strategyRes.data);
-        await xiaohongshuSupabase.saveContentStrategy({
+        const strategyToSave = {
           supabase_uuid: supabaseUuid,
-          ...strategyRes.data,
+          xhs_user_id: xhsUserId,
+          key_themes: strategyRes.data.key_themes || [],
+          trending_topics: strategyRes.data.trending_topics || [],
+          hashtags: strategyRes.data.hashtags || [],
+          optimal_times: strategyRes.data.optimal_times || [],
+        };
+        await xiaohongshuSupabase.saveContentStrategy(strategyToSave).catch(err => {
+          console.warn('Save strategy failed:', err);
         });
       }
 
       if (planRes.data) {
         setPlan(planRes.data);
-        await xiaohongshuSupabase.saveWeeklyPlan({
+        const planToSave = {
           supabase_uuid: supabaseUuid,
-          ...planRes.data,
+          xhs_user_id: xhsUserId,
+          week_start_date: planRes.data.week_start_date,
+          week_end_date: planRes.data.week_end_date,
+          plan_data: planRes.data.plan_data || {},
+          tasks: planRes.data.tasks || [],
+        };
+        await xiaohongshuSupabase.saveWeeklyPlan(planToSave).catch(err => {
+          console.warn('Save plan failed:', err);
         });
       }
     } catch (error) {
       console.error('Fetch data error:', error);
+      // 404错误是正常的（用户还没启动运营）
+      if (error instanceof Error && error.message.includes('404')) {
+        console.log('User has not started auto operation yet');
+      }
     }
   }, [supabaseUuid, xhsUserId]);
 

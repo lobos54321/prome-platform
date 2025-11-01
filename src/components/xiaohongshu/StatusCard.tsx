@@ -8,18 +8,17 @@ interface StatusCardProps {
 }
 
 export function StatusCard({ status, className = '' }: StatusCardProps) {
-  if (!status) {
-    return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="text-lg">运营状态</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-500">暂无数据</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // 如果没有status数据，显示"未启动"状态
+  const displayStatus = status || {
+    is_running: false,
+    is_logged_in: false,
+    has_config: false,
+    uptime_seconds: 0,
+    last_activity: null,
+    next_scheduled_task: null,
+  };
+
+  const isNeverStarted = !status;
 
   const formatUptime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -54,13 +53,18 @@ export function StatusCard({ status, className = '' }: StatusCardProps) {
         <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
           <span className="text-sm font-medium">当前状态</span>
           <div className="flex items-center gap-2">
-            {status.is_running ? (
+            {displayStatus.is_running ? (
               <>
                 <div className="relative flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </div>
                 <span className="text-sm font-bold text-green-600">运行中</span>
+              </>
+            ) : isNeverStarted ? (
+              <>
+                <div className="h-3 w-3 rounded-full bg-blue-400"></div>
+                <span className="text-sm font-medium text-blue-600">未启动</span>
               </>
             ) : (
               <>
@@ -78,7 +82,7 @@ export function StatusCard({ status, className = '' }: StatusCardProps) {
             <span className="text-sm">在线时长</span>
           </div>
           <span className="text-sm font-medium">
-            {formatUptime(status.uptime_seconds)}
+            {formatUptime(displayStatus.uptime_seconds)}
           </span>
         </div>
 
@@ -89,7 +93,7 @@ export function StatusCard({ status, className = '' }: StatusCardProps) {
             <span className="text-sm">最后活动</span>
           </div>
           <span className="text-sm font-medium">
-            {formatDateTime(status.last_activity)}
+            {formatDateTime(displayStatus.last_activity)}
           </span>
         </div>
 
@@ -100,7 +104,7 @@ export function StatusCard({ status, className = '' }: StatusCardProps) {
             <span className="text-sm">下次任务</span>
           </div>
           <span className="text-sm font-medium">
-            {formatDateTime(status.next_scheduled_task)}
+            {formatDateTime(displayStatus.next_scheduled_task)}
           </span>
         </div>
       </CardContent>
