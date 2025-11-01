@@ -129,20 +129,79 @@ export function DashboardSection({
     }
   }, [plan]);
 
-  const handlePause = () => {
-    alert('暂停功能开发中...');
+  const handlePause = async () => {
+    if (!confirm('确定要暂停自动运营吗？您可以稍后恢复。')) {
+      return;
+    }
+
+    try {
+      const response = await xiaohongshuAPI.pauseAutoOperation(xhsUserId);
+      if (response.success) {
+        alert('✅ 自动运营已暂停！');
+        await fetchData();
+      } else {
+        alert('暂停失败：' + (response.error || '未知错误'));
+      }
+    } catch (error: any) {
+      console.error('暂停失败:', error);
+      alert('暂停失败：' + error.message);
+    }
   };
 
   const handleViewPending = () => {
-    alert('待发内容功能开发中...');
+    // 显示待发布队列详情
+    if (readyQueue.length === 0) {
+      alert('当前没有待发布的内容');
+      return;
+    }
+
+    const content = readyQueue.map((item, i) => 
+      `${i + 1}. ${item.title}\n   时间: ${item.scheduledTime}\n   状态: ${item.status}`
+    ).join('\n\n');
+
+    alert(`📝 待发布内容 (${readyQueue.length}条)\n\n${content}`);
   };
 
-  const handleAdjustStrategy = () => {
-    alert('调整策略功能开发中...');
+  const handleAdjustStrategy = async () => {
+    const newStrategy = prompt('请输入新的内容策略关键词（用逗号分隔）：');
+    if (!newStrategy) return;
+
+    try {
+      const keywords = newStrategy.split(',').map(k => k.trim());
+      const response = await xiaohongshuAPI.updateStrategy(xhsUserId, {
+        keywords,
+        updateTime: new Date().toISOString(),
+      });
+
+      if (response.success) {
+        alert('✅ 策略已更新！系统将根据新策略生成内容。');
+        await fetchData();
+      } else {
+        alert('更新失败：' + (response.error || '未知错误'));
+      }
+    } catch (error: any) {
+      console.error('更新策略失败:', error);
+      alert('更新策略失败：' + error.message);
+    }
   };
 
   const handleViewAnalytics = () => {
-    alert('数据分析功能开发中...');
+    if (!performanceData || performanceData.totalPosts === 0) {
+      alert('暂无运营数据，等待首次发布后可查看统计信息。');
+      return;
+    }
+
+    const stats = `
+📊 运营数据统计
+
+📝 总发布数: ${performanceData.totalPosts || 0}
+👁️ 总浏览量: ${performanceData.totalViews || 0}
+❤️ 总点赞数: ${performanceData.totalLikes || 0}
+💬 总评论数: ${performanceData.totalComments || 0}
+📈 平均互动率: ${((performanceData.avgEngagementRate || 0) * 100).toFixed(2)}%
+    `.trim();
+
+    alert(stats);
   };
 
   const handleApprovePost = async (postId: string) => {
@@ -165,8 +224,31 @@ export function DashboardSection({
     }
   };
 
-  const handleEditPost = (postId: string) => {
-    alert('修改功能开发中...\n\n将在未来版本中支持：\n- 修改标题和文案\n- 调整发布时间\n- 更换图片');
+  const handleEditPost = async (postId: string) => {
+    const newTitle = prompt('请输入新的标题（留空则不修改）：');
+    const newContent = prompt('请输入新的文案（留空则不修改）：');
+
+    if (!newTitle && !newContent) {
+      alert('没有任何修改');
+      return;
+    }
+
+    try {
+      const updates: any = {};
+      if (newTitle) updates.title = newTitle;
+      if (newContent) updates.content = newContent;
+
+      const response = await xiaohongshuAPI.editPost(xhsUserId, postId, updates);
+      if (response.success) {
+        alert('✅ 内容已修改！');
+        await fetchData();
+      } else {
+        alert('修改失败：' + (response.error || '未知错误'));
+      }
+    } catch (error: any) {
+      console.error('修改失败:', error);
+      alert('修改失败：' + error.message);
+    }
   };
 
   const handleRegeneratePost = async (postId: string) => {

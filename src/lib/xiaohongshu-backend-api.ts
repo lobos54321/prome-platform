@@ -245,6 +245,114 @@ export class XiaohongshuBackendAPI {
       return this.handleError(error);
     }
   }
+
+  /**
+   * 退出登录 - 清除后端Cookie
+   */
+  async logout(userId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/xiaohongshu/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * 重置自动运营
+   */
+  async resetAutoOperation(userId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/reset/${userId}`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * 暂停自动运营
+   */
+  async pauseAutoOperation(userId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/pause/${userId}`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * 恢复自动运营
+   */
+  async resumeAutoOperation(userId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/resume/${userId}`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * 更新内容策略
+   */
+  async updateStrategy(userId: string, strategy: any): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/update-strategy/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(strategy),
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * 编辑内容
+   */
+  async editPost(userId: string, postId: string, updates: any): Promise<ApiResponse<any>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/edit/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ postId, ...updates }),
+      });
+
+      const data = await response.json();
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
 }
 
 // 导出单例

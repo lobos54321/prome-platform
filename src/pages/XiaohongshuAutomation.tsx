@@ -143,8 +143,17 @@ export default function XiaohongshuAutomation() {
 
     try {
       if (supabaseUuid && xhsUserId) {
-        // 调用后端API清除服务器端数据
+        // 调用后端API停止运营
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
+        
+        // 调用后端重置自动运营
+        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/reset/${xhsUserId}`, {
+          method: 'POST',
+        });
+        
+        if (response.ok) {
+          console.log('✅ 后端运营已停止');
+        }
       }
 
       // 重置状态
@@ -165,9 +174,22 @@ export default function XiaohongshuAutomation() {
     }
 
     try {
-      // 清除服务器端数据
+      // 调用后端清除Cookie
       if (supabaseUuid && xhsUserId) {
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
+        
+        // 调用后端退出登录API
+        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId: xhsUserId }),
+        });
+        
+        if (response.ok) {
+          console.log('✅ 后端Cookie已清除');
+        }
       }
 
       // 清除本地存储
