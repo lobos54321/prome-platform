@@ -61,7 +61,7 @@ export default function XiaohongshuAutomation() {
 
       if (status?.is_running) {
         setCurrentStep('dashboard');
-        await loadDashboardData(user.id);
+        await loadDashboardData(user.id, userId); // 传入 userId
       } else if (profile) {
         setCurrentStep('config');
       } else {
@@ -75,22 +75,25 @@ export default function XiaohongshuAutomation() {
     }
   };
 
-  const loadDashboardData = async (uuid: string) => {
+  const loadDashboardData = async (uuid: string, userId?: string) => {
     try {
-      if (!xhsUserId) {
+      // 使用传入的userId参数，如果没有则使用state中的xhsUserId
+      const effectiveUserId = userId || xhsUserId;
+      
+      if (!effectiveUserId) {
         console.warn('⚠️ xhsUserId 为空，无法加载数据');
         return;
       }
 
-      console.log(`📊 [loadDashboardData] 从后端API获取数据，userId: ${xhsUserId}`);
+      console.log(`📊 [loadDashboardData] 从后端API获取数据，userId: ${effectiveUserId}`);
 
       // ✅ 方案A：直接从后端API获取实时数据（不从Supabase获取）
       const [strategyRes, planRes] = await Promise.all([
-        xiaohongshuAPI.getContentStrategy(xhsUserId).catch(err => {
+        xiaohongshuAPI.getContentStrategy(effectiveUserId).catch(err => {
           console.warn('获取strategy失败:', err);
           return { success: false, data: null };
         }),
-        xiaohongshuAPI.getWeeklyPlan(xhsUserId).catch(err => {
+        xiaohongshuAPI.getWeeklyPlan(effectiveUserId).catch(err => {
           console.warn('获取plan失败:', err);
           return { success: false, data: null };
         }),
@@ -170,8 +173,8 @@ export default function XiaohongshuAutomation() {
             console.log('✅ 获取到运营状态:', statusData);
             
             if (statusData.success && statusData.data) {
-              // 加载完整的Dashboard数据
-              await loadDashboardData(supabaseUuid);
+              // 加载完整的Dashboard数据（传入xhsUserId以确保有值）
+              await loadDashboardData(supabaseUuid, xhsUserId || undefined);
               
               // 更新状态
               const status = await xiaohongshuSupabase.getAutomationStatus(supabaseUuid);
