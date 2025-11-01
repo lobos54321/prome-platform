@@ -77,15 +77,43 @@ export default function XiaohongshuAutomation() {
 
   const loadDashboardData = async (uuid: string) => {
     try {
-      const [strategy, plan] = await Promise.all([
-        xiaohongshuSupabase.getContentStrategy(uuid),
-        xiaohongshuSupabase.getCurrentWeekPlan(uuid),
+      if (!xhsUserId) {
+        console.warn('⚠️ xhsUserId 为空，无法加载数据');
+        return;
+      }
+
+      console.log(`📊 [loadDashboardData] 从后端API获取数据，userId: ${xhsUserId}`);
+
+      // ✅ 方案A：直接从后端API获取实时数据（不从Supabase获取）
+      const [strategyRes, planRes] = await Promise.all([
+        xiaohongshuAPI.getContentStrategy(xhsUserId).catch(err => {
+          console.warn('获取strategy失败:', err);
+          return { success: false, data: null };
+        }),
+        xiaohongshuAPI.getWeeklyPlan(xhsUserId).catch(err => {
+          console.warn('获取plan失败:', err);
+          return { success: false, data: null };
+        }),
       ]);
 
-      setContentStrategy(strategy);
-      setWeeklyPlan(plan);
+      console.log('📊 [loadDashboardData] Strategy结果:', strategyRes.success ? '✅ 成功' : '❌ 失败');
+      console.log('📊 [loadDashboardData] Plan结果:', planRes.success ? '✅ 成功' : '❌ 失败');
+
+      if (strategyRes.success && strategyRes.data) {
+        setContentStrategy(strategyRes.data);
+        console.log('✅ 已设置 contentStrategy');
+      } else {
+        console.log('⚠️ 没有获取到 strategy 数据');
+      }
+
+      if (planRes.success && planRes.data) {
+        setWeeklyPlan(planRes.data);
+        console.log('✅ 已设置 weeklyPlan');
+      } else {
+        console.log('⚠️ 没有获取到 plan 数据');
+      }
     } catch (err) {
-      console.error('Load dashboard data error:', err);
+      console.error('❌ Load dashboard data error:', err);
     }
   };
 
