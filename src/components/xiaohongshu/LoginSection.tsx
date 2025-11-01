@@ -68,7 +68,9 @@ export function LoginSection({
         onLoginSuccess();
       } else {
         setIsLoggedIn(false);
-        await tryAutoImport();
+        // ❌ 移除自动导入Cookie的逻辑
+        // 退出登录后不应该自动重新登录
+        // await tryAutoImport();
       }
     } catch (error) {
       console.error('Check login error:', error);
