@@ -212,34 +212,47 @@ export default function XiaohongshuAutomation() {
   };
 
   const handleReconfigure = async () => {
-    if (!confirm('确定要重新配置吗？这将停止当前的自动运营并清除所有数据。')) {
+    if (!confirm('确定要重新配置吗？\n\n这将：\n✅ 停止当前的自动运营\n✅ 清除所有运营数据和策略\n✅ 保留您的登录状态（无需重新扫码）\n\n您可以立即重新配置产品信息。')) {
       return;
     }
 
     try {
+      setLoading(true);
+      
       if (supabaseUuid && xhsUserId) {
-        // 调用后端API停止运营
+        // 1. 清除Supabase数据
+        console.log('🧹 清除Supabase数据...');
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
         
-        // 调用后端重置自动运营
+        // 2. 调用后端重置自动运营（清除策略、计划等）
+        console.log('🧹 调用后端重置API...');
         const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/reset/${xhsUserId}`, {
           method: 'POST',
         });
         
         if (response.ok) {
-          console.log('✅ 后端运营已停止');
+          console.log('✅ 后端运营数据已清除');
+        } else {
+          console.warn('⚠️ 后端重置失败，状态码:', response.status);
         }
       }
 
-      // 重置状态
+      // 3. 重置前端状态（但保留登录状态）
+      console.log('🧹 重置前端状态...');
       setUserProfile(null);
       setAutomationStatus(null);
       setContentStrategy(null);
       setWeeklyPlan(null);
       setCurrentStep('config');
+      
+      console.log('✅ 重新配置完成，返回配置页面');
+      alert('✅ 已清除运营数据！\n\n您可以重新配置产品信息。\n\n您的登录状态已保留，无需重新扫码。');
+      
     } catch (err) {
       console.error('Reconfigure error:', err);
-      setError('重新配置失败，请刷新页面重试');
+      setError('重新配置失败: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLoading(false);
     }
   };
 
