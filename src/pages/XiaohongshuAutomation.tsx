@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '@/lib/auth';
 import { userMappingService } from '@/lib/xiaohongshu-user-mapping';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
+import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { LoginSection } from '@/components/xiaohongshu/LoginSection';
 import { ConfigSection } from '@/components/xiaohongshu/ConfigSection';
 import { DashboardSection } from '@/components/xiaohongshu/DashboardSection';
