@@ -27,11 +27,17 @@ export class XiaohongshuBackendAPI {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<APIResponse<T>> {
+    const fullURL = `${this.baseURL}${endpoint}`;
+    const method = options.method || 'GET';
+    
+    // 🔍 详细请求日志
+    console.log(`📤 [BackendAPI] ${method} ${fullURL}`);
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
+      const response = await fetch(fullURL, {
         ...options,
         signal: controller.signal,
         headers: {
@@ -42,7 +48,12 @@ export class XiaohongshuBackendAPI {
 
       clearTimeout(timeoutId);
 
+      // 🔍 响应日志
+      console.log(`📥 [BackendAPI] ${response.status} ${fullURL}`);
+
       if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error(`❌ [BackendAPI] Error Response:`, errorText);
         throw new APIError(
           `HTTP ${response.status}: ${response.statusText}`,
           response.status
@@ -50,9 +61,17 @@ export class XiaohongshuBackendAPI {
       }
 
       const data = await response.json();
+      console.log(`✅ [BackendAPI] Success:`, data);
       return data;
     } catch (error) {
       clearTimeout(timeoutId);
+      
+      // 🔍 错误详情日志
+      console.error(`❌ [BackendAPI] Request Failed:`, {
+        url: fullURL,
+        method,
+        error: error instanceof Error ? error.message : error
+      });
       
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
@@ -143,13 +162,39 @@ export class XiaohongshuBackendAPI {
    * 启动自动运营
    */
   async startAutoOperation(userId: string, config: ProductConfig): Promise<APIResponse> {
-    return await this.request(
-      '/agent/auto/start',
-      {
+    // 启动自动运营需要更长时间，设置 60 秒超时
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    try {
+      const response = await fetch(`${this.baseUrl}/agent/auto/start`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ userId, ...config }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new APIError(
+          errorData.error || `HTTP ${response.status}`,
+          response.status,
+          errorData
+        );
       }
-    );
+
+      return await response.json();
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new APIError('启动超时，但操作可能仍在后台进行', 408);
+      }
+      throw error;
+    }
   }
 
   /**
