@@ -26,7 +26,8 @@ const STATUS_CONFIG = {
 };
 
 export function WeeklyPlanCard({ weeklyPlan, className = '' }: WeeklyPlanCardProps) {
-  if (!weeklyPlan) {
+  // 🔥 处理null或缺少plan_data的情况
+  if (!weeklyPlan || !weeklyPlan.plan_data) {
     return (
       <Card className={className}>
         <CardHeader>
@@ -36,7 +37,14 @@ export function WeeklyPlanCard({ weeklyPlan, className = '' }: WeeklyPlanCardPro
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500">暂无计划数据</p>
+          <p className="text-sm text-gray-500">
+            {!weeklyPlan ? '暂无计划数据' : '周计划功能开发中...'}
+          </p>
+          {weeklyPlan && (weeklyPlan as any).tasks && (
+            <p className="text-xs text-gray-400 mt-2">
+              提示：当前有 {(weeklyPlan as any).tasks.length} 个待办任务
+            </p>
+          )}
         </CardContent>
       </Card>
     );

@@ -99,14 +99,11 @@ export default function XiaohongshuAutomation() {
             }
             if (planRes.success && (planRes as any).plan) {
               const plan = (planRes as any).plan;
-              // 🔥 检查plan结构：后端返回{date, tasks}，前端需要{plan_data: {monday, ...}}
-              // 如果plan没有plan_data字段，暂时不设置weeklyPlan
-              if (plan.plan_data) {
-                setWeeklyPlan(plan);
-              } else {
-                console.warn('⚠️ [XHS] 后端返回的plan格式不匹配，暂不显示周计划');
-                setWeeklyPlan(null);
-              }
+              // 🔥 始终设置plan，因为DashboardSection需要plan.tasks来显示内容预览
+              // 即使plan格式不符合WeeklyPlan（缺少plan_data），WeeklyPlanCard会显示"暂无计划数据"
+              // 但plan.tasks仍然可以用于ContentPreviewCard和ReadyQueueCard
+              console.log('📅 [XHS] 设置plan数据:', plan);
+              setWeeklyPlan(plan);
             }
             
             // 🔥 强制显示dashboard - 因为后端是唯一数据源
