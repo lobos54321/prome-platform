@@ -54,8 +54,36 @@ export function DashboardSection({
       ]);
 
       if (statusData) {
-        setStatus(statusData);
-        console.log('✅ 已更新 status');
+        // 🔥 前端计算运营状态字段
+        const now = new Date();
+        const createdAt = statusData.created_at ? new Date(statusData.created_at) : now;
+        const uptimeSeconds = Math.floor((now.getTime() - createdAt.getTime()) / 1000);
+
+        // 从 planData 获取下一个待发布任务
+        let nextTask = null;
+        if (planData?.tasks) {
+          const pendingTasks = planData.tasks
+            .filter((t: any) => t.status === 'pending' || t.status === 'in-progress')
+            .sort((a: any, b: any) => {
+              const timeA = new Date(a.scheduled_time).getTime();
+              const timeB = new Date(b.scheduled_time).getTime();
+              return timeA - timeB;
+            });
+          if (pendingTasks.length > 0) {
+            nextTask = pendingTasks[0].scheduled_time;
+          }
+        }
+
+        const enrichedStatus = {
+          ...statusData,
+          is_running: strategyData !== null || planData !== null, // 有数据就是运行中
+          uptime_seconds: uptimeSeconds,
+          last_activity: statusData.updated_at || statusData.created_at,
+          next_scheduled_task: nextTask,
+        };
+
+        setStatus(enrichedStatus);
+        console.log('✅ 已更新 status (含计算字段)');
       }
 
       if (strategyData) {
