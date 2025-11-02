@@ -108,11 +108,6 @@ export function ConfigSection({
 
   const handleStartOperation = async () => {
     setError('');
-    
-    if (!saved) {
-      setError('请先保存配置');
-      return;
-    }
 
     if (!validateForm()) {
       return;
@@ -121,6 +116,38 @@ export function ConfigSection({
     try {
       setStarting(true);
 
+      // 🔥 自动保存配置（如果尚未保存）
+      if (!saved) {
+        const profile: Partial<UserProfile> = {
+          supabase_uuid: supabaseUuid,
+          xhs_user_id: xhsUserId,
+          product_name: productName,
+          target_audience: targetAudience,
+          marketing_goal: marketingGoal,
+          post_frequency: postFrequency,
+          brand_style: brandStyle,
+          review_mode: reviewMode,
+        };
+
+        await xiaohongshuSupabase.saveUserProfile(profile);
+
+        await xiaohongshuSupabase.addActivityLog({
+          supabase_uuid: supabaseUuid,
+          xhs_user_id: xhsUserId,
+          activity_type: 'config',
+          message: '自动保存产品配置',
+          metadata: profile,
+        });
+
+        setSaved(true);
+
+        const savedProfile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
+        if (savedProfile) {
+          onConfigSaved(savedProfile);
+        }
+      }
+
+      // 启动自动运营
       const response = await xiaohongshuAPI.startAutoOperation(xhsUserId, {
         productName,
         targetAudience,
@@ -263,7 +290,7 @@ export function ConfigSection({
           <Alert className="bg-green-50 border-green-200">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800">
-              配置已保存！可以启动自动运营了。
+              配置已保存！
             </AlertDescription>
           </Alert>
         )}
@@ -290,7 +317,7 @@ export function ConfigSection({
 
           <Button
             onClick={handleStartOperation}
-            disabled={!saved || saving || starting}
+            disabled={!productName.trim() || !targetAudience.trim() || saving || starting}
             className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
           >
             {starting ? (
