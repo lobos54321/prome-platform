@@ -84,17 +84,21 @@ export default function XiaohongshuAutomation() {
             xiaohongshuAPI.getContentStrategy(userId).catch(() => ({ success: false })),
             xiaohongshuAPI.getWeeklyPlan(userId).catch(() => ({ success: false })),
           ]);
-          
-          const hasBackendData = (strategyRes.success && strategyRes.data) || (planRes.success && planRes.data);
+
+          console.log('🔍 [XHS] Strategy响应:', strategyRes);
+          console.log('🔍 [XHS] Plan响应:', planRes);
+
+          // 🔥 注意：后端返回的是 {success, strategy} 或 {success, plan}，不是 {success, data}
+          const hasBackendData = (strategyRes.success && (strategyRes as any).strategy) || (planRes.success && (planRes as any).plan);
           
           if (hasBackendData) {
             console.log('✅ 后端有数据！切换到Dashboard');
             // 🔥 后端有数据，直接显示Dashboard，不管Supabase中是否有profile
-            if (strategyRes.success && strategyRes.data) {
-              setContentStrategy(strategyRes.data);
+            if (strategyRes.success && (strategyRes as any).strategy) {
+              setContentStrategy((strategyRes as any).strategy);
             }
-            if (planRes.success && planRes.data) {
-              setWeeklyPlan(planRes.data);
+            if (planRes.success && (planRes as any).plan) {
+              setWeeklyPlan((planRes as any).plan);
             }
             
             // 🔥 强制显示dashboard - 因为后端是唯一数据源
