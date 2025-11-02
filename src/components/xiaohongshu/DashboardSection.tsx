@@ -143,10 +143,12 @@ export function DashboardSection({
   // 处理下一篇内容预览和待发布队列
   useEffect(() => {
     if (plan && plan.tasks && plan.tasks.length > 0) {
-      const upcoming = plan.tasks.find((t: any) => t.status === 'pending' || t.status === 'ready');
+      // 🔥 后端status映射: ready/generating → 'in-progress', published → 'completed', 其他 → 'pending'
+      const upcoming = plan.tasks.find((t: any) => t.status === 'pending' || t.status === 'in-progress');
       setNextContent(upcoming || plan.tasks[0]);
-      
-      const ready = plan.tasks.filter((t: any) => t.status === 'ready' || t.status === 'pending');
+
+      // 🔥 待发布队列：查找in-progress（即原始ready/generating）和pending状态的任务
+      const ready = plan.tasks.filter((t: any) => t.status === 'in-progress' || t.status === 'pending');
       setReadyQueue(ready.map((t: any, i: number) => ({
         id: t.id || i.toString(),
         title: t.title,
