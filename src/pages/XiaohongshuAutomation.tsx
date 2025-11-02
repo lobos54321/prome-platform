@@ -98,7 +98,15 @@ export default function XiaohongshuAutomation() {
               setContentStrategy((strategyRes as any).strategy);
             }
             if (planRes.success && (planRes as any).plan) {
-              setWeeklyPlan((planRes as any).plan);
+              const plan = (planRes as any).plan;
+              // 🔥 检查plan结构：后端返回{date, tasks}，前端需要{plan_data: {monday, ...}}
+              // 如果plan没有plan_data字段，暂时不设置weeklyPlan
+              if (plan.plan_data) {
+                setWeeklyPlan(plan);
+              } else {
+                console.warn('⚠️ [XHS] 后端返回的plan格式不匹配，暂不显示周计划');
+                setWeeklyPlan(null);
+              }
             }
             
             // 🔥 强制显示dashboard - 因为后端是唯一数据源
