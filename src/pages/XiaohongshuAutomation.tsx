@@ -152,43 +152,33 @@ export default function XiaohongshuAutomation() {
 
   const loadDashboardData = async (uuid: string, userId?: string) => {
     try {
-      // 使用传入的userId参数，如果没有则使用state中的xhsUserId
-      const effectiveUserId = userId || xhsUserId;
-      
-      if (!effectiveUserId) {
-        console.warn('⚠️ xhsUserId 为空，无法加载数据');
-        return;
-      }
+      console.log(`📊 [loadDashboardData] 从Supabase获取数据，uuid: ${uuid}`);
 
-      console.log(`📊 [loadDashboardData] 从后端API获取数据，userId: ${effectiveUserId}`);
-
-      // ✅ 方案A：直接从后端API获取实时数据（不从Supabase获取）
-      const [strategyRes, planRes] = await Promise.all([
-        xiaohongshuAPI.getContentStrategy(effectiveUserId).catch(err => {
+      // ✅ 方案B：从Supabase读取数据显示（后端已写入Supabase）
+      const [strategy, plan] = await Promise.all([
+        xiaohongshuSupabase.getContentStrategy(uuid).catch(err => {
           console.warn('获取strategy失败:', err);
-          return { success: false, data: null };
+          return null;
         }),
-        xiaohongshuAPI.getWeeklyPlan(effectiveUserId).catch(err => {
+        xiaohongshuSupabase.getCurrentWeekPlan(uuid).catch(err => {
           console.warn('获取plan失败:', err);
-          return { success: false, data: null };
+          return null;
         }),
       ]);
 
-      console.log('📊 [loadDashboardData] Strategy结果:', strategyRes.success ? '✅ 成功' : '❌ 失败');
-      console.log('📊 [loadDashboardData] Plan结果:', planRes.success ? '✅ 成功' : '❌ 失败');
+      console.log('📊 [loadDashboardData] Strategy结果:', strategy ? '✅ 有数据' : '⚠️ 无数据');
+      console.log('📊 [loadDashboardData] Plan结果:', plan ? '✅ 有数据' : '⚠️ 无数据');
 
-      // 🔥 修复：后端返回的是 {success, strategy}，不是 {success, data}
-      if (strategyRes.success && (strategyRes as any).strategy) {
-        setContentStrategy((strategyRes as any).strategy);
-        console.log('✅ 已设置 contentStrategy:', (strategyRes as any).strategy);
+      if (strategy) {
+        setContentStrategy(strategy);
+        console.log('✅ 已设置 contentStrategy:', strategy);
       } else {
         console.log('⚠️ 没有获取到 strategy 数据');
       }
 
-      // 🔥 修复：后端返回的是 {success, plan}，不是 {success, data}
-      if (planRes.success && (planRes as any).plan) {
-        setWeeklyPlan((planRes as any).plan);
-        console.log('✅ 已设置 weeklyPlan:', (planRes as any).plan);
+      if (plan) {
+        setWeeklyPlan(plan);
+        console.log('✅ 已设置 weeklyPlan:', plan);
       } else {
         console.log('⚠️ 没有获取到 plan 数据');
       }

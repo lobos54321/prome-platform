@@ -46,71 +46,31 @@ export function DashboardSection({
 
   const fetchData = useCallback(async () => {
     try {
-      const [statusRes, strategyRes, planRes] = await Promise.all([
-        xiaohongshuAPI.getAutomationStatus(xhsUserId),
-        xiaohongshuAPI.getContentStrategy(xhsUserId),
-        xiaohongshuAPI.getWeeklyPlan(xhsUserId),
+      // ✅ 方案B：从Supabase读取显示（后端已写入）
+      const [statusData, strategyData, planData] = await Promise.all([
+        xiaohongshuSupabase.getAutomationStatus(supabaseUuid).catch(() => null),
+        xiaohongshuSupabase.getContentStrategy(supabaseUuid).catch(() => null),
+        xiaohongshuSupabase.getCurrentWeekPlan(supabaseUuid).catch(() => null),
       ]);
 
-      if (statusRes.data) {
-        setStatus(statusRes.data);
-        // 只保存符合AutomationStatus类型的字段
-        const statusToSave = {
-          supabase_uuid: supabaseUuid,
-          xhs_user_id: xhsUserId,
-          is_running: statusRes.data.is_running || false,
-          is_logged_in: statusRes.data.is_logged_in || false,
-          has_config: statusRes.data.has_config || false,
-          last_activity: statusRes.data.last_activity || null,
-          uptime_seconds: statusRes.data.uptime_seconds || 0,
-          next_scheduled_task: statusRes.data.next_scheduled_task || null,
-        };
-        await xiaohongshuSupabase.saveAutomationStatus(statusToSave).catch(err => {
-          console.warn('Save status failed:', err);
-        });
+      if (statusData) {
+        setStatus(statusData);
+        console.log('✅ 已更新 status');
       }
 
-      // 🔥 修复：后端返回的是 {success, strategy}，不是 {success, data}
-      if (strategyRes.success && (strategyRes as any).strategy) {
-        const strategyData = (strategyRes as any).strategy;
+      if (strategyData) {
         setStrategy(strategyData);
-        const strategyToSave = {
-          supabase_uuid: supabaseUuid,
-          xhs_user_id: xhsUserId,
-          key_themes: strategyData.key_themes || strategyData.keyThemes || [],
-          trending_topics: strategyData.trending_topics || strategyData.trendingTopics || [],
-          hashtags: strategyData.hashtags || [],
-          optimal_times: strategyData.optimal_times || strategyData.optimalTimes || [],
-        };
-        await xiaohongshuSupabase.saveContentStrategy(strategyToSave).catch(err => {
-          console.warn('Save strategy failed:', err);
-        });
+        console.log('✅ 已更新 strategy');
       }
 
-      // 🔥 修复：后端返回的是 {success, plan}，不是 {success, data}
-      if (planRes.success && (planRes as any).plan) {
-        const planData = (planRes as any).plan;
+      if (planData) {
         setPlan(planData);
-        const planToSave = {
-          supabase_uuid: supabaseUuid,
-          xhs_user_id: xhsUserId,
-          week_start_date: planData.week_start_date || new Date().toISOString(),
-          week_end_date: planData.week_end_date || new Date().toISOString(),
-          plan_data: planData.plan_data || {},
-          tasks: planData.tasks || [],
-        };
-        await xiaohongshuSupabase.saveWeeklyPlan(planToSave).catch(err => {
-          console.warn('Save plan failed:', err);
-        });
+        console.log('✅ 已更新 plan');
       }
     } catch (error) {
       console.error('Fetch data error:', error);
-      // 404错误是正常的（用户还没启动运营）
-      if (error instanceof Error && error.message.includes('404')) {
-        console.log('User has not started auto operation yet');
-      }
     }
-  }, [supabaseUuid, xhsUserId]);
+  }, [supabaseUuid]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
