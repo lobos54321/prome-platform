@@ -37,6 +37,9 @@ export function ContentPreviewCard({ content, onApprove, onEdit, onRegenerate }:
     );
   }
 
+  // 🔥 后端返回 image_urls (snake_case)，兼容 imageUrls (camelCase)
+  const imageUrls = (content as any).image_urls || content.imageUrls || [];
+
   return (
     <Card>
       <CardHeader>
@@ -50,19 +53,23 @@ export function ContentPreviewCard({ content, onApprove, onEdit, onRegenerate }:
           <p className="text-sm text-gray-600 line-clamp-6">{content.content}</p>
         </div>
 
-        {content.imageUrls && content.imageUrls.length > 0 && (
+        {imageUrls && imageUrls.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
               <ImageIcon className="w-4 h-4" />
-              <span className="text-sm font-medium">{content.imageUrls.length} 张图片</span>
+              <span className="text-sm font-medium">{imageUrls.length} 张图片</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {content.imageUrls.slice(0, 4).map((url, i) => (
+              {imageUrls.slice(0, 4).map((url: string, i: number) => (
                 <img
                   key={i}
                   src={url}
                   alt={`预览图 ${i + 1}`}
                   className="w-full h-24 object-cover rounded"
+                  onError={(e) => {
+                    // 🔥 图片加载失败时显示占位符
+                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3E图片%3C/text%3E%3C/svg%3E';
+                  }}
                 />
               ))}
             </div>
