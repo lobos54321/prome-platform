@@ -140,15 +140,14 @@ export class XiaohongshuSupabaseService {
       .select('*')
       .eq('supabase_uuid', supabaseUuid)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Error fetching content strategy:', error);
       throw new Error('Failed to fetch content strategy');
     }
 
-    return data;
+    return data && data.length > 0 ? data[0] : null;
   }
 
   async saveContentStrategy(strategy: Partial<ContentStrategy>): Promise<void> {
@@ -188,15 +187,14 @@ export class XiaohongshuSupabaseService {
       .select('*')
       .eq('supabase_uuid', supabaseUuid)
       .order('week_start_date', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Error fetching current week plan:', error);
       throw new Error('Failed to fetch current week plan');
     }
 
-    return data;
+    return data && data.length > 0 ? data[0] : null;
   }
 
   async saveWeeklyPlan(plan: Partial<WeeklyPlan>): Promise<void> {
