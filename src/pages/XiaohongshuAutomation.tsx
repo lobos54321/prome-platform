@@ -177,16 +177,18 @@ export default function XiaohongshuAutomation() {
       console.log('📊 [loadDashboardData] Strategy结果:', strategyRes.success ? '✅ 成功' : '❌ 失败');
       console.log('📊 [loadDashboardData] Plan结果:', planRes.success ? '✅ 成功' : '❌ 失败');
 
-      if (strategyRes.success && strategyRes.data) {
-        setContentStrategy(strategyRes.data);
-        console.log('✅ 已设置 contentStrategy');
+      // 🔥 修复：后端返回的是 {success, strategy}，不是 {success, data}
+      if (strategyRes.success && (strategyRes as any).strategy) {
+        setContentStrategy((strategyRes as any).strategy);
+        console.log('✅ 已设置 contentStrategy:', (strategyRes as any).strategy);
       } else {
         console.log('⚠️ 没有获取到 strategy 数据');
       }
 
-      if (planRes.success && planRes.data) {
-        setWeeklyPlan(planRes.data);
-        console.log('✅ 已设置 weeklyPlan');
+      // 🔥 修复：后端返回的是 {success, plan}，不是 {success, data}
+      if (planRes.success && (planRes as any).plan) {
+        setWeeklyPlan((planRes as any).plan);
+        console.log('✅ 已设置 weeklyPlan:', (planRes as any).plan);
       } else {
         console.log('⚠️ 没有获取到 plan 数据');
       }

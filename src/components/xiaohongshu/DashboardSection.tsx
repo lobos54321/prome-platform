@@ -70,30 +70,34 @@ export function DashboardSection({
         });
       }
 
-      if (strategyRes.data) {
-        setStrategy(strategyRes.data);
+      // 🔥 修复：后端返回的是 {success, strategy}，不是 {success, data}
+      if (strategyRes.success && (strategyRes as any).strategy) {
+        const strategyData = (strategyRes as any).strategy;
+        setStrategy(strategyData);
         const strategyToSave = {
           supabase_uuid: supabaseUuid,
           xhs_user_id: xhsUserId,
-          key_themes: strategyRes.data.key_themes || [],
-          trending_topics: strategyRes.data.trending_topics || [],
-          hashtags: strategyRes.data.hashtags || [],
-          optimal_times: strategyRes.data.optimal_times || [],
+          key_themes: strategyData.key_themes || strategyData.keyThemes || [],
+          trending_topics: strategyData.trending_topics || strategyData.trendingTopics || [],
+          hashtags: strategyData.hashtags || [],
+          optimal_times: strategyData.optimal_times || strategyData.optimalTimes || [],
         };
         await xiaohongshuSupabase.saveContentStrategy(strategyToSave).catch(err => {
           console.warn('Save strategy failed:', err);
         });
       }
 
-      if (planRes.data) {
-        setPlan(planRes.data);
+      // 🔥 修复：后端返回的是 {success, plan}，不是 {success, data}
+      if (planRes.success && (planRes as any).plan) {
+        const planData = (planRes as any).plan;
+        setPlan(planData);
         const planToSave = {
           supabase_uuid: supabaseUuid,
           xhs_user_id: xhsUserId,
-          week_start_date: planRes.data.week_start_date,
-          week_end_date: planRes.data.week_end_date,
-          plan_data: planRes.data.plan_data || {},
-          tasks: planRes.data.tasks || [],
+          week_start_date: planData.week_start_date || new Date().toISOString(),
+          week_end_date: planData.week_end_date || new Date().toISOString(),
+          plan_data: planData.plan_data || {},
+          tasks: planData.tasks || [],
         };
         await xiaohongshuSupabase.saveWeeklyPlan(planToSave).catch(err => {
           console.warn('Save plan failed:', err);
