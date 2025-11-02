@@ -167,7 +167,7 @@ export class XiaohongshuBackendAPI {
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/start`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,7 +256,7 @@ export class XiaohongshuBackendAPI {
    */
   async approvePost(userId: string, postId: string): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/approve/${userId}`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/approve/${userId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -276,7 +276,7 @@ export class XiaohongshuBackendAPI {
    */
   async regeneratePost(userId: string, postId: string): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/regenerate/${userId}`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/regenerate/${userId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -296,7 +296,7 @@ export class XiaohongshuBackendAPI {
    */
   async logout(userId: string): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/xiaohongshu/logout`, {
+      const response = await fetch(`${this.baseURL}/agent/xiaohongshu/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -316,7 +316,7 @@ export class XiaohongshuBackendAPI {
    */
   async resetAutoOperation(userId: string): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/reset/${userId}`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/reset/${userId}`, {
         method: 'POST',
       });
 
@@ -332,7 +332,7 @@ export class XiaohongshuBackendAPI {
    */
   async pauseAutoOperation(userId: string): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/pause/${userId}`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/pause/${userId}`, {
         method: 'POST',
       });
 
@@ -348,7 +348,7 @@ export class XiaohongshuBackendAPI {
    */
   async resumeAutoOperation(userId: string): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/resume/${userId}`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/resume/${userId}`, {
         method: 'POST',
       });
 
@@ -364,7 +364,7 @@ export class XiaohongshuBackendAPI {
    */
   async updateStrategy(userId: string, strategy: any): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/update-strategy/${userId}`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/update-strategy/${userId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -384,7 +384,7 @@ export class XiaohongshuBackendAPI {
    */
   async editPost(userId: string, postId: string, updates: any): Promise<ApiResponse<any>> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/auto/edit/${userId}`, {
+      const response = await fetch(`${this.baseURL}/agent/auto/edit/${userId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
