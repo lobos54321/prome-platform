@@ -39,17 +39,25 @@ export default function XiaohongshuAutomation() {
   }, [user, navigate]);
 
   const initializePage = async () => {
+    console.log('🚀 [XHS] initializePage 开始执行');
+
     try {
+      console.log('🚀 [XHS] 设置loading状态');
       setLoading(true);
       setError('');
 
+      console.log('🚀 [XHS] 检查用户登录状态, user:', user);
       if (!user?.id) {
+        console.error('❌ [XHS] 用户未登录');
         throw new Error('用户未登录');
       }
 
+      console.log('🚀 [XHS] 设置 supabaseUuid:', user.id);
       setSupabaseUuid(user.id);
 
+      console.log('🚀 [XHS] 准备调用 getOrCreateMapping');
       const userId = await userMappingService.getOrCreateMapping(user.id);
+      console.log('✅ [XHS] getOrCreateMapping 返回:', userId);
       setXhsUserId(userId);
 
       const [profile, status] = await Promise.all([

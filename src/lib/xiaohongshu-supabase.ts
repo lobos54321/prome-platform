@@ -22,6 +22,8 @@ export class XiaohongshuSupabaseService {
   // ============================================
   
   async getUserMapping(supabaseUuid: string): Promise<UserMapping | null> {
+    console.log('🔍 [Supabase] 查询用户映射, UUID:', supabaseUuid);
+
     const { data, error } = await supabase
       .from('xhs_user_mapping')
       .select('*')
@@ -29,22 +31,39 @@ export class XiaohongshuSupabaseService {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching user mapping:', error);
+      console.error('❌ [Supabase] 查询用户映射失败:', error);
       throw new Error('Failed to fetch user mapping');
+    }
+
+    if (error?.code === 'PGRST116') {
+      console.log('⚠️ [Supabase] 未找到用户映射 (PGRST116 - No rows)');
+    } else if (data) {
+      console.log('✅ [Supabase] 找到用户映射:', data);
     }
 
     return data;
   }
 
   async createUserMapping(mapping: Omit<UserMapping, 'created_at' | 'updated_at'>): Promise<void> {
-    const { error } = await supabase
+    console.log('💾 [Supabase] 准备插入用户映射:', mapping);
+
+    const { data, error } = await supabase
       .from('xhs_user_mapping')
-      .insert(mapping);
+      .insert(mapping)
+      .select();
 
     if (error) {
-      console.error('Error creating user mapping:', error);
-      throw new Error('Failed to create user mapping');
+      console.error('❌ [Supabase] 插入用户映射失败:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw new Error(`Failed to create user mapping: ${error.message}`);
     }
+
+    console.log('✅ [Supabase] 用户映射插入成功:', data);
   }
 
   // ============================================
