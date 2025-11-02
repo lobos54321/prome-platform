@@ -41,8 +41,9 @@ export function StrategyCard({ strategy, className = '' }: StrategyCardProps) {
             关键主题
           </div>
           <div className="flex flex-wrap gap-2">
-            {strategy.key_themes && strategy.key_themes.length > 0 ? (
-              strategy.key_themes.map((theme, index) => (
+            {/* 🔥 后端返回camelCase (keyThemes)，同时兼容snake_case */}
+            {((strategy as any).keyThemes || strategy.key_themes) && ((strategy as any).keyThemes || strategy.key_themes).length > 0 ? (
+              ((strategy as any).keyThemes || strategy.key_themes).map((theme: string, index: number) => (
                 <Badge key={index} variant="secondary" className="bg-purple-100 text-purple-700">
                   {theme}
                 </Badge>
@@ -60,8 +61,9 @@ export function StrategyCard({ strategy, className = '' }: StrategyCardProps) {
             热门话题
           </div>
           <div className="flex flex-wrap gap-2">
-            {strategy.trending_topics && strategy.trending_topics.length > 0 ? (
-              strategy.trending_topics.map((topic, index) => (
+            {/* 🔥 后端返回camelCase (trendingTopics)，同时兼容snake_case */}
+            {((strategy as any).trendingTopics || strategy.trending_topics) && ((strategy as any).trendingTopics || strategy.trending_topics).length > 0 ? (
+              ((strategy as any).trendingTopics || strategy.trending_topics).map((topic: string, index: number) => (
                 <Badge key={index} variant="secondary" className="bg-pink-100 text-pink-700">
                   {topic}
                 </Badge>
@@ -98,8 +100,9 @@ export function StrategyCard({ strategy, className = '' }: StrategyCardProps) {
             最佳发布时间
           </div>
           <div className="flex flex-wrap gap-2">
-            {strategy.optimal_times && strategy.optimal_times.length > 0 ? (
-              strategy.optimal_times.map((time, index) => (
+            {/* 🔥 后端返回camelCase (optimalTimes)，同时兼容snake_case */}
+            {((strategy as any).optimalTimes || strategy.optimal_times) && ((strategy as any).optimalTimes || strategy.optimal_times).length > 0 ? (
+              ((strategy as any).optimalTimes || strategy.optimal_times).map((time: string, index: number) => (
                 <Badge key={index} variant="secondary" className="bg-green-100 text-green-700">
                   {time}
                 </Badge>
