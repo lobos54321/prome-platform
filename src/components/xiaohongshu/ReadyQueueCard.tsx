@@ -15,6 +15,25 @@ interface ReadyQueueCardProps {
   onView?: (id: string) => void;
 }
 
+// 格式化时间显示
+function formatScheduledTime(timeStr: string | undefined | null): string {
+  if (!timeStr) return '暂无时间';
+
+  try {
+    const date = new Date(timeStr);
+    if (isNaN(date.getTime())) return timeStr; // 如果无法解析，返回原值
+
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${month}-${day} ${hours}:${minutes}`;
+  } catch (error) {
+    return timeStr;
+  }
+}
+
 export function ReadyQueueCard({ queue, onView }: ReadyQueueCardProps) {
   return (
     <Card>
@@ -41,7 +60,7 @@ export function ReadyQueueCard({ queue, onView }: ReadyQueueCardProps) {
                     <h5 className="font-medium text-sm mb-1">{item.title}</h5>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <Clock className="w-3 h-3" />
-                      <span>{item.scheduledTime}</span>
+                      <span>{formatScheduledTime(item.scheduledTime)}</span>
                       <Badge variant="secondary" className="text-xs">
                         {item.status}
                       </Badge>
