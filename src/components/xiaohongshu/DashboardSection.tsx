@@ -155,7 +155,10 @@ export function DashboardSection({
     if (plan && plan.tasks && plan.tasks.length > 0) {
       // 🔥 后端status映射: ready/generating → 'in-progress', published → 'completed', 其他 → 'pending'
       const upcoming = plan.tasks.find((t: any) => t.status === 'pending' || t.status === 'in-progress');
-      setNextContent(upcoming || plan.tasks[0]);
+      const nextContentData = upcoming || plan.tasks[0];
+      console.log('🔍 [DEBUG] 下一篇内容数据:', nextContentData);
+      console.log('🔍 [DEBUG] 内容ID:', nextContentData?.id);
+      setNextContent(nextContentData);
 
       // 🔥 待发布队列：查找in-progress（即原始ready/generating）和pending状态的任务
       const ready = plan.tasks.filter((t: any) => t.status === 'in-progress' || t.status === 'pending');
@@ -244,13 +247,24 @@ export function DashboardSection({
   };
 
   const handleApprovePost = async (postId: string) => {
+    console.log('🚀 [handleApprovePost] 开始批准发布 - postId:', postId);
+
+    if (!postId) {
+      alert('❌ 错误：内容ID为空，无法批准发布');
+      console.error('❌ [handleApprovePost] postId 为空');
+      return;
+    }
+
     if (!confirm('确认批准发布此内容？')) {
       return;
     }
 
     try {
+      console.log('📤 [handleApprovePost] 调用 API - userId:', xhsUserId, 'postId:', postId);
       // 调用批准发布API
       const response = await xiaohongshuAPI.approvePost(xhsUserId, postId);
+      console.log('📥 [handleApprovePost] API 响应:', response);
+
       if (response.success) {
         alert('✅ 内容已批准发布！');
         await fetchData(); // 刷新数据
@@ -258,7 +272,7 @@ export function DashboardSection({
         alert('批准失败：' + (response.error || '未知错误'));
       }
     } catch (error: any) {
-      console.error('批准发布失败:', error);
+      console.error('❌ [handleApprovePost] 批准发布失败:', error);
       alert('批准失败：' + error.message);
     }
   };

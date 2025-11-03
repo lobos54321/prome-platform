@@ -256,17 +256,23 @@ export class XiaohongshuBackendAPI {
    */
   async approvePost(userId: string, postId: string): Promise<ApiResponse<any>> {
     try {
+      console.log(`🚀 [BackendAPI] 批准发布 - userId: ${userId}, postId: ${postId}`);
+
       const response = await fetch(`${this.baseURL}/agent/auto/approve/${userId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ postId }),
+        body: JSON.stringify({ taskId: postId }), // 🔥 后端期望 taskId 字段
       });
 
+      console.log(`📥 [BackendAPI] 批准发布响应状态: ${response.status}`);
       const data = await response.json();
+      console.log(`📥 [BackendAPI] 批准发布响应数据:`, data);
+
       return { success: response.ok, data: data.data, error: data.error };
     } catch (error) {
+      console.error(`❌ [BackendAPI] 批准发布失败:`, error);
       return this.handleError(error);
     }
   }
