@@ -12,12 +12,28 @@ export class UserMappingService {
   
   /**
    * 生成小红书用户ID
-   * 格式：user_{前14位UUID}_prome
-   * 注意：使用14位是为了与后端历史数据保持一致
+   * 格式：user_{完整32位UUID}_prome
+   * 使用完整UUID确保唯一性，避免截断导致的冲突
    */
   private generateXhsUserId(supabaseUuid: string): string {
-    const cleanId = supabaseUuid.replace(/-/g, '').substring(0, 14);
-    return `user_${cleanId}_prome`;
+    // 移除横线，保留完整的32位UUID
+    const cleanId = supabaseUuid.replace(/-/g, '');
+    
+    // 验证格式
+    if (!/^[0-9a-f]{32}$/i.test(cleanId)) {
+      console.error('❌ [UserMapping] Invalid UUID format:', supabaseUuid);
+      throw new Error(`Invalid UUID format: ${supabaseUuid}`);
+    }
+    
+    const userId = `user_${cleanId}_prome`;
+    
+    console.log('🔑 [UserMapping] 生成xhs_user_id:', {
+      supabase_uuid: supabaseUuid,
+      xhs_user_id: userId,
+      id_length: userId.length
+    });
+    
+    return userId;
   }
 
   /**
