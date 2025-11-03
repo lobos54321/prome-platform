@@ -85,14 +85,17 @@ export function DashboardSection({
           const pendingTasks = planData.tasks
             .filter((t: any) => t.status === 'pending' || t.status === 'in-progress')
             .sort((a: any, b: any) => {
-              const timeA = new Date(a.scheduled_time).getTime();
-              const timeB = new Date(b.scheduled_time).getTime();
+              // 🔥 支持两种命名方式
+              const timeA = new Date(a.scheduled_time || a.scheduledTime).getTime();
+              const timeB = new Date(b.scheduled_time || b.scheduledTime).getTime();
               return timeA - timeB;
             });
           console.log('📋 [fetchData] 找到 pending/in-progress 任务:', pendingTasks.length);
           if (pendingTasks.length > 0) {
-            nextTask = pendingTasks[0].scheduled_time;
+            // 🔥 支持两种命名方式
+            nextTask = pendingTasks[0].scheduled_time || pendingTasks[0].scheduledTime;
             console.log('📅 [fetchData] 下一个任务时间:', nextTask);
+            console.log('🔍 [DEBUG] 第一个任务完整数据:', pendingTasks[0]);
           }
         }
 
