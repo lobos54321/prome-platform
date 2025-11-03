@@ -46,32 +46,37 @@ export function DashboardSection({
 
   const fetchData = useCallback(async () => {
     try {
-      // ✅ 方案B：从Supabase读取显示（后端已写入）
-      const [statusData, strategyData, planData] = await Promise.all([
-        xiaohongshuSupabase.getAutomationStatus(supabaseUuid).catch(() => null),
-        xiaohongshuSupabase.getContentStrategy(supabaseUuid).catch(() => null),
-        xiaohongshuSupabase.getCurrentWeekPlan(supabaseUuid).catch(() => null),
+      // ✅ 方案A：从后端API获取实时数据
+      const [statusRes, strategyRes, planRes] = await Promise.all([
+        xiaohongshuAPI.getAutomationStatus(xhsUserId).catch(() => ({ success: false, data: null })),
+        xiaohongshuAPI.getContentStrategy(xhsUserId).catch(() => ({ success: false })),
+        xiaohongshuAPI.getWeeklyPlan(xhsUserId).catch(() => ({ success: false })),
       ]);
 
-      // 🔥 前端计算运营状态字段
-      console.log('📊 [fetchData] statusData:', statusData ? '有数据' : '无数据');
-      console.log('📊 [fetchData] strategyData:', strategyData ? '有数据' : '无数据');
-      console.log('📊 [fetchData] planData:', planData ? '有数据' : '无数据');
+      console.log('📊 [fetchData] Status:', statusRes.success ? '✅' : '❌');
+      console.log('📊 [fetchData] Strategy:', strategyRes.success ? '✅' : '❌');
+      console.log('📊 [fetchData] Plan:', planRes.success ? '✅' : '❌');
 
-      if (strategyData) {
+      // 处理 strategy（后端返回 {success, strategy}）
+      let strategyData = null;
+      if (strategyRes.success && (strategyRes as any).strategy) {
+        strategyData = (strategyRes as any).strategy;
         setStrategy(strategyData);
         console.log('✅ 已更新 strategy');
       }
 
-      if (planData) {
+      // 处理 plan（后端返回 {success, plan}）
+      let planData = null;
+      if (planRes.success && (planRes as any).plan) {
+        planData = (planRes as any).plan;
         setPlan(planData);
         console.log('✅ 已更新 plan');
       }
 
-      // 计算运营状态（需要在设置strategy和plan之后）
-      if (statusData) {
+      // 处理 status（后端返回 {success, data}）
+      if (statusRes.success && statusRes.data) {
         const now = new Date();
-        const createdAt = statusData.created_at ? new Date(statusData.created_at) : now;
+        const createdAt = statusRes.data.created_at ? new Date(statusRes.data.created_at) : now;
         const uptimeSeconds = Math.floor((now.getTime() - createdAt.getTime()) / 1000);
 
         // 从 planData 获取下一个待发布任务
@@ -95,20 +100,20 @@ export function DashboardSection({
         console.log('🔄 [fetchData] is_running 计算结果:', isRunning);
 
         const enrichedStatus = {
-          ...statusData,
+          ...statusRes.data,
           is_running: isRunning,
           uptime_seconds: uptimeSeconds,
-          last_activity: statusData.updated_at || statusData.created_at,
+          last_activity: statusRes.data.last_activity || statusRes.data.updated_at || new Date().toISOString(),
           next_scheduled_task: nextTask,
         };
 
         setStatus(enrichedStatus);
-        console.log('✅ 已更新 status (含计算字段):', enrichedStatus);
+        console.log('✅ 已更新 status (含计算字段)');
       }
     } catch (error) {
       console.error('Fetch data error:', error);
     }
-  }, [supabaseUuid]);
+  }, [xhsUserId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
