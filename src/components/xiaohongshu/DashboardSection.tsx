@@ -38,11 +38,14 @@ export function DashboardSection({
   const [plan, setPlan] = useState<WeeklyPlan | null>(initialPlan);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  
+
   // 新增状态
   const [nextContent, setNextContent] = useState<any>(null);
   const [readyQueue, setReadyQueue] = useState<any[]>([]);
   const [performanceData, setPerformanceData] = useState<any>(null);
+
+  // 🔥 发布作业状态
+  const [publishJob, setPublishJob] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -265,9 +268,21 @@ export function DashboardSection({
       const response = await xiaohongshuAPI.approvePost(xhsUserId, postId);
       console.log('📥 [handleApprovePost] API 响应:', response);
 
-      if (response.success) {
-        alert('✅ 内容已批准发布！');
-        await fetchData(); // 刷新数据
+      if (response.success && response.data) {
+        const { jobId, status: jobStatus, message } = response.data;
+
+        // 🔥 设置初始作业状态
+        setPublishJob({
+          jobId,
+          status: jobStatus || 'pending',
+          progress: 0,
+        });
+
+        console.log('✅ [handleApprovePost] 发布作业已创建:', jobId);
+        alert(`✅ ${message || '发布作业已创建'}\n作业ID: ${jobId}`);
+
+        // 🔥 启动轮询查询作业状态
+        startJobPolling(jobId);
       } else {
         alert('批准失败：' + (response.error || '未知错误'));
       }
@@ -275,6 +290,62 @@ export function DashboardSection({
       console.error('❌ [handleApprovePost] 批准发布失败:', error);
       alert('批准失败：' + error.message);
     }
+  };
+
+  // 🔥 轮询查询作业状态
+  const startJobPolling = (jobId: string) => {
+    let attempts = 0;
+    const maxAttempts = 60; // 最多查询60次（5分钟）
+    const pollInterval = 5000; // 每5秒查询一次
+
+    const pollTimer = setInterval(async () => {
+      attempts++;
+      console.log(`📊 [JobPolling] 查询作业状态 (${attempts}/${maxAttempts}):`, jobId);
+
+      try {
+        const statusRes = await xiaohongshuAPI.getPublishJobStatus(jobId, xhsUserId);
+
+        if (statusRes.success && statusRes.data) {
+          const { status: jobStatus, progress, error, result } = statusRes.data;
+
+          // 更新作业状态
+          setPublishJob({
+            jobId,
+            status: jobStatus,
+            progress: progress || 0,
+            error: error,
+          });
+
+          console.log(`📊 [JobPolling] 作业状态: ${jobStatus}, 进度: ${progress}%`);
+
+          // 🔥 如果作业完成或失败，停止轮询
+          if (jobStatus === 'completed' || jobStatus === 'failed') {
+            clearInterval(pollTimer);
+            console.log(`✅ [JobPolling] 作业${jobStatus === 'completed' ? '完成' : '失败'}，停止轮询`);
+
+            // 刷新数据显示最新状态
+            await fetchData();
+
+            // 3秒后清除作业状态显示
+            setTimeout(() => {
+              setPublishJob(null);
+            }, 3000);
+          }
+        }
+      } catch (error) {
+        console.error('❌ [JobPolling] 查询作业状态失败:', error);
+      }
+
+      // 🔥 达到最大尝试次数，停止轮询
+      if (attempts >= maxAttempts) {
+        clearInterval(pollTimer);
+        console.log('⚠️ [JobPolling] 达到最大查询次数，停止轮询');
+        setPublishJob((prev: any) => ({
+          ...prev,
+          error: '查询超时，请手动刷新页面查看结果',
+        }));
+      }
+    }, pollInterval);
   };
 
   const handleEditPost = async (postId: string) => {
@@ -406,8 +477,9 @@ export function DashboardSection({
 
           {/* 次要数据卡片网格 */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <ContentPreviewCard 
+            <ContentPreviewCard
               content={nextContent}
+              publishJob={publishJob}
               onApprove={handleApprovePost}
               onEdit={handleEditPost}
               onRegenerate={handleRegeneratePost}

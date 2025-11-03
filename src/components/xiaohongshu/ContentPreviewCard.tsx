@@ -3,6 +3,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, Image as ImageIcon, Check, Edit, RefreshCw } from 'lucide-react';
 
+interface PublishJobStatus {
+  jobId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress?: number;
+  error?: string;
+  taskTitle?: string;
+}
+
 interface ContentPreviewCardProps {
   content?: {
     id?: string;
@@ -13,6 +21,7 @@ interface ContentPreviewCardProps {
     imageUrls?: string[];
     hashtags?: string[];
   } | null;
+  publishJob?: PublishJobStatus | null;
   onApprove?: (id: string) => void;
   onEdit?: (id: string) => void;
   onRegenerate?: (id: string) => void;
@@ -48,7 +57,7 @@ function formatScheduledTime(timeStr: string | undefined | null): string {
   }
 }
 
-export function ContentPreviewCard({ content, onApprove, onEdit, onRegenerate }: ContentPreviewCardProps) {
+export function ContentPreviewCard({ content, publishJob, onApprove, onEdit, onRegenerate }: ContentPreviewCardProps) {
   if (!content) {
     return (
       <Card>
@@ -121,6 +130,59 @@ export function ContentPreviewCard({ content, onApprove, onEdit, onRegenerate }:
           <span>{formatScheduledTime(content.scheduledTime)}</span>
           <Badge variant="outline">{content.type}</Badge>
         </div>
+
+        {/* 🔥 发布状态显示 */}
+        {publishJob && (
+          <div className="mt-3 p-3 rounded-lg bg-gray-50 border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {publishJob.status === 'pending' && (
+                  <>
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium text-yellow-700">⏳ 等待发布</span>
+                  </>
+                )}
+                {publishJob.status === 'processing' && (
+                  <>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium text-blue-700">🔄 正在发布中...</span>
+                  </>
+                )}
+                {publishJob.status === 'completed' && (
+                  <>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-green-700">✅ 发布成功</span>
+                  </>
+                )}
+                {publishJob.status === 'failed' && (
+                  <>
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-red-700">❌ 发布失败</span>
+                  </>
+                )}
+              </div>
+              <Badge variant="secondary" className="text-xs font-mono">
+                {publishJob.jobId.slice(0, 12)}...
+              </Badge>
+            </div>
+            {publishJob.progress !== undefined && publishJob.status === 'processing' && (
+              <div className="mt-2">
+                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${publishJob.progress}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs text-gray-600 mt-1">{publishJob.progress}%</span>
+              </div>
+            )}
+            {publishJob.error && (
+              <div className="mt-2 text-xs text-red-600">
+                错误: {publishJob.error}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 操作按钮 */}
         <div className="flex gap-2 pt-4 border-t">

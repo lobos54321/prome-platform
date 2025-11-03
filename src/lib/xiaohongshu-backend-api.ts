@@ -270,9 +270,37 @@ export class XiaohongshuBackendAPI {
       const data = await response.json();
       console.log(`📥 [BackendAPI] 批准发布响应数据:`, data);
 
-      return { success: response.ok, data: data.data, error: data.error };
+      return {
+        success: response.ok,
+        data: data, // 🔥 返回完整数据，包含 jobId
+        error: data.error
+      };
     } catch (error) {
       console.error(`❌ [BackendAPI] 批准发布失败:`, error);
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * 查询发布作业状态
+   */
+  async getPublishJobStatus(jobId: string, userId: string): Promise<ApiResponse<any>> {
+    try {
+      console.log(`📊 [BackendAPI] 查询作业状态 - jobId: ${jobId}, userId: ${userId}`);
+
+      const response = await fetch(`${this.baseURL}/agent/auto/publish-status/${jobId}?userId=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log(`📥 [BackendAPI] 作业状态:`, data);
+
+      return { success: response.ok, data: data, error: data.error };
+    } catch (error) {
+      console.error(`❌ [BackendAPI] 查询作业状态失败:`, error);
       return this.handleError(error);
     }
   }
