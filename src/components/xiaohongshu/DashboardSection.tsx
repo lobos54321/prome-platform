@@ -53,8 +53,23 @@ export function DashboardSection({
         xiaohongshuSupabase.getCurrentWeekPlan(supabaseUuid).catch(() => null),
       ]);
 
+      // 🔥 前端计算运营状态字段
+      console.log('📊 [fetchData] statusData:', statusData ? '有数据' : '无数据');
+      console.log('📊 [fetchData] strategyData:', strategyData ? '有数据' : '无数据');
+      console.log('📊 [fetchData] planData:', planData ? '有数据' : '无数据');
+
+      if (strategyData) {
+        setStrategy(strategyData);
+        console.log('✅ 已更新 strategy');
+      }
+
+      if (planData) {
+        setPlan(planData);
+        console.log('✅ 已更新 plan');
+      }
+
+      // 计算运营状态（需要在设置strategy和plan之后）
       if (statusData) {
-        // 🔥 前端计算运营状态字段
         const now = new Date();
         const createdAt = statusData.created_at ? new Date(statusData.created_at) : now;
         const uptimeSeconds = Math.floor((now.getTime() - createdAt.getTime()) / 1000);
@@ -69,31 +84,26 @@ export function DashboardSection({
               const timeB = new Date(b.scheduled_time).getTime();
               return timeA - timeB;
             });
+          console.log('📋 [fetchData] 找到 pending/in-progress 任务:', pendingTasks.length);
           if (pendingTasks.length > 0) {
             nextTask = pendingTasks[0].scheduled_time;
+            console.log('📅 [fetchData] 下一个任务时间:', nextTask);
           }
         }
 
+        const isRunning = strategyData !== null || planData !== null;
+        console.log('🔄 [fetchData] is_running 计算结果:', isRunning);
+
         const enrichedStatus = {
           ...statusData,
-          is_running: strategyData !== null || planData !== null, // 有数据就是运行中
+          is_running: isRunning,
           uptime_seconds: uptimeSeconds,
           last_activity: statusData.updated_at || statusData.created_at,
           next_scheduled_task: nextTask,
         };
 
         setStatus(enrichedStatus);
-        console.log('✅ 已更新 status (含计算字段)');
-      }
-
-      if (strategyData) {
-        setStrategy(strategyData);
-        console.log('✅ 已更新 strategy');
-      }
-
-      if (planData) {
-        setPlan(planData);
-        console.log('✅ 已更新 plan');
+        console.log('✅ 已更新 status (含计算字段):', enrichedStatus);
       }
     } catch (error) {
       console.error('Fetch data error:', error);
