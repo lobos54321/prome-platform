@@ -20,7 +20,18 @@ function formatScheduledTime(timeStr: string | undefined | null): string {
   if (!timeStr) return '暂无时间';
 
   try {
-    const date = new Date(timeStr);
+    let date: Date;
+
+    // 🔥 如果只有时间（如 "09:30"），拼接今天的日期
+    if (/^\d{2}:\d{2}$/.test(timeStr)) {
+      const today = new Date();
+      const [hours, minutes] = timeStr.split(':');
+      date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), parseInt(hours), parseInt(minutes));
+    } else {
+      // 完整日期时间字符串
+      date = new Date(timeStr);
+    }
+
     if (isNaN(date.getTime())) return timeStr; // 如果无法解析，返回原值
 
     const month = String(date.getMonth() + 1).padStart(2, '0');

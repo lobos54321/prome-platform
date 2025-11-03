@@ -18,6 +18,36 @@ interface ContentPreviewCardProps {
   onRegenerate?: (id: string) => void;
 }
 
+// 格式化时间显示
+function formatScheduledTime(timeStr: string | undefined | null): string {
+  if (!timeStr) return '暂无时间';
+
+  try {
+    let date: Date;
+
+    // 🔥 如果只有时间（如 "09:30"），拼接今天的日期
+    if (/^\d{2}:\d{2}$/.test(timeStr)) {
+      const today = new Date();
+      const [hours, minutes] = timeStr.split(':');
+      date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), parseInt(hours), parseInt(minutes));
+    } else {
+      // 完整日期时间字符串
+      date = new Date(timeStr);
+    }
+
+    if (isNaN(date.getTime())) return timeStr; // 如果无法解析，返回原值
+
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${month}-${day} ${hours}:${minutes}`;
+  } catch (error) {
+    return timeStr;
+  }
+}
+
 export function ContentPreviewCard({ content, onApprove, onEdit, onRegenerate }: ContentPreviewCardProps) {
   if (!content) {
     return (
@@ -88,7 +118,7 @@ export function ContentPreviewCard({ content, onApprove, onEdit, onRegenerate }:
 
         <div className="flex items-center gap-2 text-sm text-gray-500 pt-2 border-t">
           <Clock className="w-4 h-4" />
-          <span>{content.scheduledTime}</span>
+          <span>{formatScheduledTime(content.scheduledTime)}</span>
           <Badge variant="outline">{content.type}</Badge>
         </div>
 
