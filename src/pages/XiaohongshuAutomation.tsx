@@ -378,10 +378,13 @@ export default function XiaohongshuAutomation() {
     try {
       // 调用后端清除Cookie
       if (supabaseUuid && xhsUserId) {
+        console.log('🧹 [Logout] 开始清理...');
+        
+        // 1. 清除 Supabase 数据
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
         
-        // 调用后端退出登录API
-        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/logout`, {
+        // 2. 调用后端强制清理端点（激活60秒退出保护）
+        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/force-clear-cookies`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -390,7 +393,11 @@ export default function XiaohongshuAutomation() {
         });
         
         if (response.ok) {
-          console.log('✅ 后端Cookie已清除');
+          const result = await response.json();
+          console.log('✅ [Logout] 后端清理完成:', result);
+          console.log('🔒 [Logout] 退出保护已激活，60秒内无法重新登录');
+        } else {
+          console.error('❌ [Logout] 后端清理失败');
         }
       }
 
