@@ -68,12 +68,17 @@ export default function XiaohongshuAutomation() {
           console.log('⚠️ [XHS] 用户在退出保护期内，不加载数据');
           setError(`退出保护期：请等待 ${logoutStatus.data.remainingSeconds} 秒后重新登录`);
           setLoading(false);
+          setCurrentStep('login');
           return;
         }
         console.log('✅ [XHS] 不在退出保护期，继续初始化');
       } catch (logoutCheckError) {
-        console.warn('⚠️ [XHS] 检查退出保护失败:', logoutCheckError);
-        // 继续执行，不阻塞正常流程
+        console.error('❌ [XHS] 检查退出保护失败:', logoutCheckError);
+        // 🔥 检查失败时，为安全起见，不加载数据，显示登录界面
+        setError('检查登录状态失败，请刷新页面重试');
+        setLoading(false);
+        setCurrentStep('login');
+        return;
       }
 
       const [profile, status] = await Promise.all([
