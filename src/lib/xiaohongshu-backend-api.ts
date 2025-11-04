@@ -104,9 +104,14 @@ export class XiaohongshuBackendAPI {
     
     // 适配后端响应结构：
     // this.request直接返回response body
-    // 后端返回: { success: true, data: { isLoggedIn: true, ... }, message: "..." }
+    // 后端返回: { success: true, data: { logged_in: true 或 isLoggedIn: true, ... }, message: "..." }
     if (response.success && response.data) {
-      return response.data;
+      // 兼容两种字段名：logged_in 和 isLoggedIn
+      const isLoggedIn = response.data.isLoggedIn || response.data.logged_in || false;
+      return {
+        ...response.data,
+        isLoggedIn: isLoggedIn, // 统一使用 isLoggedIn
+      };
     }
     
     // 失败情况
