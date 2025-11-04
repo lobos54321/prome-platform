@@ -108,14 +108,28 @@ export class XiaohongshuBackendAPI {
    * 自动登录（获取二维码）
    */
   async autoLogin(userId: string): Promise<QRCodeData> {
-    const response = await this.request<QRCodeData>(
+    const response = await this.request<any>(
       '/agent/xiaohongshu/auto-login',
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
       }
     );
-    return response.data || { success: false };
+    
+    // 适配后端响应结构：后端返回 response.data.data.qrcode_url
+    if (response.data?.success && response.data?.data?.qrcode_url) {
+      return {
+        success: true,
+        qrCode: response.data.data.qrcode_url,
+        message: response.data.message || '请扫码登录'
+      };
+    }
+    
+    // 失败情况
+    return {
+      success: false,
+      message: response.data?.error || response.data?.message || '获取二维码失败'
+    };
   }
 
   /**
