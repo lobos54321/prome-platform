@@ -137,13 +137,9 @@ export function LoginSection({
     }
 
     try {
-      setLogoutProtection(true);
-      setCountdown(60);
-      setIsLoggedIn(false);
-      
       console.log('🧹 [Logout] 开始强制清除所有Cookie和状态...');
       
-      // 🔥 调用后端强制清除所有Cookie
+      // 🔥 1. 调用后端强制清除所有Cookie
       const backendAPI = new (await import('@/lib/xiaohongshu-backend-api')).XiaohongshuBackendAPI();
       const forceLogoutResult = await backendAPI.forceLogout(xhsUserId);
       
@@ -153,6 +149,16 @@ export function LoginSection({
         console.warn('⚠️ [Logout] 后端强制清除失败，但继续前端清理');
       }
       
+      // 🔥 2. 清除 Supabase 数据（Strategy, Plan, Status）
+      console.log('🧹 [Logout] 清除 Supabase 数据...');
+      try {
+        await xiaohongshuSupabase.clearUserData(supabaseUuid);
+        console.log('✅ [Logout] Supabase 数据清除成功');
+      } catch (supabaseError) {
+        console.warn('⚠️ [Logout] Supabase 数据清除失败:', supabaseError);
+      }
+      
+      // 🔥 3. 记录退出日志
       await xiaohongshuSupabase.addActivityLog({
         supabase_uuid: supabaseUuid,
         xhs_user_id: xhsUserId,
@@ -161,7 +167,28 @@ export function LoginSection({
         metadata: { forceCleanup: true },
       });
       
+      // 🔥 4. 清除前端状态
+      setIsLoggedIn(false);
+      setLogoutProtection(true);
+      setCountdown(60);
+      
+      // 🔥 5. 清除 localStorage 中的小红书相关数据
+      console.log('🧹 [Logout] 清除 localStorage...');
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('xhs') || key.includes('xiaohongshu'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`🗑️ [Logout] 移除 localStorage: ${key}`);
+      });
+      
       console.log('✅ [Logout] 退出登录完成，60秒保护期开始');
+      console.log('⏰ [Logout] 60秒后可以重新登录');
+      
     } catch (error) {
       console.error('❌ [Logout] 退出登录失败:', error);
       onError('退出登录失败');
