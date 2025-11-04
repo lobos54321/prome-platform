@@ -29,15 +29,21 @@ export function StatusCard({ status, className = '' }: StatusCardProps) {
     return `${minutes}分钟`;
   };
 
-  const formatDateTime = (dateStr: string | null): string => {
+  const formatDateTime = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '暂无';
-    const date = new Date(dateStr);
-    return date.toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      const date = new Date(dateStr);
+      // 检查日期是否有效
+      if (isNaN(date.getTime())) return '暂无';
+      return date.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '暂无';
+    }
   };
 
   return (
