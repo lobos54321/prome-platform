@@ -60,6 +60,22 @@ export default function XiaohongshuAutomation() {
       console.log('✅ [XHS] getOrCreateMapping 返回:', userId);
       setXhsUserId(userId);
 
+      // 🔥 检查是否在退出保护期内
+      console.log('🔒 [XHS] 检查退出保护状态...');
+      try {
+        const logoutStatus = await xiaohongshuAPI.checkLogoutStatus(userId);
+        if (logoutStatus.data?.inProtection) {
+          console.log('⚠️ [XHS] 用户在退出保护期内，不加载数据');
+          setError(`退出保护期：请等待 ${logoutStatus.data.remainingSeconds} 秒后重新登录`);
+          setLoading(false);
+          return;
+        }
+        console.log('✅ [XHS] 不在退出保护期，继续初始化');
+      } catch (logoutCheckError) {
+        console.warn('⚠️ [XHS] 检查退出保护失败:', logoutCheckError);
+        // 继续执行，不阻塞正常流程
+      }
+
       const [profile, status] = await Promise.all([
         xiaohongshuSupabase.getUserProfile(user.id),
         xiaohongshuSupabase.getAutomationStatus(user.id),
