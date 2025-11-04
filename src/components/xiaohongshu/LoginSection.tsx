@@ -13,6 +13,7 @@ interface LoginSectionProps {
   xhsUserId: string;
   onLoginSuccess: () => void;
   onError: (error: string) => void;
+  onLogout?: () => void; // 🔥 新增：退出登录回调
 }
 
 export function LoginSection({
@@ -20,6 +21,7 @@ export function LoginSection({
   xhsUserId,
   onLoginSuccess,
   onError,
+  onLogout, // 🔥 新增
 }: LoginSectionProps) {
   const [checking, setChecking] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -188,6 +190,14 @@ export function LoginSection({
       
       console.log('✅ [Logout] 退出登录完成，60秒保护期开始');
       console.log('⏰ [Logout] 60秒后可以重新登录');
+      
+      // 🔥 6. 通知父组件刷新页面
+      if (onLogout) {
+        onLogout();
+      } else {
+        // 如果没有提供回调，直接刷新页面
+        window.location.reload();
+      }
       
     } catch (error) {
       console.error('❌ [Logout] 退出登录失败:', error);

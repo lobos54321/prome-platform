@@ -473,6 +473,17 @@ export default function XiaohongshuAutomation() {
               xhsUserId={xhsUserId}
               onLoginSuccess={handleLoginSuccess}
               onError={setError}
+              onLogout={() => {
+                // 🔥 退出登录后，重置所有状态并刷新页面
+                console.log('🔄 [Page] 收到退出登录通知，重置状态');
+                setCurrentStep('login');
+                setContentStrategy(null);
+                setWeeklyPlan(null);
+                setAutomationStatus(null);
+                setUserProfile(null);
+                // 刷新页面以完全清除状态
+                setTimeout(() => window.location.reload(), 500);
+              }}
             />
           )}
 
