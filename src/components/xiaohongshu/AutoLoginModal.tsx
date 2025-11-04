@@ -27,19 +27,23 @@ export function AutoLoginModal({
 
     try {
       setChecking(true);
+      console.log('🔍 [AutoLoginModal] 开始检查登录状态...');
       const status = await xiaohongshuAPI.checkLoginStatus(xhsUserId);
+      console.log('📊 [AutoLoginModal] 登录状态结果:', status);
       
       if (status.isLoggedIn) {
+        console.log('✅ [AutoLoginModal] 检测到登录成功！');
         setStatusMessage('✅ 登录成功！');
         setTimeout(() => {
           onLoginSuccess();
           onClose();
         }, 1000);
       } else {
+        console.log('⏳ [AutoLoginModal] 还未登录，继续等待...');
         setStatusMessage('等待扫码登录...');
       }
     } catch (error) {
-      console.error('Check login status error:', error);
+      console.error('❌ [AutoLoginModal] Check login status error:', error);
       setStatusMessage('检查登录状态失败，请重试');
     } finally {
       setChecking(false);
