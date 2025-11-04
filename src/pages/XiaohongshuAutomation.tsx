@@ -474,15 +474,17 @@ export default function XiaohongshuAutomation() {
               onLoginSuccess={handleLoginSuccess}
               onError={setError}
               onLogout={() => {
-                // 🔥 退出登录后，重置所有状态并刷新页面
+                // 🔥 退出登录后，重置所有状态
                 console.log('🔄 [Page] 收到退出登录通知，重置状态');
                 setCurrentStep('login');
                 setContentStrategy(null);
                 setWeeklyPlan(null);
                 setAutomationStatus(null);
                 setUserProfile(null);
-                // 刷新页面以完全清除状态
-                setTimeout(() => window.location.reload(), 500);
+                setError(''); // 清除错误信息
+                setLoading(false); // 停止加载状态
+                // 🔥 不刷新页面，直接停留在登录界面
+                // 后端已经清除了数据，60秒保护期后可以重新登录
               }}
             />
           )}
