@@ -97,11 +97,20 @@ export class XiaohongshuBackendAPI {
    * 检查登录状态
    */
   async checkLoginStatus(userId: string): Promise<LoginStatus> {
-    const response = await this.request<LoginStatus>(
+    const response = await this.request<any>(
       `/agent/xiaohongshu/login/status?userId=${encodeURIComponent(userId)}`,
       { method: 'GET' }
     );
-    return response.data || { success: false, isLoggedIn: false };
+    
+    // 适配后端响应结构：
+    // this.request直接返回response body
+    // 后端返回: { success: true, data: { isLoggedIn: true, ... }, message: "..." }
+    if (response.success && response.data) {
+      return response.data;
+    }
+    
+    // 失败情况
+    return { success: false, isLoggedIn: false };
   }
 
   /**
