@@ -113,7 +113,23 @@ export default function XiaohongshuAutomation() {
           const hasBackendData = (strategyRes.success && (strategyRes as any).strategy) || (planRes.success && (planRes as any).plan);
           
           if (hasBackendData) {
-            console.log('✅ 后端有数据！切换到Dashboard');
+            console.log('✅ 后端有数据！但再次确认不在退出保护期...');
+            
+            // 🔥 再次检查退出保护期（防御性检查）
+            try {
+              const logoutCheckAgain = await xiaohongshuAPI.checkLogoutStatus(userId);
+              if (logoutCheckAgain.data?.inProtection) {
+                console.warn('⚠️ [XHS] 检测到退出保护期，忽略后端数据，显示登录界面');
+                setError(`退出保护期：请等待 ${logoutCheckAgain.data.remainingSeconds} 秒后重新登录`);
+                setLoading(false);
+                setCurrentStep('login');
+                return;
+              }
+            } catch (err) {
+              console.warn('⚠️ [XHS] 二次退出保护检查失败，继续加载数据');
+            }
+            
+            console.log('✅ 确认不在保护期，切换到Dashboard');
             // 🔥 后端有数据，直接显示Dashboard，不管Supabase中是否有profile
             if (strategyRes.success && (strategyRes as any).strategy) {
               setContentStrategy((strategyRes as any).strategy);
