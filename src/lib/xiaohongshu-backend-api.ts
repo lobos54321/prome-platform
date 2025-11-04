@@ -116,19 +116,21 @@ export class XiaohongshuBackendAPI {
       }
     );
     
-    // 适配后端响应结构：后端返回 response.data.data.qrcode_url
-    if (response.data?.success && response.data?.data?.qrcode_url) {
+    // 适配后端响应结构：
+    // this.request直接返回response body
+    // 后端返回: { success: true, data: { qrcode_url: "..." }, message: "..." }
+    if (response.success && response.data?.qrcode_url) {
       return {
         success: true,
-        qrCode: response.data.data.qrcode_url,
-        message: response.data.message || '请扫码登录'
+        qrCode: response.data.qrcode_url,
+        message: response.message || '请扫码登录'
       };
     }
     
     // 失败情况
     return {
       success: false,
-      message: response.data?.error || response.data?.message || '获取二维码失败'
+      message: response.error || response.message || '获取二维码失败'
     };
   }
 
