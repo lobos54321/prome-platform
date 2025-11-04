@@ -420,10 +420,10 @@ export default function XiaohongshuAutomation() {
 
       alert('已退出登录！\n\n⚠️ 为确保数据完全清理，系统将禁止新登录60秒。');
       
-      // 刷新页面
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // 🔥 不刷新页面，直接停留在登录界面
+      // 后端已经清除了数据，60秒保护期后可以重新登录
+      setError(''); // 清除错误信息
+      setLoading(false); // 停止加载状态
     } catch (err) {
       console.error('Logout error:', err);
       setError('退出登录失败，请刷新页面重试');
