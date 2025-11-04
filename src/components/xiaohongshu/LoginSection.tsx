@@ -141,15 +141,29 @@ export function LoginSection({
       setCountdown(60);
       setIsLoggedIn(false);
       
+      console.log('🧹 [Logout] 开始强制清除所有Cookie和状态...');
+      
+      // 🔥 调用后端强制清除所有Cookie
+      const backendAPI = new (await import('@/lib/xiaohongshu-backend-api')).XiaohongshuBackendAPI();
+      const forceLogoutResult = await backendAPI.forceLogout(xhsUserId);
+      
+      if (forceLogoutResult.success) {
+        console.log('✅ [Logout] 后端强制清除成功');
+      } else {
+        console.warn('⚠️ [Logout] 后端强制清除失败，但继续前端清理');
+      }
+      
       await xiaohongshuSupabase.addActivityLog({
         supabase_uuid: supabaseUuid,
         xhs_user_id: xhsUserId,
         activity_type: 'login',
-        message: '用户退出登录',
-        metadata: {},
+        message: '用户退出登录（强制清除）',
+        metadata: { forceCleanup: true },
       });
+      
+      console.log('✅ [Logout] 退出登录完成，60秒保护期开始');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('❌ [Logout] 退出登录失败:', error);
       onError('退出登录失败');
     }
   };

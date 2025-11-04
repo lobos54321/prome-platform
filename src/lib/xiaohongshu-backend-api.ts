@@ -346,6 +346,37 @@ export class XiaohongshuBackendAPI {
   }
 
   /**
+   * 强制清除所有Cookie和状态 - 彻底退出登录
+   * 调用 force-clear-cookies 端点，清理所有Cookie来源
+   */
+  async forceLogout(userId: string): Promise<ApiResponse<any>> {
+    try {
+      console.log(`🧹 [BackendAPI] 强制清除用户 ${userId} 的所有Cookie和状态`);
+      
+      const response = await fetch(`${this.baseURL}/agent/xiaohongshu/force-clear-cookies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log(`✅ [BackendAPI] 强制清除成功:`, data);
+      } else {
+        console.error(`❌ [BackendAPI] 强制清除失败:`, data);
+      }
+      
+      return { success: response.ok, data: data.data, error: data.error };
+    } catch (error) {
+      console.error(`❌ [BackendAPI] 强制清除异常:`, error);
+      return this.handleError(error);
+    }
+  }
+
+  /**
    * 重置自动运营
    */
   async resetAutoOperation(userId: string): Promise<ApiResponse<any>> {
