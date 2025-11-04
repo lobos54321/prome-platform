@@ -102,8 +102,26 @@ export function DashboardSection({
           }
         }
 
-        const isRunning = strategyData !== null || planData !== null;
+        // 🔥 FIX: 修复运行状态计算逻辑
+        // 不能仅根据数据存在性判断，需要检查是否有活跃任务
+        const hasActiveTasks = planData?.tasks?.some(
+          (t: any) => t.status === 'in-progress' || t.status === 'pending'
+        ) ?? false;
+        
+        // 如果后端明确返回了is_running，优先使用后端的状态
+        // 否则根据是否有活跃任务判断
+        const isRunning = statusRes.data?.is_running !== undefined 
+          ? statusRes.data.is_running 
+          : hasActiveTasks;
+        
         console.log('🔄 [fetchData] is_running 计算结果:', isRunning);
+        console.log('🔍 [fetchData] statusData:', {
+          hasStatusData: !!statusRes.data,
+          strategyData: !!strategyData,
+          planData: !!planData,
+          hasActiveTasks,
+          backendIsRunning: statusRes.data?.is_running
+        });
 
         const enrichedStatus = {
           ...statusRes.data,
