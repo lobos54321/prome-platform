@@ -174,11 +174,16 @@ export function DashboardSection({
   // 处理下一篇内容预览和待发布队列
   useEffect(() => {
     if (plan && plan.tasks && plan.tasks.length > 0) {
-      // 🔥 后端status映射: ready/generating → 'in-progress', published → 'completed', 其他 → 'pending'
+      // 🔥 优先显示最近发布的内容（published状态）
+      const recentPublished = plan.tasks.find((t: any) => t.status === 'published');
+
+      // 如果有刚发布的内容，显示它；否则显示下一个待发布的
       const upcoming = plan.tasks.find((t: any) => t.status === 'pending' || t.status === 'in-progress');
-      const nextContentData = upcoming || plan.tasks[0];
+      const nextContentData = recentPublished || upcoming || plan.tasks[0];
+
       console.log('🔍 [DEBUG] 下一篇内容数据:', nextContentData);
       console.log('🔍 [DEBUG] 内容ID:', nextContentData?.id);
+      console.log('🔍 [DEBUG] 内容状态:', nextContentData?.status);
       setNextContent(nextContentData);
 
       // 🔥 待发布队列：查找in-progress（即原始ready/generating）和pending状态的任务
@@ -341,13 +346,20 @@ export function DashboardSection({
             clearInterval(pollTimer);
             console.log(`✅ [JobPolling] 作业${jobStatus === 'completed' ? '完成' : '失败'}，停止轮询`);
 
+            // 🔥 显示用户友好的通知
+            if (jobStatus === 'completed') {
+              const taskTitle = result?.title || '内容';
+              alert(`🎉 发布成功！\n\n标题：${taskTitle}\n\n内容已成功发布到小红书，可以在平台查看。`);
+            } else if (jobStatus === 'failed') {
+              const errorMsg = error || '未知错误';
+              alert(`❌ 发布失败\n\n错误信息：${errorMsg}\n\n请检查登录状态或重试。`);
+            }
+
             // 刷新数据显示最新状态
             await fetchData();
 
-            // 3秒后清除作业状态显示
-            setTimeout(() => {
-              setPublishJob(null);
-            }, 3000);
+            // 🔥 不自动清除状态，保持显示已发布状态
+            // 用户可以通过刷新数据来更新显示
           }
         }
       } catch (error) {

@@ -131,41 +131,43 @@ export function ContentPreviewCard({ content, publishJob, onApprove, onEdit, onR
           <Badge variant="outline">{content.type}</Badge>
         </div>
 
-        {/* 🔥 发布状态显示 */}
-        {publishJob && (
+        {/* 🔥 发布状态显示 - 支持两种来源：publishJob（轮询中）和 content.status（持久化状态） */}
+        {(publishJob || content.status === 'published') && (
           <div className="mt-3 p-3 rounded-lg bg-gray-50 border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {publishJob.status === 'pending' && (
+                {publishJob?.status === 'pending' && (
                   <>
                     <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
                     <span className="text-sm font-medium text-yellow-700">⏳ 等待发布</span>
                   </>
                 )}
-                {publishJob.status === 'processing' && (
+                {publishJob?.status === 'processing' && (
                   <>
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                     <span className="text-sm font-medium text-blue-700">🔄 正在发布中...</span>
                   </>
                 )}
-                {publishJob.status === 'completed' && (
+                {(publishJob?.status === 'completed' || content.status === 'published') && (
                   <>
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-700">✅ 发布成功</span>
+                    <span className="text-sm font-medium text-green-700">✅ 已发布到小红书</span>
                   </>
                 )}
-                {publishJob.status === 'failed' && (
+                {publishJob?.status === 'failed' && (
                   <>
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                     <span className="text-sm font-medium text-red-700">❌ 发布失败</span>
                   </>
                 )}
               </div>
-              <Badge variant="secondary" className="text-xs font-mono">
-                {publishJob.jobId.slice(0, 12)}...
-              </Badge>
+              {publishJob?.jobId && (
+                <Badge variant="secondary" className="text-xs font-mono">
+                  {publishJob.jobId.slice(0, 12)}...
+                </Badge>
+              )}
             </div>
-            {publishJob.progress !== undefined && publishJob.status === 'processing' && (
+            {publishJob?.progress !== undefined && publishJob.status === 'processing' && (
               <div className="mt-2">
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
                   <div
@@ -176,7 +178,7 @@ export function ContentPreviewCard({ content, publishJob, onApprove, onEdit, onR
                 <span className="text-xs text-gray-600 mt-1">{publishJob.progress}%</span>
               </div>
             )}
-            {publishJob.error && (
+            {publishJob?.error && (
               <div className="mt-2 text-xs text-red-600">
                 错误: {publishJob.error}
               </div>
