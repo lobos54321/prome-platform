@@ -282,6 +282,16 @@ export class XiaohongshuBackendAPI {
   }
 
   /**
+   * 获取用户资料（当前登录的小红书账号信息）
+   */
+  async getUserProfile(userId: string): Promise<APIResponse<any>> {
+    return await this.request(
+      `/agent/xiaohongshu/profile?userId=${encodeURIComponent(userId)}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
    * 批准发布内容
    */
   async approvePost(userId: string, postId: string): Promise<ApiResponse<any>> {

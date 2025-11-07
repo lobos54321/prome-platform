@@ -8,6 +8,7 @@ import { WeeklyPlanCard } from './WeeklyPlanCard';
 import { ContentPreviewCard } from './ContentPreviewCard';
 import { ReadyQueueCard } from './ReadyQueueCard';
 import { PerformanceCard } from './PerformanceCard';
+import { AccountBadge } from './AccountBadge';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
 import type { AutomationStatus, ContentStrategy, WeeklyPlan } from '@/types/xiaohongshu';
