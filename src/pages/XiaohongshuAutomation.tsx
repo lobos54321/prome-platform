@@ -417,25 +417,25 @@ export default function XiaohongshuAutomation() {
       // 调用后端清除Cookie
       if (supabaseUuid && xhsUserId) {
         console.log('🧹 [Logout] 开始清理...');
-        
+
         // 1. 清除 Supabase 数据
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
-        
-        // 2. 调用后端强制清理端点（激活60秒退出保护）
-        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/force-clear-cookies`, {
+
+        // 2. 🔥 调用 MCP Router 的完整 logout 端点（清理所有Cookie文件，包括Go后端的 /app/data/cookies.json）
+        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/api/xiaohongshu/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ userId: xhsUserId }),
         });
-        
+
         if (response.ok) {
           const result = await response.json();
-          console.log('✅ [Logout] 后端清理完成:', result);
-          console.log('🔒 [Logout] 退出保护已激活，60秒内无法重新登录');
+          console.log('✅ [Logout] MCP Router 完整清理成功:', result);
+          console.log('🔒 [Logout] 所有Cookie文件已删除，包括Go后端的cookies.json');
         } else {
-          console.error('❌ [Logout] 后端清理失败');
+          console.error('❌ [Logout] MCP Router 清理失败');
         }
       }
 
