@@ -451,12 +451,11 @@ export default function XiaohongshuAutomation() {
       setWeeklyPlan(null);
       setCurrentStep('login');
 
-      alert('已退出登录！\n\n⚠️ 为确保数据完全清理，系统将禁止新登录60秒。');
-      
-      // 🔥 不刷新页面，直接停留在登录界面
-      // 后端已经清除了数据，60秒保护期后可以重新登录
-      setError(''); // 清除错误信息
-      setLoading(false); // 停止加载状态
+      alert('已退出登录！\n\n⚠️ 为确保数据完全清理，页面将自动刷新。\n60秒内无法重新登录。');
+
+      // 🔥 强制刷新页面，确保所有状态完全重置
+      // 防止前端缓存导致的自动登录
+      window.location.reload();
     } catch (err) {
       console.error('Logout error:', err);
       setError('退出登录失败，请刷新页面重试');
