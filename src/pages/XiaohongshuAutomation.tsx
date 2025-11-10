@@ -62,32 +62,23 @@ export default function XiaohongshuAutomation() {
       console.log('✅ [XHS] getOrCreateMapping 返回:', userId);
       setXhsUserId(userId);
 
-      // 🔥 关键修复：先检查登录状态和退出保护期
-      console.log('🔒 [XHS] 检查登录状态和退出保护...');
+      // 🔥 修复：只检查登录状态，不再检查退出保护期
+      // 退出保护期只用于阻止"自动Cookie导入"，不应该阻止用户手动登录
+      // 如果Cookie被正确删除，登录状态检查会返回未登录
+      console.log('🔒 [XHS] 检查登录状态...');
       try {
-        // 1. 先检查退出保护状态
-        const logoutStatus = await xiaohongshuAPI.checkLogoutStatus(userId);
-        if (logoutStatus.data?.inProtection) {
-          console.log('⚠️ [XHS] 用户在退出保护期内，停止所有初始化');
-          setError(`退出保护期：请等待 ${logoutStatus.data.remainingSeconds} 秒后重新登录`);
-          setLoading(false);
-          setCurrentStep('login');
-          return; // 🔥 立即返回，不执行任何后续操作
-        }
-
-        // 2. 检查登录状态
         const loginStatus = await xiaohongshuAPI.checkLoginStatus(userId);
         console.log('🔍 [XHS] 登录状态检查结果:', loginStatus);
 
-        // 🔥 如果在保护期或未登录，立即停止
-        if (loginStatus.inProtection || !loginStatus.isLoggedIn) {
-          console.log('⚠️ [XHS] 用户未登录或在保护期，停止初始化');
+        // 🔥 如果未登录，立即停止
+        if (!loginStatus.isLoggedIn) {
+          console.log('⚠️ [XHS] 用户未登录，停止初始化');
           setLoading(false);
           setCurrentStep('login');
           return; // 🔥 立即返回，不加载任何数据
         }
 
-        console.log('✅ [XHS] 已登录且不在保护期，继续初始化');
+        console.log('✅ [XHS] 已登录，继续初始化');
       } catch (statusCheckError) {
         console.error('❌ [XHS] 状态检查失败:', statusCheckError);
         // 🔥 检查失败时，为安全起见，不加载数据，显示登录界面
