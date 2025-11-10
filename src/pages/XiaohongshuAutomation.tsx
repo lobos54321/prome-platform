@@ -412,8 +412,8 @@ export default function XiaohongshuAutomation() {
         // 1. 清除 Supabase 数据
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
 
-        // 2. 🔥 调用 MCP Router 的完整 logout 端点（清理所有Cookie文件，包括Go后端的 /app/data/cookies.json）
-        const logoutUrl = `${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/api/xiaohongshu/logout`;
+        // 2. 🔥 调用 Claude Agent Service 的 logout 端点（通过它调用 MCP Router 清理所有Cookie文件，包括Go后端的 /app/data/cookies.json）
+        const logoutUrl = `${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/logout`;
         console.log(`🔄 [Logout] 准备调用 logout API: ${logoutUrl}`);
         console.log(`🔄 [Logout] userId: ${xhsUserId}`);
 
