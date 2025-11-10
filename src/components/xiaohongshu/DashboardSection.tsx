@@ -443,7 +443,16 @@ export function DashboardSection({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* 显示绑定的小红书账号 */}
+          <AccountBadge 
+            xhsUserId={xhsUserId} 
+            onSwitchAccount={() => {
+              if (confirm('切换账号将退出当前登录，是否继续？')) {
+                onLogout?.();
+              }
+            }}
+          />
           {onReconfigure && (
             <Button
               onClick={onReconfigure}
