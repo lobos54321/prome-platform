@@ -413,20 +413,35 @@ export default function XiaohongshuAutomation() {
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
 
         // 2. 🔥 调用 MCP Router 的完整 logout 端点（清理所有Cookie文件，包括Go后端的 /app/data/cookies.json）
-        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/api/xiaohongshu/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId: xhsUserId }),
-        });
+        const logoutUrl = `${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/api/xiaohongshu/logout`;
+        console.log(`🔄 [Logout] 准备调用 logout API: ${logoutUrl}`);
+        console.log(`🔄 [Logout] userId: ${xhsUserId}`);
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log('✅ [Logout] MCP Router 完整清理成功:', result);
-          console.log('🔒 [Logout] 所有Cookie文件已删除，包括Go后端的cookies.json');
-        } else {
-          console.error('❌ [Logout] MCP Router 清理失败');
+        try {
+          const response = await fetch(logoutUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userId: xhsUserId }),
+          });
+
+          console.log(`📊 [Logout] Response status: ${response.status}`);
+          console.log(`📊 [Logout] Response ok: ${response.ok}`);
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('✅ [Logout] MCP Router 完整清理成功:', result);
+            console.log('🔒 [Logout] 所有Cookie文件已删除，包括Go后端的cookies.json');
+          } else {
+            const errorText = await response.text();
+            console.error('❌ [Logout] MCP Router 清理失败');
+            console.error('❌ [Logout] Response status:', response.status);
+            console.error('❌ [Logout] Response body:', errorText);
+          }
+        } catch (fetchError) {
+          console.error('❌ [Logout] Fetch 调用失败:', fetchError);
+          console.error('❌ [Logout] 错误详情:', fetchError instanceof Error ? fetchError.message : String(fetchError));
         }
       }
 
