@@ -8,6 +8,8 @@ import { LoginSection } from '@/components/xiaohongshu/LoginSection';
 import { ConfigSection } from '@/components/xiaohongshu/ConfigSection';
 import { DashboardSection } from '@/components/xiaohongshu/DashboardSection';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle } from 'lucide-react';
 import type { UserProfile, AutomationStatus, ContentStrategy, WeeklyPlan } from '@/types/xiaohongshu';
 
@@ -493,6 +495,56 @@ export default function XiaohongshuAutomation() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
+        )}
+
+        {/* 🔥 全局顶部工具栏 - 始终可见 */}
+        {supabaseUuid && xhsUserId && (
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center">
+                    <span className={`w-2 h-2 rounded-full mr-2 ${
+                      currentStep === 'dashboard' ? 'bg-green-400' :
+                      currentStep === 'config' ? 'bg-yellow-400 animate-pulse' :
+                      'bg-gray-400 animate-pulse'
+                    }`}></span>
+                    <span className={`text-sm ${
+                      currentStep === 'dashboard' ? 'text-green-600 font-medium' :
+                      currentStep === 'config' ? 'text-yellow-600' :
+                      'text-gray-600'
+                    }`}>
+                      {currentStep === 'dashboard' ? '运营中' :
+                       currentStep === 'config' ? '配置中' :
+                       '未登录'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {currentStep === 'dashboard' && (
+                    <Button
+                      onClick={handleReconfigure}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      ⚙️ 重新配置
+                    </Button>
+                  )}
+                  {currentStep !== 'login' && (
+                    <Button
+                      onClick={handleLogout}
+                      variant="destructive"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      🚪 退出登录
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Content */}
