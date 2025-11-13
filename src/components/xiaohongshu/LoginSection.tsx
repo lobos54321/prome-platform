@@ -29,7 +29,8 @@ export function LoginSection({
   const [showCookieForm, setShowCookieForm] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [logoutProtection, setLogoutProtection] = useState(false);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(15);
+  const [countdownTotal, setCountdownTotal] = useState(15);
 
   useEffect(() => {
     checkLoginStatus();
@@ -44,7 +45,7 @@ export function LoginSection({
         if (prev <= 1) {
           setLogoutProtection(false);
           clearInterval(interval);
-          return 60;
+          return countdownTotal;
         }
         return prev - 1;
       });
@@ -87,7 +88,9 @@ export function LoginSection({
       const response = await xiaohongshuAPI.checkLogoutStatus(xhsUserId);
       if (response.data?.inProtection) {
         setLogoutProtection(true);
-        setCountdown(response.data.remainingSeconds);
+        const sec = response.data.remainingSeconds || 15;
+        setCountdown(sec);
+        setCountdownTotal(sec);
       }
     } catch (error) {
       console.error('Check logout protection error:', error);
@@ -172,7 +175,8 @@ export function LoginSection({
       // 🔥 4. 清除前端状态
       setIsLoggedIn(false);
       setLogoutProtection(true);
-      setCountdown(60);
+      setCountdown(15);
+      setCountdownTotal(15);
       
       // 🔥 5. 清除 localStorage 中的小红书相关数据
       console.log('🧹 [Logout] 清除 localStorage...');
@@ -247,7 +251,7 @@ export function LoginSection({
                   <div className="w-full bg-orange-200 rounded-full h-2 mt-2">
                     <div
                       className="bg-orange-500 h-2 rounded-full transition-all duration-1000"
-                      style={{ width: `${(countdown / 60) * 100}%` }}
+                      style={{ width: `${(countdown / countdownTotal) * 100}%` }}
                     ></div>
                   </div>
                 </div>
@@ -299,6 +303,21 @@ export function LoginSection({
                         '🚀 一键自动登录'
                       )}
                     </Button>
+                    {logoutProtection && (
+                      <Button
+                        onClick={async () => {
+                          try {
+                            const r = await xiaohongshuAPI.resetLogoutProtection(xhsUserId);
+                            setLogoutProtection(false);
+                            setCountdown(countdownTotal);
+                          } catch (e) {}
+                        }}
+                        variant="outline"
+                        disabled={checking}
+                      >
+                        立即解除保护
+                      </Button>
+                    )}
                     <Button
                       onClick={() => setShowCookieForm(true)}
                       variant="outline"
