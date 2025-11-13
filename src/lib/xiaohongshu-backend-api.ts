@@ -17,7 +17,7 @@ import { NetworkError, TimeoutError, APIError } from './xiaohongshu-errors';
  * xiaohongshumcp 后端 API 服务
  */
 export class XiaohongshuBackendAPI {
-  private readonly baseURL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+  private readonly baseURL = ((import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app').replace(/\/$/, '');
   private readonly timeout = 30000; // 30秒
 
   /**
@@ -27,7 +27,7 @@ export class XiaohongshuBackendAPI {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<APIResponse<T>> {
-    const fullURL = `${this.baseURL}${endpoint}`;
+    const fullURL = new URL(endpoint, this.baseURL).toString();
     const method = options.method || 'GET';
     
     // 🔍 详细请求日志
@@ -37,14 +37,10 @@ export class XiaohongshuBackendAPI {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(fullURL, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      });
+      const headers: Record<string, string> = { ...(options.headers as any) };
+      // 仅在有body时设置Content-Type，避免部分GET接口返回HTML
+      if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+      const response = await fetch(fullURL, { ...options, signal: controller.signal, headers });
 
       clearTimeout(timeoutId);
 
@@ -60,6 +56,12 @@ export class XiaohongshuBackendAPI {
         );
       }
 
+      const ct = response.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        const text = await response.text();
+        console.error(`❌ [BackendAPI] Non-JSON response`, { url: fullURL, status: response.status, contentType: ct, preview: text.slice(0, 200) });
+        throw new Error('响应不是JSON，请检查后端域名或路径');
+      }
       const data = await response.json();
       console.log(`✅ [BackendAPI] Success:`, data);
       return data;
@@ -98,7 +100,7 @@ export class XiaohongshuBackendAPI {
    */
   async checkLoginStatus(userId: string): Promise<LoginStatus> {
     const response = await this.request<any>(
-      `/api/xiaohongshu/login/status?userId=${encodeURIComponent(userId)}&force_qr=1`,
+      `/agent/xiaohongshu/login/status?userId=${encodeURIComponent(userId)}`,
       { method: 'GET' }
     );
     
@@ -123,16 +125,15 @@ export class XiaohongshuBackendAPI {
    */
   async autoLogin(userId: string): Promise<QRCodeData> {
     const response = await this.request<any>(
-      `/api/xiaohongshu/login/qrcode?userId=${encodeURIComponent(userId)}&force_qr=1`,
-      { method: 'GET' }
+      '/agent/xiaohongshu/auto-login',
+      { method: 'POST', body: JSON.stringify({ userId }) }
     );
     
     // 适配后端响应结构：
     // this.request直接返回response body
     // 后端返回: { success: true, data: { qrcode_url: "..." }, message: "..." }
-    if (response && (response.data?.img || response.img)) {
-      const img = response.data?.img || response.img;
-      return { success: true, qrCode: img, message: response.message || '请扫码登录' };
+    if (response.success && response.data?.qrcode_url) {
+      return { success: true, qrCode: response.data.qrcode_url, message: response.message || '请扫码登录' };
     }
     
     // 失败情况
