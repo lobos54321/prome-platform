@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 interface AutoLoginModalProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface AutoLoginModalProps {
   onLoginSuccess: () => void;
   onClose: () => void;
 }
+
+type LoginStage = 'qrcode' | 'verification' | 'success';
 
 export function AutoLoginModal({
   isOpen,
@@ -22,17 +25,39 @@ export function AutoLoginModal({
   const [statusMessage, setStatusMessage] = useState('请使用小红书App扫描二维码');
   const [timeoutSeconds, setTimeoutSeconds] = useState(120);
 
+  // 验证二维码状态
+  const [loginStage, setLoginStage] = useState<LoginStage>('qrcode');
+  const [verificationQRCode, setVerificationQRCode] = useState<string | null>(null);
+  const [verificationExpiresIn, setVerificationExpiresIn] = useState(60);
+
   const checkLoginStatus = useCallback(async () => {
     if (!xhsUserId || checking) return;
 
     try {
       setChecking(true);
       console.log('🔍 [AutoLoginModal] 开始检查登录状态...');
+
+      // 1. 先检查是否有验证二维码
+      const verifyData = await xiaohongshuAPI.getVerificationQRCode(xhsUserId);
+      console.log('🔐 [AutoLoginModal] 验证二维码检查结果:', verifyData);
+
+      if (verifyData.hasVerification && verifyData.qrcodeImage) {
+        console.log('⚠️ [AutoLoginModal] 检测到需要二次验证！');
+        setLoginStage('verification');
+        setVerificationQRCode(verifyData.qrcodeImage);
+        setVerificationExpiresIn(verifyData.expiresIn || 60);
+        setStatusMessage('⚠️ 需要二次验证，请扫描下方二维码');
+        setChecking(false);
+        return;
+      }
+
+      // 2. 检查登录状态
       const status = await xiaohongshuAPI.checkLoginStatus(xhsUserId);
       console.log('📊 [AutoLoginModal] 登录状态结果:', status);
-      
+
       if (status.isLoggedIn) {
         console.log('✅ [AutoLoginModal] 检测到登录成功！');
+        setLoginStage('success');
         setStatusMessage('✅ 登录成功！');
         setTimeout(() => {
           onLoginSuccess();
@@ -40,7 +65,9 @@ export function AutoLoginModal({
         }, 1000);
       } else {
         console.log('⏳ [AutoLoginModal] 还未登录，继续等待...');
-        setStatusMessage('等待扫码登录...');
+        if (loginStage === 'qrcode') {
+          setStatusMessage('等待扫码登录...');
+        }
       }
     } catch (error) {
       console.error('❌ [AutoLoginModal] Check login status error:', error);
@@ -48,13 +75,25 @@ export function AutoLoginModal({
     } finally {
       setChecking(false);
     }
-  }, [xhsUserId, checking, onLoginSuccess, onClose]);
+  }, [xhsUserId, checking, onLoginSuccess, onClose, loginStage]);
 
+  // 重置状态当 Modal 打开时
+  useEffect(() => {
+    if (isOpen) {
+      setLoginStage('qrcode');
+      setVerificationQRCode(null);
+      setVerificationExpiresIn(60);
+      setTimeoutSeconds(120);
+      setStatusMessage('请使用小红书App扫描二维码');
+    }
+  }, [isOpen]);
+
+  // 主轮询逻辑
   useEffect(() => {
     if (!isOpen || !xhsUserId) return;
 
-    const interval = setInterval(checkLoginStatus, 3000);
-    
+    const interval = setInterval(checkLoginStatus, 2000); // 改为2秒更快响应
+
     const timeout = setTimeout(() => {
       setStatusMessage('⏰ 二维码已过期，请重新获取');
       clearInterval(interval);
@@ -77,24 +116,65 @@ export function AutoLoginModal({
     };
   }, [isOpen, xhsUserId, checkLoginStatus]);
 
+  // 验证二维码倒计时
+  useEffect(() => {
+    if (loginStage !== 'verification') return;
+
+    const verifyCountdown = setInterval(() => {
+      setVerificationExpiresIn((prev) => {
+        if (prev <= 1) {
+          clearInterval(verifyCountdown);
+          setStatusMessage('⏰ 验证二维码已过期，请刷新页面重试');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(verifyCountdown);
+  }, [loginStage]);
+
+  // 当前显示的二维码
+  const currentQRCode = loginStage === 'verification' ? verificationQRCode : qrCode;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-bold text-purple-700">
-            📱 扫码登录
+            {loginStage === 'verification' ? '🔐 安全验证' : '📱 扫码登录'}
           </DialogTitle>
           <DialogDescription className="text-center">
-            请使用小红书App扫描下方二维码
+            {loginStage === 'verification'
+              ? '检测到需要二次验证，请扫描下方二维码'
+              : '请使用小红书App扫描下方二维码'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {qrCode ? (
-            <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center min-h-[300px]">
-              <img 
-                src={qrCode} 
-                alt="登录二维码" 
+          {/* 验证二维码警告 */}
+          {loginStage === 'verification' && (
+            <Alert className="bg-orange-50 border-orange-200">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">
+                <div className="space-y-1">
+                  <p className="font-medium">⚠️ 需要二次验证</p>
+                  <p className="text-sm">
+                    请在 <span className="font-bold text-red-600">{verificationExpiresIn}</span> 秒内扫描下方二维码完成验证
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* 二维码显示 */}
+          {currentQRCode ? (
+            <div className={`rounded-xl p-4 flex items-center justify-center min-h-[300px] ${
+              loginStage === 'verification' ? 'bg-orange-50 border-2 border-orange-300' : 'bg-gray-100'
+            }`}>
+              <img
+                src={currentQRCode}
+                alt={loginStage === 'verification' ? '验证二维码' : '登录二维码'}
                 className="max-w-full max-h-[280px] rounded-lg"
               />
             </div>
@@ -106,14 +186,30 @@ export function AutoLoginModal({
 
           <div className="text-center space-y-2">
             <p className={`text-sm font-medium ${
-              statusMessage.includes('成功') ? 'text-green-600' : 
-              statusMessage.includes('过期') || statusMessage.includes('失败') ? 'text-red-600' : 
+              statusMessage.includes('成功') ? 'text-green-600' :
+              statusMessage.includes('过期') || statusMessage.includes('失败') ? 'text-red-600' :
+              loginStage === 'verification' ? 'text-orange-600' :
               'text-gray-600'
             }`}>
               {statusMessage}
             </p>
-            
-            {timeoutSeconds > 0 && !statusMessage.includes('成功') && (
+
+            {/* 倒计时显示 */}
+            {loginStage === 'verification' && verificationExpiresIn > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-red-600 font-bold">
+                  ⏰ 验证二维码剩余: {verificationExpiresIn} 秒
+                </p>
+                <div className="w-full bg-orange-200 rounded-full h-2">
+                  <div
+                    className="bg-orange-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${(verificationExpiresIn / 60) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            {loginStage === 'qrcode' && timeoutSeconds > 0 && !statusMessage.includes('成功') && (
               <p className="text-xs text-gray-500">
                 二维码有效期: {Math.floor(timeoutSeconds / 60)}:{(timeoutSeconds % 60).toString().padStart(2, '0')}
               </p>

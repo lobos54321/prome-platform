@@ -96,6 +96,38 @@ export class XiaohongshuBackendAPI {
   // ============================================
 
   /**
+   * 获取验证二维码（二次验证）
+   * 当登录需要二次验证时，获取验证页面的二维码
+   */
+  async getVerificationQRCode(userId: string): Promise<{
+    hasVerification: boolean;
+    qrcodeImage?: string;
+    expiresIn?: number;
+    message?: string;
+  }> {
+    try {
+      const response = await this.request<any>(
+        `/api/xiaohongshu/login/verification-qrcode?userId=${encodeURIComponent(userId)}`,
+        { method: 'GET' }
+      );
+
+      if (response.success && response.data) {
+        return {
+          hasVerification: response.data.hasVerification || false,
+          qrcodeImage: response.data.qrcodeImage || response.data.qrcode_image,
+          expiresIn: response.data.expiresIn || response.data.expires_in,
+          message: response.data.message,
+        };
+      }
+
+      return { hasVerification: false };
+    } catch (error) {
+      console.error('❌ [BackendAPI] 获取验证二维码失败:', error);
+      return { hasVerification: false };
+    }
+  }
+
+  /**
    * 检查登录状态
    */
   async checkLoginStatus(userId: string): Promise<LoginStatus> {
