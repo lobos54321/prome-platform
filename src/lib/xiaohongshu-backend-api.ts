@@ -107,7 +107,7 @@ export class XiaohongshuBackendAPI {
   }> {
     try {
       const response = await this.request<any>(
-        `/api/v1/login/verification-qrcode?userId=${encodeURIComponent(userId)}`,
+        `/api/xiaohongshu/login/verification-qrcode?userId=${encodeURIComponent(userId)}`,
         { method: 'GET' }
       );
 
@@ -132,7 +132,7 @@ export class XiaohongshuBackendAPI {
    */
   async checkLoginStatus(userId: string): Promise<LoginStatus> {
     const response = await this.request<any>(
-      `/api/v1/login/status?userId=${encodeURIComponent(userId)}`,
+      `/api/xiaohongshu/login/status?userId=${encodeURIComponent(userId)}&force_qr=1`,
       { method: 'GET' }
     );
     
@@ -157,7 +157,7 @@ export class XiaohongshuBackendAPI {
    */
   async autoLogin(userId: string): Promise<QRCodeData> {
     const response = await this.request<any>(
-      `/api/v1/login/qrcode?userId=${encodeURIComponent(userId)}`,
+      `/api/xiaohongshu/login/qrcode?userId=${encodeURIComponent(userId)}&force_qr=1`,
       { method: 'GET' }
     );
     
