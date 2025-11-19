@@ -100,13 +100,15 @@ export function AutoLoginModal({
           }
           setVerificationQRCode(verifyData.qrcodeImage);
           setStatusMessage('⚠️ 需要安全验证，请扫描下方二维码');
-        } else if (loginStage === 'verification') {
-          // 验证二维码消失了，说明用户已经扫描验证二维码
-          // 但不代表登录成功，继续等待登录状态检查
-          console.log('ℹ️ [AutoLoginModal] 验证二维码已消失，等待登录完成...');
-          setStatusMessage('验证已完成，等待登录...');
-          // 保持在验证阶段，不要重新获取登录二维码
         } else {
+          // 验证二维码不存在或已消失
+          if (loginStage === 'verification') {
+            // 之前在验证阶段，但现在验证二维码消失了
+            // 可能是：1) 验证已完成 2) 验证二维码过期 3) 根本不需要验证
+            console.log('ℹ️ [AutoLoginModal] 验证二维码已消失，切换回登录等待状态');
+            setLoginStage('qrcode'); // 回到正常登录等待状态
+            setVerificationQRCode(null);
+          }
           // 普通等待状态
           setStatusMessage('等待扫码登录...');
         }
