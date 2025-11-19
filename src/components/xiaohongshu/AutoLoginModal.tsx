@@ -99,8 +99,21 @@ export function AutoLoginModal({
           await fetchLoginQRCode();
         }
       } else {
-        console.log('⏳ [AutoLoginModal] 还未登录，继续等待...');
-        if (loginStage === 'qrcode') {
+        // 登录阶段：也要检查是否出现了验证二维码
+        console.log('⏳ [AutoLoginModal] 还未登录，检查是否需要验证...');
+
+        // 检查是否出现了验证二维码
+        const verifyData = await xiaohongshuAPI.getVerificationQRCode(xhsUserId);
+        console.log('🔍 [AutoLoginModal] 检查验证二维码:', verifyData);
+
+        if (verifyData.hasVerification && verifyData.qrcodeImage) {
+          // 检测到需要验证，切换到验证阶段
+          console.log('⚠️ [AutoLoginModal] 检测到需要验证！切换到验证阶段');
+          setLoginStage('verification');
+          setVerificationQRCode(verifyData.qrcodeImage);
+          setVerificationExpiresIn(60);
+          setStatusMessage('⚠️ 需要安全验证，请扫描下方二维码');
+        } else {
           setStatusMessage('等待扫码登录...');
         }
       }
