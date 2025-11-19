@@ -86,34 +86,28 @@ export function AutoLoginModal({
           onLoginSuccess();
           onClose();
         }, 1000);
-      } else if (loginStage === 'verification') {
-        // 验证阶段：检查验证是否完成
-        // 如果验证二维码消失了，说明验证成功，需要获取登录二维码
-        const verifyData = await xiaohongshuAPI.getVerificationQRCode(xhsUserId);
-        console.log('🔐 [AutoLoginModal] 验证状态检查:', verifyData);
-
-        if (!verifyData.hasVerification) {
-          // 验证完成，重新获取登录二维码
-          console.log('✅ [AutoLoginModal] 验证完成！获取登录二维码...');
-          setStatusMessage('✅ 验证成功！正在获取登录二维码...');
-          await fetchLoginQRCode();
-        }
       } else {
-        // 登录阶段：也要检查是否出现了验证二维码
-        console.log('⏳ [AutoLoginModal] 还未登录，检查是否需要验证...');
-
-        // 检查是否出现了验证二维码
+        // 无论在哪个阶段，都要检查是否需要验证
         const verifyData = await xiaohongshuAPI.getVerificationQRCode(xhsUserId);
-        console.log('🔍 [AutoLoginModal] 检查验证二维码:', verifyData);
+        console.log('🔍 [AutoLoginModal] 检查验证状态:', verifyData);
 
         if (verifyData.hasVerification && verifyData.qrcodeImage) {
           // 检测到需要验证，切换到验证阶段
-          console.log('⚠️ [AutoLoginModal] 检测到需要验证！切换到验证阶段');
-          setLoginStage('verification');
+          if (loginStage !== 'verification') {
+            console.log('⚠️ [AutoLoginModal] 检测到需要验证！切换到验证阶段');
+            setLoginStage('verification');
+            setVerificationExpiresIn(60);
+          }
           setVerificationQRCode(verifyData.qrcodeImage);
-          setVerificationExpiresIn(60);
           setStatusMessage('⚠️ 需要安全验证，请扫描下方二维码');
+        } else if (loginStage === 'verification') {
+          // 验证二维码消失了，说明用户已经扫描验证二维码
+          // 但不代表登录成功，继续等待登录状态检查
+          console.log('ℹ️ [AutoLoginModal] 验证二维码已消失，等待登录完成...');
+          setStatusMessage('验证已完成，等待登录...');
+          // 保持在验证阶段，不要重新获取登录二维码
         } else {
+          // 普通等待状态
           setStatusMessage('等待扫码登录...');
         }
       }
