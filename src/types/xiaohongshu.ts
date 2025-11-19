@@ -47,6 +47,9 @@ export interface QRCodeData {
   qrCode?: string;
   qrId?: string;
   message?: string;
+  // 验证二维码相关字段（预登录人机验证）
+  hasVerification?: boolean;
+  verificationQrCode?: string;
 }
 
 // ============================================

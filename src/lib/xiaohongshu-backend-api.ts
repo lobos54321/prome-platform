@@ -163,12 +163,23 @@ export class XiaohongshuBackendAPI {
     
     // 适配后端响应结构：
     // this.request直接返回response body
-    // 后端返回: { success: true, data: { qrcode_url: "..." }, message: "..." }
+    // 后端返回: { success: true, data: { img: "...", has_verification: bool, verification_img: "..." }, message: "..." }
     if (response && (response.data?.img || response.img)) {
-      const img = response.data?.img || response.img;
-      return { success: true, qrCode: img, message: response.message || '请扫码登录' };
+      const data = response.data || response;
+      const img = data.img;
+      const hasVerification = data.has_verification || false;
+      const verificationImg = data.verification_img;
+
+      return {
+        success: true,
+        qrCode: img,
+        message: response.message || '请扫码登录',
+        // 验证二维码相关字段
+        hasVerification,
+        verificationQrCode: verificationImg,
+      };
     }
-    
+
     // 失败情况
     return {
       success: false,
