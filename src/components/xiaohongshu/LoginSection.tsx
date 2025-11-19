@@ -28,6 +28,8 @@ export function LoginSection({
   const [showQRModal, setShowQRModal] = useState(false);
   const [showCookieForm, setShowCookieForm] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [initialVerificationQrCode, setInitialVerificationQrCode] = useState<string | null>(null);
+  const [hasInitialVerification, setHasInitialVerification] = useState(false);
   const [logoutProtection, setLogoutProtection] = useState(false);
   const [countdown, setCountdown] = useState(15);
   const [countdownTotal, setCountdownTotal] = useState(15);
@@ -112,9 +114,20 @@ export function LoginSection({
     try {
       setChecking(true);
       const response = await xiaohongshuAPI.autoLogin(xhsUserId);
-      
+
       if (response.success && response.qrCode) {
         setQrCode(response.qrCode);
+
+        // 检查是否有验证二维码
+        if (response.hasVerification && response.verificationQrCode) {
+          console.log('🔐 [LoginSection] 检测到需要验证二维码');
+          setInitialVerificationQrCode(response.verificationQrCode);
+          setHasInitialVerification(true);
+        } else {
+          setInitialVerificationQrCode(null);
+          setHasInitialVerification(false);
+        }
+
         setShowQRModal(true);
       } else {
         onError(response.message || '获取二维码失败');
@@ -342,6 +355,8 @@ export function LoginSection({
         xhsUserId={xhsUserId}
         onLoginSuccess={handleQRLoginSuccess}
         onClose={() => setShowQRModal(false)}
+        initialVerificationQrCode={initialVerificationQrCode}
+        hasInitialVerification={hasInitialVerification}
       />
 
       <ManualCookieForm

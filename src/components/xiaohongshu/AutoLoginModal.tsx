@@ -10,6 +10,8 @@ interface AutoLoginModalProps {
   xhsUserId: string;
   onLoginSuccess: () => void;
   onClose: () => void;
+  initialVerificationQrCode?: string | null;
+  hasInitialVerification?: boolean;
 }
 
 type LoginStage = 'qrcode' | 'verification' | 'success';
@@ -20,6 +22,8 @@ export function AutoLoginModal({
   xhsUserId,
   onLoginSuccess,
   onClose,
+  initialVerificationQrCode,
+  hasInitialVerification,
 }: AutoLoginModalProps) {
   const [checking, setChecking] = useState(false);
   const [statusMessage, setStatusMessage] = useState('请使用小红书App扫描二维码');
@@ -111,13 +115,25 @@ export function AutoLoginModal({
   // 重置状态当 Modal 打开时
   useEffect(() => {
     if (isOpen) {
-      setLoginStage('qrcode');
-      setVerificationQRCode(null);
-      setVerificationExpiresIn(60);
-      setTimeoutSeconds(120);
-      setStatusMessage('请使用小红书App扫描二维码');
+      // 检查是否有初始验证二维码
+      if (hasInitialVerification && initialVerificationQrCode) {
+        console.log('🔐 [AutoLoginModal] 初始化为验证阶段');
+        setLoginStage('verification');
+        setVerificationQRCode(initialVerificationQrCode);
+        setVerificationExpiresIn(60);
+        setTimeoutSeconds(120);
+        setStatusMessage('⚠️ 请先扫描验证二维码完成安全验证');
+      } else {
+        console.log('📱 [AutoLoginModal] 初始化为登录阶段');
+        setLoginStage('qrcode');
+        setVerificationQRCode(null);
+        setVerificationExpiresIn(60);
+        setTimeoutSeconds(120);
+        setStatusMessage('请使用小红书App扫描二维码登录');
+      }
+      setCurrentLoginQRCode(null);
     }
-  }, [isOpen]);
+  }, [isOpen, hasInitialVerification, initialVerificationQrCode]);
 
   // 主轮询逻辑
   useEffect(() => {
