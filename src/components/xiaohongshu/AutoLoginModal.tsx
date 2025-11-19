@@ -30,6 +30,36 @@ export function AutoLoginModal({
   const [verificationQRCode, setVerificationQRCode] = useState<string | null>(null);
   const [verificationExpiresIn, setVerificationExpiresIn] = useState(60);
 
+  // 当前显示的登录二维码（可能会在验证后更新）
+  const [currentLoginQRCode, setCurrentLoginQRCode] = useState<string | null>(null);
+
+  // 重新获取登录二维码（验证成功后调用）
+  const fetchLoginQRCode = useCallback(async () => {
+    try {
+      console.log('🔄 [AutoLoginModal] 重新获取登录二维码...');
+      const response = await xiaohongshuAPI.autoLogin(xhsUserId);
+
+      if (response.success && response.qrCode) {
+        console.log('✅ [AutoLoginModal] 获取到新的登录二维码');
+        setCurrentLoginQRCode(response.qrCode);
+        setLoginStage('qrcode');
+        setStatusMessage('请使用小红书App扫描二维码登录');
+        setTimeoutSeconds(120);
+
+        // 检查新响应中是否还有验证码
+        if (response.hasVerification && response.verificationQrCode) {
+          console.log('⚠️ [AutoLoginModal] 检测到需要验证！');
+          setLoginStage('verification');
+          setVerificationQRCode(response.verificationQrCode);
+          setVerificationExpiresIn(60);
+          setStatusMessage('⚠️ 需要验证，请扫描下方二维码');
+        }
+      }
+    } catch (error) {
+      console.error('❌ [AutoLoginModal] 获取登录二维码失败:', error);
+    }
+  }, [xhsUserId]);
+
   const checkLoginStatus = useCallback(async () => {
     if (!xhsUserId || checking) return;
 
@@ -37,21 +67,7 @@ export function AutoLoginModal({
       setChecking(true);
       console.log('🔍 [AutoLoginModal] 开始检查登录状态...');
 
-      // 1. 先检查是否有验证二维码
-      const verifyData = await xiaohongshuAPI.getVerificationQRCode(xhsUserId);
-      console.log('🔐 [AutoLoginModal] 验证二维码检查结果:', verifyData);
-
-      if (verifyData.hasVerification && verifyData.qrcodeImage) {
-        console.log('⚠️ [AutoLoginModal] 检测到需要二次验证！');
-        setLoginStage('verification');
-        setVerificationQRCode(verifyData.qrcodeImage);
-        setVerificationExpiresIn(verifyData.expiresIn || 60);
-        setStatusMessage('⚠️ 需要二次验证，请扫描下方二维码');
-        setChecking(false);
-        return;
-      }
-
-      // 2. 检查登录状态
+      // 检查登录状态
       const status = await xiaohongshuAPI.checkLoginStatus(xhsUserId);
       console.log('📊 [AutoLoginModal] 登录状态结果:', status);
 
@@ -63,6 +79,18 @@ export function AutoLoginModal({
           onLoginSuccess();
           onClose();
         }, 1000);
+      } else if (loginStage === 'verification') {
+        // 验证阶段：检查验证是否完成
+        // 如果验证二维码消失了，说明验证成功，需要获取登录二维码
+        const verifyData = await xiaohongshuAPI.getVerificationQRCode(xhsUserId);
+        console.log('🔐 [AutoLoginModal] 验证状态检查:', verifyData);
+
+        if (!verifyData.hasVerification) {
+          // 验证完成，重新获取登录二维码
+          console.log('✅ [AutoLoginModal] 验证完成！获取登录二维码...');
+          setStatusMessage('✅ 验证成功！正在获取登录二维码...');
+          await fetchLoginQRCode();
+        }
       } else {
         console.log('⏳ [AutoLoginModal] 还未登录，继续等待...');
         if (loginStage === 'qrcode') {
@@ -75,7 +103,7 @@ export function AutoLoginModal({
     } finally {
       setChecking(false);
     }
-  }, [xhsUserId, checking, onLoginSuccess, onClose, loginStage]);
+  }, [xhsUserId, checking, onLoginSuccess, onClose, loginStage, fetchLoginQRCode]);
 
   // 重置状态当 Modal 打开时
   useEffect(() => {
@@ -135,7 +163,10 @@ export function AutoLoginModal({
   }, [loginStage]);
 
   // 当前显示的二维码
-  const currentQRCode = loginStage === 'verification' ? verificationQRCode : qrCode;
+  // 优先使用动态获取的登录二维码（验证成功后更新），否则使用初始prop
+  const currentQRCode = loginStage === 'verification'
+    ? verificationQRCode
+    : (currentLoginQRCode || qrCode);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
