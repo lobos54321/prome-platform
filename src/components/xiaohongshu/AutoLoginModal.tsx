@@ -41,10 +41,13 @@ export function AutoLoginModal({
 
       if (response.success && response.qrCode) {
         console.log('✅ [AutoLoginModal] 获取到新的登录二维码');
+        // 清除验证二维码，显示登录二维码
+        setVerificationQRCode(null);
         setCurrentLoginQRCode(response.qrCode);
         setLoginStage('qrcode');
         setStatusMessage('请使用小红书App扫描二维码登录');
         setTimeoutSeconds(120);
+        setVerificationExpiresIn(60); // 重置验证倒计时
 
         // 检查新响应中是否还有验证码
         if (response.hasVerification && response.verificationQrCode) {

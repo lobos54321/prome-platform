@@ -111,12 +111,25 @@ export class XiaohongshuBackendAPI {
         { method: 'GET' }
       );
 
-      if (response.success && response.data) {
+      // 后端返回格式: { available: bool, img: string, message: string }
+      const data = response.success ? (response.data || response) : response;
+
+      if (data) {
+        // 映射后端字段到前端字段
+        const hasVerification = data.available || data.hasVerification || false;
+        const qrcodeImage = data.img || data.qrcodeImage || data.qrcode_image;
+
+        console.log('🔐 [BackendAPI] 验证二维码响应:', {
+          available: data.available,
+          hasVerification,
+          hasImg: !!qrcodeImage
+        });
+
         return {
-          hasVerification: response.data.hasVerification || false,
-          qrcodeImage: response.data.qrcodeImage || response.data.qrcode_image,
-          expiresIn: response.data.expiresIn || response.data.expires_in,
-          message: response.data.message,
+          hasVerification,
+          qrcodeImage,
+          expiresIn: data.expiresIn || data.expires_in,
+          message: data.message,
         };
       }
 
