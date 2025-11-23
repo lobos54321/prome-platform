@@ -21,8 +21,8 @@ export class XhsWorkerClient {
     private secret: string;
 
     constructor() {
-        this.baseUrl = process.env.XHS_WORKER_URL || "";
-        this.secret = process.env.XHS_WORKER_SECRET || "";
+        this.baseUrl = import.meta.env.VITE_XHS_WORKER_URL || "";
+        this.secret = import.meta.env.VITE_XHS_WORKER_SECRET || "";
 
         if (!this.baseUrl) console.warn("⚠️ XHS_WORKER_URL not set!");
     }
