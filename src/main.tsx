@@ -4,6 +4,7 @@ import App from './App.tsx'
 import './index.css'
 
 // 直接渲染应用，不在这里初始化认证
+console.log('🚀 [main.tsx] Entry point executing...');
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

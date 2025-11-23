@@ -13,7 +13,8 @@ interface LoginSectionProps {
   xhsUserId: string;
   onLoginSuccess: () => void;
   onError: (error: string) => void;
-  onLogout?: () => void; // 🔥 新增：退出登录回调
+  onLogout?: () => void;
+  justLoggedOut?: boolean; // 🔥 新增
 }
 
 export function LoginSection({
@@ -21,9 +22,10 @@ export function LoginSection({
   xhsUserId,
   onLoginSuccess,
   onError,
-  onLogout, // 🔥 新增
+  onLogout,
+  justLoggedOut = false, // 🔥 默认为 false
 }: LoginSectionProps) {
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(!justLoggedOut); // 🔥 如果刚退出，初始不检查
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showCookieForm, setShowCookieForm] = useState(false);
@@ -35,9 +37,15 @@ export function LoginSection({
   const [countdownTotal, setCountdownTotal] = useState(15);
 
   useEffect(() => {
+    // 🔥 如果刚退出登录，跳过初始检查
+    if (justLoggedOut) {
+      console.log('🛑 [LoginSection] 刚退出登录，跳过初始检查');
+      setChecking(false);
+      return;
+    }
     checkLoginStatus();
     checkLogoutProtection();
-  }, [xhsUserId]);
+  }, [xhsUserId, justLoggedOut]);
 
   useEffect(() => {
     if (!logoutProtection) return;
@@ -60,7 +68,7 @@ export function LoginSection({
     try {
       setChecking(true);
       const status = await xiaohongshuAPI.checkLoginStatus(xhsUserId);
-      
+
       if (status.isLoggedIn) {
         setIsLoggedIn(true);
         await xiaohongshuSupabase.addActivityLog({
@@ -112,10 +120,15 @@ export function LoginSection({
 
   const handleAutoLogin = async () => {
     try {
+      console.log('🎯 [LoginSection] handleAutoLogin 被调用，userId:', xhsUserId);
       setChecking(true);
+
+      console.log('📡 [LoginSection] 正在调用 xiaohongshuAPI.autoLogin...');
       const response = await xiaohongshuAPI.autoLogin(xhsUserId);
+      console.log('📥 [LoginSection] autoLogin 响应:', response);
 
       if (response.success && response.qrCode) {
+        console.log('✅ [LoginSection] 获取到二维码，长度:', response.qrCode?.length);
         setQrCode(response.qrCode);
 
         // 检查是否有验证二维码
@@ -124,15 +137,19 @@ export function LoginSection({
           setInitialVerificationQrCode(response.verificationQrCode);
           setHasInitialVerification(true);
         } else {
+          console.log('ℹ️ [LoginSection] 无需验证二维码');
           setInitialVerificationQrCode(null);
           setHasInitialVerification(false);
         }
 
+        console.log('🚪 [LoginSection] 打开二维码模态框');
         setShowQRModal(true);
       } else {
+        console.error('❌ [LoginSection] autoLogin 返回失败:', response.message);
         onError(response.message || '获取二维码失败');
       }
     } catch (error) {
+      console.error('❌ [LoginSection] autoLogin 异常:', error);
       onError(error instanceof Error ? error.message : '自动登录失败');
     } finally {
       setChecking(false);
@@ -156,17 +173,17 @@ export function LoginSection({
 
     try {
       console.log('🧹 [Logout] 开始强制清除所有Cookie和状态...');
-      
+
       // 🔥 1. 调用后端强制清除所有Cookie
       const backendAPI = new (await import('@/lib/xiaohongshu-backend-api')).XiaohongshuBackendAPI();
       const forceLogoutResult = await backendAPI.forceLogout(xhsUserId);
-      
+
       if (forceLogoutResult.success) {
         console.log('✅ [Logout] 后端强制清除成功');
       } else {
         console.warn('⚠️ [Logout] 后端强制清除失败，但继续前端清理');
       }
-      
+
       // 🔥 2. 清除 Supabase 数据（Strategy, Plan, Status）
       console.log('🧹 [Logout] 清除 Supabase 数据...');
       try {
@@ -175,7 +192,7 @@ export function LoginSection({
       } catch (supabaseError) {
         console.warn('⚠️ [Logout] Supabase 数据清除失败:', supabaseError);
       }
-      
+
       // 🔥 3. 记录退出日志
       await xiaohongshuSupabase.addActivityLog({
         supabase_uuid: supabaseUuid,
@@ -184,13 +201,13 @@ export function LoginSection({
         message: '用户退出登录（强制清除）',
         metadata: { forceCleanup: true },
       });
-      
+
       // 🔥 4. 清除前端状态
       setIsLoggedIn(false);
       setLogoutProtection(true);
       setCountdown(15);
       setCountdownTotal(15);
-      
+
       // 🔥 5. 清除 localStorage 中的小红书相关数据
       console.log('🧹 [Logout] 清除 localStorage...');
       const keysToRemove: string[] = [];
@@ -204,10 +221,10 @@ export function LoginSection({
         localStorage.removeItem(key);
         console.log(`🗑️ [Logout] 移除 localStorage: ${key}`);
       });
-      
+
       console.log('✅ [Logout] 退出登录完成，60秒保护期开始');
       console.log('⏰ [Logout] 60秒后可以重新登录');
-      
+
       // 🔥 6. 通知父组件刷新页面
       if (onLogout) {
         onLogout();
@@ -215,7 +232,7 @@ export function LoginSection({
         // 如果没有提供回调，直接刷新页面
         window.location.reload();
       }
-      
+
     } catch (error) {
       console.error('❌ [Logout] 退出登录失败:', error);
       onError('退出登录失败');
@@ -323,7 +340,7 @@ export function LoginSection({
                             const r = await xiaohongshuAPI.resetLogoutProtection(xhsUserId);
                             setLogoutProtection(false);
                             setCountdown(countdownTotal);
-                          } catch (e) {}
+                          } catch (e) { }
                         }}
                         variant="outline"
                         disabled={checking}

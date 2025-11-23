@@ -16,6 +16,13 @@ import type { UserProfile, AutomationStatus, ContentStrategy, WeeklyPlan } from 
 type Step = 'login' | 'config' | 'dashboard';
 
 export default function XiaohongshuAutomation() {
+  console.log('🚀 [XiaohongshuAutomation] 组件被调用');
+
+  // Emergency test mode check removed - always load full interface
+  console.log('🚀 [XiaohongshuAutomation] Loading full interface...');
+
+  console.log('⚠️ [XiaohongshuAutomation] 未进入emergency test mode，继续正常流程');
+
   const navigate = useNavigate();
   const user = authService.getCurrentUserSync();
 
@@ -30,8 +37,10 @@ export default function XiaohongshuAutomation() {
   const [automationStatus, setAutomationStatus] = useState<AutomationStatus | null>(null);
   const [contentStrategy, setContentStrategy] = useState<ContentStrategy | null>(null);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
+  const [justLoggedOut, setJustLoggedOut] = useState(false);
 
   useEffect(() => {
+    // Force test mode for now to allow access
     if (!user) {
       navigate('/login');
       return;
@@ -47,6 +56,17 @@ export default function XiaohongshuAutomation() {
       console.log('🚀 [XHS] 设置loading状态');
       setLoading(true);
       setError('');
+
+      // 🔥 测试模式：跳过所有API调用，直接显示登录界面
+      const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+      if (isTestMode) {
+        console.log('🧪 [XHS] 测试模式：跳过初始化API调用');
+        setSupabaseUuid('test-user-id');
+        setXhsUserId('test-xhs-user');
+        setLoading(false);
+        setCurrentStep('login');
+        return;
+      }
 
       console.log('🚀 [XHS] 检查用户登录状态, user:', user);
       if (!user?.id) {
@@ -106,7 +126,7 @@ export default function XiaohongshuAutomation() {
       } else {
         // Supabase没有运行状态，尝试从后端API检查是否有历史数据
         console.log('📊 Supabase无运行状态，检查后端是否有数据...');
-        
+
         try {
           // 尝试获取后端数据
           const [strategyRes, planRes] = await Promise.all([
@@ -119,10 +139,10 @@ export default function XiaohongshuAutomation() {
 
           // 🔥 注意：后端返回的是 {success, strategy} 或 {success, plan}，不是 {success, data}
           const hasBackendData = (strategyRes.success && (strategyRes as any).strategy) || (planRes.success && (planRes as any).plan);
-          
+
           if (hasBackendData) {
             console.log('✅ 后端有数据！但再次确认不在退出保护期...');
-            
+
             // 🔥 再次检查退出保护期（防御性检查）
             try {
               const logoutCheckAgain = await xiaohongshuAPI.checkLogoutStatus(userId);
@@ -136,7 +156,7 @@ export default function XiaohongshuAutomation() {
             } catch (err) {
               console.warn('⚠️ [XHS] 二次退出保护检查失败，继续加载数据');
             }
-            
+
             console.log('✅ 确认不在保护期，切换到Dashboard');
             // 🔥 后端有数据，直接显示Dashboard，不管Supabase中是否有profile
             if (strategyRes.success && (strategyRes as any).strategy) {
@@ -150,10 +170,10 @@ export default function XiaohongshuAutomation() {
               console.log('📅 [XHS] 设置plan数据:', plan);
               setWeeklyPlan(plan);
             }
-            
+
             // 🔥 强制显示dashboard - 因为后端是唯一数据源
             setCurrentStep('dashboard');
-            
+
             // 🔥 如果Supabase没有profile，创建一个虚拟profile以满足UI需要
             if (!profile) {
               console.log('📝 创建虚拟profile以支持Dashboard显示');
@@ -261,33 +281,33 @@ export default function XiaohongshuAutomation() {
       // 立即切换到dashboard并显示加载状态
       setCurrentStep('dashboard');
       setLoading(true);
-      
+
       // 显示提示信息
       alert('🚀 自动运营已启动！\n\n系统正在后台生成内容，这需要2-5分钟时间。\n\n页面将自动刷新数据，请耐心等待。');
-      
+
       // 等待5秒让后端开始处理
       await new Promise(resolve => setTimeout(resolve, 5000));
-      
+
       // 开始轮询数据 - 最多100次，每10秒一次 = 1000秒（约16分钟）
       const maxAttempts = 100;
       let attempts = 0;
-      
+
       const pollData = async (): Promise<boolean> => {
         attempts++;
         console.log(`🔄 [${new Date().toLocaleTimeString()}] 数据轮询第 ${attempts}/${maxAttempts} 次尝试`);
-        
+
         try {
           // 从后端API获取数据
           const statusRes = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/status/${xhsUserId}`);
-          
+
           if (statusRes.ok) {
             const statusData = await statusRes.json();
             console.log('✅ 获取到运营状态:', statusData);
-            
+
             if (statusData.success && statusData.data) {
               // 加载完整的Dashboard数据（传入xhsUserId以确保有值）
               await loadDashboardData(supabaseUuid, xhsUserId || undefined);
-              
+
               // 更新状态
               const status = await xiaohongshuSupabase.getAutomationStatus(supabaseUuid);
               if (status) {
@@ -302,20 +322,20 @@ export default function XiaohongshuAutomation() {
         } catch (err) {
           console.warn(`⚠️ 轮询失败 (${attempts}/${maxAttempts}):`, err);
         }
-        
+
         return false;
       };
-      
+
       // 第一次尝试
       const success = await pollData();
-      
+
       if (!success && attempts < maxAttempts) {
         // 如果第一次失败，继续轮询
         console.log('🔄 开始持续轮询，每10秒检查一次，最多持续1000秒');
-        
+
         const interval = setInterval(async () => {
           const result = await pollData();
-          
+
           if (result) {
             clearInterval(interval);
             setLoading(false);
@@ -326,7 +346,7 @@ export default function XiaohongshuAutomation() {
             alert('⚠️ 数据加载超时\n\n后台可能还在处理中，请稍后手动刷新页面查看。\n\n如果长时间没有数据，请检查后端日志。');
           }
         }, 10000); // 每10秒轮询一次
-        
+
         // 保存interval ID以便在组件卸载时清理
         return () => clearInterval(interval);
       } else if (success) {
@@ -335,7 +355,7 @@ export default function XiaohongshuAutomation() {
       } else {
         setLoading(false);
       }
-      
+
     } catch (err) {
       console.error('Handle start operation error:', err);
       setError('启动自动运营失败: ' + (err instanceof Error ? err.message : String(err)));
@@ -361,18 +381,18 @@ export default function XiaohongshuAutomation() {
 
     try {
       setLoading(true);
-      
+
       if (supabaseUuid && xhsUserId) {
         // 1. 清除Supabase数据
         console.log('🧹 清除Supabase数据...');
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
-        
+
         // 2. 调用后端重置自动运营（清除策略、计划等）
         console.log('🧹 调用后端重置API...');
         const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/reset/${xhsUserId}`, {
           method: 'POST',
         });
-        
+
         if (response.ok) {
           console.log('✅ 后端运营数据已清除');
         } else {
@@ -387,10 +407,10 @@ export default function XiaohongshuAutomation() {
       setContentStrategy(null);
       setWeeklyPlan(null);
       setCurrentStep('config');
-      
+
       console.log('✅ 重新配置完成，返回配置页面');
       alert('✅ 已清除运营数据！\n\n您可以重新配置产品信息。\n\n您的登录状态已保留，无需重新扫码。');
-      
+
     } catch (err) {
       console.error('Reconfigure error:', err);
       setError('重新配置失败: ' + (err instanceof Error ? err.message : String(err)));
@@ -400,9 +420,10 @@ export default function XiaohongshuAutomation() {
   };
 
   const handleLogout = async () => {
-    if (!confirm('确定要退出登录吗？这将清除所有本地数据和服务器端运营配置。')) {
-      return;
-    }
+    // 🔥 Remove double confirm - DashboardSection already confirms
+    // if (!confirm('确定要退出登录吗？这将清除所有本地数据和服务器端运营配置。')) {
+    //   return;
+    // }
 
     try {
       // 调用后端清除Cookie
@@ -412,10 +433,11 @@ export default function XiaohongshuAutomation() {
         // 1. 清除 Supabase 数据
         await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
 
-        // 2. 🔥 调用 Claude Agent Service 的 logout 端点（通过它调用 MCP Router 清理所有Cookie文件，包括Go后端的 /app/data/cookies.json）
-        const logoutUrl = `${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/logout`;
+        // 2. 🔥 调用 Claude Agent Service 的 logout 端点
+        // Use env var with localhost fallback for development
+        const apiUrl = process.env.VITE_XHS_API_URL || 'http://localhost:8080';
+        const logoutUrl = `${apiUrl}/agent/xiaohongshu/logout`;
         console.log(`🔄 [Logout] 准备调用 logout API: ${logoutUrl}`);
-        console.log(`🔄 [Logout] userId: ${xhsUserId}`);
 
         try {
           const response = await fetch(logoutUrl, {
@@ -426,22 +448,13 @@ export default function XiaohongshuAutomation() {
             body: JSON.stringify({ userId: xhsUserId }),
           });
 
-          console.log(`📊 [Logout] Response status: ${response.status}`);
-          console.log(`📊 [Logout] Response ok: ${response.ok}`);
-
           if (response.ok) {
-            const result = await response.json();
-            console.log('✅ [Logout] MCP Router 完整清理成功:', result);
-            console.log('🔒 [Logout] 所有Cookie文件已删除，包括Go后端的cookies.json');
+            console.log('✅ [Logout] MCP Router 完整清理成功');
           } else {
-            const errorText = await response.text();
             console.error('❌ [Logout] MCP Router 清理失败');
-            console.error('❌ [Logout] Response status:', response.status);
-            console.error('❌ [Logout] Response body:', errorText);
           }
         } catch (fetchError) {
           console.error('❌ [Logout] Fetch 调用失败:', fetchError);
-          console.error('❌ [Logout] 错误详情:', fetchError instanceof Error ? fetchError.message : String(fetchError));
         }
       }
 
@@ -455,20 +468,23 @@ export default function XiaohongshuAutomation() {
       setAutomationStatus(null);
       setContentStrategy(null);
       setWeeklyPlan(null);
+
+      // 🔥 关键修复：设置 justLoggedOut 标志，防止 LoginSection 自动重新登录
+      // 并且不要刷新页面，避免触发 initializePage 循环
+      setJustLoggedOut(true);
       setCurrentStep('login');
-
-      alert('已退出登录！\n\n⚠️ 为确保数据完全清理，页面将自动刷新。\n60秒内无法重新登录。');
-
-      // 🔥 强制刷新页面，确保所有状态完全重置
-      // 防止前端缓存导致的自动登录
-      window.location.reload();
+      // 注意：我们需要通过某种方式将 justLoggedOut 传递给 LoginSection
+      // 这里我们使用一个临时状态或通过 props 传递
+      // 由于 LoginSection 是在 render 中渲染的，我们可以添加一个 state
     } catch (err) {
       console.error('Logout error:', err);
       setError('退出登录失败，请刷新页面重试');
     }
   };
 
-  if (!user) {
+  // 在测试模式下绕过用户检查
+  const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+  if (!user && !isTestMode) {
     return null;
   }
 
@@ -509,19 +525,17 @@ export default function XiaohongshuAutomation() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center">
-                    <span className={`w-2 h-2 rounded-full mr-2 ${
-                      currentStep === 'dashboard' ? 'bg-green-400' :
+                    <span className={`w-2 h-2 rounded-full mr-2 ${currentStep === 'dashboard' ? 'bg-green-400' :
                       currentStep === 'config' ? 'bg-yellow-400 animate-pulse' :
-                      'bg-gray-400 animate-pulse'
-                    }`}></span>
-                    <span className={`text-sm ${
-                      currentStep === 'dashboard' ? 'text-green-600 font-medium' :
+                        'bg-gray-400 animate-pulse'
+                      }`}></span>
+                    <span className={`text-sm ${currentStep === 'dashboard' ? 'text-green-600 font-medium' :
                       currentStep === 'config' ? 'text-yellow-600' :
-                      'text-gray-600'
-                    }`}>
+                        'text-gray-600'
+                      }`}>
                       {currentStep === 'dashboard' ? '运营中' :
-                       currentStep === 'config' ? '配置中' :
-                       '未登录'}
+                        currentStep === 'config' ? '配置中' :
+                          '未登录'}
                     </span>
                   </div>
                 </div>
@@ -571,9 +585,11 @@ export default function XiaohongshuAutomation() {
                 setUserProfile(null);
                 setError(''); // 清除错误信息
                 setLoading(false); // 停止加载状态
+                setJustLoggedOut(true); // 防止自动重新登录
                 // 🔥 不刷新页面，直接停留在登录界面
                 // 后端已经清除了数据，60秒保护期后可以重新登录
               }}
+              justLoggedOut={justLoggedOut}
             />
           )}
 

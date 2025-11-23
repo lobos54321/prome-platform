@@ -50,6 +50,7 @@ import XiaohongshuAutoManager from './pages/XiaohongshuAutoManager';
 const queryClient = new QueryClient();
 
 const App = () => {
+  console.log('🚀 [App.tsx] Component rendering...');
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { t } = useTranslation();
@@ -59,18 +60,18 @@ const App = () => {
     const initializeApp = async () => {
       try {
         console.log('Starting application initialization...');
-        
+
         // 简化初始化流程 - 只做最关键的步骤
         console.log('Starting critical initialization...');
-        
+
         // 关键步骤1: 环境验证（同步）
         environmentValidator.logValidationResults();
-        
+
         // 关键步骤2: 认证初始化（带超时保护）
         try {
           await Promise.race([
             authService.initializeAuth(),
-            new Promise((_, reject) => 
+            new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Auth initialization timeout')), 3000)
             )
           ]);
@@ -78,19 +79,19 @@ const App = () => {
         } catch (authError) {
           console.warn('Auth initialization failed, using fallback...', authError);
         }
-        
+
         // 关键步骤3: 获取当前用户状态
         const user = authService.getCurrentUserSync();
         setCurrentUser(user);
-        
+
         console.log('✅ Critical initialization completed');
-        
+
         // 非关键步骤：后台执行数据库连接测试
         setTimeout(() => {
           const isTestMode = import.meta.env.VITE_TEST_MODE === 'true' ||
-                           import.meta.env.VITE_NON_ADMIN_TEST === 'true' ||
-                           import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
-          
+            import.meta.env.VITE_NON_ADMIN_TEST === 'true' ||
+            import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
+
           if (!isTestMode) {
             databaseTester.testBasicConnection().catch(dbError => {
               console.warn('Background database test failed:', dbError);
@@ -134,7 +135,7 @@ const App = () => {
     };
 
     window.addEventListener('auth-state-changed', handleAuthStateChange as EventListener);
-    
+
     return () => {
       window.removeEventListener('auth-state-changed', handleAuthStateChange as EventListener);
     };
@@ -144,7 +145,7 @@ const App = () => {
   useEffect(() => {
     // Make services available globally for console debugging
     (window as Record<string, unknown>).authService = authService;
-    
+
     console.log('[App] Services exposed globally for debugging:');
     console.log('  - window.authService');
   }, []);

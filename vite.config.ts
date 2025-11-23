@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
+    host: '0.0.0.0', // 监听所有接口，包括IPv4和IPv6
     proxy: {
       '/api': {
         target: 'https://www.prome.live',

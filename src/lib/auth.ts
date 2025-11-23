@@ -8,6 +8,15 @@ class AuthService {
 
   // Get current user synchronously (from memory)
   getCurrentUserSync(): User | null {
+    // 在测试模式下返回模拟用户
+    const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+    if (isTestMode && !this.currentUser) {
+      return {
+        id: 'test-user-id',
+        email: 'test@example.com',
+        created_at: new Date().toISOString(),
+      };
+    }
     return this.currentUser;
   }
 
@@ -28,11 +37,11 @@ class AuthService {
     // 没有缓存用户，进行完整验证
     try {
       const user = await db.getCurrentUser();
-      
+
       if (user && user.id) {
         this.currentUser = user;
         this.isInitialized = true;
-        
+
         // 缓存用户信息
         const userToStore = {
           id: user.id,
@@ -41,7 +50,7 @@ class AuthService {
           role: user.role,
           balance: user.balance
         };
-        
+
         localStorage.setItem('currentUser', JSON.stringify(userToStore));
         return user;
       } else {
@@ -60,10 +69,10 @@ class AuthService {
   private clearUserState(): void {
     this.currentUser = null;
     this.isInitialized = true; // 标记为已初始化，避免重复检查
-    
+
     try {
       localStorage.removeItem('currentUser');
-      
+
       // 清除所有以 sb- 开头的键（Supabase 相关）
       const keysToRemove = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -73,7 +82,7 @@ class AuthService {
         }
       }
       keysToRemove.forEach(key => localStorage.removeItem(key));
-      
+
     } catch (error) {
       console.warn('Failed to clear user state:', error);
     }
@@ -83,11 +92,11 @@ class AuthService {
   async login(email: string, password: string): Promise<User | null> {
     try {
       const user = await db.signIn(email, password);
-      
+
       if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
         this.currentUser = user;
         this.isInitialized = true;
-        
+
         try {
           const userToStore = {
             id: user.id,
@@ -96,20 +105,20 @@ class AuthService {
             role: user.role || 'user',
             balance: typeof user.balance === 'number' ? user.balance : 0
           };
-          
+
           localStorage.setItem('currentUser', JSON.stringify(userToStore));
         } catch (storageError) {
           console.warn('Failed to store user data in localStorage:', storageError);
         }
-        
+
         // 触发认证状态变更事件
-        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-          detail: { user } 
+        window.dispatchEvent(new CustomEvent('auth-state-changed', {
+          detail: { user }
         }));
-        
+
         return user;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Login failed:', error);
@@ -121,11 +130,11 @@ class AuthService {
   async register(email: string, password: string, name: string): Promise<User | null> {
     try {
       const user = await db.signUp(email, password, name);
-      
+
       if (user && user.id && typeof user.id === 'string' && user.id.trim() !== '') {
         this.currentUser = user;
         this.isInitialized = true;
-        
+
         try {
           const userToStore = {
             id: user.id,
@@ -134,20 +143,20 @@ class AuthService {
             role: user.role || 'user',
             balance: typeof user.balance === 'number' ? user.balance : 0
           };
-          
+
           localStorage.setItem('currentUser', JSON.stringify(userToStore));
         } catch (storageError) {
           console.warn('Failed to store user data in localStorage:', storageError);
         }
-        
+
         // 触发认证状态变更事件
-        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-          detail: { user } 
+        window.dispatchEvent(new CustomEvent('auth-state-changed', {
+          detail: { user }
         }));
-        
+
         return user;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Registration failed:', error);
@@ -158,40 +167,40 @@ class AuthService {
   // 静默验证会话
   private async validateSessionQuietly(): Promise<void> {
     if (this.isValidating) return;
-    
+
     try {
       this.isValidating = true;
-      
+
       // 在测试模式下跳过验证
       const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
       const isNonAdminTest = import.meta.env.VITE_NON_ADMIN_TEST === 'true';
       const isProblematicUserTest = import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
-      
+
       if (isTestMode || isNonAdminTest || isProblematicUserTest) {
         console.log('Test mode enabled - skipping session validation');
         return;
       }
-      
+
       const user = await db.getCurrentUser();
-      
+
       if (!user && this.currentUser) {
         // 增加更严格的验证条件，避免误清除状态
         console.log('Session validation detected no server user, checking auth state...');
-        
+
         // 检查是否是网络错误或临时问题，而不是真正的认证失败
         // 如果本地有用户信息且最近更新过，给一定容错时间
         const storedUser = localStorage.getItem('currentUser');
-        const shouldClearState = !storedUser || 
+        const shouldClearState = !storedUser ||
           (this.currentUser && !this.currentUser.id) ||
           (this.currentUser && typeof this.currentUser.id !== 'string') ||
           (this.currentUser && this.currentUser.id.trim() === '');
-        
+
         if (shouldClearState) {
           console.log('Session validation failed, clearing user state');
           this.clearUserState();
           // 触发认证状态变更事件
-          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-            detail: { user: null } 
+          window.dispatchEvent(new CustomEvent('auth-state-changed', {
+            detail: { user: null }
           }));
         } else {
           console.log('Session validation inconclusive, retaining user state temporarily');
@@ -207,7 +216,7 @@ class AuthService {
           role: user.role || this.currentUser.role || 'user',
           balance: typeof user.balance === 'number' ? user.balance : (this.currentUser.balance || 0)
         };
-        
+
         try {
           const userToStore = {
             id: this.currentUser.id,
@@ -216,7 +225,7 @@ class AuthService {
             role: this.currentUser.role,
             balance: this.currentUser.balance
           };
-          
+
           localStorage.setItem('currentUser', JSON.stringify(userToStore));
         } catch (storageError) {
           console.warn('Failed to update localStorage during session validation:', storageError);
@@ -228,16 +237,16 @@ class AuthService {
     } catch (error) {
       console.warn('Session validation encountered error:', error);
       // 只有在明确的认证错误时才清除状态，网络错误等不清除
-      if (error instanceof Error && 
-          (error.message.includes('unauthorized') || 
-           error.message.includes('invalid') ||
-           error.message.includes('expired'))) {
+      if (error instanceof Error &&
+        (error.message.includes('unauthorized') ||
+          error.message.includes('invalid') ||
+          error.message.includes('expired'))) {
         console.log('Detected auth-related error, clearing user state');
         if (this.currentUser) {
           this.clearUserState();
           // 触发认证状态变更事件
-          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-            detail: { user: null } 
+          window.dispatchEvent(new CustomEvent('auth-state-changed', {
+            detail: { user: null }
           }));
         }
       } else {
@@ -247,17 +256,17 @@ class AuthService {
       this.isValidating = false;
     }
   }
-  
+
   // Check if user is authenticated
   isAuthenticated(): boolean {
-    return this.currentUser !== null && 
-           this.currentUser !== undefined && 
-           this.currentUser.id !== undefined && 
-           this.currentUser.id !== null && 
-           typeof this.currentUser.id === 'string' && 
-           this.currentUser.id.trim() !== '';
+    return this.currentUser !== null &&
+      this.currentUser !== undefined &&
+      this.currentUser.id !== undefined &&
+      this.currentUser.id !== null &&
+      typeof this.currentUser.id === 'string' &&
+      this.currentUser.id.trim() !== '';
   }
-  
+
   // Initialize auth state - 只在应用启动时调用一次
   async initializeAuth(): Promise<User | null> {
     // 如果已经初始化过，直接返回当前用户
@@ -267,7 +276,7 @@ class AuthService {
 
     try {
       console.log('Initializing auth state...');
-      
+
       // Check if we want to test the specific problematic user ID from the issue
       const isProblematicUserTest = import.meta.env.VITE_PROBLEMATIC_USER_TEST === 'true';
       if (isProblematicUserTest) {
@@ -284,7 +293,7 @@ class AuthService {
         this.isInitialized = true;
         return this.currentUser;
       }
-      
+
       // Check if we want to test non-admin user first
       const isNonAdminTest = import.meta.env.VITE_NON_ADMIN_TEST === 'true';
       if (isNonAdminTest) {
@@ -301,7 +310,7 @@ class AuthService {
         this.isInitialized = true;
         return this.currentUser;
       }
-      
+
       // Check if we're in test mode
       const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
       if (isTestMode) {
@@ -322,11 +331,11 @@ class AuthService {
       // Production mode: attempt real authentication with timeout
       await Promise.race([
         this.attemptSessionRecovery(),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Auth initialization timeout')), 5000)
         )
       ]);
-      
+
       this.isInitialized = true;
       return this.currentUser;
     } catch (error) {
@@ -341,14 +350,14 @@ class AuthService {
   // Enhanced session recovery for production use
   private async attemptSessionRecovery(): Promise<void> {
     console.log('Attempting session recovery in production mode...');
-    
+
     try {
       // First, try to restore from localStorage with validation
       const localUser = this.tryRestoreFromLocalStorage();
       if (localUser) {
         this.currentUser = localUser;
         console.log('User restored from localStorage:', localUser.id);
-        
+
         // Validate session in background without blocking UI
         this.validateAndRefreshSession();
         return;
@@ -366,7 +375,7 @@ class AuthService {
       // No valid session found
       console.log('No valid session found during recovery');
       this.clearUserState();
-      
+
     } catch (error) {
       console.warn('Session recovery failed:', error);
       this.clearUserState();
@@ -396,19 +405,19 @@ class AuthService {
   private async tryServerSessionRecovery(): Promise<User | null> {
     try {
       console.log('Attempting server session recovery...');
-      
+
       // 添加超时机制避免卡住
       const user = await Promise.race([
         db.getCurrentUser(),
-        new Promise<null>((_, reject) => 
+        new Promise<null>((_, reject) =>
           setTimeout(() => reject(new Error('Server session recovery timeout')), 3000)
         )
       ]);
-      
+
       if (user && this.isValidUserObject(user)) {
         return user;
       }
-      
+
       return null;
     } catch (error) {
       console.warn('Server session recovery failed:', error);
@@ -417,13 +426,13 @@ class AuthService {
   }
 
   private isValidUserObject(user: unknown): user is User {
-    return user && 
-           typeof user === 'object' &&
-           typeof user.id === 'string' && 
-           user.id.trim() !== '' &&
-           typeof user.email === 'string' &&
-           typeof user.name === 'string' &&
-           typeof user.role === 'string';
+    return user &&
+      typeof user === 'object' &&
+      typeof user.id === 'string' &&
+      user.id.trim() !== '' &&
+      typeof user.email === 'string' &&
+      typeof user.name === 'string' &&
+      typeof user.role === 'string';
   }
 
   private storeUserLocally(user: User): void {
@@ -448,28 +457,28 @@ class AuthService {
         // 添加超时机制避免后台验证卡住
         const freshUser = await Promise.race([
           db.getCurrentUser(),
-          new Promise<null>((_, reject) => 
+          new Promise<null>((_, reject) =>
             setTimeout(() => reject(new Error('Background validation timeout')), 2000)
           )
         ]);
-        
+
         if (freshUser && this.currentUser && freshUser.id === this.currentUser.id) {
           // Update user data if needed
           if (freshUser.balance !== this.currentUser.balance) {
             this.currentUser.balance = freshUser.balance;
             this.storeUserLocally(this.currentUser);
-            
+
             // Trigger balance update event
-            window.dispatchEvent(new CustomEvent('balance-updated', { 
-              detail: { balance: freshUser.balance } 
+            window.dispatchEvent(new CustomEvent('balance-updated', {
+              detail: { balance: freshUser.balance }
             }));
           }
         } else if (!freshUser && this.currentUser) {
           // Session expired
           console.log('Session expired during background validation');
           this.clearUserState();
-          window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-            detail: { user: null } 
+          window.dispatchEvent(new CustomEvent('auth-state-changed', {
+            detail: { user: null }
           }));
         }
       } catch (error) {
@@ -478,15 +487,15 @@ class AuthService {
       }
     }, 100); // 减少延时从2秒到100毫秒
   }
-  
+
   // Logout - 修复路由跳转问题
   async logout(): Promise<void> {
     console.log('Starting logout process...');
-    
+
     try {
       // 首先清除本地状态
       this.forceLogout();
-      
+
       // 然后尝试服务器端退出
       await db.signOut();
       console.log('Server logout successful');
@@ -494,7 +503,7 @@ class AuthService {
       console.warn('Error during server logout:', error);
       // 即使服务器退出失败，本地状态已清除
     }
-    
+
     // 确保页面状态重置 - 修复：跳转到正确的路径
     setTimeout(() => {
       if (window.location.pathname !== '/login') {
@@ -502,21 +511,21 @@ class AuthService {
       }
     }, 100);
   }
-  
+
   // 强制清除所有认证状态
   forceLogout(): void {
     console.log('Force logout - clearing all auth state');
-    
+
     // 停止任何正在进行的验证
     this.isValidating = false;
-    
+
     // 清除用户状态
     this.clearUserState();
-    
+
     // 清除localStorage中的认证相关数据
     try {
       localStorage.removeItem('currentUser');
-      
+
       // 清除所有以 sb- 开头的键（Supabase 相关）
       const keysToRemove = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -526,30 +535,30 @@ class AuthService {
         }
       }
       keysToRemove.forEach(key => localStorage.removeItem(key));
-      
+
     } catch (error) {
       console.warn('Failed to clear auth tokens:', error);
     }
-    
+
     // 触发认证状态变更事件
-    window.dispatchEvent(new CustomEvent('auth-state-changed', { 
-      detail: { user: null } 
+    window.dispatchEvent(new CustomEvent('auth-state-changed', {
+      detail: { user: null }
     }));
   }
-  
+
   // Update user balance
   async updateBalance(amount: number): Promise<number> {
     const user = this.getCurrentUserSync();
     if (!user || !user.id || typeof user.id !== 'string' || user.id.trim() === '') {
       throw new Error('No authenticated user found');
     }
-    
+
     try {
       const newBalance = await db.updateUserBalance(user.id, amount);
-      
+
       if (this.currentUser && this.currentUser.id === user.id) {
         this.currentUser.balance = newBalance;
-        
+
         try {
           const userToStore = {
             id: this.currentUser.id,
@@ -558,18 +567,18 @@ class AuthService {
             role: this.currentUser.role,
             balance: newBalance
           };
-          
+
           localStorage.setItem('currentUser', JSON.stringify(userToStore));
         } catch (storageError) {
           console.warn('Failed to update localStorage after balance update:', storageError);
         }
-        
+
         // Trigger balance update event
-        window.dispatchEvent(new CustomEvent('balance-updated', { 
-          detail: { balance: newBalance } 
+        window.dispatchEvent(new CustomEvent('balance-updated', {
+          detail: { balance: newBalance }
         }));
       }
-      
+
       return newBalance;
     } catch (error) {
       console.warn('Failed to update balance:', error);
@@ -583,23 +592,23 @@ class AuthService {
     if (!user || !user.id || typeof user.id !== 'string' || user.id.trim() === '') {
       throw new Error('No authenticated user found');
     }
-    
+
     try {
       console.log('Refreshing balance from database for user:', user.id);
-      
+
       // Get fresh user data from database
       const freshUser = await db.getUserById(user.id);
       if (!freshUser) {
         console.warn('User not found in database during balance refresh');
         return this.currentUser?.balance || 0;
       }
-      
+
       const newBalance = typeof freshUser.balance === 'number' ? freshUser.balance : 0;
-      
+
       // Update current user balance
       if (this.currentUser && this.currentUser.id === user.id) {
         this.currentUser.balance = newBalance;
-        
+
         try {
           const userToStore = {
             id: this.currentUser.id,
@@ -608,33 +617,33 @@ class AuthService {
             role: this.currentUser.role,
             balance: newBalance
           };
-          
+
           localStorage.setItem('currentUser', JSON.stringify(userToStore));
           console.log('Balance refreshed successfully:', newBalance);
         } catch (storageError) {
           console.warn('Failed to update localStorage after balance refresh:', storageError);
         }
-        
+
         // Trigger balance update event
-        window.dispatchEvent(new CustomEvent('balance-updated', { 
-          detail: { balance: newBalance } 
+        window.dispatchEvent(new CustomEvent('balance-updated', {
+          detail: { balance: newBalance }
         }));
       }
-      
+
       return newBalance;
     } catch (error) {
       console.error('Failed to refresh balance:', error);
       return this.currentUser?.balance || 0;
     }
   }
-  
+
   // Get user by ID
   async getUserById(userId: string): Promise<User | null> {
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
       console.warn('getUserById called with invalid userId:', userId);
       return null;
     }
-    
+
     try {
       return await db.getUserById(userId);
     } catch (error) {
@@ -642,7 +651,7 @@ class AuthService {
       return null;
     }
   }
-  
+
   // 安全的服务调用包装器
   async safeServiceCall<T>(
     serviceCall: (userId: string) => Promise<T>,
@@ -655,7 +664,7 @@ class AuthService {
         this.forceLogout();
         return defaultValue;
       }
-      
+
       return await serviceCall(user.id);
     } catch (error) {
       console.warn('Service call failed:', error);

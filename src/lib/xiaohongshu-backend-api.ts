@@ -2,10 +2,10 @@
 // xiaohongshumcp 后端 API 封装
 // ============================================
 
-import type { 
-  LoginStatus, 
-  QRCodeData, 
-  APIResponse, 
+import type {
+  LoginStatus,
+  QRCodeData,
+  APIResponse,
   ProductConfig,
   AutomationStatus,
   ContentStrategy,
@@ -29,10 +29,10 @@ export class XiaohongshuBackendAPI {
   ): Promise<APIResponse<T>> {
     const fullURL = new URL(endpoint, this.baseURL).toString();
     const method = options.method || 'GET';
-    
+
     // 🔍 详细请求日志
     console.log(`📤 [BackendAPI] ${method} ${fullURL}`);
-    
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -67,14 +67,14 @@ export class XiaohongshuBackendAPI {
       return data;
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       // 🔍 错误详情日志
       console.error(`❌ [BackendAPI] Request Failed:`, {
         url: fullURL,
         method,
         error: error instanceof Error ? error.message : error
       });
-      
+
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           throw new TimeoutError('请求超时，请检查网络连接');
@@ -86,7 +86,7 @@ export class XiaohongshuBackendAPI {
           throw error;
         }
       }
-      
+
       throw new Error('未知错误');
     }
   }
@@ -148,7 +148,7 @@ export class XiaohongshuBackendAPI {
       `/api/xiaohongshu/login/status?userId=${encodeURIComponent(userId)}&force_qr=1`,
       { method: 'GET' }
     );
-    
+
     // 适配后端响应结构：
     // this.request直接返回response body
     // 后端返回: { success: true, data: { logged_in: true 或 isLoggedIn: true, ... }, message: "..." }
@@ -160,7 +160,7 @@ export class XiaohongshuBackendAPI {
         isLoggedIn: isLoggedIn, // 统一使用 isLoggedIn
       };
     }
-    
+
     // 失败情况
     return { success: false, isLoggedIn: false };
   }
@@ -173,7 +173,7 @@ export class XiaohongshuBackendAPI {
       `/api/xiaohongshu/login/qrcode?userId=${encodeURIComponent(userId)}&force_qr=1`,
       { method: 'GET' }
     );
-    
+
     // 适配后端响应结构：
     // this.request直接返回response body
     // 后端返回: { success: true, data: { img: "...", has_verification: bool, verification_img: "..." }, message: "..." }
@@ -327,12 +327,12 @@ export class XiaohongshuBackendAPI {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(`${this.baseURL}/health`, {
         method: 'GET',
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
       return response.ok;
     } catch {
@@ -451,7 +451,7 @@ export class XiaohongshuBackendAPI {
   async forceLogout(userId: string): Promise<ApiResponse<any>> {
     try {
       console.log(`🧹 [BackendAPI] 强制清除用户 ${userId} 的所有Cookie和状态`);
-      
+
       const response = await fetch(`${this.baseURL}/agent/xiaohongshu/force-clear-cookies`, {
         method: 'POST',
         headers: {
@@ -461,13 +461,13 @@ export class XiaohongshuBackendAPI {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         console.log(`✅ [BackendAPI] 强制清除成功:`, data);
       } else {
         console.error(`❌ [BackendAPI] 强制清除失败:`, data);
       }
-      
+
       return { success: response.ok, data: data.data, error: data.error };
     } catch (error) {
       console.error(`❌ [BackendAPI] 强制清除异常:`, error);

@@ -13,15 +13,17 @@ import {
   Settings,
   LogOut,
   Play,
-  Pause,
   TrendingUp,
   Calendar,
   Clock,
-  Activity
+  Activity,
+  QrCode,
+  Smartphone
 } from 'lucide-react';
+import { xhsClient } from '@/lib/xhs-worker';
 
 // API 配置
-const CLAUDE_API = 'https://xiaohongshu-automation-ai.zeabur.app';
+const CLAUDE_API = import.meta.env.VITE_XHS_API_URL || 'http://localhost:8080';
 
 interface UserConfig {
   productName: string;
@@ -49,6 +51,11 @@ export default function XiaohongshuAutoManager() {
   const [logoutProtection, setLogoutProtection] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
 
+  // QR Code Login State
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [isWaitingForScan, setIsWaitingForScan] = useState(false);
+  const [loginStatusMsg, setLoginStatusMsg] = useState<string>("");
+
   // 配置表单
   const [config, setConfig] = useState<UserConfig>({
     productName: '',
@@ -64,10 +71,15 @@ export default function XiaohongshuAutoManager() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
+  const loginCheckInterval = useRef<NodeJS.Timeout | null>(null);
 
   // 检查登录状态
   useEffect(() => {
     checkLoginStatus();
+    return () => {
+      stopPolling();
+      stopLoginCheck();
+    };
   }, []);
 
   // 轮询数据
@@ -115,7 +127,7 @@ export default function XiaohongshuAutoManager() {
       if (storedUser) {
         setCurrentUser(storedUser);
         setIsLoggedIn(true);
-        
+
         // 检查是否有保存的配置
         const savedConfig = localStorage.getItem(`userConfig_${storedUser}`);
         if (savedConfig) {
@@ -133,7 +145,7 @@ export default function XiaohongshuAutoManager() {
 
   const startPolling = () => {
     if (pollingInterval.current) return;
-    
+
     fetchDashboardData(); // 立即获取一次
     pollingInterval.current = setInterval(() => {
       fetchDashboardData();
@@ -146,6 +158,85 @@ export default function XiaohongshuAutoManager() {
       pollingInterval.current = null;
     }
   };
+
+  // === QR Code Login Logic ===
+
+  const handleStartLogin = async () => {
+    setIsLoading(true);
+    setLoginStatusMsg("正在获取登录二维码...");
+    try {
+      // Generate a temporary user ID or use a fixed one for single-user mode
+      // For multi-user, we might want to let user input an ID or generate one.
+      // Here we use a timestamp-based ID for simplicity if not exists.
+      const tempUserId = `user_${Date.now()}`;
+
+      const res = await xhsClient.getLoginQRCode({
+        userId: tempUserId,
+        // proxyUrl: "...", // TODO: Add UI for Proxy input if needed
+      });
+
+      if (res.qr_image) {
+        setQrCode(res.qr_image);
+        setIsWaitingForScan(true);
+        setLoginStatusMsg("请使用小红书APP扫码登录");
+
+        // Start polling for login status
+        startLoginCheck(tempUserId);
+      } else if (res.status === 'logged_in') {
+        // Already logged in
+        handleLoginSuccess(tempUserId);
+      }
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      alert(`获取二维码失败: ${error.message}`);
+      setLoginStatusMsg("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startLoginCheck = (userId: string) => {
+    if (loginCheckInterval.current) clearInterval(loginCheckInterval.current);
+
+    loginCheckInterval.current = setInterval(async () => {
+      try {
+        const res = await xhsClient.checkLoginStatus(userId);
+        if (res.status === 'success') {
+          handleLoginSuccess(userId);
+        }
+      } catch (error) {
+        console.error("Check status failed:", error);
+      }
+    }, 2000);
+  };
+
+  const stopLoginCheck = () => {
+    if (loginCheckInterval.current) {
+      clearInterval(loginCheckInterval.current);
+      loginCheckInterval.current = null;
+    }
+  };
+
+  const handleLoginSuccess = (userId: string) => {
+    stopLoginCheck();
+    setQrCode(null);
+    setIsWaitingForScan(false);
+
+    setCurrentUser(userId);
+    setIsLoggedIn(true);
+    localStorage.setItem('currentXHSUser', userId);
+
+    alert("登录成功！");
+  };
+
+  const handleCancelLogin = () => {
+    stopLoginCheck();
+    setQrCode(null);
+    setIsWaitingForScan(false);
+    setLoginStatusMsg("");
+  };
+
+  // ===========================
 
   const fetchDashboardData = async () => {
     if (!currentUser) return;
@@ -201,13 +292,13 @@ export default function XiaohongshuAutoManager() {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         // 保存配置
         localStorage.setItem(`userConfig_${currentUser}`, JSON.stringify(config));
         setAutoModeEnabled(true);
         setShowSetup(false);
-        
+
         // 开始轮询数据
         startPolling();
       } else {
@@ -227,22 +318,19 @@ export default function XiaohongshuAutoManager() {
     }
 
     try {
-      // 停止轮询
       stopPolling();
+      stopLoginCheck();
 
-      // 调用后端清除数据
       if (currentUser) {
         await fetch(`${CLAUDE_API}/agent/auto/reset/${currentUser}`, {
           method: 'POST'
         }).catch(console.error);
       }
 
-      // 清除所有本地数据
       localStorage.removeItem('currentXHSUser');
       localStorage.removeItem(`userConfig_${currentUser}`);
       localStorage.setItem('lastLogoutTime', Date.now().toString());
 
-      // 重置状态
       setCurrentUser(null);
       setIsLoggedIn(false);
       setAutoModeEnabled(false);
@@ -252,11 +340,9 @@ export default function XiaohongshuAutoManager() {
       setLogoutCountdown(60);
 
       alert('已退出登录！\n\n⚠️ 为确保数据完全清理，系统将禁止新登录60秒。');
-      
-      // 刷新页面
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+
+      // Reload to clear state cleanly
+      window.location.reload();
     } catch (error) {
       console.error('退出登录失败:', error);
       alert('退出过程中遇到问题，请刷新页面重试');
@@ -269,11 +355,9 @@ export default function XiaohongshuAutoManager() {
     }
 
     try {
-      // 停止轮询
       stopPolling();
       setAutoModeEnabled(false);
 
-      // 清除配置
       if (currentUser) {
         localStorage.removeItem(`userConfig_${currentUser}`);
         await fetch(`${CLAUDE_API}/agent/auto/reset/${currentUser}`, {
@@ -281,7 +365,6 @@ export default function XiaohongshuAutoManager() {
         }).catch(console.error);
       }
 
-      // 重置表单
       setConfig({
         productName: '',
         targetAudience: '',
@@ -323,7 +406,7 @@ export default function XiaohongshuAutoManager() {
                   <span className="text-2xl font-bold text-orange-900">{logoutCountdown} 秒</span>
                 </div>
                 <div className="w-full bg-orange-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-orange-500 h-2 rounded-full transition-all duration-1000"
                     style={{ width: `${(logoutCountdown / 60) * 100}%` }}
                   />
@@ -344,23 +427,52 @@ export default function XiaohongshuAutoManager() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <Card>
           <CardHeader>
-            <CardTitle>未登录</CardTitle>
+            <CardTitle>连接小红书账号</CardTitle>
           </CardHeader>
           <CardContent>
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                请先登录小红书账号。您可以访问登录页面或使用自动登录功能。
-              </AlertDescription>
-            </Alert>
-            <div className="mt-4 flex gap-4">
-              <Button onClick={() => window.location.href = '/login'}>
-                前往登录
-              </Button>
-              <Button variant="outline" onClick={() => window.location.reload()}>
-                刷新页面
-              </Button>
-            </div>
+            {!qrCode ? (
+              <div className="text-center space-y-6 py-8">
+                <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
+                  <Smartphone className="w-10 h-10 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">扫码登录</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    请使用小红书APP扫描二维码登录。登录后，系统将自动获取您的账号权限以进行自动化发布。
+                  </p>
+                </div>
+                <Button size="lg" onClick={handleStartLogin} className="bg-red-500 hover:bg-red-600">
+                  <QrCode className="w-4 h-4 mr-2" />
+                  获取登录二维码
+                </Button>
+              </div>
+            ) : (
+              <div className="text-center space-y-6 py-8">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold mb-2">请扫码登录</h3>
+                  <p className="text-sm text-muted-foreground">{loginStatusMsg}</p>
+                </div>
+
+                <div className="flex justify-center">
+                  <div className="border-4 border-red-100 rounded-lg p-2">
+                    <img
+                      src={`data:image/png;base64,${qrCode}`}
+                      alt="Login QR Code"
+                      className="w-48 h-48 object-contain"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  正在等待扫码...
+                </div>
+
+                <Button variant="outline" onClick={handleCancelLogin}>
+                  取消
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -403,7 +515,7 @@ export default function XiaohongshuAutoManager() {
                   id="productName"
                   placeholder="例如：智能手表、美容护肤品、在线课程..."
                   value={config.productName}
-                  onChange={(e) => setConfig({...config, productName: e.target.value})}
+                  onChange={(e) => setConfig({ ...config, productName: e.target.value })}
                 />
               </div>
 
@@ -413,7 +525,7 @@ export default function XiaohongshuAutoManager() {
                   id="targetAudience"
                   placeholder="例如：25-35岁都市白领女性，注重生活品质..."
                   value={config.targetAudience}
-                  onChange={(e) => setConfig({...config, targetAudience: e.target.value})}
+                  onChange={(e) => setConfig({ ...config, targetAudience: e.target.value })}
                   rows={3}
                 />
               </div>
@@ -424,7 +536,7 @@ export default function XiaohongshuAutoManager() {
                   id="marketingGoal"
                   className="w-full border rounded-md p-2"
                   value={config.marketingGoal}
-                  onChange={(e) => setConfig({...config, marketingGoal: e.target.value})}
+                  onChange={(e) => setConfig({ ...config, marketingGoal: e.target.value })}
                 >
                   <option value="brand-awareness">品牌认知</option>
                   <option value="lead-generation">获客引流</option>
@@ -439,7 +551,7 @@ export default function XiaohongshuAutoManager() {
                   id="postFrequency"
                   className="w-full border rounded-md p-2"
                   value={config.postFrequency}
-                  onChange={(e) => setConfig({...config, postFrequency: e.target.value})}
+                  onChange={(e) => setConfig({ ...config, postFrequency: e.target.value })}
                 >
                   <option value="daily-1">每天1条</option>
                   <option value="daily-2">每天2条</option>
@@ -454,7 +566,7 @@ export default function XiaohongshuAutoManager() {
                   id="brandStyle"
                   className="w-full border rounded-md p-2"
                   value={config.brandStyle}
-                  onChange={(e) => setConfig({...config, brandStyle: e.target.value})}
+                  onChange={(e) => setConfig({ ...config, brandStyle: e.target.value })}
                 >
                   <option value="professional">专业严谨</option>
                   <option value="friendly">亲切友好</option>
@@ -469,7 +581,7 @@ export default function XiaohongshuAutoManager() {
                   id="reviewMode"
                   className="w-full border rounded-md p-2"
                   value={config.reviewMode}
-                  onChange={(e) => setConfig({...config, reviewMode: e.target.value})}
+                  onChange={(e) => setConfig({ ...config, reviewMode: e.target.value })}
                 >
                   <option value="manual-review">手动审核</option>
                   <option value="auto-publish">自动发布</option>
@@ -477,8 +589,8 @@ export default function XiaohongshuAutoManager() {
               </div>
             </div>
 
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               size="lg"
               onClick={handleStartAutoMode}
               disabled={!config.productName || !config.targetAudience || isGenerating}
@@ -575,10 +687,10 @@ export default function XiaohongshuAutoManager() {
                           <h4 className="font-semibold">{task.title}</h4>
                           <Badge variant={
                             task.status === 'completed' ? 'default' :
-                            task.status === 'in-progress' ? 'secondary' : 'outline'
+                              task.status === 'in-progress' ? 'secondary' : 'outline'
                           }>
                             {task.status === 'completed' ? '已完成' :
-                             task.status === 'in-progress' ? '进行中' : '待发布'}
+                              task.status === 'in-progress' ? '进行中' : '待发布'}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mb-2">

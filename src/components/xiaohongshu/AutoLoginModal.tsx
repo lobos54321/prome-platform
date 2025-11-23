@@ -196,6 +196,14 @@ export function AutoLoginModal({
     ? verificationQRCode
     : (currentLoginQRCode || qrCode);
 
+  console.log('🖼️ [AutoLoginModal] currentQRCode 计算:', {
+    loginStage,
+    verificationQRCode: verificationQRCode?.substring(0, 50) + '...',
+    currentLoginQRCode: currentLoginQRCode?.substring(0, 50) + '...',
+    qrCodeProp: qrCode?.substring(0, 50) + '...',
+    finalCurrentQRCode: currentQRCode?.substring(0, 50) + '...'
+  });
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -228,9 +236,8 @@ export function AutoLoginModal({
 
           {/* 二维码显示 */}
           {currentQRCode ? (
-            <div className={`rounded-xl p-4 flex items-center justify-center min-h-[300px] ${
-              loginStage === 'verification' ? 'bg-orange-50 border-2 border-orange-300' : 'bg-gray-100'
-            }`}>
+            <div className={`rounded-xl p-4 flex items-center justify-center min-h-[300px] ${loginStage === 'verification' ? 'bg-orange-50 border-2 border-orange-300' : 'bg-gray-100'
+              }`}>
               <img
                 src={currentQRCode}
                 alt={loginStage === 'verification' ? '验证二维码' : '登录二维码'}
@@ -244,12 +251,11 @@ export function AutoLoginModal({
           )}
 
           <div className="text-center space-y-2">
-            <p className={`text-sm font-medium ${
-              statusMessage.includes('成功') ? 'text-green-600' :
-              statusMessage.includes('过期') || statusMessage.includes('失败') ? 'text-red-600' :
-              loginStage === 'verification' ? 'text-orange-600' :
-              'text-gray-600'
-            }`}>
+            <p className={`text-sm font-medium ${statusMessage.includes('成功') ? 'text-green-600' :
+                statusMessage.includes('过期') || statusMessage.includes('失败') ? 'text-red-600' :
+                  loginStage === 'verification' ? 'text-orange-600' :
+                    'text-gray-600'
+              }`}>
               {statusMessage}
             </p>
 

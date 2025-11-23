@@ -53,20 +53,22 @@ class CloudChatHistoryService {
   constructor() {
     // 🔧 修复：使用共享的Supabase实例，避免多实例警告
     if (!supabase) {
-      throw new Error('Supabase not configured or available');
+      console.warn('[CloudChatHistory] Supabase not configured or available. Service will be disabled.');
+      // 不要抛出错误，否则会阻止应用启动
+      // throw new Error('Supabase not configured or available');
     }
 
     this.supabase = supabase;
     this.deviceId = this.getOrCreateDeviceId();
     this.userId = this.getCurrentUserId(); // 🆕 初始化用户ID
   }
-  
+
   /**
    * 🆕 获取当前登录用户ID
    */
   private getCurrentUserId(): string | null {
     if (typeof window === 'undefined') return null;
-    
+
     // 🔧 修复：从localStorage的currentUser对象中获取用户ID
     try {
       const currentUserStr = localStorage.getItem('currentUser');
@@ -80,10 +82,10 @@ class CloudChatHistoryService {
     } catch (error) {
       console.warn('[CloudChatHistory] 解析currentUser失败:', error);
     }
-    
+
     return null; // 未登录用户
   }
-  
+
   /**
    * 🆕 设置当前用户ID（登录/登出时调用）
    */
@@ -97,28 +99,28 @@ class CloudChatHistoryService {
    */
   private getOrCreateDeviceId(): string {
     if (typeof window === 'undefined') return '';
-    
+
     let deviceId = localStorage.getItem('chat_device_id');
-    
+
     if (!deviceId) {
       // 生成基于浏览器特征的设备ID
       const navigator_info = typeof navigator !== 'undefined' ? navigator.userAgent : '';
       const screen_info = typeof screen !== 'undefined' ? `${screen.width}x${screen.height}` : '';
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const language = typeof navigator !== 'undefined' ? navigator.language : '';
-      
+
       const fingerprint = `${navigator_info}-${screen_info}-${timezone}-${language}`;
       const hash = this.simpleHash(fingerprint);
-      
+
       deviceId = `device_${hash}_${Date.now()}`;
       localStorage.setItem('chat_device_id', deviceId);
-      
+
       // 注册设备到数据库
       this.registerDevice(deviceId, navigator_info).catch(error => {
         console.warn('Failed to register device:', error);
       });
     }
-    
+
     return deviceId;
   }
 
@@ -193,7 +195,7 @@ class CloudChatHistoryService {
     // 用户可稍后执行database/chat-history-schema.sql中的SQL来启用会话功能
     console.log('[Chat Debug] 使用device_id直接过滤，跳过会话设置');
     return;
-    
+
     /* 如果需要启用会话功能，请在数据库中执行以下SQL：
     CREATE OR REPLACE FUNCTION set_config(setting_name text, setting_value text)
     RETURNS void AS $$
@@ -224,10 +226,10 @@ class CloudChatHistoryService {
     // 确保设备已注册
     await this.ensureDeviceRegistered();
     await this.setCurrentDeviceId();
-    
+
     const lastUserMessage = messages.filter(m => m.role === 'user').pop();
     const lastMessage = messages[messages.length - 1];
-    
+
     // 🔄 检查是否已存在相同difyConversationId的对话记录
     let existingConversation = null;
     if (difyConversationId) {
@@ -237,10 +239,10 @@ class CloudChatHistoryService {
         .eq('device_id', this.deviceId)
         .eq('dify_conversation_id', difyConversationId)
         .single();
-      
+
       existingConversation = data;
     }
-    
+
     const conversationData = {
       device_id: this.deviceId,
       user_id: this.userId, // 🆕 添加用户ID用于数据隔离
@@ -257,7 +259,7 @@ class CloudChatHistoryService {
     };
 
     let conversationId: string;
-    
+
     if (existingConversation) {
       // 📝 更新现有对话记录
       const { data: updatedConversation, error: updateError } = await this.supabase
@@ -270,14 +272,14 @@ class CloudChatHistoryService {
       if (updateError) {
         throw new Error(`Failed to update conversation: ${updateError.message}`);
       }
-      
+
       conversationId = updatedConversation.id;
       console.log(`[ConversationHistory] Updated existing conversation ${conversationId} (${messages.length} messages)`);
-      
+
       // 📨 只插入新消息 - 从上次保存后的新消息
       const previousMessageCount = existingConversation.message_count || 0;
       const newMessages = messages.slice(previousMessageCount);
-      
+
       if (newMessages.length > 0) {
         const messagesToInsert = newMessages.map(msg => ({
           conversation_id: conversationId,
@@ -311,7 +313,7 @@ class CloudChatHistoryService {
 
       conversationId = conversation.id;
       console.log(`[ConversationHistory] Created new conversation ${conversationId} (${messages.length} messages)`);
-      
+
       // 📨 插入所有消息
       const messagesToInsert = messages.map(msg => ({
         conversation_id: conversationId,
@@ -342,14 +344,14 @@ class CloudChatHistoryService {
     loadMessages: boolean = false
   ): Promise<{ conversations: ChatConversation[]; total: number; hasMore: boolean }> {
     await this.setCurrentDeviceId();
-    
+
     const offset = page * limit;
-    
+
     // 🆕 构建查询条件 - 优先使用用户ID，未登录用户使用设备ID
     const queryBuilder = this.supabase
       .from('chat_conversations')
       .select('id', { count: 'exact', head: true });
-    
+
     if (this.userId) {
       // 已登录用户：只查询该用户的对话
       queryBuilder.eq('user_id', this.userId);
@@ -359,23 +361,23 @@ class CloudChatHistoryService {
       queryBuilder.eq('device_id', this.deviceId).is('user_id', null);
       console.log('[CloudChatHistory] 查询匿名对话，device_id:', this.deviceId);
     }
-    
+
     const { count } = await queryBuilder;
     const total = count || 0;
-    
+
     // 🆕 获取分页数据 - 使用相同的过滤条件
     const dataQueryBuilder = this.supabase
       .from('chat_conversations')
       .select('*')
       .order('updated_at', { ascending: false })
       .range(offset, offset + limit - 1);
-    
+
     if (this.userId) {
       dataQueryBuilder.eq('user_id', this.userId);
     } else {
       dataQueryBuilder.eq('device_id', this.deviceId).is('user_id', null);
     }
-    
+
     const { data, error } = await dataQueryBuilder;
 
     if (error) {
@@ -384,9 +386,9 @@ class CloudChatHistoryService {
 
     const conversations = data || [];
     const hasMore = offset + conversations.length < total;
-    
+
     console.log(`[CloudChatHistory] 加载了 ${conversations.length} 个对话 (总计: ${total})`);
-    
+
     // 🔍 调试：显示加载的对话的user_id
     if (conversations.length > 0) {
       console.log('[CloudChatHistory] 📋 加载的对话详情:', conversations.map(c => ({
@@ -396,7 +398,7 @@ class CloudChatHistoryService {
         device_id: c.device_id
       })));
     }
-    
+
     return {
       conversations,
       total,
@@ -416,12 +418,12 @@ class CloudChatHistoryService {
    * 获取特定对话及其消息（支持分页加载）
    */
   async getConversationWithMessages(
-    conversationId: string, 
+    conversationId: string,
     messageLimit?: number,
     messageOffset?: number
   ): Promise<ConversationWithMessages | null> {
     await this.setCurrentDeviceId();
-    
+
     // 获取对话信息
     const { data: conversation, error: convError } = await this.supabase
       .from('chat_conversations')
@@ -441,7 +443,7 @@ class CloudChatHistoryService {
       .select('*')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
-    
+
     // 如果指定了限制和偏移量，则应用分页
     if (messageLimit !== undefined) {
       const offset = messageOffset || 0;
@@ -466,7 +468,7 @@ class CloudChatHistoryService {
    */
   async getConversationPreview(conversationId: string, messageCount: number = 5): Promise<ChatMessage[]> {
     await this.setCurrentDeviceId();
-    
+
     const { data: messages, error } = await this.supabase
       .from('chat_messages')
       .select('*')
@@ -495,7 +497,7 @@ class CloudChatHistoryService {
     }>
   ): Promise<void> {
     await this.setCurrentDeviceId();
-    
+
     const { error } = await this.supabase
       .from('chat_conversations')
       .update({
@@ -515,7 +517,7 @@ class CloudChatHistoryService {
    */
   async deleteConversation(conversationId: string): Promise<void> {
     await this.setCurrentDeviceId();
-    
+
     const { error } = await this.supabase
       .from('chat_conversations')
       .delete()
@@ -537,7 +539,7 @@ class CloudChatHistoryService {
     metadata?: Record<string, any>
   ): Promise<void> {
     await this.setCurrentDeviceId();
-    
+
     // 插入消息
     const { error: messageError } = await this.supabase
       .from('chat_messages')
@@ -606,7 +608,7 @@ class CloudChatHistoryService {
    */
   async loadConversationFromHistory(conversationId: string): Promise<ConversationWithMessages | null> {
     console.log('[Chat Debug] 🔄 开始加载历史对话:', conversationId);
-    
+
     const conversationWithMessages = await this.getConversationWithMessages(conversationId);
     if (!conversationWithMessages) {
       console.log('[Chat Debug] ❌ 历史对话未找到');
