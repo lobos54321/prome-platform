@@ -21,7 +21,8 @@ export class XhsWorkerClient {
     private secret: string;
 
     constructor() {
-        this.baseUrl = import.meta.env.VITE_XHS_WORKER_URL || "";
+        const url = import.meta.env.VITE_XHS_WORKER_URL || "";
+        this.baseUrl = url.replace(/\/$/, ""); // Remove trailing slash
         this.secret = import.meta.env.VITE_XHS_WORKER_SECRET || "";
 
         if (!this.baseUrl) console.warn("⚠️ XHS_WORKER_URL not set!");
