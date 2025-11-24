@@ -55,6 +55,8 @@ export default function XiaohongshuAutoManager() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isWaitingForScan, setIsWaitingForScan] = useState(false);
   const [loginStatusMsg, setLoginStatusMsg] = useState<string>("");
+  const [qrSecondsRemaining, setQrSecondsRemaining] = useState<number>(90);
+  const [retryCount, setRetryCount] = useState<number>(0);
 
   // 配置表单
   const [config, setConfig] = useState<UserConfig>({
@@ -72,6 +74,8 @@ export default function XiaohongshuAutoManager() {
 
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
   const loginCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const qrRefreshTimer = useRef<NodeJS.Timeout | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
 
   // 检查登录状态
   useEffect(() => {
@@ -79,6 +83,7 @@ export default function XiaohongshuAutoManager() {
     return () => {
       stopPolling();
       stopLoginCheck();
+      if (qrRefreshTimer.current) clearTimeout(qrRefreshTimer.current);
     };
   }, []);
 
@@ -161,35 +166,55 @@ export default function XiaohongshuAutoManager() {
 
   // === QR Code Login Logic ===
 
-  const handleStartLogin = async () => {
+  const handleStartLogin = async (attemptCount: number = 0) => {
     setIsLoading(true);
     setLoginStatusMsg("正在获取登录二维码...");
     try {
-      // Generate a temporary user ID or use a fixed one for single-user mode
-      // For multi-user, we might want to let user input an ID or generate one.
-      // Here we use a timestamp-based ID for simplicity if not exists.
       const tempUserId = `user_${Date.now()}`;
+      currentUserIdRef.current = tempUserId;
 
       const res = await xhsClient.getLoginQRCode({
         userId: tempUserId,
-        // proxyUrl: "...", // TODO: Add UI for Proxy input if needed
       });
 
       if (res.qr_image) {
         setQrCode(res.qr_image);
         setIsWaitingForScan(true);
+        setQrSecondsRemaining(90);
+        setRetryCount(0); // Reset retry count on success
         setLoginStatusMsg("请使用小红书APP扫码登录");
 
         // Start polling for login status
         startLoginCheck(tempUserId);
+
+        // Start 85-second auto-refresh timer
+        if (qrRefreshTimer.current) clearTimeout(qrRefreshTimer.current);
+        qrRefreshTimer.current = setTimeout(() => {
+          console.log('QR code nearing expiration, auto-refreshing...');
+          handleCancelLogin();
+          handleStartLogin(0); // Refresh QR code
+        }, 85000); // 85 seconds
+
       } else if (res.status === 'logged_in') {
-        // Already logged in
-        handleLoginSuccess(tempUserId);
+        handleLoginSuccess(tempUserId, undefined);
       }
     } catch (error: any) {
       console.error("Login failed:", error);
-      alert(`获取二维码失败: ${error.message}`);
-      setLoginStatusMsg("");
+
+      // Exponential backoff retry logic
+      if (attemptCount < 3) {
+        const delay = Math.pow(2, attemptCount) * 1000; // 1s, 2s, 4s
+        setRetryCount(attemptCount + 1);
+        setLoginStatusMsg(`获取失败，${delay / 1000}秒后重试... (第${attemptCount + 1}次)`);
+
+        setTimeout(() => {
+          handleStartLogin(attemptCount + 1);
+        }, delay);
+      } else {
+        alert(`获取二维码失败: ${error.message}`);
+        setLoginStatusMsg("");
+        setRetryCount(0);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -201,8 +226,39 @@ export default function XiaohongshuAutoManager() {
     loginCheckInterval.current = setInterval(async () => {
       try {
         const res = await xhsClient.checkLoginStatus(userId);
-        if (res.status === 'success') {
-          handleLoginSuccess(userId);
+
+        // Handle different statuses from backend
+        switch (res.status) {
+          case 'success':
+            // Login successful - stop polling and handle success
+            console.log('Login successful!', res);
+            handleLoginSuccess(userId, res.cookies);
+            break;
+
+          case 'qr_expired':
+            // QR code expired - auto refresh
+            console.log('QR code expired, refreshing...');
+            setLoginStatusMsg(`二维码已过期 (${res.seconds_elapsed}秒)，正在刷新...`);
+            handleCancelLogin();
+            handleStartLogin(0);
+            break;
+
+          case 'waiting_scan':
+            // Still waiting - update countdown
+            if (res.seconds_remaining !== undefined) {
+              setQrSecondsRemaining(res.seconds_remaining);
+              setLoginStatusMsg(`等待扫码中 (${res.seconds_remaining}秒)`);
+            }
+            break;
+
+          case 'not_found':
+            // Session not found - should not happen but handle gracefully
+            console.warn('Login session not found');
+            handleCancelLogin();
+            break;
+
+          default:
+            console.log('Unknown status:', res.status);
         }
       } catch (error) {
         console.error("Check status failed:", error);
@@ -215,9 +271,13 @@ export default function XiaohongshuAutoManager() {
       clearInterval(loginCheckInterval.current);
       loginCheckInterval.current = null;
     }
+    if (qrRefreshTimer.current) {
+      clearTimeout(qrRefreshTimer.current);
+      qrRefreshTimer.current = null;
+    }
   };
 
-  const handleLoginSuccess = (userId: string) => {
+  const handleLoginSuccess = (userId: string, cookies?: any) => {
     stopLoginCheck();
     setQrCode(null);
     setIsWaitingForScan(false);
@@ -226,7 +286,20 @@ export default function XiaohongshuAutoManager() {
     setIsLoggedIn(true);
     localStorage.setItem('currentXHSUser', userId);
 
+    // Save cookies if provided
+    if (cookies) {
+      console.log('Saving cookies:', cookies);
+      localStorage.setItem(`xhs_cookies_${userId}`, JSON.stringify(cookies));
+    }
+
     alert("登录成功！");
+    setLoginStatusMsg("登录成功，即将跳转...");
+
+    // Auto-transition to dashboard (show setup)
+    setTimeout(() => {
+      setShowSetup(true);
+      setLoginStatusMsg("");
+    }, 1500);
   };
 
   const handleCancelLogin = () => {
@@ -234,6 +307,7 @@ export default function XiaohongshuAutoManager() {
     setQrCode(null);
     setIsWaitingForScan(false);
     setLoginStatusMsg("");
+    setQrSecondsRemaining(90);
   };
 
   // ===========================
