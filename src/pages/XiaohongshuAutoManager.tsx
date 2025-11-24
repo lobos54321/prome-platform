@@ -174,8 +174,16 @@ export default function XiaohongshuAutoManager() {
     setIsLoading(true);
     setLoginStatusMsg("正在获取登录二维码...");
     try {
-      const tempUserId = `user_${Date.now()}`;
-      currentUserIdRef.current = tempUserId;
+      // REUSE existing session ID if available, otherwise create new one
+      // This is CRITICAL for browser pool reuse on the backend
+      let tempUserId = currentUserIdRef.current;
+      if (!tempUserId) {
+        tempUserId = `user_${Date.now()}`;
+        currentUserIdRef.current = tempUserId;
+        console.log(`🆕 Created new session ID: ${tempUserId}`);
+      } else {
+        console.log(`♻️ Reusing existing session ID: ${tempUserId}`);
+      }
 
       const res = await xhsClient.getLoginQRCode({
         userId: tempUserId,
@@ -322,9 +330,12 @@ export default function XiaohongshuAutoManager() {
 
   const handleCancelLogin = () => {
     stopLoginCheck();
-    setQrCode(null);
+    if (qrRefreshTimer.current) clearTimeout(qrRefreshTimer.current);
     setIsWaitingForScan(false);
+    setQrCode(null);
     setLoginStatusMsg("");
+    // Clear the session ID so next time we get a fresh browser
+    currentUserIdRef.current = null;
     setQrSecondsRemaining(90);
   };
 
