@@ -167,6 +167,10 @@ export default function XiaohongshuAutoManager() {
   // === QR Code Login Logic ===
 
   const handleStartLogin = async (attemptCount: number = 0) => {
+    // CRITICAL: Stop all old polling/timers FIRST to prevent conflicts
+    console.log('🛑 Stopping all old sessions before creating new QR...');
+    stopLoginCheck();
+
     setIsLoading(true);
     setLoginStatusMsg("正在获取登录二维码...");
     try {
@@ -221,26 +225,40 @@ export default function XiaohongshuAutoManager() {
   };
 
   const startLoginCheck = (userId: string) => {
-    if (loginCheckInterval.current) clearInterval(loginCheckInterval.current);
+    // Clear any existing interval first
+    if (loginCheckInterval.current) {
+      console.log('🛑 Clearing existing login check interval');
+      clearInterval(loginCheckInterval.current);
+    }
 
+    console.log(`✅ Starting login check for user: ${userId}`);
     loginCheckInterval.current = setInterval(async () => {
       try {
+        // Verify we're still checking the right user
+        if (currentUserIdRef.current !== userId) {
+          console.log(`⚠️ UserID mismatch, stopping polling for ${userId}`);
+          if (loginCheckInterval.current) clearInterval(loginCheckInterval.current);
+          return;
+        }
+
         const res = await xhsClient.checkLoginStatus(userId);
 
         // Handle different statuses from backend
         switch (res.status) {
           case 'success':
             // Login successful - stop polling and handle success
-            console.log('Login successful!', res);
+            console.log('✅ Login successful!', res);
             handleLoginSuccess(userId, res.cookies);
             break;
 
           case 'qr_expired':
-            // QR code expired - auto refresh
-            console.log('QR code expired, refreshing...');
-            setLoginStatusMsg(`二维码已过期 (${res.seconds_elapsed}秒)，正在刷新...`);
-            handleCancelLogin();
-            handleStartLogin(0);
+            // QR code expired - auto refresh ONLY if this is still the current session
+            if (currentUserIdRef.current === userId) {
+              console.log('⏰ QR code expired, refreshing...');
+              setLoginStatusMsg(`二维码已过期 (${res.seconds_elapsed}秒)，正在刷新...`);
+              handleCancelLogin();
+              handleStartLogin(0);
+            }
             break;
 
           case 'waiting_scan':
@@ -252,16 +270,16 @@ export default function XiaohongshuAutoManager() {
             break;
 
           case 'not_found':
-            // Session not found - should not happen but handle gracefully
-            console.warn('Login session not found');
-            handleCancelLogin();
+            // Session not found - stop polling silently (probably old session)
+            console.warn(`⚠️ Session ${userId} not found on backend`);
+            if (loginCheckInterval.current) clearInterval(loginCheckInterval.current);
             break;
 
           default:
-            console.log('Unknown status:', res.status);
+            console.log('❓ Unknown status:', res.status);
         }
       } catch (error) {
-        console.error("Check status failed:", error);
+        console.error("❌ Check status failed:", error);
       }
     }, 2000);
   };
