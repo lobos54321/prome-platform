@@ -430,6 +430,10 @@ export default function XiaohongshuAutoManager() {
       stopLoginCheck();
 
       if (currentUser) {
+        // Close browser session on worker
+        await xhsClient.closeSession(currentUser).catch(console.error);
+
+        // Reset auto agent state
         await fetch(`${CLAUDE_API}/agent/auto/reset/${currentUser}`, {
           method: 'POST'
         }).catch(console.error);
