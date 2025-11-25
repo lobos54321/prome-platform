@@ -425,22 +425,33 @@ export default function XiaohongshuAutoManager() {
       return;
     }
 
+    // Use a flag to track if we should reload
+    let shouldReload = false;
+
     try {
       stopPolling();
       stopLoginCheck();
 
       if (currentUser) {
-        // Close browser session on worker
-        await xhsClient.closeSession(currentUser).catch(console.error);
+        // Close browser session on worker - fire and forget to avoid blocking
+        xhsClient.closeSession(currentUser).catch(console.error);
 
-        // Reset auto agent state
-        await fetch(`${CLAUDE_API}/agent/auto/reset/${currentUser}`, {
+        // Reset auto agent state - fire and forget
+        fetch(`${CLAUDE_API}/agent/auto/reset/${currentUser}`, {
           method: 'POST'
         }).catch(console.error);
       }
 
+      shouldReload = true;
+    } catch (error) {
+      console.error('退出登录清理过程出错:', error);
+      // Even if error occurs, we force logout locally
+      shouldReload = true;
+    } finally {
+      // ALWAYS clear local state
       localStorage.removeItem('currentXHSUser');
       localStorage.removeItem(`userConfig_${currentUser}`);
+      localStorage.removeItem('xhs_session_id'); // Critical: Clear the session ID for browser pool
       localStorage.setItem('lastLogoutTime', Date.now().toString());
 
       setCurrentUser(null);
@@ -451,13 +462,10 @@ export default function XiaohongshuAutoManager() {
       setLogoutProtection(true);
       setLogoutCountdown(60);
 
-      alert('已退出登录！\n\n⚠️ 为确保数据完全清理，系统将禁止新登录60秒。');
-
-      // Reload to clear state cleanly
-      window.location.reload();
-    } catch (error) {
-      console.error('退出登录失败:', error);
-      alert('退出过程中遇到问题，请刷新页面重试');
+      if (shouldReload) {
+        alert('已退出登录！\n\n⚠️ 为确保数据完全清理，系统将禁止新登录60秒。');
+        window.location.reload();
+      }
     }
   };
 
