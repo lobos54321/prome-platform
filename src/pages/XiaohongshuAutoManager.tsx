@@ -18,7 +18,9 @@ import {
   Clock,
   Activity,
   QrCode,
-  Smartphone
+  Smartphone,
+  Upload,
+  Video
 } from 'lucide-react';
 import { xhsClient } from '@/lib/xhs-worker';
 
