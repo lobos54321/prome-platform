@@ -599,18 +599,18 @@ export default function XiaohongshuAutoManager() {
           <h1 className="text-4xl font-bold mb-2">🤖 小红书全自动运营系统</h1>
           <p className="text-muted-foreground">一次设置，终身自动 - 让Claude为你打理一切</p>
         </div>
-        {!showSetup && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {!showSetup && (
             <Button variant="outline" onClick={handleReconfigure}>
               <Settings className="w-4 h-4 mr-2" />
               重新配置
             </Button>
-            <Button variant="destructive" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              退出登录
-            </Button>
-          </div>
-        )}
+          )}
+          <Button variant="destructive" onClick={handleLogout}>
+            <LogOut className="w-4 h-4 mr-2" />
+            退出登录
+          </Button>
+        </div>
       </div>
 
       {/* Setup Wizard */}
