@@ -174,16 +174,20 @@ export default function XiaohongshuAutoManager() {
     setIsLoading(true);
     setLoginStatusMsg("正在获取登录二维码...");
     try {
-      // REUSE existing session ID if available, otherwise create new one
+      // REUSE existing session ID from localStorage if available
       // This is CRITICAL for browser pool reuse on the backend
-      let tempUserId = currentUserIdRef.current;
+      let tempUserId = localStorage.getItem('xhs_session_id');
+
       if (!tempUserId) {
         tempUserId = `user_${Date.now()}`;
-        currentUserIdRef.current = tempUserId;
+        localStorage.setItem('xhs_session_id', tempUserId);
         console.log(`🆕 Created new session ID: ${tempUserId}`);
       } else {
-        console.log(`♻️ Reusing existing session ID: ${tempUserId}`);
+        console.log(`♻️ Reusing existing session ID from storage: ${tempUserId}`);
       }
+
+      // Update ref for local usage
+      currentUserIdRef.current = tempUserId;
 
       const res = await xhsClient.getLoginQRCode({
         userId: tempUserId,
@@ -336,6 +340,7 @@ export default function XiaohongshuAutoManager() {
     setLoginStatusMsg("");
     // Clear the session ID so next time we get a fresh browser
     currentUserIdRef.current = null;
+    localStorage.removeItem('xhs_session_id'); // Clear from storage
     setQrSecondsRemaining(90);
   };
 
