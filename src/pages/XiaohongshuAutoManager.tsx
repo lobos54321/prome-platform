@@ -72,6 +72,13 @@ export default function XiaohongshuAutoManager() {
   const [dashboardData, setDashboardData] = useState<DashboardData>({});
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Publishing State
+  const [publishType, setPublishType] = useState<"video" | "image">("video");
+  const [publishUrl, setPublishUrl] = useState("");
+  const [publishTitle, setPublishTitle] = useState("");
+  const [publishDesc, setPublishDesc] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
+
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
   const loginCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const qrRefreshTimer = useRef<NodeJS.Timeout | null>(null);
@@ -342,6 +349,66 @@ export default function XiaohongshuAutoManager() {
     currentUserIdRef.current = null;
     localStorage.removeItem('xhs_session_id'); // Clear from storage
     setQrSecondsRemaining(90);
+  };
+
+  const handlePublish = async () => {
+    if (!currentUser || !publishUrl || !publishTitle) {
+      alert("请填写完整信息");
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      // Get cookies from local storage
+      const cookiesStr = localStorage.getItem(`xhs_cookies_${currentUser}`);
+      const cookies = cookiesStr ? JSON.parse(cookiesStr) : [];
+
+      // Parse URLs (comma separated or newline separated)
+      const urls = publishUrl.split(/[\n,]/).map(u => u.trim()).filter(u => u.length > 0);
+
+      await xhsClient.publish({
+        userId: currentUser,
+        cookie: cookies,
+        publishType: publishType,
+        files: urls,
+        title: publishTitle,
+        desc: publishDesc
+      });
+
+      alert("发布任务已提交！后台正在处理...");
+      setPublishUrl("");
+      setPublishTitle("");
+      setPublishDesc("");
+    } catch (error: any) {
+      console.error("Publish failed:", error);
+      alert(`发布失败: ${error.message}`);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleTaskPublish = (task: any) => {
+    // Pre-fill the manual publish form with task data
+    setPublishTitle(task.title || "");
+    setPublishDesc(task.content || "");
+
+    // Determine type and URLs
+    if (task.image_urls && task.image_urls.length > 0) {
+      setPublishType("image");
+      setPublishUrl(task.image_urls.join('\n'));
+    } else if (task.video_url) {
+      setPublishType("video");
+      setPublishUrl(task.video_url);
+    } else {
+      // Default fallback
+      setPublishType("image");
+    }
+
+    // Scroll to publish card
+    const publishCard = document.getElementById("manual-publish-card");
+    if (publishCard) {
+      publishCard.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   // ===========================
@@ -754,6 +821,98 @@ export default function XiaohongshuAutoManager() {
             </CardContent>
           </Card>
 
+          {/* Manual Publish Card */}
+          <Card id="manual-publish-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Video className="w-5 h-5" />
+                发布新内容
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>发布类型</Label>
+                <div className="flex gap-4 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="publishType"
+                      value="video"
+                      checked={publishType === 'video'}
+                      onChange={() => setPublishType('video')}
+                    />
+                    <span>视频笔记</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="publishType"
+                      value="image"
+                      checked={publishType === 'image'}
+                      onChange={() => setPublishType('image')}
+                    />
+                    <span>图文笔记</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <Label>{publishType === 'video' ? '视频链接' : '图片链接 (每行一个)'}</Label>
+                {publishType === 'video' ? (
+                  <Input
+                    placeholder="请输入视频下载链接 (例如: https://example.com/video.mp4)"
+                    value={publishUrl}
+                    onChange={(e) => setPublishUrl(e.target.value)}
+                  />
+                ) : (
+                  <Textarea
+                    placeholder="请输入图片链接，每行一个..."
+                    rows={3}
+                    value={publishUrl}
+                    onChange={(e) => setPublishUrl(e.target.value)}
+                  />
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  * 支持直接输入链接，或者使用 OSS/S3 链接
+                </p>
+              </div>
+              <div>
+                <Label>标题</Label>
+                <Input
+                  placeholder="填写吸引人的标题"
+                  value={publishTitle}
+                  onChange={(e) => setPublishTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>描述</Label>
+                <Textarea
+                  placeholder="填写视频描述和话题标签..."
+                  rows={4}
+                  value={publishDesc}
+                  onChange={(e) => setPublishDesc(e.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full"
+                onClick={handlePublish}
+                disabled={isPublishing || !publishUrl || !publishTitle}
+              >
+                {isPublishing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    正在发布中...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    立即发布
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Strategy */}
           {dashboardData.strategy && (
             <Card>
@@ -805,13 +964,19 @@ export default function XiaohongshuAutoManager() {
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="font-semibold">{task.title}</h4>
-                          <Badge variant={
-                            task.status === 'completed' ? 'default' :
-                              task.status === 'in-progress' ? 'secondary' : 'outline'
-                          }>
-                            {task.status === 'completed' ? '已完成' :
-                              task.status === 'in-progress' ? '进行中' : '待发布'}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={
+                              task.status === 'completed' ? 'default' :
+                                task.status === 'in-progress' ? 'secondary' : 'outline'
+                            }>
+                              {task.status === 'completed' ? '已完成' :
+                                task.status === 'in-progress' ? '进行中' : '待发布'}
+                            </Badge>
+                            <Button size="sm" variant="outline" onClick={() => handleTaskPublish(task)}>
+                              <Upload className="w-3 h-3 mr-1" />
+                              发布
+                            </Button>
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground mb-2">
                           {task.content?.substring(0, 100)}...
