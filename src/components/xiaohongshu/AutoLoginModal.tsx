@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
@@ -37,6 +37,9 @@ export function AutoLoginModal({
   // 当前显示的登录二维码（可能会在验证后更新）
   const [currentLoginQRCode, setCurrentLoginQRCode] = useState<string | null>(null);
 
+  // Ref to track the current polling userId to prevent outdated session polling
+  const pollingUserIdRef = useRef<string | null>(null);
+
   // 重新获取登录二维码（验证成功后调用）
   const fetchLoginQRCode = useCallback(async () => {
     try {
@@ -70,12 +73,25 @@ export function AutoLoginModal({
   const checkLoginStatus = useCallback(async () => {
     if (!xhsUserId || checking) return;
 
+    // Pre-request check: verify we're still polling the correct userId
+    if (pollingUserIdRef.current !== xhsUserId) {
+      console.log(`⏭️ [AutoLoginModal] Skipping check for outdated session: ${xhsUserId}`);
+      return;
+    }
+
     try {
       setChecking(true);
       console.log('🔍 [AutoLoginModal] 开始检查登录状态...');
 
       // 检查登录状态
       const status = await xiaohongshuAPI.checkLoginStatus(xhsUserId);
+      
+      // Post-request check: verify userId hasn't changed while request was in-flight
+      if (pollingUserIdRef.current !== xhsUserId) {
+        console.log(`⏭️ [AutoLoginModal] Ignoring response for outdated session: ${xhsUserId}`);
+        return;
+      }
+      
       console.log('📊 [AutoLoginModal] 登录状态结果:', status);
 
       if (status.isLoggedIn) {
@@ -114,6 +130,11 @@ export function AutoLoginModal({
         }
       }
     } catch (error) {
+      // If this is for an outdated session, ignore the error
+      if (pollingUserIdRef.current !== xhsUserId) {
+        console.log(`⏭️ [AutoLoginModal] Ignoring error for outdated session: ${xhsUserId}`);
+        return;
+      }
       console.error('❌ [AutoLoginModal] Check login status error:', error);
       setStatusMessage('检查登录状态失败，请重试');
     } finally {
@@ -146,7 +167,15 @@ export function AutoLoginModal({
 
   // 主轮询逻辑
   useEffect(() => {
-    if (!isOpen || !xhsUserId) return;
+    if (!isOpen || !xhsUserId) {
+      // Modal closed or no userId - clear the polling ref
+      pollingUserIdRef.current = null;
+      return;
+    }
+
+    // Update the polling ref to the current userId
+    pollingUserIdRef.current = xhsUserId;
+    console.log(`🔄 [AutoLoginModal] Starting polling for userId: ${xhsUserId}`);
 
     const interval = setInterval(checkLoginStatus, 2000); // 改为2秒更快响应
 
@@ -166,6 +195,8 @@ export function AutoLoginModal({
     }, 1000);
 
     return () => {
+      console.log(`🛑 [AutoLoginModal] Stopping polling for userId: ${xhsUserId}`);
+      pollingUserIdRef.current = null;
       clearInterval(interval);
       clearTimeout(timeout);
       clearInterval(countdown);
