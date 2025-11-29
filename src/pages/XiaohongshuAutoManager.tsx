@@ -255,14 +255,20 @@ export default function XiaohongshuAutoManager() {
     console.log(`✅ Starting login check for user: ${userId}`);
     loginCheckInterval.current = setInterval(async () => {
       try {
-        // Verify we're still checking the right user
+        // Verify we're still checking the right user (pre-request check)
         if (currentUserIdRef.current !== userId) {
-          console.log(`⚠️ UserID mismatch, stopping polling for ${userId}`);
+          console.log(`⏭️ Skipping check for outdated session: ${userId}`);
           if (loginCheckInterval.current) clearInterval(loginCheckInterval.current);
           return;
         }
 
         const res = await xhsClient.checkLoginStatus(userId);
+
+        // Post-request validation: check if session ID changed while request was in-flight
+        if (currentUserIdRef.current !== userId) {
+          console.log(`⏭️ Ignoring response for outdated session: ${userId}`);
+          return;
+        }
 
         // Handle different statuses from backend
         switch (res.status) {
@@ -292,14 +298,19 @@ export default function XiaohongshuAutoManager() {
 
           case 'not_found':
             // Session not found - stop polling silently (probably old session)
-            console.warn(`⚠️ Session ${userId} not found on backend`);
+            console.log(`⚠️ Session ${userId} not found on backend (graceful handling)`);
             if (loginCheckInterval.current) clearInterval(loginCheckInterval.current);
             break;
 
           default:
             console.log('❓ Unknown status:', res.status);
         }
-      } catch (error) {
+      } catch (error: any) {
+        // If it's a 404 error for an outdated session, ignore it silently
+        if (currentUserIdRef.current !== userId) {
+          console.log(`⏭️ Ignoring error for outdated session: ${userId}`);
+          return;
+        }
         console.error("❌ Check status failed:", error);
       }
     }, 2000);

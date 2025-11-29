@@ -98,6 +98,15 @@ export class XhsWorkerClient {
                 headers: this.headers,
             });
 
+            // Handle 404 - session not found (expired or doesn't exist)
+            if (res.status === 404) {
+                console.log(`⚠️ Session ${userId} not found on worker (404)`);
+                return { 
+                    status: "not_found", 
+                    message: "Session 已过期或不存在" 
+                };
+            }
+
             if (!res.ok) {
                 const err = await res.text();
                 throw new Error(`Worker Error (${res.status}): ${err}`);
@@ -106,6 +115,31 @@ export class XhsWorkerClient {
             return await res.json(); // Returns { status: "success" | "waiting" }
         } catch (error) {
             console.error("Failed to check login status:", error);
+            throw error;
+        }
+    }
+
+    async closeSession(userId: string) {
+        try {
+            const res = await fetch(`${this.baseUrl}/api/v1/login/close/${userId}`, {
+                method: "POST",
+                headers: this.headers,
+            });
+
+            // Ignore 404 - session might already be closed
+            if (res.status === 404) {
+                console.log(`⚠️ Session ${userId} already closed or not found`);
+                return { status: "not_found" };
+            }
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(`Worker Error (${res.status}): ${err}`);
+            }
+
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to close session:", error);
             throw error;
         }
     }
