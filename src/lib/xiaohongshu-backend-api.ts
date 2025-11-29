@@ -447,11 +447,13 @@ export class XiaohongshuBackendAPI {
   /**
    * 强制清除所有Cookie和状态 - 彻底退出登录
    * 调用 force-clear-cookies 端点，清理所有Cookie来源
+   * 同时调用 Worker 清理接口清除用户数据目录
    */
   async forceLogout(userId: string): Promise<ApiResponse<any>> {
     try {
       console.log(`🧹 [BackendAPI] 强制清除用户 ${userId} 的所有Cookie和状态`);
 
+      // 1. 调用中间层清理
       const response = await fetch(`${this.baseURL}/agent/xiaohongshu/force-clear-cookies`, {
         method: 'POST',
         headers: {
@@ -463,9 +465,33 @@ export class XiaohongshuBackendAPI {
       const data = await response.json();
 
       if (response.ok) {
-        console.log(`✅ [BackendAPI] 强制清除成功:`, data);
+        console.log(`✅ [BackendAPI] 中间层强制清除成功:`, data);
       } else {
-        console.error(`❌ [BackendAPI] 强制清除失败:`, data);
+        console.error(`❌ [BackendAPI] 中间层强制清除失败:`, data);
+      }
+
+      // 2. 调用 Worker 清理接口清除用户数据目录
+      const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
+      const workerSecret = (import.meta as any).env?.VITE_WORKER_SECRET || 'default_secret_key';
+
+      try {
+        console.log(`🧹 [BackendAPI] 调用 Worker 清理接口...`);
+        const workerResponse = await fetch(`${workerUrl}/api/v1/login/session/${encodeURIComponent(userId)}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${workerSecret}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (workerResponse.ok) {
+          console.log(`✅ [BackendAPI] Worker 清理成功`);
+        } else {
+          console.warn(`⚠️ [BackendAPI] Worker 清理失败: ${workerResponse.status}`);
+        }
+      } catch (workerError) {
+        console.warn(`⚠️ [BackendAPI] Worker 清理请求失败:`, workerError);
+        // 不阻止退出流程
       }
 
       return { success: response.ok, data: data.data, error: data.error };

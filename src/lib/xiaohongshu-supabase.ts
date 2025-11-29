@@ -245,7 +245,7 @@ export class XiaohongshuSupabaseService {
   // 数据清除
   // ============================================
 
-  async clearUserData(supabaseUuid: string): Promise<void> {
+  async clearUserData(supabaseUuid: string, clearMapping: boolean = true): Promise<void> {
     try {
       // 清除自动化状态
       await supabase
@@ -271,10 +271,96 @@ export class XiaohongshuSupabaseService {
         .delete()
         .eq('supabase_uuid', supabaseUuid);
 
-      console.log('✅ User data cleared successfully');
+      // 清除用户配置
+      await supabase
+        .from('xhs_user_profiles')
+        .delete()
+        .eq('supabase_uuid', supabaseUuid);
+
+      // 清除用户映射（完全退出时）
+      if (clearMapping) {
+        await supabase
+          .from('xhs_user_mapping')
+          .delete()
+          .eq('supabase_uuid', supabaseUuid);
+      }
+
+      // 清除保存的 cookies（如果有这个表）
+      try {
+        await supabase
+          .from('xhs_cookies')
+          .delete()
+          .eq('supabase_uuid', supabaseUuid);
+      } catch (e) {
+        // 表可能不存在，忽略错误
+        console.log('xhs_cookies table might not exist, skipping...');
+      }
+
+      console.log('✅ User data cleared successfully (including mapping and profiles)');
     } catch (error) {
       console.error('Error clearing user data:', error);
       throw new Error('Failed to clear user data');
+    }
+  }
+
+  // ============================================
+  // Cookie 存储管理
+  // ============================================
+
+  /**
+   * 保存登录 cookies 到数据库
+   */
+  async saveCookies(supabaseUuid: string, xhsUserId: string, cookies: Record<string, unknown>): Promise<void> {
+    const { error } = await supabase
+      .from('xhs_cookies')
+      .upsert({
+        supabase_uuid: supabaseUuid,
+        xhs_user_id: xhsUserId,
+        cookies: cookies,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'supabase_uuid'
+      });
+
+    if (error) {
+      console.error('Error saving cookies:', error);
+      // 不抛出错误，因为表可能不存在
+    }
+  }
+
+  /**
+   * 获取保存的 cookies
+   */
+  async getCookies(supabaseUuid: string): Promise<Record<string, unknown> | null> {
+    try {
+      const { data, error } = await supabase
+        .from('xhs_cookies')
+        .select('cookies')
+        .eq('supabase_uuid', supabaseUuid)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching cookies:', error);
+        return null;
+      }
+
+      return data?.cookies || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * 清除保存的 cookies
+   */
+  async clearCookies(supabaseUuid: string): Promise<void> {
+    try {
+      await supabase
+        .from('xhs_cookies')
+        .delete()
+        .eq('supabase_uuid', supabaseUuid);
+    } catch (e) {
+      // 表可能不存在，忽略
     }
   }
 }
