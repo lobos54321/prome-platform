@@ -472,26 +472,31 @@ export class XiaohongshuBackendAPI {
 
       // 2. 调用 Worker 清理接口清除用户数据目录
       const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
-      const workerSecret = (import.meta as any).env?.VITE_WORKER_SECRET || 'default_secret_key';
+      const workerSecret = (import.meta as any).env?.VITE_WORKER_SECRET;
 
-      try {
-        console.log(`🧹 [BackendAPI] 调用 Worker 清理接口...`);
-        const workerResponse = await fetch(`${workerUrl}/api/v1/login/session/${encodeURIComponent(userId)}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${workerSecret}`,
-            'Content-Type': 'application/json',
-          },
-        });
+      // 只有在配置了 Worker 密钥时才调用 Worker 清理接口
+      if (workerSecret) {
+        try {
+          console.log(`🧹 [BackendAPI] 调用 Worker 清理接口...`);
+          const workerResponse = await fetch(`${workerUrl}/api/v1/login/session/${encodeURIComponent(userId)}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${workerSecret}`,
+              'Content-Type': 'application/json',
+            },
+          });
 
-        if (workerResponse.ok) {
-          console.log(`✅ [BackendAPI] Worker 清理成功`);
-        } else {
-          console.warn(`⚠️ [BackendAPI] Worker 清理失败: ${workerResponse.status}`);
+          if (workerResponse.ok) {
+            console.log(`✅ [BackendAPI] Worker 清理成功`);
+          } else {
+            console.warn(`⚠️ [BackendAPI] Worker 清理失败: ${workerResponse.status}`);
+          }
+        } catch (workerError) {
+          console.warn(`⚠️ [BackendAPI] Worker 清理请求失败:`, workerError);
+          // 不阻止退出流程
         }
-      } catch (workerError) {
-        console.warn(`⚠️ [BackendAPI] Worker 清理请求失败:`, workerError);
-        // 不阻止退出流程
+      } else {
+        console.warn(`⚠️ [BackendAPI] VITE_WORKER_SECRET 未配置，跳过 Worker 清理`);
       }
 
       return { success: response.ok, data: data.data, error: data.error };
