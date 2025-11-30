@@ -622,62 +622,80 @@ export default function XiaohongshuAutoManager() {
     );
   }
 
-  // Extension Sync Logic
-  const EXTENSION_ID = "YOUR_EXTENSION_ID_HERE"; // 用户需要替换这个ID
+  // Extension Sync Logic (Content Script Bridge)
+  const [hasExtension, setHasExtension] = useState(false);
+
+  // Auto-detect extension
+  useEffect(() => {
+    const checkExtension = () => {
+      if (document.getElementById('prome-extension-installed')) {
+        setHasExtension(true);
+      }
+    };
+
+    checkExtension();
+    const interval = setInterval(checkExtension, 1000); // Check every second
+    return () => clearInterval(interval);
+  }, []);
 
   const handleExtensionSync = () => {
     setIsLoading(true);
     setLoginStatusMsg("正在连接插件...");
 
-    // Check if chrome runtime is available
-    const chrome = (window as any).chrome;
-    if (chrome && chrome.runtime) {
-      chrome.runtime.sendMessage(
-        EXTENSION_ID,
-        { action: "SYNC_XHS" },
-        async (response: any) => {
-          if (chrome.runtime.lastError || !response) {
-            console.error("Extension error:", chrome.runtime.lastError);
-            setLoginStatusMsg("未检测到插件，请先安装 Prome 助手插件");
-            setIsLoading(false);
-            // Show install guide or link
-            window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank");
-            return;
-          }
+    // Setup one-time listener for response
+    const handleResponse = async (event: MessageEvent) => {
+      if (event.source !== window) return;
+      if (event.data.type === "SYNC_XHS_RESPONSE") {
+        window.removeEventListener("message", handleResponse);
 
-          if (response.success) {
-            setLoginStatusMsg("获取成功，正在同步...");
-            try {
-              // Generate a temp user ID if not exists
-              let tempUserId = localStorage.getItem('xhs_session_id');
-              if (!tempUserId) {
-                tempUserId = `user_${Date.now()}`;
-                localStorage.setItem('xhs_session_id', tempUserId);
-              }
-
-              // Send to backend
-              await xhsClient.syncCookies(tempUserId, response.data.cookies, response.data.ua);
-
-              // Handle success
-              handleLoginSuccess(tempUserId, response.data.cookies);
-            } catch (error: any) {
-              console.error("Sync failed:", error);
-              alert("同步失败: " + error.message);
-              setLoginStatusMsg("");
-            } finally {
-              setIsLoading(false);
+        if (event.data.success) {
+          setLoginStatusMsg("获取成功，正在同步...");
+          try {
+            // Generate a temp user ID if not exists
+            let tempUserId = localStorage.getItem('xhs_session_id');
+            if (!tempUserId) {
+              tempUserId = `user_${Date.now()}`;
+              localStorage.setItem('xhs_session_id', tempUserId);
             }
-          } else {
-            alert("同步失败：" + response.msg);
+
+            // Send to backend
+            await xhsClient.syncCookies(tempUserId, event.data.data.cookies, event.data.data.ua);
+
+            // Handle success
+            handleLoginSuccess(tempUserId, event.data.data.cookies);
+          } catch (error: any) {
+            console.error("Sync failed:", error);
+            alert("同步失败: " + error.message);
             setLoginStatusMsg("");
+          } finally {
             setIsLoading(false);
           }
+        } else {
+          alert("同步失败：" + event.data.msg);
+          setLoginStatusMsg("");
+          setIsLoading(false);
         }
-      );
-    } else {
-      alert("请使用 Chrome 浏览器并安装插件");
-      setIsLoading(false);
-    }
+      }
+    };
+
+    window.addEventListener("message", handleResponse);
+
+    // Send request
+    window.postMessage({ type: "SYNC_XHS_REQUEST" }, "*");
+
+    // Timeout fallback
+    setTimeout(() => {
+      window.removeEventListener("message", handleResponse);
+      if (isLoading) {
+        // setIsLoading(false); // Don't stop loading, just let it hang or show error?
+        // Actually if timeout, it means content script didn't respond
+        console.warn("Extension sync timeout");
+      }
+    }, 5000);
+  };
+
+  const handleDownloadExtension = () => {
+    window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank");
   };
 
   if (!isLoggedIn) {
@@ -695,21 +713,30 @@ export default function XiaohongshuAutoManager() {
               <div>
                 <h3 className="text-lg font-semibold mb-2">一键托管账号</h3>
                 <p className="text-muted-foreground max-w-md mx-auto">
-                  请确保您已安装 Prome 助手插件，并在当前浏览器登录了小红书。
-                  <br />
-                  点击下方按钮，系统将自动同步您的登录状态。
+                  {hasExtension
+                    ? "已检测到 Prome 助手插件，点击下方按钮一键连接。"
+                    : "请先安装 Prome 助手插件，以便自动同步登录状态。"}
                 </p>
               </div>
 
               <div className="flex flex-col gap-4 items-center">
-                <Button size="lg" onClick={handleExtensionSync} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
-                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-                  {isLoading ? loginStatusMsg || "正在同步..." : "一键连接小红书"}
-                </Button>
+                {hasExtension ? (
+                  <Button size="lg" onClick={handleExtensionSync} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                    {isLoading ? loginStatusMsg || "正在同步..." : "一键连接小红书"}
+                  </Button>
+                ) : (
+                  <Button size="lg" variant="outline" onClick={handleDownloadExtension} className="min-w-[200px]">
+                    <Upload className="w-4 h-4 mr-2" />
+                    下载并安装插件
+                  </Button>
+                )}
 
-                <p className="text-xs text-gray-400">
-                  未安装插件? <a href="#" onClick={(e) => { e.preventDefault(); window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank"); }} className="underline hover:text-red-500">点击下载安装</a>
-                </p>
+                {!hasExtension && (
+                  <p className="text-xs text-gray-400">
+                    安装后请刷新页面
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
