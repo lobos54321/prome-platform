@@ -638,7 +638,26 @@ export default function XiaohongshuAutoManager() {
     );
   }
 
+  // Extension Sync Logic (Content Script Bridge)
+  const [hasExtension, setHasExtension] = useState(false);
+  const [isChrome, setIsChrome] = useState(false);
 
+  // Auto-detect extension and browser
+  useEffect(() => {
+    // Check if Chrome
+    const isChromeBrowser = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+    setIsChrome(isChromeBrowser);
+
+    const checkExtension = () => {
+      if (document.getElementById('prome-extension-installed')) {
+        setHasExtension(true);
+      }
+    };
+
+    checkExtension();
+    const interval = setInterval(checkExtension, 1000); // Check every second
+    return () => clearInterval(interval);
+  }, []);
 
   const handleExtensionSync = () => {
     setIsLoading(true);
@@ -712,17 +731,30 @@ export default function XiaohongshuAutoManager() {
               <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
                 <Smartphone className="w-10 h-10 text-red-500" />
               </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2">一键托管账号</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  {hasExtension
-                    ? "已检测到 Prome 助手插件，点击下方按钮一键连接。"
-                    : "请先安装 Prome 助手插件，以便自动同步登录状态。"}
-                </p>
-              </div>
+
+              {!isChrome ? (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 text-orange-600">请使用 Chrome 浏览器</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    Prome 助手插件仅支持 Google Chrome 浏览器。<br />
+                    请切换到 Chrome 浏览器后访问本页面。
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">一键托管账号</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    {hasExtension
+                      ? "已检测到 Prome 助手插件，点击下方按钮一键连接。"
+                      : "检测到您正在使用 Chrome，请先安装 Prome 助手插件。"}
+                  </p>
+                </div>
+              )}
 
               <div className="flex flex-col gap-4 items-center">
-                {hasExtension ? (
+                {!isChrome ? (
+                  <Button variant="outline" disabled>不支持当前浏览器</Button>
+                ) : hasExtension ? (
                   <Button size="lg" onClick={handleExtensionSync} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
                     {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                     {isLoading ? loginStatusMsg || "正在同步..." : "一键连接小红书"}
@@ -734,7 +766,7 @@ export default function XiaohongshuAutoManager() {
                   </Button>
                 )}
 
-                {!hasExtension && (
+                {isChrome && !hasExtension && (
                   <p className="text-xs text-gray-400">
                     安装后请刷新页面
                   </p>
