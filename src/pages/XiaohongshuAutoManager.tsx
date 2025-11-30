@@ -666,10 +666,14 @@ export default function XiaohongshuAutoManager() {
             }
 
             // Send to backend
-            await xhsClient.syncCookies(tempUserId, event.data.data.cookies, event.data.data.ua);
+            const res = await xhsClient.syncCookies(tempUserId, event.data.data.cookies, event.data.data.ua);
 
-            // Handle success
-            handleLoginSuccess(tempUserId, event.data.data.cookies);
+            if (res.status === 'success') {
+              // Handle success
+              handleLoginSuccess(tempUserId, event.data.data.cookies);
+            } else {
+              throw new Error(res.message || "Cookie verification failed");
+            }
           } catch (error: any) {
             console.error("Sync failed:", error);
             alert("同步失败: " + error.message);
