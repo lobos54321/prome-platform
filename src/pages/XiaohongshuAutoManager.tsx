@@ -646,10 +646,12 @@ export default function XiaohongshuAutoManager() {
 
 
 
-  const handleExtensionSync = () => {
-    setIsLoading(true);
-    setLoginStatusMsg("正在连接插件...");
-    setSyncError(null);
+  const handleExtensionSync = (silent: boolean = false) => {
+    if (!silent) {
+      setIsLoading(true);
+      setLoginStatusMsg("正在连接插件...");
+      setSyncError(null);
+    }
 
     // Setup one-time listener for response
     const handleResponse = async (event: MessageEvent) => {
@@ -678,15 +680,19 @@ export default function XiaohongshuAutoManager() {
             }
           } catch (error: any) {
             console.error("Sync failed:", error);
-            setSyncError(error.message);
-            setLoginStatusMsg("");
+            if (!silent) {
+              setSyncError(error.message);
+              setLoginStatusMsg("");
+            }
           } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
           }
         } else {
-          setSyncError(event.data.msg);
-          setLoginStatusMsg("");
-          setIsLoading(false);
+          if (!silent) {
+            setSyncError(event.data.msg);
+            setLoginStatusMsg("");
+            setIsLoading(false);
+          }
         }
       }
     };
@@ -699,13 +705,26 @@ export default function XiaohongshuAutoManager() {
     // Timeout fallback
     setTimeout(() => {
       window.removeEventListener("message", handleResponse);
-      if (isLoading) {
+      if (isLoading && !silent) {
         // setIsLoading(false); // Don't stop loading, just let it hang or show error?
         // Actually if timeout, it means content script didn't respond
         console.warn("Extension sync timeout");
       }
     }, 5000);
   };
+
+  // Auto-sync on focus
+  useEffect(() => {
+    const onFocus = () => {
+      if (hasExtension && !isLoggedIn && !isLoading) {
+        console.log("Window focused, attempting silent sync...");
+        handleExtensionSync(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [hasExtension, isLoggedIn, isLoading]);
 
   const handleDownloadExtension = () => {
     window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank");
@@ -747,7 +766,7 @@ export default function XiaohongshuAutoManager() {
                 {!isChrome ? (
                   <Button variant="outline" disabled>不支持当前浏览器</Button>
                 ) : hasExtension ? (
-                  <Button size="lg" onClick={handleExtensionSync} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
+                  <Button size="lg" onClick={() => handleExtensionSync(false)} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
                     {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                     {isLoading ? loginStatusMsg || "正在同步..." : "一键连接小红书"}
                   </Button>
