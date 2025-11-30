@@ -88,9 +88,14 @@ export default function XiaohongshuAutoManager() {
 
   // Extension Sync Logic (Content Script Bridge)
   const [hasExtension, setHasExtension] = useState(false);
+  const [isChrome, setIsChrome] = useState(false);
 
-  // Auto-detect extension
+  // Auto-detect extension and browser
   useEffect(() => {
+    // Check if Chrome
+    const isChromeBrowser = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+    setIsChrome(isChromeBrowser);
+
     const checkExtension = () => {
       if (document.getElementById('prome-extension-installed')) {
         setHasExtension(true);
@@ -638,26 +643,7 @@ export default function XiaohongshuAutoManager() {
     );
   }
 
-  // Extension Sync Logic (Content Script Bridge)
-  const [hasExtension, setHasExtension] = useState(false);
-  const [isChrome, setIsChrome] = useState(false);
 
-  // Auto-detect extension and browser
-  useEffect(() => {
-    // Check if Chrome
-    const isChromeBrowser = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
-    setIsChrome(isChromeBrowser);
-
-    const checkExtension = () => {
-      if (document.getElementById('prome-extension-installed')) {
-        setHasExtension(true);
-      }
-    };
-
-    checkExtension();
-    const interval = setInterval(checkExtension, 1000); // Check every second
-    return () => clearInterval(interval);
-  }, []);
 
   const handleExtensionSync = () => {
     setIsLoading(true);
