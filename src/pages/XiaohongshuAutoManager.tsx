@@ -765,7 +765,7 @@ export default function XiaohongshuAutoManager() {
                 {hasExtension && (
                   <div className="text-xs text-gray-400 max-w-xs text-center mt-2">
                     <p>💡 如需切换账号：</p>
-                    <p>请先在 <a href="https://www.xiaohongshu.com" target="_blank" className="underline hover:text-red-500">小红书官网</a> 退出当前账号并登录新账号，然后再次点击上方按钮。</p>
+                    <p>请先在 <a href="https://creator.xiaohongshu.com/login" target="_blank" className="underline hover:text-red-500">小红书创作平台</a> 退出当前账号并登录新账号，然后再次点击上方按钮。</p>
                   </div>
                 )}
               </div>
