@@ -622,6 +622,64 @@ export default function XiaohongshuAutoManager() {
     );
   }
 
+  // Extension Sync Logic
+  const EXTENSION_ID = "YOUR_EXTENSION_ID_HERE"; // 用户需要替换这个ID
+
+  const handleExtensionSync = () => {
+    setIsLoading(true);
+    setLoginStatusMsg("正在连接插件...");
+
+    // Check if chrome runtime is available
+    const chrome = (window as any).chrome;
+    if (chrome && chrome.runtime) {
+      chrome.runtime.sendMessage(
+        EXTENSION_ID,
+        { action: "SYNC_XHS" },
+        async (response: any) => {
+          if (chrome.runtime.lastError || !response) {
+            console.error("Extension error:", chrome.runtime.lastError);
+            setLoginStatusMsg("未检测到插件，请先安装 Prome 助手插件");
+            setIsLoading(false);
+            // Show install guide or link
+            window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank");
+            return;
+          }
+
+          if (response.success) {
+            setLoginStatusMsg("获取成功，正在同步...");
+            try {
+              // Generate a temp user ID if not exists
+              let tempUserId = localStorage.getItem('xhs_session_id');
+              if (!tempUserId) {
+                tempUserId = `user_${Date.now()}`;
+                localStorage.setItem('xhs_session_id', tempUserId);
+              }
+
+              // Send to backend
+              await xhsClient.syncCookies(tempUserId, response.data.cookies, response.data.ua);
+
+              // Handle success
+              handleLoginSuccess(tempUserId, response.data.cookies);
+            } catch (error: any) {
+              console.error("Sync failed:", error);
+              alert("同步失败: " + error.message);
+              setLoginStatusMsg("");
+            } finally {
+              setIsLoading(false);
+            }
+          } else {
+            alert("同步失败：" + response.msg);
+            setLoginStatusMsg("");
+            setIsLoading(false);
+          }
+        }
+      );
+    } else {
+      alert("请使用 Chrome 浏览器并安装插件");
+      setIsLoading(false);
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -630,49 +688,30 @@ export default function XiaohongshuAutoManager() {
             <CardTitle>连接小红书账号</CardTitle>
           </CardHeader>
           <CardContent>
-            {!qrCode ? (
-              <div className="text-center space-y-6 py-8">
-                <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
-                  <Smartphone className="w-10 h-10 text-red-500" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">扫码登录</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    请使用小红书APP扫描二维码登录。登录后，系统将自动获取您的账号权限以进行自动化发布。
-                  </p>
-                </div>
-                <Button size="lg" onClick={handleStartLogin} className="bg-red-500 hover:bg-red-600">
-                  <QrCode className="w-4 h-4 mr-2" />
-                  获取登录二维码
-                </Button>
+            <div className="text-center space-y-6 py-8">
+              <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
+                <Smartphone className="w-10 h-10 text-red-500" />
               </div>
-            ) : (
-              <div className="text-center space-y-6 py-8">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-2">请扫码登录</h3>
-                  <p className="text-sm text-muted-foreground">{loginStatusMsg}</p>
-                </div>
-
-                <div className="flex justify-center">
-                  <div className="border-4 border-red-100 rounded-lg p-2">
-                    <img
-                      src={`data:image/png;base64,${qrCode}`}
-                      alt="Login QR Code"
-                      className="w-48 h-48 object-contain"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  正在等待扫码...
-                </div>
-
-                <Button variant="outline" onClick={handleCancelLogin}>
-                  取消
-                </Button>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">一键托管账号</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  请确保您已安装 Prome 助手插件，并在当前浏览器登录了小红书。
+                  <br />
+                  点击下方按钮，系统将自动同步您的登录状态。
+                </p>
               </div>
-            )}
+
+              <div className="flex flex-col gap-4 items-center">
+                <Button size="lg" onClick={handleExtensionSync} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
+                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  {isLoading ? loginStatusMsg || "正在同步..." : "一键连接小红书"}
+                </Button>
+
+                <p className="text-xs text-gray-400">
+                  未安装插件? <a href="#" onClick={(e) => { e.preventDefault(); window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank"); }} className="underline hover:text-red-500">点击下载安装</a>
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

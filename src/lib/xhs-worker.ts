@@ -101,9 +101,9 @@ export class XhsWorkerClient {
             // Handle 404 - session not found (expired or doesn't exist)
             if (res.status === 404) {
                 console.log(`⚠️ Session ${userId} not found on worker (404)`);
-                return { 
-                    status: "not_found", 
-                    message: "Session 已过期或不存在" 
+                return {
+                    status: "not_found",
+                    message: "Session 已过期或不存在"
                 };
             }
 
@@ -140,6 +140,30 @@ export class XhsWorkerClient {
             return await res.json();
         } catch (error) {
             console.error("Failed to close session:", error);
+            throw error;
+        }
+    }
+
+    async syncCookies(userId: string, cookies: any[], ua: string) {
+        try {
+            const res = await fetch(`${this.baseUrl}/api/v1/login/sync`, {
+                method: "POST",
+                headers: this.headers,
+                body: JSON.stringify({
+                    user_id: userId,
+                    cookies: cookies,
+                    ua: ua
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(`Worker Error (${res.status}): ${err}`);
+            }
+
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to sync cookies:", error);
             throw error;
         }
     }
