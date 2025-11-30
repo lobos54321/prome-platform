@@ -89,6 +89,7 @@ export default function XiaohongshuAutoManager() {
   // Extension Sync Logic (Content Script Bridge)
   const [hasExtension, setHasExtension] = useState(false);
   const [isChrome, setIsChrome] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Auto-detect extension and browser
   useEffect(() => {
@@ -648,6 +649,7 @@ export default function XiaohongshuAutoManager() {
   const handleExtensionSync = () => {
     setIsLoading(true);
     setLoginStatusMsg("正在连接插件...");
+    setSyncError(null);
 
     // Setup one-time listener for response
     const handleResponse = async (event: MessageEvent) => {
@@ -676,13 +678,13 @@ export default function XiaohongshuAutoManager() {
             }
           } catch (error: any) {
             console.error("Sync failed:", error);
-            alert("同步失败: " + error.message);
+            setSyncError(error.message);
             setLoginStatusMsg("");
           } finally {
             setIsLoading(false);
           }
         } else {
-          alert("同步失败：" + event.data.msg);
+          setSyncError(event.data.msg);
           setLoginStatusMsg("");
           setIsLoading(false);
         }
@@ -760,6 +762,15 @@ export default function XiaohongshuAutoManager() {
                   <p className="text-xs text-gray-400">
                     安装后请刷新页面
                   </p>
+                )}
+
+                {syncError && (
+                  <Alert variant="destructive" className="mt-4 max-w-md text-left">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="break-all">
+                      <div dangerouslySetInnerHTML={{ __html: syncError.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="underline hover:text-red-800">$1</a>') }} />
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 {hasExtension && (
