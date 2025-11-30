@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,6 +50,7 @@ export default function XiaohongshuAutoManager() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showSetup, setShowSetup] = useState(true);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [autoModeEnabled, setAutoModeEnabled] = useState(false);
   const [logoutProtection, setLogoutProtection] = useState(false);
   const [logoutCountdown, setLogoutCountdown] = useState(60);
@@ -369,8 +371,15 @@ export default function XiaohongshuAutoManager() {
 
     // Auto-transition to dashboard (show setup)
     setTimeout(() => {
-      setShowSetup(true);
+      setShowLoginDialog(false);
+      setShowSetup(false); // Actually if they were in setup, maybe keep them there? 
+      // But if they clicked "Start" -> Login -> Success, we should probably trigger start?
+      // For now, just close dialog and let them click start again or auto-start.
+      // Let's just close dialog.
       setLoginStatusMsg("");
+
+      // If we have config, maybe auto-start? 
+      // For now, let's just let them click start again to be safe/clear.
     }, 1500);
   };
 
@@ -483,7 +492,10 @@ export default function XiaohongshuAutoManager() {
   };
 
   const handleStartAutoMode = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setShowLoginDialog(true);
+      return;
+    }
 
     setIsGenerating(true);
     try {
@@ -730,84 +742,87 @@ export default function XiaohongshuAutoManager() {
     window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank");
   };
 
-  if (!isLoggedIn) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>连接小红书账号</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center space-y-6 py-8">
-              <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
-                <Smartphone className="w-10 h-10 text-red-500" />
-              </div>
-
-              {!isChrome ? (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2 text-orange-600">请使用 Chrome 浏览器</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    Prome 助手插件仅支持 Google Chrome 浏览器。<br />
-                    请切换到 Chrome 浏览器后访问本页面。
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">一键托管账号</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    {hasExtension
-                      ? "已检测到 Prome 助手插件，点击下方按钮一键连接。"
-                      : "检测到您正在使用 Chrome，请先安装 Prome 助手插件。"}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-4 items-center">
-                {!isChrome ? (
-                  <Button variant="outline" disabled>不支持当前浏览器</Button>
-                ) : hasExtension ? (
-                  <Button size="lg" onClick={() => handleExtensionSync(false)} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-                    {isLoading ? loginStatusMsg || "正在同步..." : "一键连接小红书"}
-                  </Button>
-                ) : (
-                  <Button size="lg" variant="outline" onClick={handleDownloadExtension} className="min-w-[200px]">
-                    <Upload className="w-4 h-4 mr-2" />
-                    下载并安装插件
-                  </Button>
-                )}
-
-                {!hasExtension && (
-                  <p className="text-xs text-gray-400">
-                    安装后请刷新页面
-                  </p>
-                )}
-
-                {syncError && (
-                  <Alert variant="destructive" className="mt-4 max-w-md text-left">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="break-all">
-                      <div dangerouslySetInnerHTML={{ __html: syncError.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="underline hover:text-red-800">$1</a>') }} />
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {hasExtension && (
-                  <div className="text-xs text-gray-400 max-w-xs text-center mt-2">
-                    <p>💡 如需切换账号：</p>
-                    <p>请先在 <a href="https://creator.xiaohongshu.com/login" target="_blank" className="underline hover:text-red-500">小红书创作平台</a> 退出当前账号并登录新账号，然后再次点击上方按钮。</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+  // Render Login Content (Reusable)
+  const renderLoginContent = () => (
+    <div className="text-center space-y-6 py-4">
+      <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
+        <Smartphone className="w-10 h-10 text-red-500" />
       </div>
-    );
-  }
+
+      {!isChrome ? (
+        <div>
+          <h3 className="text-lg font-semibold mb-2 text-orange-600">请使用 Chrome 浏览器</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Prome 助手插件仅支持 Google Chrome 浏览器。<br />
+            请切换到 Chrome 浏览器后访问本页面。
+          </p>
+        </div>
+      ) : (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">一键托管账号</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            {hasExtension
+              ? "已检测到 Prome 助手插件，点击下方按钮一键连接。"
+              : "检测到您正在使用 Chrome，请先安装 Prome 助手插件。"}
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4 items-center">
+        {!isChrome ? (
+          <Button variant="outline" disabled>不支持当前浏览器</Button>
+        ) : hasExtension ? (
+          <Button size="lg" onClick={() => handleExtensionSync(false)} className="bg-red-500 hover:bg-red-600 min-w-[200px]" disabled={isLoading}>
+            {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+            {isLoading ? loginStatusMsg || "正在同步..." : "一键连接小红书"}
+          </Button>
+        ) : (
+          <Button size="lg" variant="outline" onClick={handleDownloadExtension} className="min-w-[200px]">
+            <Upload className="w-4 h-4 mr-2" />
+            下载并安装插件
+          </Button>
+        )}
+
+        {!hasExtension && (
+          <p className="text-xs text-gray-400">
+            安装后请刷新页面
+          </p>
+        )}
+
+        {syncError && (
+          <Alert variant="destructive" className="mt-4 max-w-md text-left">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="break-all">
+              <div dangerouslySetInnerHTML={{ __html: syncError.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="underline hover:text-red-800">$1</a>') }} />
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {hasExtension && (
+          <div className="text-xs text-gray-400 max-w-xs text-center mt-2">
+            <p>💡 如需切换账号：</p>
+            <p>请先在 <a href="https://creator.xiaohongshu.com/login" target="_blank" className="underline hover:text-red-500">小红书创作平台</a> 退出当前账号并登录新账号，然后再次点击上方按钮。</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Login Dialog */}
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>连接小红书账号</DialogTitle>
+            <DialogDescription>
+              需要连接账号才能开始自动生成和发布内容
+            </DialogDescription>
+          </DialogHeader>
+          {renderLoginContent()}
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
