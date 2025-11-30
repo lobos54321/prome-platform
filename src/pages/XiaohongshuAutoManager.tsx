@@ -143,6 +143,19 @@ export default function XiaohongshuAutoManager() {
     }
   }, [logoutProtection, logoutCountdown]);
 
+  // Auto-sync on focus (Moved to top level to fix React Error #310)
+  useEffect(() => {
+    const onFocus = () => {
+      if (hasExtension && !isLoggedIn && !isLoading) {
+        console.log("Window focused, attempting silent sync...");
+        handleExtensionSync(true);
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [hasExtension, isLoggedIn, isLoading]);
+
   const checkLoginStatus = async () => {
     setIsLoading(true);
     try {
@@ -725,18 +738,7 @@ export default function XiaohongshuAutoManager() {
     }, 5000);
   };
 
-  // Auto-sync on focus
-  useEffect(() => {
-    const onFocus = () => {
-      if (hasExtension && !isLoggedIn && !isLoading) {
-        console.log("Window focused, attempting silent sync...");
-        handleExtensionSync(true);
-      }
-    };
 
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [hasExtension, isLoggedIn, isLoading]);
 
   const handleDownloadExtension = () => {
     window.open("https://github.com/lobos54321/xiaohongshu-worker/tree/main/chrome-extension", "_blank");
