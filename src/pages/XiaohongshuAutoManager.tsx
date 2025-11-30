@@ -86,6 +86,22 @@ export default function XiaohongshuAutoManager() {
   const qrRefreshTimer = useRef<NodeJS.Timeout | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
+  // Extension Sync Logic (Content Script Bridge)
+  const [hasExtension, setHasExtension] = useState(false);
+
+  // Auto-detect extension
+  useEffect(() => {
+    const checkExtension = () => {
+      if (document.getElementById('prome-extension-installed')) {
+        setHasExtension(true);
+      }
+    };
+
+    checkExtension();
+    const interval = setInterval(checkExtension, 1000); // Check every second
+    return () => clearInterval(interval);
+  }, []);
+
   // 检查登录状态
   useEffect(() => {
     checkLoginStatus();
@@ -622,21 +638,7 @@ export default function XiaohongshuAutoManager() {
     );
   }
 
-  // Extension Sync Logic (Content Script Bridge)
-  const [hasExtension, setHasExtension] = useState(false);
 
-  // Auto-detect extension
-  useEffect(() => {
-    const checkExtension = () => {
-      if (document.getElementById('prome-extension-installed')) {
-        setHasExtension(true);
-      }
-    };
-
-    checkExtension();
-    const interval = setInterval(checkExtension, 1000); // Check every second
-    return () => clearInterval(interval);
-  }, []);
 
   const handleExtensionSync = () => {
     setIsLoading(true);
