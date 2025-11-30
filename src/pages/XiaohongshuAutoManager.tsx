@@ -628,46 +628,7 @@ export default function XiaohongshuAutoManager() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
-  }
 
-  if (logoutProtection) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <Card className="bg-orange-50 border-orange-200">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <Clock className="w-16 h-16 mx-auto text-orange-500" />
-              <h2 className="text-2xl font-bold text-orange-800">系统正在清理中</h2>
-              <p className="text-orange-700">
-                刚刚执行了退出登录，系统正在完全清理所有数据，为确保安全需要等待片刻
-              </p>
-              <div className="bg-orange-100 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-orange-800">剩余等待时间：</span>
-                  <span className="text-2xl font-bold text-orange-900">{logoutCountdown} 秒</span>
-                </div>
-                <div className="w-full bg-orange-200 rounded-full h-2">
-                  <div
-                    className="bg-orange-500 h-2 rounded-full transition-all duration-1000"
-                    style={{ width: `${(logoutCountdown / 60) * 100}%` }}
-                  />
-                </div>
-              </div>
-              <p className="text-orange-600 text-sm">
-                等待结束后系统将自动恢复登录功能
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
 
 
@@ -810,6 +771,47 @@ export default function XiaohongshuAutoManager() {
     </div>
   );
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (logoutProtection) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <Card className="bg-orange-50 border-orange-200">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <Clock className="w-16 h-16 mx-auto text-orange-500" />
+              <h2 className="text-2xl font-bold text-orange-800">系统正在清理中</h2>
+              <p className="text-orange-700">
+                刚刚执行了退出登录，系统正在完全清理所有数据，为确保安全需要等待片刻
+              </p>
+              <div className="bg-orange-100 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-orange-800">剩余等待时间：</span>
+                  <span className="text-2xl font-bold text-orange-900">{logoutCountdown} 秒</span>
+                </div>
+                <div className="w-full bg-orange-200 rounded-full h-2">
+                  <div
+                    className="bg-orange-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${(logoutCountdown / 60) * 100}%` }}
+                  />
+                </div>
+              </div>
+              <p className="text-orange-600 text-sm">
+                等待结束后系统将自动恢复登录功能
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Login Dialog */}
@@ -838,10 +840,12 @@ export default function XiaohongshuAutoManager() {
               重新配置
             </Button>
           )}
-          <Button variant="destructive" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            退出登录
-          </Button>
+          {isLoggedIn && (
+            <Button variant="destructive" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              退出登录
+            </Button>
+          )}
         </div>
       </div>
 
