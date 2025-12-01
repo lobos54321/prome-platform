@@ -27,7 +27,7 @@ import { xhsClient } from '@/lib/xhs-worker';
 
 // API 配置
 const CLAUDE_API = import.meta.env.VITE_XHS_API_URL || 'http://localhost:8080';
-const API_SECRET = import.meta.env.VITE_XHS_API_SECRET || '';
+const API_SECRET = import.meta.env.VITE_XHS_WORKER_SECRET || '';
 
 interface UserConfig {
   productName: string;
