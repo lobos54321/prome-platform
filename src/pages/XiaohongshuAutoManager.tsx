@@ -27,6 +27,7 @@ import { xhsClient } from '@/lib/xhs-worker';
 
 // API 配置
 const CLAUDE_API = import.meta.env.VITE_XHS_API_URL || 'http://localhost:8080';
+const API_SECRET = import.meta.env.VITE_XHS_API_SECRET || '';
 
 interface UserConfig {
   productName: string;
@@ -474,10 +475,11 @@ export default function XiaohongshuAutoManager() {
     if (!currentUser) return;
 
     try {
+      const headers = API_SECRET ? { 'Authorization': `Bearer ${API_SECRET}` } : {};
       const [strategyRes, planRes, statusRes] = await Promise.all([
-        fetch(`${CLAUDE_API}/agent/auto/strategy/${currentUser}`).catch(() => null),
-        fetch(`${CLAUDE_API}/agent/auto/plan/${currentUser}`).catch(() => null),
-        fetch(`${CLAUDE_API}/agent/auto/status/${currentUser}`).catch(() => null)
+        fetch(`${CLAUDE_API}/agent/auto/strategy/${currentUser}`, { headers }).catch(() => null),
+        fetch(`${CLAUDE_API}/agent/auto/plan/${currentUser}`, { headers }).catch(() => null),
+        fetch(`${CLAUDE_API}/agent/auto/status/${currentUser}`, { headers }).catch(() => null)
       ]);
 
       const newData: DashboardData = {};
@@ -512,9 +514,12 @@ export default function XiaohongshuAutoManager() {
 
     setIsGenerating(true);
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (API_SECRET) headers['Authorization'] = `Bearer ${API_SECRET}`;
+
       const response = await fetch(`${CLAUDE_API}/agent/auto/start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           userId: currentUser,
           productName: config.productName,
