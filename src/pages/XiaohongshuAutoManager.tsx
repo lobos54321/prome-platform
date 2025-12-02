@@ -469,6 +469,41 @@ export default function XiaohongshuAutoManager() {
     }
   };
 
+  const handleApproveTask = async (task: any, taskId: string) => {
+    if (!currentUser) {
+      alert("请先登录");
+      return;
+    }
+
+    if (!confirm(`确认批准发布此内容？\n\n标题：${task.title}`)) {
+      return;
+    }
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (API_SECRET) headers['Authorization'] = `Bearer ${API_SECRET}`;
+
+      const response = await fetch(`${CLAUDE_API}/agent/auto/approve/${currentUser}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ taskId })
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.jobId) {
+        alert(`✅ 发布作业已创建\n作业ID: ${result.jobId}\n\n请查看日志或等待发布完成`);
+        // Refresh dashboard to update status
+        fetchDashboardData();
+      } else {
+        alert(`发布失败：${result.error || '未知错误'}`);
+      }
+    } catch (error: any) {
+      console.error('批准发布失败:', error);
+      alert(`批准发布失败: ${error.message}`);
+    }
+  };
+
   // ===========================
 
   const fetchDashboardData = async () => {
@@ -1140,7 +1175,11 @@ export default function XiaohongshuAutoManager() {
                             </Badge>
                             <Button size="sm" variant="outline" onClick={() => handleTaskPublish(task)}>
                               <Upload className="w-3 h-3 mr-1" />
-                              发布
+                              填充表单
+                            </Button>
+                            <Button size="sm" variant="default" className="bg-green-500 hover:bg-green-600" onClick={() => handleApproveTask(task, (i + 1).toString())}>
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              批准发布
                             </Button>
                           </div>
                         </div>
