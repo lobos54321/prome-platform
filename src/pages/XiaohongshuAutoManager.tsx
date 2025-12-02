@@ -572,9 +572,46 @@ export default function XiaohongshuAutoManager() {
         }
 
         if (publishResult.success) {
+          console.log('📊 [handleApproveTask] Publish successful, saving result to backend');
+
+          // 🆕 保存发布结果（包含 feedId）到后端
+          try {
+            const saveResponse = await fetch(`${CLAUDE_API}/agent/auto/update-publish-result/${currentUser}`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                taskId,
+                feedId: (publishResult as any).feedId || null,
+                xsecToken: (publishResult as any).xsecToken || null,
+                publishedUrl: (publishResult as any).publishedUrl || null,
+                publishedAt: new Date().toISOString(),
+                title: task.title,
+                content: task.content,
+                images: task.imageUrls || [],
+                tags: task.hashtags || []
+              })
+            });
+
+            const saveResult = await saveResponse.json();
+
+            if (saveResult.success) {
+              console.log('✅ [handleApproveTask] Publish result saved:', saveResult.data);
+              if (saveResult.data.feedId) {
+                console.log(`📝 FeedId captured: ${saveResult.data.feedId}`);
+              } else {
+                console.log('⚠️ FeedId not captured, tracking unavailable');
+              }
+            } else {
+              console.warn('⚠️ Failed to save publish result:', saveResult.message);
+            }
+          } catch (saveError) {
+            console.error('❌ Error saving publish result:', saveError);
+            // 不影响主流程，只记录错误
+          }
+
           alert(`✅ 发布成功！\n${publishResult.message || ''}`);
 
-          // 更新后端任务状态
+          // 更新后端任务状态（旧接口，保持兼容）
           try {
             await fetch(`${CLAUDE_API}/agent/auto/update-task-status/${currentUser}`, {
               method: 'POST',
