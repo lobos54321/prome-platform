@@ -478,19 +478,33 @@ export default function XiaohongshuAutoManager() {
       return;
     }
 
+    // 检查插件是否安装
+    if (!hasExtension) {
+      const installConfirm = confirm(
+        "未检测到 Prome 助手插件。\n\n" +
+        "需要安装插件才能自动发布内容。\n\n" +
+        "点击「确定」下载插件，或点击「取消」返回。"
+      );
+
+      if (installConfirm) {
+        handleDownloadExtension();
+      }
+      return;
+    }
+
     console.log(`📋 [handleApproveTask] Confirming task: ${task.title}`);
-    if (!confirm(`确认批准发布此内容？\n\n标题：${task.title}`)) {
+    if (!confirm(`确认批准发布此内容？\n\n标题：${task.title}\n\n将通过浏览器插件发布到小红书`)) {
       console.log('❌ [handleApproveTask] User cancelled');
       return;
     }
 
     try {
+      // 1. 从后端获取完整的发布数据
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (API_SECRET) headers['Authorization'] = `Bearer ${API_SECRET}`;
 
-      const url = `${CLAUDE_API}/agent/auto/approve/${currentUser}`;
-      console.log(`🌐 [handleApproveTask] Sending request to: ${url}`);
-      console.log(`📦 [handleApproveTask] Request body:`, { taskId });
+      const url = `${CLAUDE_API}/agent/auto/approve-for-extension/${currentUser}`;
+      console.log(`🌐 [handleApproveTask] Fetching publish data from: ${url}`);
 
       const response = await fetch(url, {
         method: 'POST',
@@ -498,20 +512,114 @@ export default function XiaohongshuAutoManager() {
         body: JSON.stringify({ taskId })
       });
 
-      console.log(`📥 [handleApproveTask] Response status: ${response.status}`);
       const result = await response.json();
-      console.log(`📥 [handleApproveTask] Response data:`, result);
+      console.log(`📥 [handleApproveTask] Response:`, result);
 
-      if (result.success && result.jobId) {
-        alert(`✅ 发布作业已创建\n作业ID: ${result.jobId}\n\n请查看日志或等待发布完成`);
-        // Refresh dashboard to update status
-        fetchDashboardData();
-      } else {
-        alert(`发布失败：${result.error || '未知错误'}`);
+      if (!result.success || !result.publishData) {
+        throw new Error(result.error || '获取发布数据失败');
       }
+
+      // 2. 设置监听器等待插件响应
+      console.log(`📤 [handleApproveTask] Setting up response listener`);
+
+      const publishPromise = new Promise<{ success: boolean, message: string, needRedirect?: boolean }>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('message', handleResponse);
+          reject(new Error('插件响应超时（5分钟），请确保已在小红书发布页面'));
+        }, 300000); // 5分钟超时
+
+        const handleResponse = (event: MessageEvent) => {
+          if (event.source !== window) return;
+          if (event.data.type === 'PROME_PUBLISH_RESULT') {
+            console.log('📥 [handleApproveTask] Received publish result:', event.data);
+            clearTimeout(timeout);
+            window.removeEventListener('message', handleResponse);
+            resolve(event.data);
+          }
+        };
+
+        window.addEventListener('message', handleResponse);
+      });
+
+      // 3. 发送发布任务给插件
+      console.log(`📤 [handleApproveTask] Sending task to extension via postMessage`);
+      window.postMessage({
+        type: 'PROME_PUBLISH_TASK',
+        data: result.publishData
+      }, '*');
+
+      // 4. 提示用户
+      alert(
+        `📝 发布任务已发送到插件！\n\n` +
+        `请确保：\n` +
+        `1. 已在浏览器中打开小红书发布页面\n` +
+        `   (creator.xiaohongshu.com/publish)\n` +
+        `2. 已登录小红书账号\n\n` +
+        `插件将自动完成发布操作。`
+      );
+
+      // 5. 等待插件完成
+      try {
+        const publishResult = await publishPromise;
+
+        if (publishResult.needRedirect) {
+          alert(
+            `⚠️ 请先打开小红书发布页面\n\n` +
+            `正在为您打开发布页面...\n` +
+            `页面打开后，插件会自动执行发布。`
+          );
+          return;
+        }
+
+        if (publishResult.success) {
+          alert(`✅ 发布成功！\n${publishResult.message || ''}`);
+
+          // 更新后端任务状态
+          try {
+            await fetch(`${CLAUDE_API}/agent/auto/update-task-status/${currentUser}`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                taskId,
+                status: 'published',
+                message: publishResult.message
+              })
+            });
+          } catch (updateError) {
+            console.error('⚠️ Failed to update task status:', updateError);
+          }
+
+          // 刷新数据
+          fetchDashboardData();
+        } else {
+          alert(`❌ 发布失败：${publishResult.message || '未知错误'}`);
+
+          // 更新后端任务状态为失败
+          try {
+            await fetch(`${CLAUDE_API}/agent/auto/update-task-status/${currentUser}`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                taskId,
+                status: 'failed',
+                message: publishResult.message
+              })
+            });
+          } catch (updateError) {
+            console.error('⚠️ Failed to update task status:', updateError);
+          }
+        }
+      } catch (waitError: any) {
+        console.error('⚠️ [handleApproveTask] Wait error:', waitError);
+        alert(
+          `⚠️ ${waitError.message}\n\n` +
+          `如果发布已完成，请手动刷新页面查看状态。`
+        );
+      }
+
     } catch (error: any) {
-      console.error('❌ [handleApproveTask] 批准发布失败:', error);
-      alert(`批准发布失败: ${error.message}`);
+      console.error('❌ [handleApproveTask] Error:', error);
+      alert(`发布失败: ${error.message}`);
     }
   };
 
