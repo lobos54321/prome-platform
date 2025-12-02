@@ -470,12 +470,17 @@ export default function XiaohongshuAutoManager() {
   };
 
   const handleApproveTask = async (task: any, taskId: string) => {
+    console.log('🚀 [handleApproveTask] Button clicked!', { task, taskId, currentUser });
+
     if (!currentUser) {
+      console.error('❌ [handleApproveTask] No currentUser');
       alert("请先登录");
       return;
     }
 
+    console.log(`📋 [handleApproveTask] Confirming task: ${task.title}`);
     if (!confirm(`确认批准发布此内容？\n\n标题：${task.title}`)) {
+      console.log('❌ [handleApproveTask] User cancelled');
       return;
     }
 
@@ -483,13 +488,19 @@ export default function XiaohongshuAutoManager() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (API_SECRET) headers['Authorization'] = `Bearer ${API_SECRET}`;
 
-      const response = await fetch(`${CLAUDE_API}/agent/auto/approve/${currentUser}`, {
+      const url = `${CLAUDE_API}/agent/auto/approve/${currentUser}`;
+      console.log(`🌐 [handleApproveTask] Sending request to: ${url}`);
+      console.log(`📦 [handleApproveTask] Request body:`, { taskId });
+
+      const response = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({ taskId })
       });
 
+      console.log(`📥 [handleApproveTask] Response status: ${response.status}`);
       const result = await response.json();
+      console.log(`📥 [handleApproveTask] Response data:`, result);
 
       if (result.success && result.jobId) {
         alert(`✅ 发布作业已创建\n作业ID: ${result.jobId}\n\n请查看日志或等待发布完成`);
@@ -499,7 +510,7 @@ export default function XiaohongshuAutoManager() {
         alert(`发布失败：${result.error || '未知错误'}`);
       }
     } catch (error: any) {
-      console.error('批准发布失败:', error);
+      console.error('❌ [handleApproveTask] 批准发布失败:', error);
       alert(`批准发布失败: ${error.message}`);
     }
   };
