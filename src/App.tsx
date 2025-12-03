@@ -46,6 +46,7 @@ import AuthCallback from './pages/AuthCallback';
 import XiaohongshuAutomation from './pages/XiaohongshuAutomation';
 import XiaohongshuMarketing from './pages/XiaohongshuMarketing';
 import XiaohongshuAutoManager from './pages/XiaohongshuAutoManager';
+import Analytics from './pages/Analytics';
 
 const queryClient = new QueryClient();
 
@@ -208,6 +209,7 @@ const App = () => {
               <Route path="/xiaohongshu" element={<XiaohongshuAutomation />} />
               <Route path="/xiaohongshu-manager" element={<XiaohongshuAutoManager />} />
               <Route path="/xiaohongshu-api" element={<XiaohongshuMarketing />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/admin" element={<Admin />} />
 
 
