@@ -12,6 +12,17 @@ import { databaseTester } from './lib/database-tester';
 import { User } from './types';
 import { useTranslation } from 'react-i18next';
 import './lib/i18n'; // Initialize i18n
+
+// Declare Prome Config for extension
+declare global {
+  interface Window {
+    __PROME_CONFIG__?: {
+      supabaseUrl: string;
+      supabaseKey: string;
+      userId?: string;
+    };
+  }
+}
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -123,6 +134,47 @@ const App = () => {
       cancelled = true;
     };
   }, []);
+
+  // Push Supabase config to extension
+  useEffect(() => {
+    // Expose global config
+    window.__PROME_CONFIG__ = {
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
+      supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+      userId: currentUser?.id || ''
+    };
+
+    // Listen for config requests from extension
+    const handleConfigRequest = (event: MessageEvent) => {
+      if (event.data?.type === 'PROME_REQUEST_SUPABASE_CONFIG') {
+        console.log('[Prome] Extension requested config, pushing...');
+        window.postMessage({
+          type: 'PROME_SET_SUPABASE_CONFIG',
+          data: window.__PROME_CONFIG__
+        }, '*');
+      }
+    };
+
+    window.addEventListener('message', handleConfigRequest);
+
+    // Proactively push if extension detected
+    const checkAndPush = () => {
+      const extensionMarker = document.getElementById('prome-extension-installed');
+      if (extensionMarker && window.__PROME_CONFIG__) {
+        console.log('[Prome] Extension detected, pushing config...');
+        window.postMessage({
+          type: 'PROME_SET_SUPABASE_CONFIG',
+          data: window.__PROME_CONFIG__
+        }, '*');
+      }
+    };
+
+    // Delayed checks to ensure extension is loaded
+    setTimeout(checkAndPush, 1000);
+    setTimeout(checkAndPush, 3000);
+
+    return () => window.removeEventListener('message', handleConfigRequest);
+  }, [currentUser]);
 
   // Listen for auth state changes
   useEffect(() => {
