@@ -72,8 +72,8 @@ interface AIAnalysis {
 
 // ==================== Supabase 配置 ====================
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -263,7 +263,7 @@ export default function XiaohongshuAnalyticsDashboard({ userId, onAnalysisComple
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
         setAiAnalysis(result.data);
         onAnalysisComplete?.(result.data);
@@ -371,7 +371,7 @@ export default function XiaohongshuAnalyticsDashboard({ userId, onAnalysisComple
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-600">{error}</p>
-        <button 
+        <button
           onClick={loadData}
           className="mt-2 text-sm text-red-600 underline"
         >
@@ -472,15 +472,14 @@ export default function XiaohongshuAnalyticsDashboard({ userId, onAnalysisComple
                 {aiAnalysis.performanceScore}
               </div>
               <div>
-                <div className={`inline-block px-2 py-1 rounded text-sm font-medium ${
-                  aiAnalysis.performanceLevel === 'excellent' ? 'bg-green-100 text-green-800' :
-                  aiAnalysis.performanceLevel === 'good' ? 'bg-blue-100 text-blue-800' :
-                  aiAnalysis.performanceLevel === 'average' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
+                <div className={`inline-block px-2 py-1 rounded text-sm font-medium ${aiAnalysis.performanceLevel === 'excellent' ? 'bg-green-100 text-green-800' :
+                    aiAnalysis.performanceLevel === 'good' ? 'bg-blue-100 text-blue-800' :
+                      aiAnalysis.performanceLevel === 'average' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                  }`}>
                   {aiAnalysis.performanceLevel === 'excellent' ? '优秀' :
-                   aiAnalysis.performanceLevel === 'good' ? '良好' :
-                   aiAnalysis.performanceLevel === 'average' ? '一般' : '需改进'}
+                    aiAnalysis.performanceLevel === 'good' ? '良好' :
+                      aiAnalysis.performanceLevel === 'average' ? '一般' : '需改进'}
                 </div>
                 <p className="text-sm text-gray-600 mt-1">综合表现评分</p>
               </div>
@@ -598,16 +597,16 @@ function NoteCard({ note }: { note: NoteWithAnalytics }) {
             className="w-16 h-16 rounded object-cover flex-shrink-0"
           />
         )}
-        
+
         <div className="flex-1 min-w-0">
           {/* 标题 */}
           <h4 className="font-medium text-gray-800 truncate">{note.title}</h4>
-          
+
           {/* 发布时间 */}
           <p className="text-xs text-gray-500 mt-1">
             {note.published_at ? new Date(note.published_at).toLocaleString('zh-CN') : '未知时间'}
           </p>
-          
+
           {/* 数据指标 */}
           {analytics ? (
             <div className="flex flex-wrap gap-3 mt-2 text-sm">
