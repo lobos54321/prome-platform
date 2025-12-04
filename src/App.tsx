@@ -136,18 +136,24 @@ const App = () => {
   }, []);
 
   // Push Supabase config to extension
+  // Push Supabase config to extension
   useEffect(() => {
     // Expose global config
-    window.__PROME_CONFIG__ = {
-      supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
-      supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-      userId: currentUser?.id || ''
+    const updateConfig = () => {
+      window.__PROME_CONFIG__ = {
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
+        supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        userId: currentUser?.id || ''
+      };
     };
+
+    updateConfig();
 
     // Listen for config requests from extension
     const handleConfigRequest = (event: MessageEvent) => {
       if (event.data?.type === 'PROME_REQUEST_SUPABASE_CONFIG') {
         console.log('[Prome] Extension requested config, pushing...');
+        updateConfig(); // Ensure latest config
         window.postMessage({
           type: 'PROME_SET_SUPABASE_CONFIG',
           data: window.__PROME_CONFIG__
@@ -161,19 +167,28 @@ const App = () => {
     const checkAndPush = () => {
       const extensionMarker = document.getElementById('prome-extension-installed');
       if (extensionMarker && window.__PROME_CONFIG__) {
-        console.log('[Prome] Extension detected, pushing config...');
-        window.postMessage({
-          type: 'PROME_SET_SUPABASE_CONFIG',
-          data: window.__PROME_CONFIG__
-        }, '*');
+        // Only push if we have a user ID, otherwise it might be premature
+        if (window.__PROME_CONFIG__.userId) {
+          console.log('[Prome] Extension detected, pushing config...');
+          window.postMessage({
+            type: 'PROME_SET_SUPABASE_CONFIG',
+            data: window.__PROME_CONFIG__
+          }, '*');
+        }
       }
     };
 
     // Delayed checks to ensure extension is loaded
-    setTimeout(checkAndPush, 1000);
-    setTimeout(checkAndPush, 3000);
+    const t1 = setTimeout(checkAndPush, 1000);
+    const t2 = setTimeout(checkAndPush, 3000);
+    const t3 = setTimeout(checkAndPush, 5000);
 
-    return () => window.removeEventListener('message', handleConfigRequest);
+    return () => {
+      window.removeEventListener('message', handleConfigRequest);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, [currentUser]);
 
   // Listen for auth state changes

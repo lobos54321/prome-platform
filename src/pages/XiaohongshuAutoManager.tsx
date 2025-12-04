@@ -111,6 +111,20 @@ export default function XiaohongshuAutoManager() {
     return () => clearInterval(interval);
   }, []);
 
+  // Sync token to extension when user is logged in
+  useEffect(() => {
+    if (currentUser && hasExtension) {
+      console.log('Syncing token to extension...');
+      window.postMessage({
+        type: 'PROME_SET_TOKEN',
+        data: {
+          token: `ext_${currentUser}`,
+          userId: currentUser
+        }
+      }, '*');
+    }
+  }, [currentUser, hasExtension]);
+
   // 检查登录状态
   useEffect(() => {
     checkLoginStatus();
