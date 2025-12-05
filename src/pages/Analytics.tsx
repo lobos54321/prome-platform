@@ -1,8 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
 import XiaohongshuAnalyticsDashboard from '@/components/XiaohongshuAnalyticsDashboard';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function AnalyticsPage() {
-    const currentUser = localStorage.getItem('currentUser') || 'user_9dee489189a644ee8fe869097846e97d_prome';
+    const { currentUser } = useAuth();
+
+    if (!currentUser) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <h2 className="text-xl font-semibold text-gray-700">请先登录</h2>
+                    <p className="text-gray-500 mt-2">需要登录后才能查看数据分析</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -13,7 +26,8 @@ export default function AnalyticsPage() {
                 </div>
 
                 <XiaohongshuAnalyticsDashboard
-                    userId={currentUser}
+                    userId={currentUser.id}
+                    supabaseClient={supabase}
                     onAnalysisComplete={(analysis) => {
                         console.log('AI Analysis completed:', analysis);
                     }}

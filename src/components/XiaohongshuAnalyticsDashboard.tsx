@@ -72,19 +72,17 @@ interface AIAnalysis {
 
 // ==================== Supabase 配置 ====================
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Note: supabaseClient will be passed as prop to ensure authenticated access
 
 // ==================== 主组件 ====================
 
 interface Props {
   userId: string;
+  supabaseClient: any; // Authenticated Supabase client from parent
   onAnalysisComplete?: (analysis: AIAnalysis) => void;
 }
 
-export default function XiaohongshuAnalyticsDashboard({ userId, onAnalysisComplete }: Props) {
+export default function XiaohongshuAnalyticsDashboard({ userId, supabaseClient, onAnalysisComplete }: Props) {
   const [notes, setNotes] = useState<NoteWithAnalytics[]>([]);
   const [summary, setSummary] = useState<AnalysisSummary | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null);
@@ -113,7 +111,7 @@ export default function XiaohongshuAnalyticsDashboard({ userId, onAnalysisComple
       }
 
       // 获取笔记列表
-      let notesQuery = supabase
+      let notesQuery = supabaseClient
         .from('xhs_published_notes')
         .select('*')
         .eq('user_id', userId)
@@ -131,7 +129,7 @@ export default function XiaohongshuAnalyticsDashboard({ userId, onAnalysisComple
       const notesWithAnalytics: NoteWithAnalytics[] = await Promise.all(
         (notesData || []).map(async (note) => {
           // 通过 feed_id 或 title_hash 查询分析数据
-          let analyticsQuery = supabase
+          let analyticsQuery = supabaseClient
             .from('xhs_note_analytics')
             .select('*')
             .eq('user_id', userId)
@@ -473,9 +471,9 @@ export default function XiaohongshuAnalyticsDashboard({ userId, onAnalysisComple
               </div>
               <div>
                 <div className={`inline-block px-2 py-1 rounded text-sm font-medium ${aiAnalysis.performanceLevel === 'excellent' ? 'bg-green-100 text-green-800' :
-                    aiAnalysis.performanceLevel === 'good' ? 'bg-blue-100 text-blue-800' :
-                      aiAnalysis.performanceLevel === 'average' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
+                  aiAnalysis.performanceLevel === 'good' ? 'bg-blue-100 text-blue-800' :
+                    aiAnalysis.performanceLevel === 'average' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
                   }`}>
                   {aiAnalysis.performanceLevel === 'excellent' ? '优秀' :
                     aiAnalysis.performanceLevel === 'good' ? '良好' :
