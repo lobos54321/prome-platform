@@ -135,6 +135,7 @@ export default function XiaohongshuAnalyticsDashboard({ userId, supabaseClient, 
             .eq('user_id', userId)
             .order('collected_at', { ascending: false });
 
+          // 优先使用 feed_id，如果没有则使用 title_hash
           if (note.feed_id) {
             analyticsQuery = analyticsQuery.eq('feed_id', note.feed_id);
           } else if (note.title_hash) {
