@@ -111,14 +111,15 @@ export default function XiaohongshuAnalyticsDashboard({ userId, supabaseClient, 
       }
 
       // 获取笔记列表
+      // 使用 created_at 而不是 published_at，因为 published_at 可能为 null
       let notesQuery = supabaseClient
         .from('xhs_published_notes')
         .select('*')
         .eq('user_id', userId)
-        .order('published_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (dateFilter) {
-        notesQuery = notesQuery.gte('published_at', dateFilter);
+        notesQuery = notesQuery.gte('created_at', dateFilter);
       }
 
       const { data: notesData, error: notesError } = await notesQuery;
