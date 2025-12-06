@@ -252,7 +252,8 @@ export default function XiaohongshuAnalyticsDashboard({ userId, supabaseClient, 
       };
 
       // 调用后端 AI 分析 API
-      const response = await fetch('/api/agent/auto/analyze-content-performance', {
+      const CLAUDE_API = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+      const response = await fetch(`${CLAUDE_API}/api/agent/auto/analyze-content-performance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(analysisData)
