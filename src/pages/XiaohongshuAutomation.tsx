@@ -81,9 +81,29 @@ export default function XiaohongshuAutomation() {
       console.log('🚀 [XHS] 设置 supabaseUuid:', user.id);
       setSupabaseUuid(user.id);
 
-      console.log('🚀 [XHS] 准备调用 getOrCreateMapping');
-      const userId = await userMappingService.getOrCreateMapping(user.id);
-      console.log('✅ [XHS] getOrCreateMapping 返回:', userId);
+      // 🔥 新逻辑：优先获取绑定的小红书账号ID
+      let userId: string;
+      try {
+        const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+        const response = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${user.id}`);
+        const data = await response.json();
+
+        if (data.success && data.data.accounts.length > 0) {
+          // 有绑定账号，使用绑定的 xhs_account_id
+          const defaultAccount = data.data.accounts.find((a: any) => a.is_default);
+          userId = (defaultAccount || data.data.accounts[0]).xhs_account_id;
+          console.log('✅ [XHS] 使用绑定的小红书账号ID:', userId);
+        } else {
+          // 没有绑定账号，使用旧的映射逻辑（向后兼容）
+          console.log('⚠️ [XHS] 未找到绑定账号，使用旧的映射逻辑');
+          userId = await userMappingService.getOrCreateMapping(user.id);
+        }
+      } catch (accountErr) {
+        console.error('❌ [XHS] 获取绑定账号失败，降级到旧逻辑:', accountErr);
+        userId = await userMappingService.getOrCreateMapping(user.id);
+      }
+
+      console.log('✅ [XHS] 最终使用的 xhsUserId:', userId);
       setXhsUserId(userId);
 
       // 🔥 修复：只检查登录状态，不再检查退出保护期
