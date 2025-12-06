@@ -7,6 +7,7 @@ import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { LoginSection } from '@/components/xiaohongshu/LoginSection';
 import { ConfigSection } from '@/components/xiaohongshu/ConfigSection';
 import { DashboardSection } from '@/components/xiaohongshu/DashboardSection';
+import { AccountSelector } from '@/components/xiaohongshu/AccountSelector';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -523,7 +524,23 @@ export default function XiaohongshuAutomation() {
           <Card className="mb-6">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-4">
+                  {/* 账号选择器 - 支持多账号切换 */}
+                  <AccountSelector
+                    supabaseUuid={supabaseUuid}
+                    onAccountChange={(account) => {
+                      if (account) {
+                        console.log('🔄 切换到账号:', account.nickname || account.id);
+                        // 切换账号后重新初始化页面
+                        initializePage();
+                      }
+                    }}
+                    onAddAccount={() => {
+                      // 点击添加账号时，跳转到登录流程
+                      setCurrentStep('login');
+                    }}
+                  />
+
                   <div className="flex items-center">
                     <span className={`w-2 h-2 rounded-full mr-2 ${currentStep === 'dashboard' ? 'bg-green-400' :
                       currentStep === 'config' ? 'bg-yellow-400 animate-pulse' :
