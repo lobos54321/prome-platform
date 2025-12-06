@@ -8,13 +8,15 @@ import { LoginSection } from '@/components/xiaohongshu/LoginSection';
 import { ConfigSection } from '@/components/xiaohongshu/ConfigSection';
 import { DashboardSection } from '@/components/xiaohongshu/DashboardSection';
 import { AccountSelector } from '@/components/xiaohongshu/AccountSelector';
+import { MatrixDashboard } from '@/components/xiaohongshu/MatrixDashboard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, LayoutGrid, User } from 'lucide-react';
 import type { UserProfile, AutomationStatus, ContentStrategy, WeeklyPlan } from '@/types/xiaohongshu';
 
 type Step = 'login' | 'config' | 'dashboard';
+type ViewMode = 'single' | 'matrix';
 
 export default function XiaohongshuAutomation() {
   console.log('🚀 [XiaohongshuAutomation] 组件被调用');
@@ -39,6 +41,7 @@ export default function XiaohongshuAutomation() {
   const [contentStrategy, setContentStrategy] = useState<ContentStrategy | null>(null);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
   const [justLoggedOut, setJustLoggedOut] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('matrix'); // 默认显示矩阵视图
 
   useEffect(() => {
     // Force test mode for now to allow access
@@ -557,7 +560,29 @@ export default function XiaohongshuAutomation() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {currentStep === 'dashboard' && (
+                  {/* 视图切换按钮 */}
+                  <div className="flex rounded-lg border border-gray-200 p-0.5">
+                    <Button
+                      variant={viewMode === 'matrix' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="text-xs px-2"
+                      onClick={() => setViewMode('matrix')}
+                    >
+                      <LayoutGrid className="w-3 h-3 mr-1" />
+                      矩阵
+                    </Button>
+                    <Button
+                      variant={viewMode === 'single' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="text-xs px-2"
+                      onClick={() => setViewMode('single')}
+                    >
+                      <User className="w-3 h-3 mr-1" />
+                      单账号
+                    </Button>
+                  </div>
+
+                  {currentStep === 'dashboard' && viewMode === 'single' && (
                     <Button
                       onClick={handleReconfigure}
                       variant="outline"
@@ -585,54 +610,78 @@ export default function XiaohongshuAutomation() {
 
         {/* Content */}
         <div className="space-y-6">
-          {/* Step 1: Login */}
-          {(currentStep === 'login') && supabaseUuid && xhsUserId && (
-            <LoginSection
+          {/* 矩阵视图 - 同时管理所有账号 */}
+          {viewMode === 'matrix' && supabaseUuid && (
+            <MatrixDashboard
               supabaseUuid={supabaseUuid}
-              xhsUserId={xhsUserId}
-              onLoginSuccess={handleLoginSuccess}
-              onError={setError}
-              onLogout={() => {
-                // 🔥 退出登录后，重置所有状态
-                console.log('🔄 [Page] 收到退出登录通知，重置状态');
+              onAddAccount={() => {
+                setViewMode('single');
                 setCurrentStep('login');
-                setContentStrategy(null);
-                setWeeklyPlan(null);
-                setAutomationStatus(null);
-                setUserProfile(null);
-                setError(''); // 清除错误信息
-                setLoading(false); // 停止加载状态
-                setJustLoggedOut(true); // 防止自动重新登录
-                // 🔥 不刷新页面，直接停留在登录界面
-                // 后端已经清除了数据，60秒保护期后可以重新登录
               }}
-              justLoggedOut={justLoggedOut}
+              onConfigureAccount={(account) => {
+                console.log('配置账号:', account);
+                setViewMode('single');
+                setCurrentStep('config');
+              }}
+              onViewDetails={(account) => {
+                console.log('查看详情:', account);
+                setViewMode('single');
+                setCurrentStep('dashboard');
+              }}
             />
           )}
 
-          {/* Step 2: Config */}
-          {(currentStep === 'config' || currentStep === 'dashboard') && supabaseUuid && xhsUserId && (
-            <ConfigSection
-              supabaseUuid={supabaseUuid}
-              xhsUserId={xhsUserId}
-              initialConfig={userProfile}
-              onConfigSaved={handleConfigSaved}
-              onStartOperation={handleStartOperation}
-            />
-          )}
+          {/* 单账号视图 */}
+          {viewMode === 'single' && (
+            <>
+              {/* Step 1: Login */}
+              {(currentStep === 'login') && supabaseUuid && xhsUserId && (
+                <LoginSection
+                  supabaseUuid={supabaseUuid}
+                  xhsUserId={xhsUserId}
+                  onLoginSuccess={handleLoginSuccess}
+                  onError={setError}
+                  onLogout={() => {
+                    // 🔥 退出登录后，重置所有状态
+                    console.log('🔄 [Page] 收到退出登录通知，重置状态');
+                    setCurrentStep('login');
+                    setContentStrategy(null);
+                    setWeeklyPlan(null);
+                    setAutomationStatus(null);
+                    setUserProfile(null);
+                    setError(''); // 清除错误信息
+                    setLoading(false); // 停止加载状态
+                    setJustLoggedOut(true); // 防止自动重新登录
+                  }}
+                  justLoggedOut={justLoggedOut}
+                />
+              )}
 
-          {/* Step 3: Dashboard */}
-          {currentStep === 'dashboard' && supabaseUuid && xhsUserId && (
-            <DashboardSection
-              supabaseUuid={supabaseUuid}
-              xhsUserId={xhsUserId}
-              automationStatus={automationStatus}
-              contentStrategy={contentStrategy}
-              weeklyPlan={weeklyPlan}
-              onRefresh={handleRefresh}
-              onReconfigure={handleReconfigure}
-              onLogout={handleLogout}
-            />
+              {/* Step 2: Config */}
+              {(currentStep === 'config' || currentStep === 'dashboard') && supabaseUuid && xhsUserId && (
+                <ConfigSection
+                  supabaseUuid={supabaseUuid}
+                  xhsUserId={xhsUserId}
+                  initialConfig={userProfile}
+                  onConfigSaved={handleConfigSaved}
+                  onStartOperation={handleStartOperation}
+                />
+              )}
+
+              {/* Step 3: Dashboard */}
+              {currentStep === 'dashboard' && supabaseUuid && xhsUserId && (
+                <DashboardSection
+                  supabaseUuid={supabaseUuid}
+                  xhsUserId={xhsUserId}
+                  automationStatus={automationStatus}
+                  contentStrategy={contentStrategy}
+                  weeklyPlan={weeklyPlan}
+                  onRefresh={handleRefresh}
+                  onReconfigure={handleReconfigure}
+                  onLogout={handleLogout}
+                />
+              )}
+            </>
           )}
         </div>
 
