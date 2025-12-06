@@ -118,39 +118,36 @@ export function LoginSection({
     }
   };
 
-  const handleAutoLogin = async () => {
+  /**
+   * 插件登录：从浏览器已登录的小红书获取Cookie并同步到后端
+   */
+  const handleExtensionLogin = async () => {
     try {
-      console.log('🎯 [LoginSection] handleAutoLogin 被调用，userId:', xhsUserId);
+      console.log('🔌 [LoginSection] 开始插件登录...');
       setChecking(true);
 
-      console.log('📡 [LoginSection] 正在调用 xiaohongshuAPI.autoLogin...');
-      const response = await xiaohongshuAPI.autoLogin(xhsUserId);
-      console.log('📥 [LoginSection] autoLogin 响应:', response);
+      // 1. 检查插件是否已安装
+      const extensionInstalled = !!(window as any).__PROME_EXTENSION_INSTALLED__;
+      if (!extensionInstalled) {
+        onError('请先安装 Prome Chrome 插件，并在小红书网站登录后再试');
+        return;
+      }
 
-      if (response.success && response.qrCode) {
-        console.log('✅ [LoginSection] 获取到二维码，长度:', response.qrCode?.length);
-        setQrCode(response.qrCode);
+      // 2. 调用后端的 autoImportCookies 接口（插件会自动注入Cookie）
+      console.log('📡 [LoginSection] 调用 autoImportCookies...');
+      const response = await xiaohongshuAPI.autoImportCookies(xhsUserId);
+      console.log('📥 [LoginSection] autoImportCookies 响应:', response);
 
-        // 检查是否有验证二维码
-        if (response.hasVerification && response.verificationQrCode) {
-          console.log('🔐 [LoginSection] 检测到需要验证二维码');
-          setInitialVerificationQrCode(response.verificationQrCode);
-          setHasInitialVerification(true);
-        } else {
-          console.log('ℹ️ [LoginSection] 无需验证二维码');
-          setInitialVerificationQrCode(null);
-          setHasInitialVerification(false);
-        }
-
-        console.log('🚪 [LoginSection] 打开二维码模态框');
-        setShowQRModal(true);
+      if (response.success) {
+        console.log('✅ [LoginSection] Cookie导入成功，检查登录状态');
+        await checkLoginStatus();
       } else {
-        console.error('❌ [LoginSection] autoLogin 返回失败:', response.message);
-        onError(response.message || '获取二维码失败');
+        // 如果Cookie导入失败，提示用户去小红书网站登录
+        onError('请先在浏览器中打开 xiaohongshu.com 并登录，然后刷新此页面重试');
       }
     } catch (error) {
-      console.error('❌ [LoginSection] autoLogin 异常:', error);
-      onError(error instanceof Error ? error.message : '自动登录失败');
+      console.error('❌ [LoginSection] 插件登录失败:', error);
+      onError('登录失败，请确保已在浏览器中登录小红书');
     } finally {
       setChecking(false);
     }
@@ -320,44 +317,22 @@ export function LoginSection({
                   <p className="font-medium">❌ 未检测到登录状态</p>
                   <div className="flex flex-wrap gap-3">
                     <Button
-                      onClick={handleAutoLogin}
+                      onClick={handleExtensionLogin}
                       disabled={checking}
                       className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                     >
                       {checking ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          处理中...
+                          同步中...
                         </>
                       ) : (
-                        '🚀 一键自动登录'
+                        '🔌 使用插件登录'
                       )}
-                    </Button>
-                    {logoutProtection && (
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const r = await xiaohongshuAPI.resetLogoutProtection(xhsUserId);
-                            setLogoutProtection(false);
-                            setCountdown(countdownTotal);
-                          } catch (e) { }
-                        }}
-                        variant="outline"
-                        disabled={checking}
-                      >
-                        立即解除保护
-                      </Button>
-                    )}
-                    <Button
-                      onClick={() => setShowCookieForm(true)}
-                      variant="outline"
-                      disabled={checking}
-                    >
-                      🔧 手动导入Cookie
                     </Button>
                   </div>
                   <p className="text-sm text-red-700">
-                    提示：推荐使用一键自动登录，更安全便捷
+                    提示：请确保已安装 Prome 插件，并在浏览器中登录过小红书
                   </p>
                 </div>
               </AlertDescription>
