@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle, AlertCircle, LogOut } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, LogOut, Chrome, Download, ExternalLink, RefreshCw } from 'lucide-react';
 import { AutoLoginModal } from './AutoLoginModal';
 import { ManualCookieForm } from './ManualCookieForm';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
@@ -14,8 +14,23 @@ interface LoginSectionProps {
   onLoginSuccess: () => void;
   onError: (error: string) => void;
   onLogout?: () => void;
-  justLoggedOut?: boolean; // 🔥 新增
+  justLoggedOut?: boolean;
 }
+
+// 检测是否为 Chrome 浏览器
+const isChromeBrowser = (): boolean => {
+  const userAgent = navigator.userAgent;
+  return /Chrome/.test(userAgent) && !/Edge|Edg|OPR|Opera/.test(userAgent);
+};
+
+// 检测插件是否安装
+const isExtensionInstalled = (): boolean => {
+  return !!(window as any).__PROME_EXTENSION_INSTALLED__;
+};
+
+// 插件下载链接
+const EXTENSION_DOWNLOAD_URL = 'https://github.com/lobos54321/prome-extension/releases/latest';
+const CHROME_DOWNLOAD_URL = 'https://www.google.com/chrome/';
 
 export function LoginSection({
   supabaseUuid,
@@ -23,9 +38,9 @@ export function LoginSection({
   onLoginSuccess,
   onError,
   onLogout,
-  justLoggedOut = false, // 🔥 默认为 false
+  justLoggedOut = false,
 }: LoginSectionProps) {
-  const [checking, setChecking] = useState(!justLoggedOut); // 🔥 如果刚退出，初始不检查
+  const [checking, setChecking] = useState(!justLoggedOut);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showCookieForm, setShowCookieForm] = useState(false);
@@ -36,6 +51,44 @@ export function LoginSection({
   const [countdown, setCountdown] = useState(15);
   const [countdownTotal, setCountdownTotal] = useState(15);
 
+  // 🔥 浏览器和插件检测状态
+  const [isChrome, setIsChrome] = useState(true);
+  const [hasExtension, setHasExtension] = useState(false);
+  const [setupStep, setSetupStep] = useState<'checking' | 'need-chrome' | 'need-extension' | 'need-xhs-login' | 'ready'>('checking');
+
+  // 检测浏览器和插件
+  useEffect(() => {
+    const detectEnvironment = () => {
+      const chromeDetected = isChromeBrowser();
+      const extensionDetected = isExtensionInstalled();
+
+      console.log('🔍 [LoginSection] 环境检测:', { chromeDetected, extensionDetected });
+
+      setIsChrome(chromeDetected);
+      setHasExtension(extensionDetected);
+
+      if (!chromeDetected) {
+        setSetupStep('need-chrome');
+      } else if (!extensionDetected) {
+        setSetupStep('need-extension');
+      } else {
+        setSetupStep('ready');
+      }
+    };
+
+    detectEnvironment();
+
+    // 定期检测插件（用户可能在后台安装）
+    const interval = setInterval(() => {
+      if (isExtensionInstalled() && !hasExtension) {
+        setHasExtension(true);
+        setSetupStep('ready');
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [hasExtension]);
+
   useEffect(() => {
     // 🔥 如果刚退出登录，跳过初始检查
     if (justLoggedOut) {
@@ -43,9 +96,13 @@ export function LoginSection({
       setChecking(false);
       return;
     }
-    checkLoginStatus();
-    checkLogoutProtection();
-  }, [xhsUserId, justLoggedOut]);
+
+    // 只有环境就绪且有插件时才检查登录状态
+    if (setupStep === 'ready') {
+      checkLoginStatus();
+      checkLogoutProtection();
+    }
+  }, [xhsUserId, justLoggedOut, setupStep]);
 
   useEffect(() => {
     if (!logoutProtection) return;
@@ -235,6 +292,99 @@ export function LoginSection({
       onError('退出登录失败');
     }
   };
+
+  // 🔥 设置向导 - 需要 Chrome
+  if (setupStep === 'need-chrome') {
+    return (
+      <Card className="border-orange-200">
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center gap-2">
+            <Chrome className="h-6 w-6 text-orange-500" />
+            需要 Chrome 浏览器
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="bg-orange-50 border-orange-200">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <p className="font-medium mb-2">Prome 自动化需要 Chrome 浏览器和 Prome 插件才能运行</p>
+              <p className="text-sm">请先下载并安装 Google Chrome 浏览器，然后在 Chrome 中打开此页面。</p>
+            </AlertDescription>
+          </Alert>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => window.open(CHROME_DOWNLOAD_URL, '_blank')}
+              className="bg-gradient-to-r from-blue-500 to-blue-600"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              下载 Chrome 浏览器
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 🔥 设置向导 - 需要插件
+  if (setupStep === 'need-extension') {
+    return (
+      <Card className="border-purple-200">
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center gap-2">
+            <Download className="h-6 w-6 text-purple-500" />
+            安装 Prome 插件
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="bg-purple-50 border-purple-200">
+            <AlertDescription className="text-purple-800">
+              <p className="font-medium mb-2">✅ Chrome 浏览器已检测到</p>
+              <p className="text-sm">现在需要安装 Prome Chrome 插件来同步您的小红书账号。</p>
+            </AlertDescription>
+          </Alert>
+
+          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+            <h4 className="font-medium">安装步骤：</h4>
+            <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
+              <li>点击下方按钮下载插件 ZIP 文件</li>
+              <li>打开 Chrome 扩展页面 <code className="bg-gray-200 px-1 rounded">chrome://extensions</code></li>
+              <li>开启右上角的 <strong>"开发者模式"</strong></li>
+              <li>解压 ZIP 文件，点击 <strong>"加载已解压的扩展程序"</strong></li>
+              <li>选择解压后的文件夹</li>
+            </ol>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              onClick={() => window.open(EXTENSION_DOWNLOAD_URL, '_blank')}
+              className="bg-gradient-to-r from-purple-500 to-pink-500"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              下载 Prome 插件
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.open('chrome://extensions', '_blank')}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              打开扩展页面
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              刷新检测
+            </Button>
+          </div>
+
+          <p className="text-xs text-gray-500">
+            安装完成后，页面会自动检测到插件。如果没有自动刷新，请点击"刷新检测"。
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (checking && !logoutProtection) {
     return (
