@@ -58,6 +58,7 @@ import XiaohongshuAutomation from './pages/XiaohongshuAutomation';
 import XiaohongshuMarketing from './pages/XiaohongshuMarketing';
 import XiaohongshuAutoManager from './pages/XiaohongshuAutoManager';
 import Analytics from './pages/Analytics';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 const queryClient = new QueryClient();
 
@@ -289,6 +290,7 @@ const App = () => {
               <Route path="/dify-debug-old" element={<DifyDebugPage />} />
               <Route path="/dify-flow-test" element={<DifyFlowTest />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
