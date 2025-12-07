@@ -325,62 +325,53 @@ export function LoginSection({
     );
   }
 
-  // 🔥 设置向导 - 需要插件
+  // 🔥 设置向导 - 需要插件 (极简版)
   if (setupStep === 'need-extension') {
     return (
       <Card className="border-purple-200">
         <CardHeader>
           <CardTitle className="text-xl flex items-center gap-2">
             <Download className="h-6 w-6 text-purple-500" />
-            安装 Prome 插件
+            一键安装 Prome 插件
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Alert className="bg-purple-50 border-purple-200">
-            <AlertDescription className="text-purple-800">
-              <p className="font-medium mb-2">✅ Chrome 浏览器已检测到</p>
-              <p className="text-sm">现在需要安装 Prome Chrome 插件来同步您的小红书账号。</p>
+          <Alert className="bg-green-50 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">
+              ✅ Chrome 浏览器已就绪
             </AlertDescription>
           </Alert>
 
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-            <h4 className="font-medium">安装步骤：</h4>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-              <li>点击下方按钮下载插件 ZIP 文件</li>
-              <li>打开 Chrome 扩展页面 <code className="bg-gray-200 px-1 rounded">chrome://extensions</code></li>
-              <li>开启右上角的 <strong>"开发者模式"</strong></li>
-              <li>解压 ZIP 文件，点击 <strong>"加载已解压的扩展程序"</strong></li>
-              <li>选择解压后的文件夹</li>
-            </ol>
-          </div>
+          <p className="text-gray-600">
+            点击下方按钮安装 Prome 插件，安装后页面将自动刷新。
+          </p>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={() => window.open(EXTENSION_DOWNLOAD_URL, '_blank')}
-              className="bg-gradient-to-r from-purple-500 to-pink-500"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              下载 Prome 插件
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => window.open('chrome://extensions', '_blank')}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              打开扩展页面
-            </Button>
+          <Button
+            onClick={() => {
+              // 自动下载扩展
+              window.open(EXTENSION_DOWNLOAD_URL, '_blank');
+              // 3秒后提示用户
+              setTimeout(() => {
+                alert('下载完成后，请解压并在 chrome://extensions 中加载插件。\n\n完成后刷新此页面即可。');
+              }, 1000);
+            }}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 h-12 text-lg"
+          >
+            <Download className="mr-2 h-5 w-5" />
+            立即安装插件
+          </Button>
+
+          <div className="flex gap-2 justify-center">
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => window.location.reload()}
             >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              刷新检测
+              <RefreshCw className="mr-1 h-3 w-3" />
+              已安装？刷新检测
             </Button>
           </div>
-
-          <p className="text-xs text-gray-500">
-            安装完成后，页面会自动检测到插件。如果没有自动刷新，请点击"刷新检测"。
-          </p>
         </CardContent>
       </Card>
     );
