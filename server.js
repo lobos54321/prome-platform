@@ -110,7 +110,7 @@ const IDLE_TIMEOUT_MINUTES = 20; // 20分钟闲置自动关机
 function updateLastUsage() {
   lastApiCallTime = new Date();
   console.log(`📱 更新API使用时间: ${lastApiCallTime.toISOString()}`);
-  
+
   // 重置自动关机定时器
   resetAutoShutdownTimer();
 }
@@ -121,25 +121,25 @@ function resetAutoShutdownTimer() {
   if (autoShutdownTimer) {
     clearTimeout(autoShutdownTimer);
   }
-  
+
   // 设置新的定时器：20分钟后自动关机
   autoShutdownTimer = setTimeout(async () => {
     try {
       console.log(`⏰ ${IDLE_TIMEOUT_MINUTES}分钟无活动，开始自动关机...`);
-      
+
       // 首先检查实例状态
       const statusResponse = await fetch('http://localhost:8080/api/xiangong/instance/status');
       if (statusResponse.ok) {
         const statusResult = await statusResponse.json();
-        
+
         if (statusResult.success && statusResult.data.status === 'running') {
           console.log('🔄 实例正在运行，执行自动关机...');
-          
+
           // 调用关机API
           const shutdownResponse = await fetch('http://localhost:8080/api/xiangong/instance/stop', {
             method: 'POST'
           });
-          
+
           if (shutdownResponse.ok) {
             const shutdownResult = await shutdownResponse.json();
             console.log('✅ 自动关机成功:', shutdownResult);
@@ -156,7 +156,7 @@ function resetAutoShutdownTimer() {
       console.error('❌ 自动关机过程出错:', error);
     }
   }, IDLE_TIMEOUT_MINUTES * 60 * 1000); // 转换为毫秒
-  
+
   console.log(`⏱️ 自动关机定时器已设置：${IDLE_TIMEOUT_MINUTES}分钟后执行`);
 }
 
@@ -165,12 +165,12 @@ function checkIdleTime() {
   if (!lastApiCallTime) {
     return;
   }
-  
+
   const now = new Date();
   const idleMinutes = (now - lastApiCallTime) / (1000 * 60);
-  
+
   console.log(`📊 当前闲置时间: ${idleMinutes.toFixed(1)} 分钟`);
-  
+
   return idleMinutes;
 }
 const XIANGONG_INDEXTTS2_URL = XIANGONG_COMFYUI_URL;
@@ -191,7 +191,7 @@ if (!DIFY_API_URL || !DIFY_API_KEY) {
 
 // UUID utility functions
 function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -214,27 +214,27 @@ function getValidUserId(user) {
   if (user && isValidUUID(user)) {
     return user;
   }
-  
+
   // If user is provided but not a UUID, try to extract UUID from it
   if (user && typeof user === 'string') {
     const uuidMatch = user.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
     if (uuidMatch) {
       return uuidMatch[0];
     }
-    
+
     // Check if we already have a mapping for this user string
     if (userIdMappings.has(user)) {
       console.log('🔄 Using existing user ID mapping for:', user);
       return userIdMappings.get(user);
     }
-    
+
     // Create new mapping for this user string
     const anonymousUserId = generateUUID();
     userIdMappings.set(user, anonymousUserId);
     console.log('🔧 Created new user ID mapping:', user, '->', anonymousUserId);
     return anonymousUserId;
   }
-  
+
   // For completely anonymous users, generate a UUID
   const anonymousUserId = generateUUID();
   console.log('🔧 Generated anonymous user ID:', anonymousUserId);
@@ -269,7 +269,7 @@ async function manageConversationContext(conversationId, newMessage) {
     console.log('⚠️  Context management skipped (Supabase not configured)');
     return null;
   }
-  
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
@@ -300,20 +300,20 @@ async function manageConversationContext(conversationId, newMessage) {
     // 从最新消息开始，累加token直到达到限制
     for (const message of messages) {
       const messageTokens = estimateTokens(message.content);
-      
+
       // 检查是否有未完整的回答（答案突然截断的特征）
       if (message.role === 'assistant' && message.content) {
         const content = message.content.trim();
         // 检查答案是否可能被截断：没有适当的结尾标点、突然中断的句子等
-        if (content.length > 100 && 
-            !content.match(/[。！？\.\!\?]$/) && 
-            !content.includes('完成') && 
-            !content.includes('结束')) {
+        if (content.length > 100 &&
+          !content.match(/[。！？\.\!\?]$/) &&
+          !content.includes('完成') &&
+          !content.includes('结束')) {
           incompleteAnswerFound = true;
           console.log('🚨 检测到可能未完整的回答，将优先保留');
         }
       }
-      
+
       if (totalTokens + messageTokens > MAX_CONTEXT_TOKENS) {
         // 如果发现未完整的回答，调整策略
         if (incompleteAnswerFound && messagesToKeep.length > 0) {
@@ -324,11 +324,11 @@ async function manageConversationContext(conversationId, newMessage) {
           messagesToKeep = messagesToKeep.slice(0, recentPairs);
           totalTokens = estimateTokens(newMessage) + messagesToKeep.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
         }
-        
+
         truncatedCount = messages.length - messagesToKeep.length;
         break;
       }
-      
+
       totalTokens += messageTokens;
       messagesToKeep.unshift(message); // 添加到开头，保持时间顺序
     }
@@ -336,7 +336,7 @@ async function manageConversationContext(conversationId, newMessage) {
     if (truncatedCount > 0) {
       console.log(`🔄 Context management: keeping ${messagesToKeep.length} messages, truncating ${truncatedCount} older messages`);
       console.log(`📊 Estimated total tokens: ${totalTokens}/${MAX_CONTEXT_TOKENS}`);
-      
+
       // 根据是否有未完整回答调整提示信息  
       let truncationNote;
       if (incompleteAnswerFound) {
@@ -344,7 +344,7 @@ async function manageConversationContext(conversationId, newMessage) {
       } else {
         truncationNote = `[系统提示：为避免上下文溢出，已自动整理了前面的 ${truncatedCount} 条历史消息。如需完整对话历史，建议开始新对话]`;
       }
-      
+
       return {
         truncated: true,
         truncatedCount,
@@ -376,7 +376,7 @@ async function detectContextOverflowRisk(conversationId, newMessage) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return null;
   }
-  
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
@@ -404,13 +404,13 @@ async function detectContextOverflowRisk(conversationId, newMessage) {
 
     if (totalTokens > riskThreshold) {
       console.log(`⚠️ Context overflow risk detected: ${totalTokens}/${DIFY_TOKEN_LIMIT} tokens`);
-      
+
       return {
         isAtRisk: true,
         currentTokens: totalTokens,
         limit: DIFY_TOKEN_LIMIT,
         riskLevel: totalTokens > DIFY_TOKEN_LIMIT * 0.9 ? 'high' : 'medium',
-        suggestion: totalTokens > DIFY_TOKEN_LIMIT * 0.9 
+        suggestion: totalTokens > DIFY_TOKEN_LIMIT * 0.9
           ? '建议开始新对话以避免输出被截断'
           : '即将达到上下文限制，复杂回答可能被截断'
       };
@@ -442,7 +442,7 @@ async function checkDatabaseHealth(supabase) {
           .from(table)
           .select('id')
           .limit(1);
-        
+
         if (error) {
           results[table] = { exists: false, error: error.message };
         } else {
@@ -454,7 +454,7 @@ async function checkDatabaseHealth(supabase) {
     }
 
     const allTablesExist = Object.values(results).every(result => result.exists);
-    
+
     if (allTablesExist) {
       console.log('✅ Database health check passed - all required tables exist');
       return true;
@@ -539,7 +539,7 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
   if (process.env.NODE_ENV !== 'production') {
     console.log('🔍 ensureConversationExists called with:', { conversationId, difyConversationId, userId, hasSupabase: !!supabase });
   }
-  
+
   if (!supabase) {
     console.log('📝 Skipping conversation check (Supabase not configured)');
     return;
@@ -548,14 +548,14 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
   try {
     // Use difyConversationId as primary identifier if available
     const primaryId = difyConversationId || conversationId;
-    
+
     // First check if conversation already exists by dify_conversation_id
     let { data: existingConversation, error: checkError } = await supabase
       .from('conversations')
       .select('id, dify_conversation_id')
       .eq('dify_conversation_id', primaryId)
       .maybeSingle();
-    
+
     // If not found by dify_conversation_id, try by internal id (for backward compatibility)
     if (!existingConversation && !checkError) {
       const { data: fallbackConversation, error: fallbackError } = await supabase
@@ -563,7 +563,7 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
         .select('id, dify_conversation_id')
         .eq('id', conversationId)
         .maybeSingle();
-        
+
       existingConversation = fallbackConversation;
       checkError = fallbackError;
     }
@@ -578,7 +578,7 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
       if (!existingConversation.dify_conversation_id && difyConversationId) {
         const { error: updateError } = await supabase
           .from('conversations')
-          .update({ 
+          .update({
             dify_conversation_id: difyConversationId,
             updated_at: new Date().toISOString()
           })
@@ -631,25 +631,25 @@ async function ensureConversationExists(supabase, conversationId, difyConversati
     // Use upsert to handle potential race conditions and ensure record exists
     const { data: insertResult, error: insertError } = await supabase
       .from('conversations')
-      .upsert(insertData, { 
+      .upsert(insertData, {
         onConflict: 'id',
-        ignoreDuplicates: false 
+        ignoreDuplicates: false
       })
       .select('id');
 
     if (insertError) {
       console.error('Error creating conversation record:', insertError);
-      
+
       // If it still fails due to user constraint, retry without user_id
       if (insertError.code === '23503' && insertError.message.includes('user_id')) {
         console.log('Retrying conversation creation without user_id...');
         delete insertData.user_id;
-        
+
         const { data: retryResult, error: retryError } = await supabase
           .from('conversations')
-          .upsert(insertData, { 
+          .upsert(insertData, {
             onConflict: 'id',
-            ignoreDuplicates: false 
+            ignoreDuplicates: false
           })
           .select('id');
 
@@ -699,11 +699,11 @@ async function saveMessages(supabase, conversationId, userMessage, difyResponse)
     // Save assistant message
     // 改进空内容处理，防止数据库约束错误
     const assistantContent = difyResponse.answer || '系统处理中，请稍后重试';
-    
+
     if (!assistantContent.trim()) {
       console.warn('⚠️  Assistant response is empty, using fallback message');
     }
-    
+
     const { error: assistantError } = await supabase
       .from('messages')
       .insert({
@@ -732,17 +732,17 @@ const videoResults = new Map();
 // 视频结果接收端点 - 供N8n工作流3回调使用
 app.post('/api/video-result', (req, res) => {
   console.log('📥 N8n工作流3回调 - 视频结果:', req.body);
-  
+
   const { sessionId, videoUrl, status, timestamp } = req.body;
-  
+
   // 验证必填字段
   if (!sessionId || !videoUrl) {
     console.error('❌ 缺少必填字段 sessionId 或 videoUrl');
-    return res.status(400).json({ 
-      error: 'Missing required fields: sessionId, videoUrl' 
+    return res.status(400).json({
+      error: 'Missing required fields: sessionId, videoUrl'
     });
   }
-  
+
   // 存储结果
   videoResults.set(sessionId, {
     sessionId,
@@ -751,11 +751,11 @@ app.post('/api/video-result', (req, res) => {
     timestamp: timestamp || new Date().toISOString(),
     receivedAt: new Date().toISOString()
   });
-  
+
   console.log('✅ 视频结果已保存:', sessionId);
-  
-  res.json({ 
-    success: true, 
+
+  res.json({
+    success: true,
     message: 'Video result received successfully',
     sessionId: sessionId
   });
@@ -765,9 +765,9 @@ app.post('/api/video-result', (req, res) => {
 app.post('/api/upload-image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '没有收到图片文件' 
+      return res.status(400).json({
+        success: false,
+        error: '没有收到图片文件'
       });
     }
 
@@ -823,13 +823,13 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
 app.post('/api/upload/video', videoUpload.single('video'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '没有收到视频文件' 
+      return res.status(400).json({
+        success: false,
+        error: '没有收到视频文件'
       });
     }
 
-    
+
     // Initialize Supabase client with service role key for storage access
     const supabase = createClient(
       process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
@@ -894,13 +894,13 @@ app.post('/api/upload/video', videoUpload.single('video'), async (req, res) => {
 app.post('/api/upload/image', imageUpload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '没有收到图片文件' 
+      return res.status(400).json({
+        success: false,
+        error: '没有收到图片文件'
       });
     }
 
-    
+
     // Initialize Supabase client with service role key for storage access
     const supabase = createClient(
       process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
@@ -978,9 +978,9 @@ setInterval(() => {
 // Image extraction from web pages endpoint
 app.post('/api/extract-images', async (req, res) => {
   const { pageUrl } = req.body;
-  
+
   console.log('🔍 Image extraction request for:', pageUrl);
-  
+
   // Temporarily disable cache for debugging
   const cacheKey = pageUrl;
   console.log('🔍 Processing fresh request for:', pageUrl);
@@ -989,11 +989,11 @@ app.post('/api/extract-images', async (req, res) => {
   //   console.log('💾 Returning cached result for:', pageUrl);
   //   return res.json(cachedResult.data);
   // }
-  
+
   if (!pageUrl || !pageUrl.startsWith('http')) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Invalid URL provided' 
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid URL provided'
     });
   }
 
@@ -1015,8 +1015,8 @@ app.post('/api/extract-images', async (req, res) => {
     } else if (pageUrl.includes('jd.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
       headers['Referer'] = 'https://www.jd.com/';
-    } 
-    
+    }
+
     // US Platforms
     else if (pageUrl.includes('walmart.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -1039,8 +1039,8 @@ app.post('/api/extract-images', async (req, res) => {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
     } else if (pageUrl.includes('macys.com') || pageUrl.includes('nordstrom.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-    } 
-    
+    }
+
     // UK Platforms
     else if (pageUrl.includes('argos.co.uk') || pageUrl.includes('currys.co.uk')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -1052,7 +1052,7 @@ app.post('/api/extract-images', async (req, res) => {
       headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
       headers['Accept-Language'] = 'en-GB,en;q=0.9';
     }
-    
+
     // European Platforms
     else if (pageUrl.includes('otto.de') || pageUrl.includes('zalando.')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -1067,7 +1067,7 @@ app.post('/api/extract-images', async (req, res) => {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
       headers['Accept-Language'] = 'de-DE,de;q=0.9,en;q=0.8';
     }
-    
+
     // Third-party marketplace platforms (where SMEs can open stores)
     else if (pageUrl.includes('etsy.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -1079,7 +1079,7 @@ app.post('/api/extract-images', async (req, res) => {
     } else if (pageUrl.includes('reverb.com') || pageUrl.includes('discogs.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
     }
-    
+
     // European marketplaces
     else if (pageUrl.includes('allegro.pl') || pageUrl.includes('olx.')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -1097,7 +1097,7 @@ app.post('/api/extract-images', async (req, res) => {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
       headers['Accept-Language'] = 'sv-SE,sv;q=0.9,en;q=0.8';
     }
-    
+
     // Global marketplace platforms
     else if (pageUrl.includes('facebook.com/marketplace') || pageUrl.includes('fb.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -1109,12 +1109,12 @@ app.post('/api/extract-images', async (req, res) => {
     } else if (pageUrl.includes('offerup.com') || pageUrl.includes('letgo.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1';
     }
-    
+
     // Shopify and independent stores
     else if (pageUrl.includes('shopify.com') || pageUrl.includes('myshopify.com')) {
       headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-    } 
-    
+    }
+
     else {
       // Default for other platforms
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -1124,7 +1124,7 @@ app.post('/api/extract-images', async (req, res) => {
     }
 
     console.log(`🌐 Using platform-specific headers for: ${new URL(pageUrl).hostname}`);
-    
+
     const response = await fetch(pageUrl, {
       headers,
       timeout: 15000 // Increase to 15 second timeout
@@ -1136,17 +1136,17 @@ app.post('/api/extract-images', async (req, res) => {
 
     const html = await response.text();
     const $ = cheerio.load(html);
-    
+
     const images = [];
     const seenUrls = new Set();
 
     // Extract images with quality scoring
     const imageData = [];
-    
+
     // Amazon特殊处理 - 只关注主要产品区域
     if (pageUrl.includes('amazon.')) {
       console.log('🎯 Amazon page detected - using specialized extraction');
-      
+
       // Amazon主要产品图片选择器 - 按优先级排序
       const amazonSelectors = [
         '#landingImage',
@@ -1158,7 +1158,7 @@ app.post('/api/extract-images', async (req, res) => {
         '.imageBlock img',
         '[data-action="main-image-click"] img'
       ];
-      
+
       amazonSelectors.forEach(selector => {
         $(selector).each((i, elem) => {
           const src = $(elem).attr('src') || $(elem).attr('data-src');
@@ -1166,7 +1166,7 @@ app.post('/api/extract-images', async (req, res) => {
           const className = $(elem).attr('class') || '';
           const width = parseInt($(elem).attr('width')) || 0;
           const height = parseInt($(elem).attr('height')) || 0;
-          
+
           if (src) {
             try {
               const absoluteUrl = new URL(src, pageUrl).href;
@@ -1191,7 +1191,7 @@ app.post('/api/extract-images', async (req, res) => {
         const className = $(elem).attr('class') || '';
         const width = parseInt($(elem).attr('width')) || 0;
         const height = parseInt($(elem).attr('height')) || 0;
-        
+
         if (src) {
           try {
             const absoluteUrl = new URL(src, pageUrl).href;
@@ -1212,22 +1212,22 @@ app.post('/api/extract-images', async (req, res) => {
       const srcset = $(elem).attr('srcset');
       const alt = $(elem).attr('alt') || '';
       const className = $(elem).attr('class') || '';
-      
+
       if (srcset) {
         // Parse srcset to get the highest resolution image
         const sources = srcset.split(',').map(src => {
           const parts = src.trim().split(' ');
           const url = parts[0];
           const descriptor = parts[1] || '1x';
-          const resolution = descriptor.includes('w') 
-            ? parseInt(descriptor.replace('w', '')) 
+          const resolution = descriptor.includes('w')
+            ? parseInt(descriptor.replace('w', ''))
             : (descriptor.includes('x') ? parseFloat(descriptor.replace('x', '')) * 100 : 100);
           return { url, resolution };
         });
-        
+
         // Get the highest resolution source
         const bestSource = sources.sort((a, b) => b.resolution - a.resolution)[0];
-        
+
         if (bestSource) {
           try {
             const absoluteUrl = new URL(bestSource.url, pageUrl).href;
@@ -1267,7 +1267,7 @@ app.post('/api/extract-images', async (req, res) => {
     let topImages = imageData
       .filter(item => item.score > qualityThreshold)
       .sort((a, b) => b.score - a.score);
-    
+
     // 如果高质量图片太少，逐步降低阈值
     if (topImages.length < 2) {
       qualityThreshold = 50;
@@ -1275,33 +1275,33 @@ app.post('/api/extract-images', async (req, res) => {
         .filter(item => item.score > qualityThreshold)
         .sort((a, b) => b.score - a.score);
     }
-    
+
     if (topImages.length < 1) {
       qualityThreshold = 0;
       topImages = imageData
         .filter(item => item.score > qualityThreshold)
         .sort((a, b) => b.score - a.score);
     }
-    
+
     // 只取前4张最高分图片
     topImages = topImages.slice(0, 4);
-    
+
     console.log(`🎯 Using quality threshold: ${qualityThreshold}, found ${topImages.length} images`);
-    
+
     // 转换为高清URL，并验证有效性
     const filteredImages = await Promise.all(
       topImages.map(async (item) => {
         const highResUrl = convertToHighResUrl(item.url);
-        
+
         console.log(`🔄 Converting image: ${item.url.substring(0, 100)}...`);
         console.log(`   ➡️ High-res: ${highResUrl.substring(0, 100)}...`);
-        
+
         // 对于Amazon图片，验证URL有效性并尝试多个版本
         if (highResUrl.includes('amazon') && highResUrl.includes('/images/I/')) {
           const imageIdMatch = highResUrl.match(/\/images\/I\/([^._\/]+)/);
           if (imageIdMatch) {
             const imageId = imageIdMatch[1];
-            
+
             // 按优先级测试多个版本
             const testUrls = [
               `https://m.media-amazon.com/images/I/${imageId}.jpg`, // 原始
@@ -1311,19 +1311,19 @@ app.post('/api/extract-images', async (req, res) => {
               `https://m.media-amazon.com/images/I/${imageId}._SX679_.jpg`, // 679px宽
               item.url // 原始缩略图作为最后备选
             ];
-            
+
             console.log(`🧪 正在测试Amazon图片ID ${imageId} 的多个版本...`);
-            
+
             for (let i = 0; i < testUrls.length; i++) {
               try {
-                const testResponse = await fetch(testUrls[i], { 
-                  method: 'HEAD', 
+                const testResponse = await fetch(testUrls[i], {
+                  method: 'HEAD',
                   timeout: 2000,
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                   }
                 });
-                
+
                 if (testResponse.ok) {
                   console.log(`✅ Amazon图片版本 ${i + 1} 可用: ${testUrls[i].substring(0, 80)}...`);
                   return testUrls[i];
@@ -1333,22 +1333,22 @@ app.post('/api/extract-images', async (req, res) => {
                 continue;
               }
             }
-            
+
             console.log(`⚠️ 所有Amazon版本都不可用，使用原始URL`);
             return item.url;
           }
         }
-        
+
         // Quick validation for non-Amazon images
         try {
-          const testResponse = await fetch(highResUrl, { 
-            method: 'HEAD', 
+          const testResponse = await fetch(highResUrl, {
+            method: 'HEAD',
             timeout: 3000,
             headers: {
               'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             }
           });
-          
+
           if (testResponse.ok) {
             console.log(`✅ Image validated: ${highResUrl.substring(0, 80)}...`);
             return highResUrl;
@@ -1379,25 +1379,25 @@ app.post('/api/extract-images', async (req, res) => {
 
     console.log(`✅ Extracted ${filteredImages.length} high-quality images from ${pageUrl}`);
     console.log(`📊 Quality filter: ${imageData.length} total -> ${filteredImages.length} high-quality (score > 100)`);
-    
-    const responseData = { 
-      success: true, 
+
+    const responseData = {
+      success: true,
       images: filteredImages,
       count: filteredImages.length
     };
-    
+
     // Temporarily disable caching for debugging
     // imageCache.set(cacheKey, {
     //   data: responseData,
     //   timestamp: Date.now()
     // });
-    
+
     res.json(responseData);
 
   } catch (error) {
     console.error('❌ Image extraction failed:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: error.message || 'Failed to extract images from page'
     });
   }
@@ -1406,16 +1406,16 @@ app.post('/api/extract-images', async (req, res) => {
 // Helper function to convert thumbnail URLs to high-resolution versions
 function convertToHighResUrl(url) {
   if (!url) return url;
-  
+
   try {
     // Amazon images URL optimization
     if (url.includes('amazon.com') || url.includes('ssl-images-amazon.com') || url.includes('m.media-amazon.com')) {
       // Amazon图片URL破解策略：
       // 1. 删除所有尺寸和压缩标识符，获取原始图片
       // 2. 尝试多种最高清格式
-      
+
       let originalUrl = url;
-      
+
       // 方法1：完全清除所有Amazon压缩标识符，获取原始图片
       let cleanUrl = url
         // 移除所有已知的Amazon压缩标识符
@@ -1427,7 +1427,7 @@ function convertToHighResUrl(url) {
         .replace(/\._SY\d+_/g, '.')     // 移除_SY123_格式
         .replace(/\._CB\d+_/g, '.')     // 移除_CB缓存标识符
         .replace(/\.\./g, '.');         // 清理可能的双点
-      
+
       // 方法2：如果清理后的URL无效，使用超高清格式
       let ultraHighResUrl = url
         .replace(/\._AC_[^.]*_/g, '._SL3000_')
@@ -1436,12 +1436,12 @@ function convertToHighResUrl(url) {
         .replace(/\._SS\d+_/g, '._SL3000_')
         .replace(/\._SX\d+_/g, '._SL3000_')
         .replace(/\._SY\d+_/g, '._SL3000_');
-      
+
       // 如果没有任何标识符，添加超高清标识
       if (ultraHighResUrl === url) {
         ultraHighResUrl = url.replace(/(\.(jpg|jpeg|png|webp))$/i, '._SL3000_$1');
       }
-      
+
       // 亚马逊图片ID提取策略 - 模拟放大功能
       const imageIdMatch = url.match(/\/images\/I\/([^._]+)/);
       if (imageIdMatch) {
@@ -1456,29 +1456,29 @@ function convertToHighResUrl(url) {
           ultraHighResUrl, // 3000px版本
           cleanUrl, // 清理版本
         ];
-        
+
         console.log(`🎯 Amazon图片ID: ${imageId}`);
         console.log(`📊 尝试多个URL版本:`);
         possibleUrls.forEach((url, index) => {
           console.log(`   ${index + 1}. ${url}`);
         });
-        
+
         // 返回第一个可能的最高质量版本 (原始无压缩)
         return possibleUrls[0];
       }
-      
+
       // 如果无法提取图片ID，使用原有策略
       const finalUrl = cleanUrl !== url ? cleanUrl : ultraHighResUrl;
-      
+
       console.log(`🔄 Amazon URL optimization (fallback):`);
       console.log(`   原始: ${originalUrl}`);
       console.log(`   清理: ${cleanUrl}`);
       console.log(`   3K版: ${ultraHighResUrl}`);
       console.log(`   最终: ${finalUrl}`);
-      
+
       return finalUrl;
     }
-    
+
     // Shopify images
     if (url.includes('shopify.com') || url.includes('cdn.shopify.com')) {
       // Replace size parameters with large version
@@ -1490,13 +1490,13 @@ function convertToHighResUrl(url) {
         .replace(/_medium\./g, '_2048x2048.')
         .replace(/_large\./g, '_2048x2048.')
         .replace(/_thumb\./g, '_2048x2048.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Shopify URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // Alibaba/AliExpress images
     if (url.includes('alicdn.com') || url.includes('alibaba.com')) {
       let highResUrl = url
@@ -1505,13 +1505,13 @@ function convertToHighResUrl(url) {
         .replace(/\.summ\./g, '.2048x2048.')
         .replace(/\.jpg_50x50\.jpg/g, '.jpg')
         .replace(/\.png_50x50\.png/g, '.png');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Alibaba URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // 淘宝/天猫 images
     if (url.includes('taobao.com') || url.includes('tmall.com') || url.includes('aliimg.com')) {
       let highResUrl = url
@@ -1523,13 +1523,13 @@ function convertToHighResUrl(url) {
         // 淘宝特有的缩略图格式
         .replace(/!!\d+x\d+\.jpg/g, '!!2000x2000.jpg')
         .replace(/!!\d+x\d+\.png/g, '!!2000x2000.png');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Taobao/Tmall URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // 京东 images
     if (url.includes('jd.com') || url.includes('360buyimg.com')) {
       let highResUrl = url
@@ -1540,26 +1540,26 @@ function convertToHighResUrl(url) {
         .replace(/_\d+x\d+\.jpg/g, '_2000x2000.jpg')
         .replace(/_s\.jpg/g, '.jpg')
         .replace(/_m\.jpg/g, '.jpg');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 JD.com URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // Walmart images
     if (url.includes('walmart.com') || url.includes('walmartimages.com')) {
       let highResUrl = url
         .replace(/\?odnHeight=\d+&odnWidth=\d+/g, '?odnHeight=2000&odnWidth=2000')
         .replace(/resize=\d+:\d+/g, 'resize=2000:2000')
         .replace(/_\d+x\d+\./g, '_2000x2000.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Walmart URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // eBay images
     if (url.includes('ebay.com') || url.includes('ebayimg.com')) {
       let highResUrl = url
@@ -1567,51 +1567,51 @@ function convertToHighResUrl(url) {
         .replace(/s-m\d+\./g, 's-l2000.')
         .replace(/\$_\d+\.JPG/g, '$_2000.JPG')
         .replace(/\$_\d+\.jpg/g, '$_2000.jpg');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 eBay URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // Target images
     if (url.includes('target.com') || url.includes('scene7.com')) {
       let highResUrl = url
         .replace(/wid=\d+&hei=\d+/g, 'wid=2000&hei=2000')
         .replace(/\?fmt=webp&wid=\d+/g, '?fmt=webp&wid=2000')
         .replace(/_\d+x\d+\./g, '_2000x2000.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Target URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // Best Buy images
     if (url.includes('bestbuy.com') || url.includes('bbystatic.com')) {
       let highResUrl = url
         .replace(/;maxHeight=\d+;maxWidth=\d+/g, ';maxHeight=2000;maxWidth=2000')
         .replace(/\?w=\d+&h=\d+/g, '?w=2000&h=2000')
         .replace(/_\d+x\d+\./g, '_2000x2000.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Best Buy URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // Costco images
     if (url.includes('costco.com') || url.includes('costcocdn.com')) {
       let highResUrl = url
         .replace(/wid_\d+,hei_\d+/g, 'wid_2000,hei_2000')
         .replace(/\?wid=\d+&hei=\d+/g, '?wid=2000&hei=2000');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Costco URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
       return highResUrl;
     }
-    
+
     // 独立站智能优化 - 优先处理
     // 1. 通用独立站缩略图模式检测和转换
     const thumbnailPatterns = [
@@ -1629,10 +1629,10 @@ function convertToHighResUrl(url) {
       /\?w=\d+|\?width=\d+|\?size=\d+/gi,
       /&w=\d+|&width=\d+|&size=\d+/gi
     ];
-    
+
     let independentSiteUrl = url;
     let wasOptimized = false;
-    
+
     // 应用所有缩略图转换规则
     thumbnailPatterns.forEach(pattern => {
       const before = independentSiteUrl;
@@ -1667,7 +1667,7 @@ function convertToHighResUrl(url) {
         wasOptimized = true;
       }
     });
-    
+
     if (wasOptimized) {
       console.log(`🔄 Independent site URL optimized: ${url.substring(0, 80)}...`);
       console.log(`   ➡️ Optimized: ${independentSiteUrl.substring(0, 80)}...`);
@@ -1684,7 +1684,7 @@ function convertToHighResUrl(url) {
         .replace(/\/h_\d+\//g, '/h_2000/')
         .replace(/\/c_fill,w_\d+,h_\d+\//g, '/c_scale,w_2000/')
         .replace(/\/q_auto:\w+\//g, '/q_auto:best/');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Cloudinary URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1698,7 +1698,7 @@ function convertToHighResUrl(url) {
         .replace(/[?&]h=\d+/g, '&h=2000')
         .replace(/[?&]fit=\w+/g, '&fit=scale')
         .replace(/[?&]q=\d+/g, '&q=90');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Imgix URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1712,7 +1712,7 @@ function convertToHighResUrl(url) {
         .replace(/_\d+x\d+\./g, '_2000x2000.')
         .replace(/\/small\//g, '/large/')
         .replace(/\/thumb\//g, '/large/');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Argos UK URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1724,7 +1724,7 @@ function convertToHighResUrl(url) {
         .replace(/\/\d+x\d+\//g, '/2000x2000/')
         .replace(/\?w=\d+&h=\d+/g, '?w=2000&h=2000')
         .replace(/\?width=\d+/g, '?width=2000');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 John Lewis URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1736,7 +1736,7 @@ function convertToHighResUrl(url) {
         .replace(/\/sz_\d+\//g, '/sz_2000/')
         .replace(/\?hei=\d+&wid=\d+/g, '?hei=2000&wid=2000')
         .replace(/\/thumb\//g, '/zoom/');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Next UK URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1749,7 +1749,7 @@ function convertToHighResUrl(url) {
         .replace(/\/\d+x\d+\//g, '/2000x2000/')
         .replace(/\?w=\d+&h=\d+/g, '?w=2000&h=2000')
         .replace(/\_\d+x\d+\./g, '_2000x2000.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Otto.de URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1761,7 +1761,7 @@ function convertToHighResUrl(url) {
         .replace(/\/\d+x\d+\//g, '/2000x2000/')
         .replace(/\?size=\d+x\d+/g, '?size=2000x2000')
         .replace(/\/thumb\//g, '/large/');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Zalando URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1773,7 +1773,7 @@ function convertToHighResUrl(url) {
         .replace(/\/\d+x\d+\//g, '/2000x2000/')
         .replace(/\?width=\d+&height=\d+/g, '?width=2000&height=2000')
         .replace(/\_thumb\./g, '_large.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 MediaMarkt/Saturn URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1786,7 +1786,7 @@ function convertToHighResUrl(url) {
         .replace(/\/\d+x\d+\//g, '/2000x2000/')
         .replace(/\?width=\d+&height=\d+/g, '?width=2000&height=2000')
         .replace(/\/(s|m|l)\//g, '/xl/');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Bol.com URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1798,7 +1798,7 @@ function convertToHighResUrl(url) {
         .replace(/\/fit_\d+x\d+\//g, '/fit_2000x2000/')
         .replace(/\?width=\d+/g, '?width=2000')
         .replace(/\/thumb\//g, '/zoom/');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Coolblue URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1811,7 +1811,7 @@ function convertToHighResUrl(url) {
         .replace(/\/\d+x\d+\//g, '/2000x2000/')
         .replace(/\?width=\d+&height=\d+/g, '?width=2000&height=2000')
         .replace(/\_m\./g, '_xl.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Fnac URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1823,7 +1823,7 @@ function convertToHighResUrl(url) {
         .replace(/\/\d+x\d+\//g, '/2000x2000/')
         .replace(/\?f=\d+x\d+/g, '?f=2000x2000')
         .replace(/\/m\//g, '/l/');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 Cdiscount URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1836,7 +1836,7 @@ function convertToHighResUrl(url) {
         .replace(/tr:w-\d+,h-\d+/g, 'tr:w-2000,h-2000')
         .replace(/tr:w-\d+/g, 'tr:w-2000')
         .replace(/tr:h-\d+/g, 'tr:h-2000');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 ImageKit URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1855,7 +1855,7 @@ function convertToHighResUrl(url) {
         .replace(/-medium\./g, '.')
         .replace(/-large\./g, '.')
         .replace(/-thumbnail\./g, '.');
-      
+
       if (highResUrl !== url) {
         console.log(`🔄 WordPress/WooCommerce URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
       }
@@ -1874,23 +1874,23 @@ function convertToHighResUrl(url) {
       { pattern: /([?&])w=\d+/gi, replacement: '$1w=2000' },
       { pattern: /([?&])h=\d+/gi, replacement: '$1h=2000' },
       { pattern: /([?&])size=\d+/gi, replacement: '$1size=2000' },
-      
+
       // 文件名中的尺寸：image_300x300.jpg → image_2000x2000.jpg
       { pattern: /_\d+x\d+\./gi, replacement: '_2000x2000.' },
       { pattern: /-\d+x\d+\./gi, replacement: '-2000x2000.' },
-      
+
       // 常见缩略图标识符
       { pattern: /[_-]thumb[_-]?/gi, replacement: '_large_' },
       { pattern: /[_-]small[_-]?/gi, replacement: '_large_' },
       { pattern: /[_-]medium[_-]?/gi, replacement: '_large_' },
       { pattern: /[_-]mini[_-]?/gi, replacement: '_large_' },
-      
+
       // 尺寸相关的路径片段：/thumbs/ → /images/
       { pattern: /\/thumbs?\//gi, replacement: '/images/' },
       { pattern: /\/thumb_/gi, replacement: '/full_' },
       { pattern: /\/small\//gi, replacement: '/large/' },
       { pattern: /\/medium\//gi, replacement: '/large/' },
-      
+
       // 数字尺寸标识：image50.jpg → image.jpg, image_200.jpg → image.jpg
       { pattern: /(\w+)_?\d{2,4}(\.(jpg|jpeg|png|webp))/gi, replacement: '$1$2' },
     ];
@@ -1922,11 +1922,11 @@ function convertToHighResUrl(url) {
         }
       }
     }
-    
+
     if (highResUrl !== url) {
       console.log(`🔄 Generic URL converted: ${url.substring(0, 60)}... → ${highResUrl.substring(0, 60)}...`);
     }
-    
+
     return highResUrl;
   } catch (error) {
     console.error('❌ URL conversion failed:', error);
@@ -1937,96 +1937,96 @@ function convertToHighResUrl(url) {
 // Helper function to calculate image quality score
 function calculateImageScore(url, alt, className, width, height) {
   let score = 50; // Lower base score to be more inclusive
-  
+
   const lowercaseUrl = url.toLowerCase();
   const lowercaseAlt = alt.toLowerCase();
   const lowercaseClass = className.toLowerCase();
-  
+
   // Platform-specific high-priority patterns - 平衡严格性和覆盖率
   const highPriorityPatterns = [
     // Amazon specific - 最高优先级
     'landingImage', 'a-dynamic-image', 'a-size-large', 'imgBlkFront',
     'a-image-wrapper', 'a-button-thumbnail', 'imgTagWrapper',
-    
+
     // Universal high-value patterns
     'product', 'main', 'hero', 'primary', 'featured', 'detail', 'large',
     'gallery', 'zoom', 'fullsize', 'original', 'image', 'img', 'pic', 'photo'
   ];
-  
+
   highPriorityPatterns.forEach(pattern => {
     if (lowercaseUrl.includes(pattern) || lowercaseAlt.includes(pattern) || lowercaseClass.includes(pattern)) {
       score += 200; // Much higher bonus for product images
     }
   });
-  
+
   // Medium-priority indicators
   const mediumPriorityPatterns = [
     'banner', 'showcase', 'cover', 'thumb', 'preview', 'image', 'pic', 'photo'
   ];
-  
+
   mediumPriorityPatterns.forEach(pattern => {
     if (lowercaseUrl.includes(pattern) || lowercaseAlt.includes(pattern) || lowercaseClass.includes(pattern)) {
       score += 30;
     }
   });
-  
+
   // 超严格过滤 - 彻底清除非产品图片
   const strongNegativePatterns = [
     // 广告和推荐 - 超严厉惩罚
     'ad', 'ads', 'advertisement', 'sponsored', 'sponsor', 'promo', 'banner',
     'recommended', 'suggest', 'related', 'similar', 'also-bought', 'cross-sell',
     'upsell', 'recommendation', 'carousel', 'slider', 'widget', 'module',
-    
+
     // Amazon specific 广告和推荐
     'sp-atf', 'adplacements', 'amazontrustsignals', 'acs-', 'desktop-ad',
     'mobile-ad', 'ad-feedback', 'ad-display', 'sponsored-products',
     'aplus-', 'a-plus', 'enhanced-content', 'comparison', 'feature-',
     'brand-', 'storefront', 'variation', 'swatch', 'color-',
-    
+
     // 页面导航和界面
     'nav', 'menu', 'header', 'footer', 'sidebar', 'breadcrumb',
     'logo', 'icon', 'badge', 'button', 'arrow', 'bullet', 'dot', '1x1',
-    'pixel', 'tracker', 'analytics', 'loading', 'spinner', 'placeholder', 
+    'pixel', 'tracker', 'analytics', 'loading', 'spinner', 'placeholder',
     'blank', 'spacer', 'separator', 'divider', 'background',
-    
+
     // 社交和分享
     'facebook', 'twitter', 'instagram', 'youtube', 'linkedin', 'pinterest',
     'social', 'share', 'follow', 'wishlist', 'favorite', 'bookmark',
-    
+
     // 小图和缩略图
     'thumb', 'mini', 'tiny', 'small', 'xs', 'icon-', 'thumbnail',
     'preview', 'sample', 'swatch', 'chip',
-    
+
     // Amazon推荐系统
     'customers-', 'bought-together', 'frequently-', 'compare',
     'alternatives', 'substitutes', 'bundle', 'deal', 'promotion',
     'bestseller', 'choice', 'pick', 'selection',
-    
+
     // 评价和评分
     'review', 'rating', 'star', 'feedback', 'comment', 'testimonial',
-    
+
     // 其他品牌和商品
     'other-', 'more-', 'additional-', 'extra-', 'bonus-'
   ];
-  
+
   strongNegativePatterns.forEach(pattern => {
     if (lowercaseUrl.includes(pattern) || lowercaseAlt.includes(pattern) || lowercaseClass.includes(pattern)) {
       score -= 150; // Strong penalty for clearly non-product images
     }
   });
-  
+
   // Light penalty for some patterns (but don't completely exclude)
   const lightNegativePatterns = [
     'nav', 'menu', 'header', 'footer', 'sidebar', 'widget',
     'avatar', 'profile', 'user', 'comment', 'rating', 'star'
   ];
-  
+
   lightNegativePatterns.forEach(pattern => {
     if (lowercaseUrl.includes(pattern) || lowercaseAlt.includes(pattern) || lowercaseClass.includes(pattern)) {
       score -= 20; // Light penalty only
     }
   });
-  
+
   // Balanced quality requirements - practical for most product images
   if (width && height) {
     const area = width * height;
@@ -2037,12 +2037,12 @@ function calculateImageScore(url, alt, className, width, height) {
     else if (area > 200000) score += 80; // Medium images (200k+ pixels)
     else if (area > 100000) score += 50; // Small-medium images (100k+ pixels)
     else if (area < 50000) score -= 100; // 只对很小的图片减分
-    
+
     // 最小尺寸要求更宽松
     if (width < 100 || height < 100) {
       score -= 50; // 只对很小的图片适度减分
     }
-    
+
     // Aspect ratio bonus for product images
     const aspectRatio = width / height;
     if (aspectRatio >= 0.75 && aspectRatio <= 1.5) {
@@ -2052,39 +2052,39 @@ function calculateImageScore(url, alt, className, width, height) {
     // 没有尺寸信息的图片适度减分
     score -= 30;
   }
-  
+
   // Resolution indicators in URL - 扩展高清标识符
   const highResIndicators = [
     '_large', '_xl', '_big', '_full', '_original', '_hd', '_high',
     '1200', '1920', '2048', '1500', '1600', '1800', '2400', '3000',
     'large', 'orig', 'master', 'max', 'full-size', 'high-res'
   ];
-  
-  const hasHighResIndicator = highResIndicators.some(indicator => 
+
+  const hasHighResIndicator = highResIndicators.some(indicator =>
     lowercaseUrl.includes(indicator)
   );
-  
+
   if (hasHighResIndicator) {
     score += 100; // 增加高清图片奖励分数
   }
-  
-  if (lowercaseUrl.includes('_small') || lowercaseUrl.includes('_thumb') || 
-      lowercaseUrl.includes('_mini') || lowercaseUrl.includes('50x50') ||
-      lowercaseUrl.includes('100x100') || lowercaseUrl.includes('64x64')) {
+
+  if (lowercaseUrl.includes('_small') || lowercaseUrl.includes('_thumb') ||
+    lowercaseUrl.includes('_mini') || lowercaseUrl.includes('50x50') ||
+    lowercaseUrl.includes('100x100') || lowercaseUrl.includes('64x64')) {
     score -= 50;
   }
-  
+
   // Format preferences
   if (lowercaseUrl.includes('.webp')) score += 25; // Modern format
   if (lowercaseUrl.includes('.jpg') || lowercaseUrl.includes('.jpeg')) score += 15;
   if (lowercaseUrl.includes('.png')) score += 10;
-  
+
   // CDN and quality indicators
-  if (lowercaseUrl.includes('cdn') || lowercaseUrl.includes('cloudinary') || 
-      lowercaseUrl.includes('imgix') || lowercaseUrl.includes('amazonaws')) {
+  if (lowercaseUrl.includes('cdn') || lowercaseUrl.includes('cloudinary') ||
+    lowercaseUrl.includes('imgix') || lowercaseUrl.includes('amazonaws')) {
     score += 30;
   }
-  
+
   return Math.max(0, score); // Ensure non-negative score
 }
 
@@ -2095,13 +2095,13 @@ function isValidImageUrl(url) {
     // Check if it's a valid image extension
     const path = parsedUrl.pathname.toLowerCase();
     const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'];
-    
+
     // Also accept URLs that might have image content types or query parameters
-    return validExtensions.some(ext => path.endsWith(ext)) || 
-           path.includes('/image') || 
-           parsedUrl.search.includes('format=') ||
-           parsedUrl.hostname.includes('cdn') ||
-           parsedUrl.hostname.includes('img');
+    return validExtensions.some(ext => path.endsWith(ext)) ||
+      path.includes('/image') ||
+      parsedUrl.search.includes('format=') ||
+      parsedUrl.hostname.includes('cdn') ||
+      parsedUrl.hostname.includes('img');
   } catch {
     return false;
   }
@@ -2114,7 +2114,7 @@ app.get('/api/video-result/debug', (req, res) => {
     sessionId: key,
     ...value
   }));
-  res.json({ 
+  res.json({
     success: true,
     count: videoResults.size,
     results: allResults
@@ -2124,25 +2124,25 @@ app.get('/api/video-result/debug', (req, res) => {
 // 前端轮询检查端点
 app.get('/api/video-result/check/:sessionId', (req, res) => {
   const { sessionId } = req.params;
-  
+
   console.log('🔍 轮询检查 sessionId:', sessionId);
   console.log('🗄️ 当前存储的所有 sessionId:', Array.from(videoResults.keys()));
-  
+
   const result = videoResults.get(sessionId);
-  
+
   if (result) {
     console.log('🎉 找到视频结果:', sessionId);
     // 返回结果后清理存储
     videoResults.delete(sessionId);
-    res.json({ 
-      success: true, 
-      result: result 
+    res.json({
+      success: true,
+      result: result
     });
   } else {
     console.log('❌ 未找到视频结果:', sessionId);
-    res.json({ 
-      success: false, 
-      message: 'No result found yet' 
+    res.json({
+      success: false,
+      message: 'No result found yet'
     });
   }
 });
@@ -2160,19 +2160,19 @@ if (!global.billingTracker) {
 // 🔧 UNIFIED BILLING: 统一的积分扣除函数
 async function handleTokenBilling(responseData, user, endpoint = 'unknown', options = {}) {
   const { emergencyFallback = false } = options;
-  
+
   // 🔧 全局tracking：记录每次billing调用
   global.billingTracker.totalCalls++;
   if (emergencyFallback) {
     global.billingTracker.emergencyFallbacks++;
   }
-  
+
   const callId = `${endpoint}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
   console.log(`🎯 [BILLING-TRACKER] Call #${global.billingTracker.totalCalls}: ${callId}`);
   console.log(`🔍 [BILLING-${endpoint}] Checking responseData structure:`, {
     hasResponseData: !!responseData,
     hasMetadata: !!(responseData?.metadata),
-    hasUsage: !!(responseData?.metadata?.usage), 
+    hasUsage: !!(responseData?.metadata?.usage),
     hasTotalTokens: !!(responseData?.metadata?.usage?.total_tokens),
     hasUsageField: !!(responseData?.usage), // 检查直接在responseData下的usage字段
     responseDataKeys: responseData ? Object.keys(responseData) : [],
@@ -2209,7 +2209,7 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
 
   if (totalTokens && totalTokens > 0) {
     const pointsToDeduct = Math.ceil(actualCost * 10000); // 🔧 CORRECT FORMULA: 美金成本 × 10000 = 积分
-    
+
     // 🔧 Emergency fallback特殊标记
     if (emergencyFallback) {
       console.log(`🚨 [BILLING-${endpoint}] EMERGENCY FALLBACK billing: ${totalTokens} tokens`);
@@ -2218,13 +2218,13 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
       console.log(`💰 [BILLING-${endpoint}] Multi-node LLM: ${totalTokens} tokens`);
     }
     console.log(`💰 [COST-${endpoint}] Actual cost: $${actualCost.toFixed(6)} = ${pointsToDeduct} points`);
-    
+
     const userId = getValidUserId(user);
-    
+
     // 🔧 IMPLEMENT ACTUAL POINTS DEDUCTION
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     if (supabaseClient && userId) {
       try {
         // First check current balance
@@ -2233,27 +2233,27 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
           .select('balance')
           .eq('id', userId)
           .single();
-          
+
         if (balanceError) {
           console.log(`⚠️  [BILLING-${endpoint}] User not found in database: ${userId}`);
-          
+
           // 🔧 新策略：为临时用户创建游客记录，或跳过计费但记录使用
           console.log(`💡 [BILLING-${endpoint}] Creating guest user session for: ${userId}`);
-          
+
           // 临时方案：不扣除积分，但记录使用情况
           console.log(`⚠️  [BILLING-${endpoint}] Guest user - no points deducted, usage recorded only`);
-          
+
           // 在内存中记录guest用户余额
           if (!global.guestBalances) {
             global.guestBalances = new Map();
           }
-          
+
           const currentGuestBalance = global.guestBalances.get(userId) || 10000;
           const newGuestBalance = Math.max(0, currentGuestBalance - pointsToDeduct);
           global.guestBalances.set(userId, newGuestBalance);
-          
+
           console.log(`📝 [BILLING-${endpoint}] Guest balance updated: ${currentGuestBalance} → ${newGuestBalance} (memory only)`);
-          
+
           // 🔧 更新全局统计
           global.billingTracker.successfulCalls++;
           global.billingTracker.callHistory.push({
@@ -2266,9 +2266,9 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
             emergencyFallback,
             timestamp: new Date().toISOString()
           });
-          
+
           console.log(`✅ [BILLING-TRACKER] Success #${global.billingTracker.successfulCalls}: ${callId}`);
-          
+
           return {
             tokens: totalTokens,
             points: pointsToDeduct,
@@ -2281,18 +2281,18 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
         } else {
           const currentBalance = userBalance.balance || 0;
           const newBalance = Math.max(0, currentBalance - pointsToDeduct);
-          
+
           // Update user balance
           const { error: updateError } = await supabaseClient
             .from('users')
-            .update({ 
+            .update({
               balance: newBalance
             })
             .eq('id', userId);
-            
+
           if (updateError) {
             console.error(`❌ [BILLING-${endpoint}] Failed to deduct points: ${updateError.message}`);
-            
+
             // 🔧 更新失败统计
             global.billingTracker.failedCalls++;
             global.billingTracker.callHistory.push({
@@ -2305,9 +2305,9 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
               emergencyFallback,
               timestamp: new Date().toISOString()
             });
-            
+
             console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - DATABASE_UPDATE_ERROR`);
-            
+
             return {
               tokens: totalTokens,
               points: pointsToDeduct,
@@ -2318,7 +2318,7 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
             };
           } else {
             console.log(`✅ [BILLING-${endpoint}] Deducted ${pointsToDeduct} points. Balance: ${currentBalance} → ${newBalance}`);
-            
+
             // 🔧 更新全局统计
             global.billingTracker.successfulCalls++;
             global.billingTracker.callHistory.push({
@@ -2332,9 +2332,9 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
               balanceChange: `${currentBalance} → ${newBalance}`,
               timestamp: new Date().toISOString()
             });
-            
+
             console.log(`✅ [BILLING-TRACKER] Success #${global.billingTracker.successfulCalls}: ${callId}`);
-            
+
             return {
               tokens: totalTokens,
               points: pointsToDeduct,
@@ -2347,7 +2347,7 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
         }
       } catch (dbError) {
         console.error(`❌ [BILLING-${endpoint}] Database error: ${dbError.message}`);
-        
+
         // 🔧 更新失败统计
         global.billingTracker.failedCalls++;
         global.billingTracker.callHistory.push({
@@ -2360,9 +2360,9 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
           emergencyFallback,
           timestamp: new Date().toISOString()
         });
-        
+
         console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - DATABASE_CONNECTION_ERROR`);
-        
+
         return {
           tokens: totalTokens,
           points: pointsToDeduct,
@@ -2374,7 +2374,7 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
       }
     } else {
       console.log(`⚠️  [BILLING-${endpoint}] Cannot deduct points - missing database or userId`);
-      
+
       // 🔧 更新失败统计
       global.billingTracker.failedCalls++;
       global.billingTracker.callHistory.push({
@@ -2387,9 +2387,9 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
         emergencyFallback,
         timestamp: new Date().toISOString()
       });
-      
+
       console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - MISSING_DATABASE_OR_USER`);
-      
+
       return {
         tokens: totalTokens,
         points: pointsToDeduct,
@@ -2403,10 +2403,10 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
     // 🚨 没有找到任何token使用信息 - 这可能导致计费遗漏！
     console.error(`🚨 [BILLING-${endpoint}] NO TOKEN USAGE DATA FOUND! This interaction will not be billed!`);
     console.error(`🚨 [BILLING-${endpoint}] responseData structure:`, JSON.stringify(responseData, null, 2));
-    
+
     // 记录这次遗漏，用于调试和审计
     console.error(`🚨 [BILLING-${endpoint}] POTENTIAL BILLING LOSS - endpoint: ${endpoint}, user: ${getValidUserId(user)}, timestamp: ${new Date().toISOString()}`);
-    
+
     // 🔧 更新失败统计
     global.billingTracker.failedCalls++;
     global.billingTracker.callHistory.push({
@@ -2419,9 +2419,9 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
       emergencyFallback,
       timestamp: new Date().toISOString()
     });
-    
+
     console.log(`❌ [BILLING-TRACKER] Failed #${global.billingTracker.failedCalls}: ${callId} - NO_TOKEN_DATA`);
-    
+
     return {
       tokens: 0,
       points: 0,
@@ -2433,7 +2433,7 @@ async function handleTokenBilling(responseData, user, endpoint = 'unknown', opti
       emergencyFallback
     };
   }
-  
+
   return null;
 }
 
@@ -2447,9 +2447,9 @@ app.get('/api/billing/stats', (req, res) => {
   }
 
   const tracker = global.billingTracker;
-  const successRate = tracker.totalCalls > 0 ? 
+  const successRate = tracker.totalCalls > 0 ?
     ((tracker.successfulCalls / tracker.totalCalls) * 100).toFixed(2) : '0.00';
-  
+
   const stats = {
     totalCalls: tracker.totalCalls,
     successfulCalls: tracker.successfulCalls,
@@ -2500,7 +2500,7 @@ app.post('/api/dify/chat/simple', async (req, res) => {
 
   // Generate or get user ID
   const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
-  
+
   // Get or create conversation ID
   let conversationId = clientConvId;
   if (!conversationId || !isValidUUID(conversationId)) {
@@ -2537,13 +2537,13 @@ app.post('/api/dify/chat/simple', async (req, res) => {
     }
 
     const data = await difyResponse.json();
-    
+
     // 🔍 CRITICAL DEBUG: 详细分析Dify API响应
     console.log('🔍 [DIFY API DEBUG] ===== DETAILED RESPONSE ANALYSIS =====');
     console.log('🔍 [DIFY API DEBUG] Response Status:', difyResponse.status);
     console.log('🔍 [DIFY API DEBUG] Response Headers:', Object.fromEntries(difyResponse.headers.entries()));
     console.log('🔍 [DIFY API DEBUG] Full Response Body:', JSON.stringify(data, null, 2));
-    
+
     // 分析usage数据结构
     console.log('🔍 [USAGE DEBUG] Usage Analysis:', {
       hasData: !!data,
@@ -2555,7 +2555,7 @@ app.post('/api/dify/chat/simple', async (req, res) => {
       usageKeys: data?.metadata?.usage ? Object.keys(data.metadata.usage) : [],
       usageData: data?.metadata?.usage || data?.usage || 'NO_USAGE_FOUND'
     });
-    
+
     // 检查token数据的具体值
     if (data?.metadata?.usage) {
       const usage = data.metadata.usage;
@@ -2569,7 +2569,7 @@ app.post('/api/dify/chat/simple', async (req, res) => {
         currency: usage.currency,
         allUsageFields: Object.keys(usage)
       });
-      
+
       // 检查是否所有值都是0
       const allZero = (
         (!usage.prompt_tokens || usage.prompt_tokens === 0) &&
@@ -2577,7 +2577,7 @@ app.post('/api/dify/chat/simple', async (req, res) => {
         (!usage.total_tokens || usage.total_tokens === 0) &&
         (!usage.total_price || parseFloat(usage.total_price) === 0)
       );
-      
+
       if (allZero) {
         console.error('🚨 [CRITICAL] All usage values are ZERO - This is the core problem!');
         console.error('🚨 [DIAGNOSIS] Possible causes:');
@@ -2589,7 +2589,7 @@ app.post('/api/dify/chat/simple', async (req, res) => {
       }
     }
     console.log('🔍 [DIFY API DEBUG] ===== END ANALYSIS =====');
-    
+
     console.log('[Simple Chat] Success:', {
       conversationId: data.conversation_id,
       answerLength: data.answer?.length || 0,
@@ -2598,11 +2598,11 @@ app.post('/api/dify/chat/simple', async (req, res) => {
 
     // 🔧 BILLING: 处理积分扣除
     let billingInfo = await handleTokenBilling(data, userId, 'SIMPLE');
-    
+
     // 🚨 CRITICAL FIX: 如果SIMPLE billing失败，强制执行fallback billing
     if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
       console.error(`🚨 [CRITICAL] Primary billing failed for SIMPLE, executing emergency billing!`);
-      
+
       // 创建强制billing数据
       const emergencyTokens = Math.max(150, Math.ceil((message?.length || 0) / 3));
       const emergencyData = {
@@ -2619,11 +2619,11 @@ app.post('/api/dify/chat/simple', async (req, res) => {
         },
         billing_source: 'EMERGENCY_FORCED_BILLING'
       };
-      
+
       billingInfo = await handleTokenBilling(emergencyData, userId, 'EMERGENCY_SIMPLE', {
         emergencyFallback: true
       });
-      
+
       console.log(`🔧 [EMERGENCY] Forced SIMPLE billing result:`, billingInfo);
     }
 
@@ -2642,7 +2642,7 @@ app.post('/api/dify/chat/simple', async (req, res) => {
 
   } catch (error) {
     console.error('[Simple Chat] API error:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error',
       type: 'server_error'
@@ -2656,11 +2656,11 @@ app.post('/api/dify/chat', async (req, res) => {
 
   // Generate or get user ID
   const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
-  
+
   // Get or create conversation ID
   let conversationId = clientConvId;
   let isNewConversation = false;
-  
+
   if (!conversationId) {
     conversationId = generateUUID();
     isNewConversation = true;
@@ -2705,7 +2705,7 @@ app.post('/api/dify/chat', async (req, res) => {
     }
 
     const data = await difyResponse.json();
-    
+
     // 🔍 Enhanced logging for token analysis
     console.log(`[Token Analysis] Response analysis:`, {
       conversation_id: data.conversation_id,
@@ -2719,20 +2719,20 @@ app.post('/api/dify/chat', async (req, res) => {
 
     // 🚀 Workflow Enhancement: Auto-trigger LLM nodes if needed
     let finalData = data;
-    
+
     // Check if we need to trigger LLM processing for workflow completion
     if (data.metadata?.usage?.total_tokens === 0 && data.answer?.includes('COMPLETENESS: 4')) {
       console.log(`[Workflow] Detected completion trigger, attempting to auto-trigger LLM node...`);
-      
+
       try {
         const llmTriggerPayload = {
           ...difyPayload,
           query: '开始生成痛点', // Trigger phrase for LLM processing
           conversation_id: data.conversation_id || conversationId
         };
-        
+
         console.log(`[LLM Trigger] Sending trigger request...`);
-        
+
         const llmResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
           method: 'POST',
           headers: {
@@ -2741,11 +2741,11 @@ app.post('/api/dify/chat', async (req, res) => {
           },
           body: JSON.stringify(llmTriggerPayload),
         });
-        
+
         if (llmResponse.ok) {
           const llmData = await llmResponse.json();
           console.log(`[LLM Trigger] Success! Tokens: ${llmData.metadata?.usage?.total_tokens || 0}`);
-          
+
           // Use LLM response if it has actual token usage
           if (llmData.metadata?.usage?.total_tokens > 0) {
             finalData = llmData;
@@ -2756,14 +2756,14 @@ app.post('/api/dify/chat', async (req, res) => {
         console.warn(`[LLM Trigger] Failed to auto-trigger:`, llmError.message);
       }
     }
-    
+
     // 🔧 BILLING: 处理积分扣除
     let billingInfo = await handleTokenBilling(finalData, userIdentifier, 'CHAT');
-    
+
     // 🚨 CRITICAL FIX: 如果CHAT billing失败，强制执行fallback billing
     if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
       console.error(`🚨 [CRITICAL] Primary billing failed for CHAT, executing emergency billing!`);
-      
+
       // 创建强制billing数据
       const emergencyTokens = Math.max(160, Math.ceil((message?.length || 0) / 3));
       const emergencyData = {
@@ -2780,14 +2780,14 @@ app.post('/api/dify/chat', async (req, res) => {
         },
         billing_source: 'EMERGENCY_FORCED_BILLING'
       };
-      
+
       billingInfo = await handleTokenBilling(emergencyData, userIdentifier, 'EMERGENCY_CHAT', {
         emergencyFallback: true
       });
-      
+
       console.log(`🔧 [EMERGENCY] Forced CHAT billing result:`, billingInfo);
     }
-    
+
     // Update conversation state in memory store
     conversationStore.set(finalData.conversation_id || conversationId, {
       ...conversationState,
@@ -2804,7 +2804,7 @@ app.post('/api/dify/chat', async (req, res) => {
 
   } catch (error) {
     console.error('API error:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -2814,10 +2814,10 @@ app.post('/api/dify/chat', async (req, res) => {
 // MOCK ENDPOINT FOR TESTING - When Dify API is not accessible
 app.post('/api/dify/chat/mock', async (req, res) => {
   const { message, conversationId: clientConvId, userId } = req.body;
-  
+
   // Generate or get user ID
   const userIdentifier = userId || req.headers['x-user-id'] || `user-${generateUUID()}`;
-  
+
   // Get or create conversation ID
   let conversationId = clientConvId;
   if (!conversationId) {
@@ -2844,11 +2844,11 @@ app.post('/api/dify/chat/mock', async (req, res) => {
 
   // 🔧 BILLING: 处理积分扣除 (Mock endpoint)
   let billingInfo = await handleTokenBilling(mockResponse, userIdentifier, 'MOCK');
-  
+
   // 🚨 CRITICAL FIX: 如果MOCK billing失败，强制执行fallback billing
   if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
     console.error(`🚨 [CRITICAL] Primary billing failed for MOCK, executing emergency billing!`);
-    
+
     // 创建强制billing数据
     const emergencyTokens = Math.max(100, Math.ceil((message?.length || 0) / 4));
     const emergencyMockResponse = {
@@ -2865,11 +2865,11 @@ app.post('/api/dify/chat/mock', async (req, res) => {
       },
       billing_source: 'EMERGENCY_FORCED_BILLING'
     };
-    
+
     billingInfo = await handleTokenBilling(emergencyMockResponse, userIdentifier, 'EMERGENCY_MOCK', {
       emergencyFallback: true
     });
-    
+
     console.log(`🔧 [EMERGENCY] Forced MOCK billing result:`, billingInfo);
   }
 
@@ -2881,24 +2881,24 @@ app.post('/api/dify/chat/mock', async (req, res) => {
   });
 
   console.log(`✅ Mock response generated for user ${userIdentifier}, conversation ${conversationId}`);
-  
+
   res.json(mockResponse);
 });
 
 // Context status endpoint - 让前端可以检查对话的token状态
 app.get('/api/dify/:conversationId/context-status', async (req, res) => {
   const { conversationId } = req.params;
-  
+
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.json({ 
+      return res.json({
         error: 'Database not configured',
-        hasContext: false 
+        hasContext: false
       });
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     // 获取对话历史
     const { data: messages, error } = await supabase
       .from('messages')
@@ -2927,8 +2927,8 @@ app.get('/api/dify/:conversationId/context-status', async (req, res) => {
     });
 
     const DIFY_TOKEN_LIMIT = 8192;
-    const riskLevel = totalTokens > DIFY_TOKEN_LIMIT * 0.9 ? 'high' : 
-                     totalTokens > DIFY_TOKEN_LIMIT * 0.7 ? 'medium' : 'low';
+    const riskLevel = totalTokens > DIFY_TOKEN_LIMIT * 0.9 ? 'high' :
+      totalTokens > DIFY_TOKEN_LIMIT * 0.7 ? 'medium' : 'low';
 
     let suggestion = null;
     if (riskLevel === 'high') {
@@ -2998,13 +2998,13 @@ app.post('/api/dify', async (req, res) => {
     const bodyStream = req.body.stream;
     const queryStream = req.query.stream === 'true';
     const shouldStream = bodyStream || queryStream;
-    
+
     const { message, query, user, conversation_id } = req.body;
     const actualMessage = message || query; // Support both message and query fields
-    
+
     console.log(`📊 Streaming mode: body=${bodyStream}, query=${queryStream}, final=${shouldStream}`);
     console.log('🔍 Full request body:', JSON.stringify(req.body, null, 2));
-    
+
     if (!actualMessage) {
       return res.status(400).json({ error: 'Message or query is required' });
     }
@@ -3013,7 +3013,7 @@ app.post('/api/dify', async (req, res) => {
     if (!DIFY_API_URL || !DIFY_API_KEY) {
       return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
     }
-    
+
     // Initialize Supabase only if fully configured
     let supabase = null;
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
@@ -3024,7 +3024,7 @@ app.post('/api/dify', async (req, res) => {
     let conversationId = null;
     let difyConversationId = null;
     let isExplicitNewConversation = conversation_id === null;
-    
+
     if (isExplicitNewConversation) {
       // 前端明确要求新对话，生成新的内部conversation ID但不查找数据库
       conversationId = generateUUID();
@@ -3065,7 +3065,7 @@ app.post('/api/dify', async (req, res) => {
     // 🔧 DIFY API 正确用法：为新对话确保conversation variables正确初始化
     // 检查是否为新对话，如果是则初始化conversation variables
     const isNewConversation = isExplicitNewConversation || !difyConversationId;
-    
+
     // ✅ 完全信任DIFY ChatFlow的自然流程管理
     // 移除人为计算conversation_info_completeness，让Dify根据工作流配置自然管理状态
 
@@ -3086,7 +3086,7 @@ app.post('/api/dify', async (req, res) => {
       requestBody.conversation_id = difyConversationId;
       console.log('🔄 Continuing existing conversation:', difyConversationId);
     }
-    
+
     // 🔧 调试：记录发送给DIFY的完整请求
     console.log('📤 [DIFY API] Sending request to chat-messages:', {
       query: actualMessage.substring(0, 100) + '...',
@@ -3097,7 +3097,7 @@ app.post('/api/dify', async (req, res) => {
       // 移除人为计算的completeness，完全信任Dify工作流
       timestamp: new Date().toISOString()
     });
-    
+
     // ✅ 完全信任DIFY ChatFlow的自然流程管理
 
     // Detect context overflow risk before processing
@@ -3110,26 +3110,26 @@ app.post('/api/dify', async (req, res) => {
     let contextManagementResult = null;
     if (supabase && actualMessage) {
       contextManagementResult = await manageConversationContext(conversationId, actualMessage);
-      
+
       if (contextManagementResult && contextManagementResult.truncated) {
         console.log(`📊 Context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
       }
     }
-    
+
     // 🚨 EMERGENCY FALLBACK: If context management failed and we're at high risk, force new conversation
     if (!contextManagementResult && overflowRisk && overflowRisk.isAtRisk && overflowRisk.currentTokens > 8000) {
       console.log(`🚨 EMERGENCY: Context management failed and tokens (${overflowRisk.currentTokens}) exceed safe limit`);
       console.log('🔄 Forcing new conversation to prevent API failure');
       console.log(`⚠️ [BILLING-WARNING] Emergency fallback triggered - ensuring billing tracking continues`);
-      
+
       // Clear the conversation_id to force a new conversation
       delete requestBody.conversation_id;
       difyConversationId = null;
-      
+
       // Generate a new conversation ID for our records
       conversationId = generateUUID();
       console.log(`🆕 Emergency new conversation ID: ${conversationId}`);
-      
+
       // 🔧 标记这是emergency fallback，用于billing追踪
       requestBody.emergency_fallback = true;
     }
@@ -3141,7 +3141,7 @@ app.post('/api/dify', async (req, res) => {
     // Send message to Dify API
     let response;
     let data;
-    
+
     try {
       response = await fetchWithTimeoutAndRetry(
         `${DIFY_API_URL}/chat-messages`,
@@ -3163,11 +3163,11 @@ app.post('/api/dify', async (req, res) => {
         if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
           console.log('❌ Conversation not found in DIFY - attempting recovery');
           console.log('🔄 Creating new conversation to replace expired one');
-          
+
           // Remove conversation_id and retry as new conversation
           delete requestBody.conversation_id;
           console.log('🆕 Retrying without conversation_id to create fresh conversation');
-          
+
           // Retry the request without conversation_id
           const retryResponse = await fetchWithTimeoutAndRetry(
             `${DIFY_API_URL}/chat-messages`,
@@ -3181,13 +3181,13 @@ app.post('/api/dify', async (req, res) => {
             },
             DEFAULT_TIMEOUT
           );
-          
+
           if (!retryResponse.ok) {
             const retryError = await retryResponse.json();
             console.error('❌ Retry also failed:', retryError);
             throw new Error(`Dify API failed even after retry: ${retryError.message}`);
           }
-          
+
           response = retryResponse; // Use the retry response
           console.log('✅ Successfully recovered with new conversation');
         } else {
@@ -3203,15 +3203,15 @@ app.post('/api/dify', async (req, res) => {
           response.headers.forEach((value, key) => {
             allHeaders[key.toLowerCase()] = value;
           });
-          
+
           console.log('[Server Generic] 🔍 Dify API 响应头:', allHeaders);
-          
+
           // 提取响应头中的元数据
           const inputTokensHeader = response.headers.get('x-usage-input-tokens');
           const outputTokensHeader = response.headers.get('x-usage-output-tokens');
           const modelHeader = response.headers.get('x-dify-model');
           const requestIdHeader = response.headers.get('x-dify-request-id');
-          
+
           console.log('[Server Generic] 响应头元数据检查:', {
             'x-usage-input-tokens': inputTokensHeader,
             'x-usage-output-tokens': outputTokensHeader,
@@ -3220,13 +3220,13 @@ app.post('/api/dify', async (req, res) => {
             hasTokenStats: !!(inputTokensHeader && outputTokensHeader),
             hasModelInfo: !!modelHeader
           });
-          
+
           const metadata = {
             headers: allHeaders,
             extractedFromHeaders: true,
             timestamp: new Date().toISOString()
           };
-          
+
           // 只有在响应头存在token信息时才添加
           if (inputTokensHeader && outputTokensHeader) {
             metadata.headerTokenStats = {
@@ -3237,51 +3237,51 @@ app.post('/api/dify', async (req, res) => {
             };
             console.log('[Server Generic] ✅ 从响应头提取到token统计:', metadata.headerTokenStats);
           }
-          
+
           if (modelHeader) {
             metadata.modelFromHeader = modelHeader;
             console.log('[Server Generic] ✅ 从响应头提取到模型信息:', modelHeader);
           }
-          
+
           if (requestIdHeader) {
             metadata.requestId = requestIdHeader;
           }
-          
+
           return metadata;
         } catch (error) {
           console.error('[Server Generic] ❌ 提取响应头元数据时出错:', error);
           return null;
         }
       };
-      
+
       // 提取响应头元数据
       const headerMetadata = extractMetadataFromHeaders(response);
 
       // Handle streaming vs blocking response
       if (shouldStream && requestBody.response_mode === 'streaming') {
         console.log('🔄 Handling streaming response from Dify API');
-        
+
         // Set up streaming response headers
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('Access-Control-Allow-Origin', '*');
-        
+
         // Get streaming reader
         const reader = response.body?.getReader();
         if (!reader) {
           return res.status(500).json({ error: 'No response body reader available' });
         }
-        
+
         const decoder = new TextDecoder();
         let buffer = '';
         let finalData = null;
         let bodyUsageData = null; // 存储响应体中的usage信息
         let streamEnded = false;
-        
+
         // 🔧 修复：在流处理作用域中引用响应头元数据
         const responseHeaderMetadata = headerMetadata;
-        
+
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -3289,49 +3289,49 @@ app.post('/api/dify', async (req, res) => {
               console.log('[Server] 📡 Stream读取完成 - checking for pending usage data');
               break;
             }
-            
+
             const chunk = decoder.decode(value, { stream: true });
             buffer += chunk;
-            
+
             // Process complete lines from buffer
             let lineEndIndex;
             while ((lineEndIndex = buffer.indexOf('\n')) !== -1) {
               const line = buffer.substring(0, lineEndIndex).trim();
               buffer = buffer.substring(lineEndIndex + 1);
-              
+
               if (line.startsWith('data: ')) {
                 const data = line.substring(6).trim();
-                
+
                 if (data === '[DONE]') {
                   console.log('🔚 Streaming ended with [DONE]');
                   streamEnded = true;
                   break;
                 }
-                
+
                 try {
                   const parsed = JSON.parse(data);
-                  
+
                   // Store final data for database saving
                   if (parsed.conversation_id) {
                     finalData = parsed;
                   }
-                  
+
                   // 🎯 提取响应体中的usage信息（包含价格）
                   if (parsed.event === 'message_end' && parsed.metadata?.usage) {
                     bodyUsageData = parsed.metadata.usage;
                     console.log('[Server] 📊 从响应体提取usage信息 (含价格): token统计和价格数据已获取');
                   }
-                  
+
                   // Forward the streaming data to client
                   res.write(`data: ${data}\n\n`);
-                  
+
                   console.log('📤 Forwarded streaming data:', {
                     event: parsed.event,
                     hasAnswer: !!parsed.answer,
                     conversationId: parsed.conversation_id,
                     hasUsage: !!parsed.metadata?.usage
                   });
-                  
+
                 } catch (parseError) {
                   console.warn('⚠️ Failed to parse streaming data:', parseError);
                   // Forward as-is if we can't parse
@@ -3339,18 +3339,18 @@ app.post('/api/dify', async (req, res) => {
                 }
               }
             }
-            
+
             if (streamEnded) break;
           }
-          
+
           // 🎯 结合响应头token统计和响应体价格信息发送混合数据
           // 修复：无论是否收到[DONE]标记，只要有usage数据就发送增强信息
           if ((streamEnded || bodyUsageData) && (responseHeaderMetadata?.headerTokenStats || bodyUsageData)) {
             console.log('[Server] 📊 结合响应头和响应体数据准备发送混合token使用信息');
-            
+
             // 创建混合的usage数据
             let combinedUsage = null;
-            
+
             if (responseHeaderMetadata?.headerTokenStats && bodyUsageData) {
               // 最佳情况：同时有响应头的准确token统计和响应体的价格信息
               combinedUsage = {
@@ -3390,7 +3390,7 @@ app.post('/api/dify', async (req, res) => {
               };
               console.log('[Server] ⚠️ 仅使用响应体usage信息');
             }
-            
+
             if (combinedUsage) {
               // 创建一个特殊的事件来传递混合的token使用信息
               const enhancedTokenUsageEvent = {
@@ -3403,7 +3403,7 @@ app.post('/api/dify', async (req, res) => {
                 conversation_id: finalData?.conversation_id,
                 timestamp: new Date().toISOString()
               };
-              
+
               res.write(`data: ${JSON.stringify(enhancedTokenUsageEvent)}\n\n`);
               console.log('[Server] ✅ 混合token使用信息已发送到前端');
             } else {
@@ -3416,7 +3416,7 @@ app.post('/api/dify', async (req, res) => {
               });
             }
           }
-          
+
           // 🚨 CRITICAL FIX: 强制billing检查 - 确保每个交互都被计费 (移到[DONE]之前)
           if (!finalData) {
             console.error(`🚨 [BILLING-CRITICAL] No finalData found for streaming request! This would skip billing!`);
@@ -3427,7 +3427,7 @@ app.post('/api/dify', async (req, res) => {
               streamEnded,
               timestamp: new Date().toISOString()
             });
-            
+
             // 创建强制的fallback finalData以确保billing
             const estimatedTokens = Math.max(50, Math.ceil((actualMessage?.length || 0) / 4));
             finalData = {
@@ -3461,7 +3461,7 @@ app.post('/api/dify', async (req, res) => {
             let billingInfo = await handleTokenBilling(finalData, user, 'WORKFLOW_STREAM', {
               emergencyFallback: requestBody?.emergency_fallback || false
             });
-            
+
             // 🚨 CRITICAL FIX: 如果billing失败，强制执行fallback billing
             if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
               console.error(`🚨 [CRITICAL] Primary billing failed for WORKFLOW_STREAM, executing emergency billing!`);
@@ -3471,7 +3471,7 @@ app.post('/api/dify', async (req, res) => {
                 emergencyFallback: requestBody?.emergency_fallback || false,
                 endpoint: 'WORKFLOW_STREAM'
               });
-              
+
               // 创建强制billing数据
               const emergencyTokens = Math.max(200, Math.ceil((actualMessage?.length || 0) / 3)); // 保守估算
               const emergencyFinalData = {
@@ -3488,14 +3488,14 @@ app.post('/api/dify', async (req, res) => {
                 },
                 billing_source: 'EMERGENCY_FORCED_BILLING'
               };
-              
+
               billingInfo = await handleTokenBilling(emergencyFinalData, user, 'EMERGENCY_STREAM', {
                 emergencyFallback: true
               });
-              
+
               console.log(`🔧 [EMERGENCY] Forced billing result:`, billingInfo);
             }
-            
+
             // 🔧 关键修复：发送余额更新信息给前端
             if (billingInfo && billingInfo.newBalance !== null && billingInfo.success) {
               console.log(`🔥 [STREAM] Sending balance update to frontend: ${billingInfo.newBalance}`);
@@ -3509,11 +3509,11 @@ app.post('/api/dify', async (req, res) => {
                 }
               })}\n\n`);
             }
-            
+
             const effectiveConversationId = finalData.conversation_id || conversationId;
             try {
               const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, finalData.conversation_id, getValidUserId(user));
-              
+
               if (conversationCreated !== false) {
                 await saveMessages(supabase, effectiveConversationId, actualMessage, finalData);
                 console.log('✅ Saved streaming conversation to database');
@@ -3523,12 +3523,12 @@ app.post('/api/dify', async (req, res) => {
               // Don't let database errors break the stream
             }
           }
-          
+
           // End the stream with [DONE] signal (移到正确位置)
           res.write('data: [DONE]\n\n');
           res.end();
           return;
-          
+
         } catch (streamError) {
           console.error('❌ Streaming error:', streamError);
           res.write(`data: {"error": "Streaming failed: ${streamError.message}"}\n\n`);
@@ -3536,11 +3536,11 @@ app.post('/api/dify', async (req, res) => {
           res.end();
           return;
         }
-        
+
       } else {
         // Handle blocking response
         data = await response.json();
-        
+
         // 🔧 调试：记录DIFY的完整响应
         console.log('📥 [DIFY API] Received blocking response:', {
           conversation_id: data.conversation_id,
@@ -3551,16 +3551,16 @@ app.post('/api/dify', async (req, res) => {
           hasUsage: !!data.metadata?.usage,
           timestamp: new Date().toISOString()
         });
-        
+
         console.log('✅ Successfully received response from Dify API');
       }
-      
+
     } catch (error) {
       console.error('⚠️ Dify API request failed:', error.message);
-      return res.status(503).json({ 
-        error: 'Dify API unavailable', 
+      return res.status(503).json({
+        error: 'Dify API unavailable',
         message: 'Unable to connect to Dify API. Please check your configuration and network connectivity.',
-        details: error.message 
+        details: error.message
       });
     }
 
@@ -3569,17 +3569,17 @@ app.post('/api/dify', async (req, res) => {
       try {
         // Use Dify's conversation_id as the authoritative source
         const effectiveConversationId = data.conversation_id || conversationId;
-        
+
         // First ensure conversation record exists with Dify's ID as primary
         const conversationCreated = await ensureConversationExists(supabase, effectiveConversationId, data.conversation_id, getValidUserId(user));
-        
+
         // Then save messages using Dify's conversation_id only if conversation was successfully created/exists
         if (conversationCreated !== false) {
           // Add context truncation note if context was managed
           if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
             data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
           }
-          
+
           await saveMessages(supabase, effectiveConversationId, actualMessage, data);
         } else {
           console.error('⚠️ Skipping message save due to conversation creation failure');
@@ -3639,7 +3639,7 @@ app.post('/api/dify', async (req, res) => {
         emergencyFallback: requestBody?.emergency_fallback || false,
         endpoint: 'DIFY_GENERIC_BLOCKING'
       });
-      
+
       // 创建强制billing数据
       const emergencyTokens = Math.max(200, Math.ceil((actualMessage?.length || 0) / 3)); // 保守估算
       const emergencyResponseData = {
@@ -3656,11 +3656,11 @@ app.post('/api/dify', async (req, res) => {
         },
         billing_source: 'EMERGENCY_FORCED_BILLING'
       };
-      
+
       billingInfo = await handleTokenBilling(emergencyResponseData, user, 'EMERGENCY_BLOCKING', {
         emergencyFallback: true
       });
-      
+
       console.log(`🔧 [EMERGENCY] Forced blocking billing result:`, billingInfo);
     }
 
@@ -3688,15 +3688,15 @@ app.post('/api/dify/workflow', async (req, res) => {
   try {
     const { message, query, user, conversation_id, stream = true } = req.body;
     const actualMessage = message || query; // Support both message and query fields
-    
+
     if (!DIFY_API_URL || !DIFY_API_KEY) {
       return res.status(500).json({ error: 'Server configuration error: Missing Dify API configuration' });
     }
-    
+
     if (!actualMessage) {
       return res.status(400).json({ error: 'Message or query is required' });
     }
-    
+
     console.log('[Workflow API] Processing request:', {
       message: actualMessage.substring(0, 100) + '...',
       user,
@@ -3704,14 +3704,14 @@ app.post('/api/dify/workflow', async (req, res) => {
       stream,
       timestamp: new Date().toISOString()
     });
-    
+
     // Initialize Supabase only if fully configured
     const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
     // 🔧 CRITICAL FIX: Separate internal conversation_id from DIFY conversation_id
     let conversationId = conversation_id && isValidUUID(conversation_id) ? conversation_id : generateUUID();
     let difyConversationId = null; // Will be retrieved from database
-    
+
     // Log UUID generation for debugging
     if (conversation_id && !isValidUUID(conversation_id)) {
       console.log(`🔧 Generated new UUID for invalid conversation ID: ${conversation_id} -> ${conversationId}`);
@@ -3744,14 +3744,14 @@ app.post('/api/dify/workflow', async (req, res) => {
 
     // 🔧 DIFY API 正确用法：Workflow端点也应使用query参数，不是inputs
     // conversation_variables由DIFY内部管理，不应通过inputs传递
-    
+
     const requestBody = {
       inputs: {}, // 🔧 根据DIFY API文档：空对象，只包含App定义的变量
       query: actualMessage, // 🔧 用户输入使用query参数
       response_mode: stream ? 'streaming' : 'blocking',
       user: getValidUserId(user)
     };
-    
+
     // 🔧 调试：记录发送给DIFY workflow的完整请求
     console.log('📤 [DIFY WORKFLOW] Sending request:', {
       query: actualMessage.substring(0, 100) + '...',
@@ -3761,14 +3761,14 @@ app.post('/api/dify/workflow', async (req, res) => {
       conversation_id: difyConversationId || 'NEW_CONVERSATION',
       timestamp: new Date().toISOString()
     });
-    
+
     // ✅ 完全信任DIFY ChatFlow的自然流程管理
 
     // Context length management - Check and manage conversation history before API call
     let contextManagementResult = null;
     if (supabase && actualMessage) {
       contextManagementResult = await manageConversationContext(conversationId, actualMessage);
-      
+
       if (contextManagementResult && contextManagementResult.truncated) {
         console.log(`📊 Workflow context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
       }
@@ -3826,7 +3826,7 @@ app.post('/api/dify/workflow', async (req, res) => {
               if (done) break;
 
               buffer += decoder.decode(value, { stream: true });
-              
+
               // 🚨 WORKFLOW LOOP DEBUG: Prove this loop executes
               if (buffer.length === decoder.decode(value, { stream: true }).length) { // First chunk
                 console.log('🚨 WORKFLOW LOOP - FIRST CHUNK PROCESSED');
@@ -3850,7 +3850,7 @@ app.post('/api/dify/workflow', async (req, res) => {
               for (const line of lines) {
                 if (line.startsWith('data: ')) {
                   const data = line.slice(6).trim();
-                  
+
                   if (data === '[DONE]') {
                     // 🔧 CRITICAL FIX: Even without message_end event, we need to save conversation_id
                     if (!finalData && currentConversationId) {
@@ -3862,18 +3862,18 @@ app.post('/api/dify/workflow', async (req, res) => {
                         metadata: {}
                       };
                     }
-                    
+
                     // Save messages to database if we have final data
                     if (finalData && supabase) {
                       try {
                         // Ensure conversation exists first
                         await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(user));
-                        
+
                         // Add context truncation note if context was managed
                         if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
                           finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
                         }
-                        
+
                         // Then save messages
                         await saveMessages(supabase, conversationId, actualMessage, finalData);
                       } catch (dbError) {
@@ -3881,7 +3881,7 @@ app.post('/api/dify/workflow', async (req, res) => {
                         // Don't let database errors break the stream
                       }
                     }
-                    
+
                     res.write('data: [DONE]\n\n');
                     res.end();
                     return;
@@ -3889,12 +3889,12 @@ app.post('/api/dify/workflow', async (req, res) => {
 
                   try {
                     const parsed = JSON.parse(data);
-                    
+
                     // 🔧 CRITICAL FIX: Capture conversation_id from any DIFY event
                     if (parsed.conversation_id) {
                       currentConversationId = parsed.conversation_id;
                     }
-                    
+
                     // Log workflow events for debugging
                     if (parsed.event && parsed.event.startsWith('node_')) {
                       console.log('[Workflow API] Node event:', {
@@ -3920,12 +3920,12 @@ app.post('/api/dify/workflow', async (req, res) => {
                         message_id: parsed.message_id,
                         metadata: parsed.metadata
                       };
-                      
+
                       // 🔥 CRITICAL FIX: Extract usage information from workflow_finished event
                       if (parsed.event === 'workflow_finished' && parsed.data) {
                         console.log('💰 [STREAMING] Processing workflow_finished event for usage data...');
                         console.log('📊 [STREAMING] Raw workflow_finished data:', JSON.stringify(parsed.data));
-                        
+
                         // Try multiple possible locations for usage data
                         let usageData = null;
                         if (parsed.data.metadata && parsed.data.metadata.usage) {
@@ -3938,7 +3938,7 @@ app.post('/api/dify/workflow', async (req, res) => {
                           usageData = parsed.usage;
                           console.log('💰 [STREAMING] Found usage in root level:', JSON.stringify(usageData));
                         }
-                        
+
                         if (usageData) {
                           finalData.metadata = {
                             ...finalData.metadata,
@@ -3949,7 +3949,7 @@ app.post('/api/dify/workflow', async (req, res) => {
                           console.log('⚠️ [STREAMING] No usage data found in workflow_finished event');
                         }
                       }
-                      
+
                       // Also check message_end events for usage data
                       if (parsed.event === 'message_end' && parsed.metadata && parsed.metadata.usage) {
                         console.log('💰 [STREAMING] Found usage data in message_end event:', JSON.stringify(parsed.metadata.usage));
@@ -3976,10 +3976,10 @@ app.post('/api/dify/workflow', async (req, res) => {
 
         } catch (apiError) {
           console.error('[Workflow API] External API failed:', apiError.message);
-          res.write(`data: ${JSON.stringify({ 
-            error: 'Dify Workflow API unavailable', 
+          res.write(`data: ${JSON.stringify({
+            error: 'Dify Workflow API unavailable',
             message: 'Unable to connect to Dify Workflow API. Please check your configuration and network connectivity.',
-            details: apiError.message 
+            details: apiError.message
           })}\n\n`);
           res.end();
           return;
@@ -3987,10 +3987,10 @@ app.post('/api/dify/workflow', async (req, res) => {
 
       } catch (error) {
         console.error('[Workflow API] Streaming error:', error);
-        const errorMessage = error.name === 'AbortError' 
-          ? 'Workflow execution timed out. Please try again.' 
+        const errorMessage = error.name === 'AbortError'
+          ? 'Workflow execution timed out. Please try again.'
           : `Workflow streaming error: ${error.message}`;
-        
+
         res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
         res.end();
       }
@@ -4005,7 +4005,7 @@ app.post('/api/dify/workflow', async (req, res) => {
       // Handle non-streaming response
       try {
         let data;
-        
+
         try {
           const response = await fetchWithTimeoutAndRetry(
             `${DIFY_API_URL}/chat-messages`,
@@ -4026,14 +4026,14 @@ app.post('/api/dify/workflow', async (req, res) => {
 
           data = await response.json();
           console.log('✅ Successfully received workflow response from Dify API');
-          
+
           // 🔧 BILLING: 处理积分扣除
           let billingInfo = await handleTokenBilling(data, user, 'WORKFLOW');
-          
+
           // 🚨 CRITICAL FIX: 如果WORKFLOW billing失败，强制执行fallback billing
           if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
             console.error(`🚨 [CRITICAL] Primary billing failed for WORKFLOW, executing emergency billing!`);
-            
+
             // 创建强制billing数据
             const emergencyTokens = Math.max(220, Math.ceil((query?.length || 0) / 3));
             const emergencyData = {
@@ -4050,20 +4050,20 @@ app.post('/api/dify/workflow', async (req, res) => {
               },
               billing_source: 'EMERGENCY_FORCED_BILLING'
             };
-            
+
             billingInfo = await handleTokenBilling(emergencyData, user, 'EMERGENCY_WORKFLOW', {
               emergencyFallback: true
             });
-            
+
             console.log(`🔧 [EMERGENCY] Forced WORKFLOW billing result:`, billingInfo);
           }
-          
+
         } catch (apiError) {
           console.error('[Workflow API] External API failed:', apiError.message);
-          return res.status(503).json({ 
-            error: 'Dify Workflow API unavailable', 
+          return res.status(503).json({
+            error: 'Dify Workflow API unavailable',
             message: 'Unable to connect to Dify Workflow API. Please check your configuration and network connectivity.',
-            details: apiError.message 
+            details: apiError.message
           });
         }
 
@@ -4072,12 +4072,12 @@ app.post('/api/dify/workflow', async (req, res) => {
           try {
             // First ensure conversation record exists
             await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(user));
-            
+
             // Add context truncation note if context was managed
             if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
               data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || data.data?.outputs?.answer || 'Workflow completed');
             }
-            
+
             // Then save messages
             await saveMessages(supabase, conversationId, actualMessage, data);
           } catch (dbError) {
@@ -4098,10 +4098,10 @@ app.post('/api/dify/workflow', async (req, res) => {
 
       } catch (error) {
         console.error('[Workflow API] Error:', error);
-        const errorMessage = error.name === 'AbortError' 
-          ? 'Workflow execution timed out. Please try again.' 
+        const errorMessage = error.name === 'AbortError'
+          ? 'Workflow execution timed out. Please try again.'
           : 'Workflow processing failed';
-        
+
         res.status(500).json({ error: errorMessage, details: error.message });
       }
     }
@@ -4211,33 +4211,33 @@ app.post('/api/dify/:conversationId/regenerate-painpoints', async (req, res) => 
 // 🎯 开始生成痛点专用endpoint - 确保进入LLM0而非LLM3
 app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
   console.log('🎯 START PAINPOINTS ENDPOINT CALLED:', req.params.conversationId);
-  
+
   try {
     const { conversationId } = req.params;
     const { productInfo, userId } = req.body;
-    
+
     console.log('🔍 [DEBUG] Received productInfo:', productInfo);
     console.log('🔍 [DEBUG] userId:', userId);
-    
+
     if (!DIFY_API_URL || !DIFY_API_KEY) {
       return res.status(500).json({ error: 'Dify API not configured' });
     }
-    
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     // 1. 清除当前conversation的dify状态，确保干净开始
     const { data: conversationRow } = await supabase
       .from('conversations')
       .select('dify_conversation_id')
       .eq('id', conversationId)
       .maybeSingle();
-      
+
     const difyConversationId = conversationRow?.dify_conversation_id;
-    
+
     // 2. 如果存在dify conversation，删除它以确保干净状态
     if (difyConversationId) {
       console.log('🗑️ Deleting contaminated Dify conversation:', difyConversationId);
-      
+
       try {
         await fetchWithTimeoutAndRetry(
           `${DIFY_API_URL}/conversations/${difyConversationId}`,
@@ -4255,14 +4255,14 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
       } catch (deleteError) {
         console.log('⚠️ Delete conversation failed:', deleteError.message);
       }
-      
+
       // 清除数据库记录
       await supabase
         .from('conversations')
         .update({ dify_conversation_id: null })
         .eq('id', conversationId);
     }
-    
+
     // 3. 通过inputs预设工作流状态，告诉Dify直接进入痛点生成阶段
     const forcedPainPointPrompt = `基于已收集的产品信息直接生成3个痛点选项，不需要任何确认。产品信息：${productInfo}。请立即输出3个痛点的JSON格式。`;
 
@@ -4282,17 +4282,17 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
       user: userId || `clean-user-${Date.now()}`
       // 不传conversation_id，让Dify创建全新但包含预设状态的conversation
     };
-    
+
     console.log('🚀 Creating clean conversation for pain point generation');
     console.log('📤 Sending request to Dify with prompt:', forcedPainPointPrompt.substring(0, 100) + '...');
-    
+
     // 设置SSE流式响应头
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
-    
+
     console.log('🌐 Making request to Dify API...');
     const response = await fetchWithTimeoutAndRetry(
       `${DIFY_API_URL}/chat-messages`,
@@ -4307,14 +4307,14 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
       30000,
       1
     );
-    
+
     // 转发流式响应并更新conversation ID
     if (response.body) {
       console.log('📡 [DEBUG] Response body exists, starting stream processing...');
       const reader = response.body.getReader();
       let newDifyConversationId = null;
       let chunkCount = 0;
-      
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -4322,10 +4322,10 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
             console.log(`📡 [DEBUG] Stream completed. Total chunks: ${chunkCount}`);
             break;
           }
-          
+
           chunkCount++;
           console.log(`📡 [DEBUG] Processing chunk ${chunkCount}, size: ${value.length}`);
-          
+
           // 提取新的conversation_id并直接转发数据
           const chunk = new TextDecoder().decode(value);
           if (chunk.includes('conversation_id') && !newDifyConversationId) {
@@ -4335,12 +4335,12 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
               console.log('🆕 New clean conversation ID:', newDifyConversationId);
             }
           }
-          
+
           // 直接转发数据（Dify已经是正确的SSE格式）
           console.log(`📤 [DEBUG] Forwarding chunk ${chunkCount} to frontend`);
           res.write(value);
         }
-        
+
         // 更新数据库
         if (newDifyConversationId) {
           await supabase
@@ -4349,7 +4349,7 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
             .eq('id', conversationId);
           console.log('✅ Clean conversation ID saved to database');
         }
-        
+
         res.end();
       } catch (streamError) {
         console.error('❌ [DEBUG] Stream error:', streamError);
@@ -4360,7 +4360,7 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
       console.log('❌ [DEBUG] No response body from Dify API');
       res.end();
     }
-    
+
   } catch (error) {
     console.error('❌ [DEBUG] Start painpoints error:', error);
     res.status(500).json({ error: 'Failed to start pain points generation', details: error.message });
@@ -4370,25 +4370,25 @@ app.post('/api/dify/:conversationId/start-painpoints', async (req, res) => {
 // 🔧 对话状态清理endpoint - 重置conversation为干净状态
 app.post('/api/dify/:conversationId/reset-workflow', async (req, res) => {
   console.log('🔧 WORKFLOW RESET ENDPOINT CALLED:', req.params.conversationId);
-  
+
   try {
     const { conversationId } = req.params;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     // 清除数据库中的dify_conversation_id，下次请求时会创建新的
     const updateResult = await supabase
       .from('conversations')
       .update({ dify_conversation_id: null })
       .eq('id', conversationId);
-    
+
     if (updateResult.error) {
       console.error('❌ Failed to reset conversation:', updateResult.error);
       return res.status(500).json({ error: 'Failed to reset conversation' });
     }
-    
+
     console.log('✅ Conversation workflow state reset successfully');
     res.json({ success: true, message: 'Workflow state reset' });
-    
+
   } catch (error) {
     console.error('Workflow reset error:', error);
     res.status(500).json({ error: 'Failed to reset workflow state' });
@@ -4398,29 +4398,29 @@ app.post('/api/dify/:conversationId/reset-workflow', async (req, res) => {
 // Dify chat proxy API (streaming)
 app.post('/api/dify/:conversationId/stream', async (req, res) => {
   console.log('🗣️ STREAM ENDPOINT CALLED with conversation ID:', req.params.conversationId);
-  
+
   // 🚀 ENDPOINT CALLED CONFIRMATION - Log only, don't send response yet
   console.log('✅ STREAM ENDPOINT CONFIRMED - Processing request');
-  
+
   // Endpoint debugging for development
   if (process.env.NODE_ENV !== 'production') {
     console.log('🔍 Stream endpoint processing conversation:', req.params.conversationId);
   }
-  
+
   try {
     const { message } = req.body;
     const { conversationId: rawConversationId } = req.params;
-    
+
     // Validate and fix conversation ID - generate new UUID if invalid
     const conversationId = isValidUUID(rawConversationId) ? rawConversationId : generateUUID();
     if (conversationId !== rawConversationId) {
       console.log(`🔧 Generated new UUID for invalid conversation ID: ${rawConversationId} -> ${conversationId}`);
     }
-    
+
     if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ error: 'Server configuration error: Missing required environment variables' });
     }
-    
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // 查找或创建当前会话的 dify_conversation_id
@@ -4431,19 +4431,19 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       .maybeSingle();
 
     let difyConversationId = conversationRow?.dify_conversation_id || null;
-    
+
     // 如果数据库中没有这个对话记录，先创建一个
     if (!conversationRow) {
       console.log(`🆕 Creating conversation record for: ${conversationId}`);
       await ensureConversationExists(supabase, conversationId, null, getValidUserId(req.body.user));
-      
+
       // 重新查询以获取创建的记录
       const { data: newConversationRow } = await supabase
         .from('conversations')
         .select('dify_conversation_id')
         .eq('id', conversationId)
         .maybeSingle();
-      
+
       conversationRow = newConversationRow;
       difyConversationId = conversationRow?.dify_conversation_id || null;
     }
@@ -4458,12 +4458,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     let contextManagementResult = null;
     if (supabase && message) {
       contextManagementResult = await manageConversationContext(conversationId, message);
-      
+
       if (contextManagementResult && contextManagementResult.truncated) {
         console.log(`📊 Context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
       }
     }
-    
+
     // 🔧 首先定义基础requestBody
     let requestBody = {
       inputs: {},
@@ -4477,14 +4477,14 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       console.log(`🚨 STREAM EMERGENCY: Context management failed and tokens (${overflowRisk.currentTokens}) exceed safe limit`);
       console.log('🔄 Forcing new conversation to prevent streaming API failure');
       console.log(`⚠️ [BILLING-WARNING] Stream emergency fallback triggered - ensuring billing tracking continues`);
-      
+
       // Clear the conversation_id to force a new conversation
       difyConversationId = null;
-      
+
       // Generate a new conversation ID for our records
       conversationId = generateUUID();
       console.log(`🆕 Stream emergency new conversation ID: ${conversationId}`);
-      
+
       // 🔧 标记这是emergency fallback，用于billing追踪
       requestBody.emergency_fallback = true;
     }
@@ -4498,20 +4498,20 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
     // ChatFlow需要对话状态来正确执行条件分支（dialogue_count=0,1,2...）
     let apiEndpoint = `${DIFY_API_URL}/chat-messages`;
     let apiRequestBody = requestBody;
-    
+
     console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
-    
+
     // Direct API call to Dify - opening statement handled in Dify backend
-    
-    
+
+
     // ✅ 保持原有inputs完全不变，让Dify ChatFlow按原有逻辑工作
-    
+
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
     console.log('   Local conversation ID:', conversationId);
     console.log('   DIFY conversation ID:', difyConversationId);
     console.log('   Request body:', JSON.stringify(apiRequestBody, null, 2));
-    
+
     // 特别检查conversation_id是否在请求体中
     if (apiRequestBody.conversation_id) {
       console.log('✅ Conversation ID will be sent to DIFY:', apiRequestBody.conversation_id);
@@ -4541,15 +4541,15 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
         response.headers.forEach((value, key) => {
           allHeaders[key.toLowerCase()] = value;
         });
-        
+
         console.log('[Server] 🔍 Dify API 响应头:', allHeaders);
-        
+
         // 提取响应头中的元数据
         const inputTokensHeader = response.headers.get('x-usage-input-tokens');
         const outputTokensHeader = response.headers.get('x-usage-output-tokens');
         const modelHeader = response.headers.get('x-dify-model');
         const requestIdHeader = response.headers.get('x-dify-request-id');
-        
+
         console.log('[Server] 响应头元数据检查:', {
           'x-usage-input-tokens': inputTokensHeader,
           'x-usage-output-tokens': outputTokensHeader,
@@ -4558,13 +4558,13 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           hasTokenStats: !!(inputTokensHeader && outputTokensHeader),
           hasModelInfo: !!modelHeader
         });
-        
+
         const metadata = {
           headers: allHeaders,
           extractedFromHeaders: true,
           timestamp: new Date().toISOString()
         };
-        
+
         // 只有在响应头存在token信息时才添加
         if (inputTokensHeader && outputTokensHeader) {
           metadata.headerTokenStats = {
@@ -4575,23 +4575,23 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           };
           console.log('[Server] ✅ 从响应头提取到token统计:', metadata.headerTokenStats);
         }
-        
+
         if (modelHeader) {
           metadata.modelFromHeader = modelHeader;
           console.log('[Server] ✅ 从响应头提取到模型信息:', modelHeader);
         }
-        
+
         if (requestIdHeader) {
           metadata.requestId = requestIdHeader;
         }
-        
+
         return metadata;
       } catch (error) {
         console.error('[Server] ❌ 提取响应头元数据时出错:', error);
         return null;
       }
     };
-    
+
     // 提取响应头元数据
     const headerMetadata = extractMetadataFromHeaders(response);
 
@@ -4603,11 +4603,11 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
         console.log('❌ Stream: Conversation not found in DIFY - attempting recovery');
         console.log('🔄 Stream: Creating new conversation to replace expired one');
-        
+
         // Remove conversation_id and retry as new conversation  
         delete requestBody.conversation_id;
         console.log('🆕 Stream: Retrying without conversation_id to create fresh conversation');
-        
+
         // Retry the request without conversation_id
         const retryResponse = await fetchWithTimeoutAndRetry(
           `${DIFY_API_URL}/chat-messages`,
@@ -4621,13 +4621,13 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           },
           DEFAULT_TIMEOUT
         );
-        
+
         if (!retryResponse.ok) {
           const retryError = await retryResponse.json();
           console.error('❌ Stream retry also failed:', retryError);
           throw new Error(`Dify API failed even after retry: ${retryError.message}`);
         }
-        
+
         response = retryResponse; // Use the retry response
         console.log('✅ Stream: Successfully recovered with new conversation');
       } else {
@@ -4659,12 +4659,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
       let allChunks = '';
       while (true) {
         const { done, value } = await reader.read();
-        
+
         if (done) break;
-        
+
         const chunk = decoder.decode(value, { stream: true });
         allChunks += chunk;
-        
+
         // 🚨 DIALOGUE_COUNT DEBUG: Look for dialogue_count in every chunk
         if (chunk.includes('dialogue_count')) {
           const dialogueMatch = chunk.match(/"dialogue_count"\s*:\s*(\d+)/);
@@ -4674,7 +4674,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
             console.log('🚨 Full chunk with dialogue_count:', chunk.substring(0, 500) + '...');
           }
         }
-        
+
         // 🚨 FORCE DEBUG: Always execute on first chunk to prove this loop runs
         if (allChunks.length === chunk.length) { // First chunk
           console.log('🚨 FIRST CHUNK PROCESSED - LOOP IS EXECUTING');
@@ -4692,18 +4692,18 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
             console.error('❌ LOOP EXECUTION PROOF FAILED:', loopProofError);
           }
         }
-        
+
         // 🔥 IMMEDIATE SAVE: Extract and save conversation_id as soon as we see it
         if (chunk.includes('conversation_id') && !finalData) {
           const match = chunk.match(/"conversation_id"\s*:\s*"([^"]+)"/);
           if (match) {
             const foundConversationId = match[1];
             console.log('🔥 IMMEDIATE: Found conversation_id in chunk:', foundConversationId);
-            
+
             try {
               await ensureConversationExists(supabase, conversationId, foundConversationId, getValidUserId(req.body.user));
               console.log('✅ IMMEDIATE SAVE successful for:', foundConversationId);
-              
+
               // Mark as saved to prevent duplicate saves
               finalData = {
                 answer: 'Processing...',
@@ -4716,12 +4716,12 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
             }
           }
         }
-        
+
         // Try to detect if this is standard SSE format or direct JSON response
         if (process.env.NODE_ENV !== 'production') {
           console.log('📝 Processing chunk, includes data:', chunk.includes('data: '), 'chunk preview:', chunk.substring(0, 100));
         }
-        
+
         // Send debug message to confirm we're processing chunks
         if (allChunks.length < 500 && process.env.NODE_ENV !== 'production') {
           res.write(`data: {"event": "debug", "message": "Processing chunk ${allChunks.length} chars"}\n\n`);
@@ -4729,7 +4729,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
         if (chunk.includes('data: ')) {
           // Standard SSE format - process line by line
           const lines = chunk.split('\n');
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const data = line.slice(6);
@@ -4744,29 +4744,29 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
                     metadata: {}
                   };
                 }
-                
+
                 // Save messages to database
                 if (finalData) {
                   // Ensure conversation exists first
                   await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
-                  
+
                   // Add context truncation note if context was managed
                   if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
                     finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
                   }
-                  
+
                   // Then save messages (use original message, not modified continue prompt)
                   await saveMessages(supabase, conversationId, message, finalData);
                 }
-                
+
                 res.write(`data: [DONE]\n\n`);
                 res.end();
                 return;
               }
-              
+
               try {
                 const parsed = JSON.parse(data);
-                
+
                 // 🔧 CRITICAL FIX: Capture conversation_id from any DIFY event
                 if (parsed.conversation_id) {
                   currentConversationId = parsed.conversation_id;
@@ -4774,7 +4774,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
                     console.log('🆔 Captured conversation_id from stream:', currentConversationId);
                     res.write(`data: {"event": "debug", "message": "Captured conversation_id: ${currentConversationId}"}\n\n`);
                   }
-                  
+
                   // 🔥 AGGRESSIVE FIX: Save immediately upon receiving first conversation_id
                   if (!finalData) {
                     console.log('🔥 Attempting immediate save of conversation_id');
@@ -4786,7 +4786,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
                     }
                   }
                 }
-                
+
                 // Collect answer content and final data
                 if (parsed.event === 'message' && parsed.answer) {
                   fullAnswer += parsed.answer;
@@ -4798,7 +4798,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
                     metadata: parsed.metadata
                   };
                 }
-                
+
                 // Forward the chunk to client
                 res.write(`data: ${data}\n\n`);
               } catch (e) {
@@ -4808,17 +4808,17 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           }
         }
       }
-      
+
       // 🔧 CRITICAL FIX: If we have conversation_id but no finalData, save it now
       console.log('🔍 Checking save conditions - finalData:', !!finalData, 'currentConversationId:', currentConversationId, 'message:', !!message);
       if (!finalData && currentConversationId && message) {
         console.log('🔧 Stream ended naturally without [DONE], saving conversation_id:', currentConversationId);
         console.log('⚠️ [BILLING-DEBUG] Stream ended without token usage data - using fallback billing!');
-        
+
         // 🔧 关键修复：为无usage数据的stream提供fallback billing
         const estimatedTokens = Math.max(100, Math.ceil((fullAnswer?.length || 0) / 4)); // 粗略估算：1 token ≈ 4 字符
         console.log(`📊 [BILLING-FALLBACK] Estimating ${estimatedTokens} tokens for stream without usage data`);
-        
+
         finalData = {
           answer: fullAnswer || 'Stream completed',
           conversation_id: currentConversationId,
@@ -4834,10 +4834,10 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           // 标记这是fallback数据，用于审计
           billing_source: 'STREAM_FALLBACK'
         };
-        
+
         // 🔧 BILLING: 处理积分扣除（现在有fallback usage数据了）
         const billingInfo = await handleTokenBilling(finalData, req.body.user, 'STREAM_FALLBACK');
-        
+
         // 🔧 关键修复：为fallback billing也发送balance_updated事件
         if (billingInfo && billingInfo.newBalance !== null && billingInfo.success) {
           console.log(`🔥 [STREAM-FALLBACK] Sending balance update to frontend: ${billingInfo.newBalance}`);
@@ -4852,19 +4852,19 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
             }
           })}\n\n`);
         }
-        
+
         // Save to database immediately
         await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
         await saveMessages(supabase, conversationId, message, finalData);
         console.log('✅ Successfully saved conversation_id after stream end');
       }
-      
+
       // Handle case where DIFY returns complete JSON response instead of streaming
       if (allChunks && !finalData) {
         try {
           console.log('🔍 Received complete JSON response from DIFY, converting to stream format');
           const completeResponse = JSON.parse(allChunks);
-          
+
           if (completeResponse.answer) {
             // DIFY's answer might be a JSON string that needs parsing
             let actualAnswer = completeResponse.answer;
@@ -4885,7 +4885,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
               // If parsing fails, use the original answer as is
               console.log('📝 Using original answer as is (not JSON)');
             }
-            
+
             fullAnswer = actualAnswer;
             finalData = {
               answer: actualAnswer,
@@ -4893,7 +4893,7 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
               message_id: completeResponse.message_id,
               metadata: completeResponse.metadata
             };
-            
+
             // Convert to proper streaming format for frontend
             // Send message chunks using the parsed answer
             const chunks = actualAnswer.match(/.{1,50}/g) || [actualAnswer];
@@ -4903,11 +4903,11 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
                 answer: chunk,
                 conversation_id: completeResponse.conversation_id
               })}\n\n`);
-              
+
               // Small delay to simulate streaming
               await new Promise(resolve => setTimeout(resolve, 10));
             }
-            
+
             // Send message end event
             res.write(`data: ${JSON.stringify({
               event: 'message_end',
@@ -4915,17 +4915,17 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
               message_id: completeResponse.message_id,
               metadata: completeResponse.metadata
             })}\n\n`);
-            
+
             // Save messages to database
             await ensureConversationExists(supabase, conversationId, completeResponse.conversation_id, getValidUserId(req.body.user));
-            
+
             // Add context truncation note if context was managed
             if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
               finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
             }
-            
+
             await saveMessages(supabase, conversationId, message, finalData);
-            
+
             res.write(`data: [DONE]\n\n`);
             res.end();
             return;
@@ -4945,23 +4945,23 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
           message_id: generateUUID(),
           metadata: {}
         };
-        
+
         // Save to database
         try {
           await ensureConversationExists(supabase, conversationId, finalData.conversation_id, getValidUserId(req.body.user));
-          
+
           // Add context truncation note if context was managed
           if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
             finalData.answer = contextManagementResult.truncationNote + '\n\n' + (finalData.answer || '');
           }
-          
+
           await saveMessages(supabase, conversationId, message, finalData);
           console.log('✅ Successfully saved conversation_id in finally block');
         } catch (saveError) {
           console.error('❌ Error saving in finally block:', saveError);
         }
       }
-      
+
       reader.releaseLock();
       if (!res.headersSent) {
         res.end();
@@ -4976,26 +4976,26 @@ app.post('/api/dify/:conversationId/stream', async (req, res) => {
 // Dify chat proxy API (blocking)
 app.post('/api/dify/:conversationId', async (req, res) => {
   console.log('🗣️ NON-STREAM /:conversationId ENDPOINT CALLED with:', req.params.conversationId);
-  
+
   // Endpoint debugging for development
   if (process.env.NODE_ENV !== 'production') {
     console.log('🔍 Non-stream endpoint processing conversation:', req.params.conversationId);
   }
-  
+
   try {
     const { message } = req.body;
     const { conversationId: rawConversationId } = req.params;
-    
+
     // Validate and fix conversation ID - generate new UUID if invalid
     const conversationId = isValidUUID(rawConversationId) ? rawConversationId : generateUUID();
     if (conversationId !== rawConversationId) {
       console.log(`🔧 Generated new UUID for invalid conversation ID: ${rawConversationId} -> ${conversationId}`);
     }
-    
+
     if (!DIFY_API_URL || !DIFY_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ error: 'Server configuration error: Missing required environment variables' });
     }
-    
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // 查找或创建当前会话的 dify_conversation_id
@@ -5006,19 +5006,19 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       .maybeSingle();
 
     let difyConversationId = conversationRow?.dify_conversation_id || null;
-    
+
     // 如果数据库中没有这个对话记录，先创建一个
     if (!conversationRow) {
       console.log(`🆕 Creating conversation record for: ${conversationId}`);
       await ensureConversationExists(supabase, conversationId, null, getValidUserId(req.body.user));
-      
+
       // 重新查询以获取创建的记录
       const { data: newConversationRow } = await supabase
         .from('conversations')
         .select('dify_conversation_id')
         .eq('id', conversationId)
         .maybeSingle();
-      
+
       conversationRow = newConversationRow;
       difyConversationId = conversationRow?.dify_conversation_id || null;
     }
@@ -5033,25 +5033,25 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     let contextManagementResult = null;
     if (supabase && message) {
       contextManagementResult = await manageConversationContext(conversationId, message);
-      
+
       if (contextManagementResult && contextManagementResult.truncated) {
         console.log(`📊 Context management applied: ${contextManagementResult.truncatedCount} older messages truncated`);
       }
     }
-    
+
     // 🚨 EMERGENCY FALLBACK for chat: If context management failed and we're at high risk, force new conversation
     if (!contextManagementResult && overflowRisk && overflowRisk.isAtRisk && overflowRisk.currentTokens > 8000) {
       console.log(`🚨 CHAT EMERGENCY: Context management failed and tokens (${overflowRisk.currentTokens}) exceed safe limit`);
       console.log('🔄 Forcing new conversation to prevent chat API failure');
       console.log(`⚠️ [BILLING-WARNING] Chat emergency fallback triggered - ensuring billing tracking continues`);
-      
+
       // Clear the conversation_id to force a new conversation  
       difyConversationId = null;
-      
+
       // Generate a new conversation ID for our records
       conversationId = generateUUID();
       console.log(`🆕 Chat emergency new conversation ID: ${conversationId}`);
-      
+
       // 🔧 标记这是emergency fallback，用于billing追踪
       requestBody.emergency_fallback = true;
     }
@@ -5076,20 +5076,20 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     // ChatFlow需要对话状态来正确执行条件分支（dialogue_count=0,1,2...）
     let apiEndpoint = `${DIFY_API_URL}/chat-messages`;
     let apiRequestBody = requestBody;
-    
+
     console.log('🔧 FIXED: Using chat-messages API to maintain conversation state for ChatFlow');
-    
+
     // Direct API call to Dify - opening statement handled in Dify backend
-    
-    
+
+
     // ✅ 保持原有inputs完全不变，让Dify ChatFlow按原有逻辑工作
-    
+
     console.log('🔍 API Debug Info:');
     console.log('   Endpoint:', apiEndpoint);
     console.log('   Local conversation ID:', conversationId);
     console.log('   DIFY conversation ID:', difyConversationId);
     console.log('   Request body:', JSON.stringify(apiRequestBody, null, 2));
-    
+
     // 特别检查conversation_id是否在请求体中
     if (apiRequestBody.conversation_id) {
       console.log('✅ Conversation ID will be sent to DIFY:', apiRequestBody.conversation_id);
@@ -5119,11 +5119,11 @@ app.post('/api/dify/:conversationId', async (req, res) => {
       if (errorData.code === 'not_found' && errorData.message?.includes('Conversation')) {
         console.log('❌ Simple: Conversation not found in DIFY - attempting recovery');
         console.log('🔄 Simple: Creating new conversation to replace expired one');
-        
+
         // Remove conversation_id and retry as new conversation
         delete apiRequestBody.conversation_id;
         console.log('🆕 Simple: Retrying without conversation_id to create fresh conversation');
-        
+
         // Retry the request without conversation_id
         const retryResponse = await fetchWithTimeoutAndRetry(
           `${DIFY_API_URL}/chat-messages`,
@@ -5137,13 +5137,13 @@ app.post('/api/dify/:conversationId', async (req, res) => {
           },
           DEFAULT_TIMEOUT
         );
-        
+
         if (!retryResponse.ok) {
           const retryError = await retryResponse.json();
           console.error('❌ Simple retry also failed:', retryError);
           throw new Error(`Dify API failed even after retry: ${retryError.message}`);
         }
-        
+
         response = retryResponse; // Use the retry response
         console.log('✅ Simple: Successfully recovered with new conversation');
       } else {
@@ -5158,11 +5158,11 @@ app.post('/api/dify/:conversationId', async (req, res) => {
 
     // 🔧 BILLING: 处理积分扣除
     let billingInfo = await handleTokenBilling(data, req.body.user, 'CONVERSATION');
-    
+
     // 🚨 CRITICAL FIX: 如果CONVERSATION billing失败，强制执行fallback billing
     if (!billingInfo || !billingInfo.success || billingInfo.tokens === 0) {
       console.error(`🚨 [CRITICAL] Primary billing failed for CONVERSATION, executing emergency billing!`);
-      
+
       // 创建强制billing数据
       const emergencyTokens = Math.max(180, Math.ceil((message?.length || 0) / 3));
       const emergencyData = {
@@ -5179,11 +5179,11 @@ app.post('/api/dify/:conversationId', async (req, res) => {
         },
         billing_source: 'EMERGENCY_FORCED_BILLING'
       };
-      
+
       billingInfo = await handleTokenBilling(emergencyData, req.body.user, 'EMERGENCY_CONVERSATION', {
         emergencyFallback: true
       });
-      
+
       console.log(`🔧 [EMERGENCY] Forced CONVERSATION billing result:`, billingInfo);
     }
 
@@ -5191,12 +5191,12 @@ app.post('/api/dify/:conversationId', async (req, res) => {
     if (supabase) {
       // First ensure conversation record exists
       await ensureConversationExists(supabase, conversationId, data.conversation_id, getValidUserId(req.body.user));
-      
+
       // Add context truncation note if context was managed
       if (contextManagementResult && contextManagementResult.truncated && contextManagementResult.truncationNote) {
         data.answer = contextManagementResult.truncationNote + '\n\n' + (data.answer || '');
       }
-      
+
       // Then save messages  
       await saveMessages(supabase, conversationId, message, data);
     }
@@ -5220,17 +5220,17 @@ app.post('/api/payment/stripe', async (req, res) => {
     stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
     minimumAmount: 0.5
   });
-  
+
   try {
     const { amount } = req.body; // 单位：美元
-    
+
     // 详细的金额验证日志
     console.log('💳 [STRIPE] Amount validation:', {
       amount,
       type: typeof amount,
       isValid: amount && amount >= 0.1
     });
-    
+
     if (!amount || amount < 0.5) {
       console.log('❌ [STRIPE] Amount validation failed:', amount);
       return res.status(400).json({ error: '充值金额不能低于0.5美元（Stripe最低要求）' });
@@ -5243,7 +5243,7 @@ app.post('/api/payment/stripe', async (req, res) => {
     }
 
     console.log('💳 [STRIPE] Creating payment intent for amount:', amount);
-    
+
     // Stripe 以分为单位，需*100
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100),
@@ -5270,10 +5270,10 @@ app.post('/api/payment/stripe', async (req, res) => {
 
 // 健康检查端点 - 必须在SPA路由之前
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    server: 'prome-backend' 
+    server: 'prome-backend'
   });
 });
 
@@ -5324,7 +5324,7 @@ app.get('/api/env-check', (req, res) => {
       SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'EMPTY'
     }
   };
-  
+
   res.status(200).json(envCheck);
 });
 
@@ -5424,7 +5424,7 @@ app.get('/api/dify/test-connection', async (req, res) => {
 
       testResult.tests.chat_endpoint.status = chatResponse.ok ? 'passed' : 'failed';
       testResult.tests.chat_endpoint.response_status = chatResponse.status;
-      
+
       if (chatResponse.ok) {
         const chatData = await chatResponse.json();
         testResult.tests.chat_endpoint.conversation_id = chatData.conversation_id;
@@ -5445,7 +5445,7 @@ app.get('/api/dify/test-connection', async (req, res) => {
   // Determine overall status
   const allTests = Object.values(testResult.tests);
   const failedTests = allTests.filter(test => test.status === 'failed');
-  
+
   testResult.overall_status = failedTests.length === 0 ? 'healthy' : 'unhealthy';
   testResult.summary = {
     total_tests: allTests.length,
@@ -5464,28 +5464,28 @@ app.get('/api/dify/test-connection', async (req, res) => {
 app.get('/api/video/balance/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ error: 'Database not configured' });
     }
-    
+
     // Convert user ID to valid UUID format if needed
     const validUserId = getValidUserId(userId);
     console.log('🔄 Video balance check: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     const { data: user, error } = await supabase
       .from('users')
       .select('balance')
       .eq('id', validUserId)
       .single();
-    
+
     if (error) {
       console.error('Error fetching user balance:', error);
       return res.status(404).json({ error: 'User not found' });
     }
-    
+
     // Balance field stores credits directly
     const credits = user.balance || 0;
     res.json({ balance: user.balance || 0, credits });
@@ -5499,32 +5499,32 @@ app.get('/api/video/balance/:userId', async (req, res) => {
 app.post('/api/video/check-balance', async (req, res) => {
   try {
     const { userId, credits } = req.body;
-    
+
     if (!userId || !credits) {
       return res.status(400).json({ error: 'Missing userId or credits' });
     }
-    
+
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ error: 'Database not configured' });
     }
-    
+
     // Convert user ID to valid UUID format if needed
     const validUserId = getValidUserId(userId);
     console.log('🔄 Video check-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     // Use credits directly (no USD conversion for auto-video)
     const { data: hasEnough, error } = await supabase.rpc('check_user_credits_for_video', {
       user_uuid: validUserId,
       required_credits: credits
     });
-    
+
     if (error) {
       console.error('Error checking user balance:', error);
       return res.status(500).json({ error: 'Failed to check balance' });
     }
-    
+
     res.json({ hasEnoughCredits: hasEnough });
   } catch (error) {
     console.error('Balance check error:', error);
@@ -5536,21 +5536,21 @@ app.post('/api/video/check-balance', async (req, res) => {
 app.post('/api/video/reserve-balance', async (req, res) => {
   try {
     const { userId, credits, sessionId, duration, metadata = {} } = req.body;
-    
+
     if (!userId || !credits || !sessionId) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
-    
+
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ error: 'Database not configured' });
     }
-    
+
     // Convert user ID to valid UUID format if needed
     const validUserId = getValidUserId(userId);
     console.log('🔄 Video reserve-balance: Original userId:', userId, '→ Valid UUID:', validUserId);
-    
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     // Use credits directly (no USD conversion for auto-video)
     console.log('💰 Attempting to reserve credits:', {
       validUserId,
@@ -5558,7 +5558,7 @@ app.post('/api/video/reserve-balance', async (req, res) => {
       sessionId,
       duration: duration || 8
     });
-    
+
     const { data: success, error: reserveError } = await supabase.rpc('reserve_credits_for_video', {
       user_uuid: validUserId,
       credits_amount: credits,
@@ -5566,23 +5566,23 @@ app.post('/api/video/reserve-balance', async (req, res) => {
       duration_param: duration || 8,
       metadata_param: metadata
     });
-    
+
     console.log('💰 Reserve credits result:', { success, reserveError });
-    
+
     if (reserveError || !success) {
       console.error('Error reserving balance for video:', reserveError);
       return res.status(400).json({ error: 'Insufficient balance or reservation failed' });
     }
-    
+
     // Get updated balance (balance field stores credits directly)
     const { data: user } = await supabase
       .from('users')
       .select('balance')
       .eq('id', validUserId)
       .single();
-    
+
     const remainingCredits = user?.balance || 0;
-    
+
     res.json({
       success: true,
       sessionId,
@@ -5598,8 +5598,8 @@ app.post('/api/video/reserve-balance', async (req, res) => {
 // A2E Digital Human Training API
 app.post('/api/digital-human/train', async (req, res) => {
   try {
-    const { 
-      userId, 
+    const {
+      userId,
       name,
       videoUrl,
       tempVideoFileName, // Filename of temporarily uploaded video for cleanup
@@ -5608,8 +5608,8 @@ app.post('/api/digital-human/train', async (req, res) => {
       voiceId // 克隆的声音ID
     } = req.body;
 
-    console.log('🎭 Digital human training request:', { 
-      userId, 
+    console.log('🎭 Digital human training request:', {
+      userId,
       name,
       gender,
       language,
@@ -5619,8 +5619,8 @@ app.post('/api/digital-human/train', async (req, res) => {
 
     // Validate required parameters (imageUrl is now optional, videoUrl is required per A2E API docs)
     if (!userId || !name || !videoUrl) {
-      return res.status(400).json({ 
-        error: 'Missing required parameters: userId, name, videoUrl' 
+      return res.status(400).json({
+        error: 'Missing required parameters: userId, name, videoUrl'
       });
     }
 
@@ -5629,22 +5629,22 @@ app.post('/api/digital-human/train', async (req, res) => {
 
     if (!A2E_API_KEY) {
       console.log('⚠️ A2E API Key not configured, using mock response');
-      
+
       // Clean up temporary video file in mock mode too
       if (tempVideoFileName) {
         try {
-                const supabase = createClient(
+          const supabase = createClient(
             process.env.VITE_SUPABASE_URL,
             process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
           );
-          
+
           await supabase.storage.from('digital-human-videos').remove([tempVideoFileName]);
           console.log(`🗑️ Mock training started, cleaned up temp video: ${tempVideoFileName}`);
         } catch (cleanupError) {
           console.error('⚠️ Failed to cleanup temp video file in mock mode:', cleanupError);
         }
       }
-      
+
       // Return mock training response
       const mockTrainingId = `twin_${userId}_${Date.now()}`;
       return res.json({
@@ -5668,7 +5668,7 @@ app.post('/api/digital-human/train', async (req, res) => {
 
     // Add language parameter
     trainingPayload.language = language;
-    
+
     // Add voice ID if provided (cloned voice)
     if (voiceId) {
       trainingPayload.voice_id = voiceId;
@@ -5689,7 +5689,7 @@ app.post('/api/digital-human/train', async (req, res) => {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'A2E training request failed');
     }
@@ -5713,9 +5713,9 @@ app.post('/api/digital-human/train', async (req, res) => {
 
   } catch (error) {
     console.error('Digital human training error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error during training',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -5724,7 +5724,7 @@ app.post('/api/digital-human/train', async (req, res) => {
 app.get('/api/digital-human/status/:trainingId', async (req, res) => {
   try {
     const { trainingId } = req.params;
-    
+
     console.log('🔍 Checking A2E training status:', trainingId);
 
     const A2E_API_KEY = process.env.A2E_API_KEY;
@@ -5755,7 +5755,7 @@ app.get('/api/digital-human/status/:trainingId', async (req, res) => {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Failed to get training status');
     }
@@ -5766,13 +5766,13 @@ app.get('/api/digital-human/status/:trainingId', async (req, res) => {
     const currentStatus = result.data?.current_status;
     if ((currentStatus === 'completed' || currentStatus === 'failed') && tempFileCleanupMap[trainingId]) {
       const tempFileName = tempFileCleanupMap[trainingId];
-      
+
       try {
         const supabase = createClient(
           process.env.VITE_SUPABASE_URL,
           process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
         );
-        
+
         await supabase.storage.from('digital-human-videos').remove([tempFileName]);
         delete tempFileCleanupMap[trainingId]; // Remove from cleanup map
         console.log(`🗑️ Training ${currentStatus}, cleaned up temp video: ${tempFileName}`);
@@ -5788,7 +5788,7 @@ app.get('/api/digital-human/status/:trainingId', async (req, res) => {
       imageResultUrl: result.data?.image_result_url || null,
       trainingData: result.data
     });
-    
+
   } catch (error) {
     console.error('❌ Failed to check training status:', error);
     res.status(500).json({
@@ -5802,7 +5802,7 @@ app.get('/api/digital-human/status/:trainingId', async (req, res) => {
 app.get('/api/digital-human/list/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     console.log('📋 Fetching digital humans for user:', userId);
 
     // Query localStorage-like storage in memory (for now)
@@ -5815,7 +5815,7 @@ app.get('/api/digital-human/list/:userId', async (req, res) => {
       success: true,
       digitalHumans: userDigitalHumans
     });
-    
+
   } catch (error) {
     console.error('❌ Failed to fetch digital humans:', error);
     res.status(500).json({
@@ -5828,17 +5828,17 @@ app.get('/api/digital-human/list/:userId', async (req, res) => {
 // Save trained digital human
 app.post('/api/digital-human/save', async (req, res) => {
   try {
-    const { 
-      userId, 
+    const {
+      userId,
       trainingId,
       name,
       gender,
       status,
       previewUrl,
       imageResultUrl,
-      trainingData 
+      trainingData
     } = req.body;
-    
+
     console.log('💾 Saving digital human:', { userId, trainingId, name, status });
 
     // Initialize user storage if not exists
@@ -5848,7 +5848,7 @@ app.post('/api/digital-human/save', async (req, res) => {
 
     // Check if digital human already exists
     const existingIndex = digitalHumansStorage[userId].findIndex(dh => dh.trainingId === trainingId);
-    
+
     const digitalHuman = {
       trainingId,
       name,
@@ -5876,7 +5876,7 @@ app.post('/api/digital-human/save', async (req, res) => {
       digitalHuman,
       total: digitalHumansStorage[userId].length
     });
-    
+
   } catch (error) {
     console.error('❌ Failed to save digital human:', error);
     res.status(500).json({
@@ -5890,7 +5890,7 @@ app.post('/api/digital-human/save', async (req, res) => {
 app.get('/api/video-proxy', async (req, res) => {
   try {
     const { url } = req.query;
-    
+
     if (!url) {
       return res.status(400).json({ error: 'Missing video URL parameter' });
     }
@@ -5901,7 +5901,7 @@ app.get('/api/video-proxy', async (req, res) => {
     const https = await import('https');
     const http = await import('http');
     const urlModule = await import('url');
-    
+
     const parsedUrl = urlModule.default.parse(url);
     const isHttps = parsedUrl.protocol === 'https:';
     const client = isHttps ? https.default : http.default;
@@ -5930,11 +5930,11 @@ app.get('/api/video-proxy', async (req, res) => {
 
       // Copy status code and relevant headers from the original response
       res.status(proxyRes.statusCode);
-      
+
       if (proxyRes.headers['content-length']) {
         res.set('Content-Length', proxyRes.headers['content-length']);
       }
-      
+
       if (proxyRes.headers['content-range']) {
         res.set('Content-Range', proxyRes.headers['content-range']);
       }
@@ -5951,7 +5951,7 @@ app.get('/api/video-proxy', async (req, res) => {
     });
 
     proxyReq.end();
-    
+
   } catch (error) {
     console.error('❌ Video proxy error:', error);
     if (!res.headersSent) {
@@ -5964,17 +5964,17 @@ app.get('/api/video-proxy', async (req, res) => {
 app.get('/api/audio-proxy', async (req, res) => {
   try {
     const { url } = req.query;
-    
+
     if (!url) {
       return res.status(400).json({ error: 'URL parameter required' });
     }
 
     console.log('🎵 Audio proxy request for A2E:', url);
-    
+
     const https = await import('https');
     const http = await import('http');
     const urlModule = await import('url');
-    
+
     const parsedUrl = urlModule.default.parse(url);
     const isHttps = parsedUrl.protocol === 'https:';
     const client = isHttps ? https.default : http.default;
@@ -5992,7 +5992,7 @@ app.get('/api/audio-proxy', async (req, res) => {
 
     const proxyReq = client.request(options, (proxyRes) => {
       console.log('🎵 Audio proxy response status:', proxyRes.statusCode);
-      
+
       // Set appropriate headers for audio/video content
       res.set({
         'Content-Type': proxyRes.headers['content-type'] || 'video/mp4',
@@ -6002,7 +6002,7 @@ app.get('/api/audio-proxy', async (req, res) => {
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Range, Content-Range, User-Agent'
       });
-      
+
       res.status(proxyRes.statusCode);
       proxyRes.pipe(res);
     });
@@ -6026,7 +6026,7 @@ app.get('/api/audio-proxy', async (req, res) => {
 // A2E Voice Cloning API
 app.post('/api/voice/clone', async (req, res) => {
   try {
-    const { 
+    const {
       userId,
       trainingId,
       name,
@@ -6038,21 +6038,21 @@ app.post('/api/voice/clone', async (req, res) => {
       language = 'zh'
     } = req.body;
 
-    console.log('🎤 Voice cloning request:', { 
-      userId, 
+    console.log('🎤 Voice cloning request:', {
+      userId,
       trainingId,
-      name, 
-      voiceUrls: voiceUrls?.length, 
-      gender, 
-      denoise, 
-      model, 
-      language 
+      name,
+      voiceUrls: voiceUrls?.length,
+      gender,
+      denoise,
+      model,
+      language
     });
 
     // Validate required parameters
     if (!userId || !name || !voiceUrls || voiceUrls.length === 0) {
-      return res.status(400).json({ 
-        error: 'Missing required parameters: userId, name, voiceUrls' 
+      return res.status(400).json({
+        error: 'Missing required parameters: userId, name, voiceUrls'
       });
     }
 
@@ -6152,12 +6152,12 @@ app.post('/api/voice/clone', async (req, res) => {
 app.get('/api/voice/status/:voiceId', async (req, res) => {
   try {
     const { voiceId } = req.params;
-    
+
     console.log('🔍 Checking voice cloning status:', voiceId);
-    
+
     const A2E_API_KEY = process.env.A2E_API_KEY;
     const A2E_API_URL = process.env.A2E_API_URL;
-    
+
     if (!A2E_API_KEY || !A2E_API_URL) {
       console.log('⚠️ A2E API Key not configured for voice status check');
       return res.status(400).json({ error: 'A2E API not configured' });
@@ -6203,13 +6203,13 @@ app.get('/api/voice/status/:voiceId', async (req, res) => {
 app.post('/api/xiangong/instance/start', async (req, res) => {
   try {
     console.log('🚀 启动仙宫云实例请求');
-    
+
     const xiangongAPI = 'https://api.xiangongyun.com';
     const instanceId = '3iaszw98tkh12h9x';
-    
+
     // 使用官方文档的正确端点: /open/instance/boot
     console.log('🔍 使用官方API端点: /open/instance/boot');
-    
+
     const response = await fetch(`${xiangongAPI}/open/instance/boot`, {
       method: 'POST',
       headers: {
@@ -6226,7 +6226,7 @@ app.post('/api/xiangong/instance/start', async (req, res) => {
       const result = await response.json();
       console.log('✅ 实例启动命令发送成功');
       console.log('📊 响应结果:', result);
-      
+
       return res.json({
         success: true,
         message: '实例启动命令已发送，请等待实例启动',
@@ -6236,16 +6236,16 @@ app.post('/api/xiangong/instance/start', async (req, res) => {
 
     const errorText = await response.text();
     console.error('❌ 实例启动失败:', response.status, errorText);
-    
-    return res.status(response.status).json({ 
+
+    return res.status(response.status).json({
       error: `实例启动失败: ${errorText}`,
       statusCode: response.status
     });
-    
+
   } catch (error) {
     console.error('启动实例错误:', error);
-    res.status(500).json({ 
-      error: error.message || '启动实例失败' 
+    res.status(500).json({
+      error: error.message || '启动实例失败'
     });
   }
 });
@@ -6253,10 +6253,10 @@ app.post('/api/xiangong/instance/start', async (req, res) => {
 app.post('/api/xiangong/instance/stop', async (req, res) => {
   try {
     console.log('⏸️ 停止仙宫云实例请求');
-    
+
     const xiangongAPI = 'https://api.xiangongyun.com';
     const instanceId = '3iaszw98tkh12h9x';
-    
+
     const response = await fetch(`${xiangongAPI}/open/instance/shutdown_release_gpu`, {
       method: 'POST',
       headers: {
@@ -6271,8 +6271,8 @@ app.post('/api/xiangong/instance/stop', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('停止实例失败:', response.status, errorText);
-      return res.status(response.status).json({ 
-        error: `停止实例失败: ${errorText}` 
+      return res.status(response.status).json({
+        error: `停止实例失败: ${errorText}`
       });
     }
 
@@ -6287,8 +6287,8 @@ app.post('/api/xiangong/instance/stop', async (req, res) => {
 
   } catch (error) {
     console.error('停止实例失败:', error);
-    res.status(500).json({ 
-      error: error.message || '停止实例失败' 
+    res.status(500).json({
+      error: error.message || '停止实例失败'
     });
   }
 });
@@ -6299,12 +6299,12 @@ app.get('/api/xiangong/auto-shutdown/status', async (req, res) => {
     const now = new Date();
     let idleMinutes = 0;
     let remainingMinutes = IDLE_TIMEOUT_MINUTES;
-    
+
     if (lastApiCallTime) {
       idleMinutes = (now - lastApiCallTime) / (1000 * 60);
       remainingMinutes = Math.max(0, IDLE_TIMEOUT_MINUTES - idleMinutes);
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -6318,8 +6318,8 @@ app.get('/api/xiangong/auto-shutdown/status', async (req, res) => {
     });
   } catch (error) {
     console.error('获取自动关机状态失败:', error);
-    res.status(500).json({ 
-      error: error.message || '获取自动关机状态失败' 
+    res.status(500).json({
+      error: error.message || '获取自动关机状态失败'
     });
   }
 });
@@ -6327,10 +6327,10 @@ app.get('/api/xiangong/auto-shutdown/status', async (req, res) => {
 app.get('/api/xiangong/instance/status', async (req, res) => {
   try {
     console.log('🔍 获取仙宫云实例状态');
-    
+
     const xiangongAPI = 'https://api.xiangongyun.com';
     const instanceId = '3iaszw98tkh12h9x';
-    
+
     // 使用单个实例API获取状态
     const response = await fetch(`${xiangongAPI}/open/instance/${instanceId}`, {
       method: 'GET',
@@ -6342,19 +6342,19 @@ app.get('/api/xiangong/instance/status', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('获取实例状态失败:', response.status, errorText);
-      return res.status(response.status).json({ 
-        error: `获取实例状态失败: ${errorText}` 
+      return res.status(response.status).json({
+        error: `获取实例状态失败: ${errorText}`
       });
     }
 
     const instance = await response.json();
     console.log('✅ 获取实例状态成功');
     console.log('📊 实例信息:', instance);
-    
+
     if (!instance || !instance.data) {
       return res.status(404).json({ error: '实例不存在或数据格式错误' });
     }
-    
+
     const instanceData = instance.data;
     console.log(`实例状态: ${instanceData.status}`);
 
@@ -6373,8 +6373,8 @@ app.get('/api/xiangong/instance/status', async (req, res) => {
 
   } catch (error) {
     console.error('获取实例状态失败:', error);
-    res.status(500).json({ 
-      error: error.message || '获取实例状态失败' 
+    res.status(500).json({
+      error: error.message || '获取实例状态失败'
     });
   }
 });
@@ -6384,9 +6384,9 @@ app.post('/api/xiangong/upload-training-video', async (req, res) => {
   try {
     // 跟踪API使用情况，重置自动关机定时器
     updateLastUsage();
-    
+
     // 使用已经配置好的videoUpload中间件
-    const upload = multer({ 
+    const upload = multer({
       storage: multer.memoryStorage(),
       limits: { fileSize: 100 * 1024 * 1024 }, // 100MB限制
       fileFilter: (req, file, cb) => {
@@ -6401,10 +6401,10 @@ app.post('/api/xiangong/upload-training-video', async (req, res) => {
           'video/mov',
           'application/octet-stream' // 有时QuickTime文件会被识别为此类型
         ];
-        const isVideo = file.mimetype.startsWith('video/') || 
-                       videoMimeTypes.includes(file.mimetype) ||
-                       file.originalname.toLowerCase().match(/\.(mp4|mov|avi|webm|ogg|mkv)$/);
-        
+        const isVideo = file.mimetype.startsWith('video/') ||
+          videoMimeTypes.includes(file.mimetype) ||
+          file.originalname.toLowerCase().match(/\.(mp4|mov|avi|webm|ogg|mkv)$/);
+
         if (isVideo) {
           cb(null, true);
         } else {
@@ -6415,16 +6415,16 @@ app.post('/api/xiangong/upload-training-video', async (req, res) => {
 
     upload(req, res, async (err) => {
       if (err) {
-        return res.status(400).json({ 
-          success: false, 
-          error: err.message 
+        return res.status(400).json({
+          success: false,
+          error: err.message
         });
       }
 
       if (!req.file) {
-        return res.status(400).json({ 
-          success: false, 
-          error: '未找到视频文件' 
+        return res.status(400).json({
+          success: false,
+          error: '未找到视频文件'
         });
       }
 
@@ -6452,7 +6452,7 @@ app.post('/api/xiangong/upload-training-video', async (req, res) => {
       }
 
       const uploadResult = await uploadResponse.json();
-      
+
       // 保存用户数字人信息到数据库
       if (supabase) {
         const { error } = await supabase
@@ -6472,7 +6472,7 @@ app.post('/api/xiangong/upload-training-video', async (req, res) => {
 
       // 保存数字人档案到数据库，不强制生成预览
       console.log('📁 保存数字人档案到数据库...');
-      
+
       res.json({
         success: true,
         message: '数字人训练视频上传成功',
@@ -6499,9 +6499,9 @@ app.post('/api/xiangong/upload-training-video', async (req, res) => {
 app.post('/api/xiangong/generate-preview', async (req, res) => {
   try {
     const { userId } = req.body;
-    
+
     console.log('🎭 开始生成数字人预览...');
-    
+
     // 获取用户档案
     let userProfile = null;
     if (supabase && userId) {
@@ -6510,17 +6510,17 @@ app.post('/api/xiangong/generate-preview', async (req, res) => {
         .select('*')
         .eq('user_id', userId)
         .single();
-      
+
       if (error || !data) {
         return res.status(404).json({
           success: false,
           error: '用户数字人档案不存在'
         });
       }
-      
+
       userProfile = data;
     }
-    
+
     if (!userProfile?.training_video_filename) {
       return res.status(400).json({
         success: false,
@@ -6562,7 +6562,7 @@ app.post('/api/xiangong/generate-preview', async (req, res) => {
     }
 
     const workflowResult = await workflowResponse.json();
-    
+
     res.json({
       success: true,
       message: '预览生成任务已提交',
@@ -6594,13 +6594,13 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
     // 跟踪API使用情况，重置自动关机定时器
     updateLastUsage();
 
-    console.log('🎬 仙宫云InfiniteTalk请求:', { 
-      textLength: text?.length, 
-      avatar, 
-      voice, 
-      emotion, 
+    console.log('🎬 仙宫云InfiniteTalk请求:', {
+      textLength: text?.length,
+      avatar,
+      voice,
+      emotion,
       background,
-      userId 
+      userId
     });
 
     if (!text) {
@@ -6610,7 +6610,7 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
     // 首先确保实例正在运行
     console.log('🔄 检查实例状态...');
     const statusResponse = await fetch('http://localhost:8080/api/xiangong/instance/status');
-    
+
     let needsStart = true;
     if (statusResponse.ok) {
       const statusData = await statusResponse.json();
@@ -6625,11 +6625,11 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
       const startResponse = await fetch('http://localhost:8080/api/xiangong/instance/start', {
         method: 'POST'
       });
-      
+
       if (!startResponse.ok) {
         throw new Error('无法启动实例');
       }
-      
+
       // 等待实例启动
       console.log('⏳ 等待实例启动...');
       await new Promise(resolve => setTimeout(resolve, 30000)); // 等待30秒
@@ -6642,9 +6642,9 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
     // 生成唯一客户端ID和任务ID
     const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const taskId = `infinitetalk_${Date.now()}`;
-    
+
     console.log('🎬 准备InfiniteTalk工作流...');
-    
+
     // 首先获取用户的数字人配置文件
     let userProfile = null;
     if (supabase && userId) {
@@ -6654,7 +6654,7 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
           .select('*')
           .eq('user_id', userId)
           .single();
-        
+
         if (!error && data) {
           userProfile = data;
           console.log('✅ 找到用户数字人配置:', userProfile.training_video_filename);
@@ -6695,7 +6695,7 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
       },
       client_id: clientId
     };
-    
+
     console.log('🚀 提交ComfyUI工作流...');
     const response = await fetch(`${XIANGONG_COMFYUI_URL}/prompt`, {
       method: 'POST',
@@ -6708,11 +6708,11 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('ComfyUI API错误:', response.status, errorText);
-      
+
       // 智能错误分析和临时解决方案
       let errorAnalysis = '工作流提交失败';
       let suggestions = [];
-      
+
       if (errorText.includes('IndexTTS2')) {
         errorAnalysis = 'IndexTTS2节点配置问题';
         suggestions.push('检查IndexTTS2模型是否正确加载');
@@ -6720,7 +6720,7 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
         errorAnalysis = 'InfiniteTalk节点配置问题';
         suggestions.push('检查InfiniteTalk模型是否正确加载');
       }
-      
+
       console.log('🔗 提供ComfyUI直接访问方案');
       return res.json({
         success: false,
@@ -6748,7 +6748,7 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
 
     const result = await response.json();
     const promptId = result.prompt_id;
-    
+
     console.log('✅ ComfyUI工作流提交成功:', { promptId, clientId });
 
     // 存储任务状态
@@ -6782,9 +6782,9 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
 
   } catch (error) {
     console.error('InfiniteTalk生成失败:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error.message || '数字人视频生成失败' 
+      error: error.message || '数字人视频生成失败'
     });
   }
 });
@@ -6793,23 +6793,23 @@ app.post('/api/xiangong/infinitetalk', async (req, res) => {
 async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
   try {
     console.log(`🔗 启动WebSocket监控: ${promptId}`);
-    
+
     const WebSocket = require('ws');
     const wsUrl = XIANGONG_COMFYUI_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws';
-    
+
     const ws = new WebSocket(`${wsUrl}?clientId=${clientId}`);
     let heartbeatInterval;
 
     ws.on('open', () => {
       console.log(`✅ WebSocket连接成功: ${promptId}`);
-      
+
       // 发送心跳包
       heartbeatInterval = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.ping();
         }
       }, 30000);
-      
+
       // 更新任务状态
       const task = activeInfiniteTalkTasks.get(promptId);
       if (task) {
@@ -6829,7 +6829,7 @@ async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
         if (message.type === 'progress' && message.data.prompt_id === promptId) {
           const progress = Math.round((message.data.value / message.data.max) * 100);
           console.log(`⏳ 进度更新: ${progress}% (${message.data.value}/${message.data.max})`);
-          
+
           task.progress = progress;
           task.status = 'processing';
           task.lastUpdate = new Date();
@@ -6838,18 +6838,18 @@ async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
         if (message.type === 'executing' && message.data.prompt_id === promptId) {
           if (message.data.node === null) {
             console.log('✅ 工作流执行完成，获取结果...');
-            
+
             try {
               // 获取并处理结果
               const results = await getInfiniteTalkResults(promptId);
               await processInfiniteTalkResults(promptId, results, userId);
-              
+
             } catch (error) {
               console.error('结果处理失败:', error);
               task.status = 'failed';
               task.error = error.message;
             }
-            
+
             ws.close();
           }
         }
@@ -6879,7 +6879,7 @@ async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
       }
-      
+
       const task = activeInfiniteTalkTasks.get(promptId);
       if (task) {
         task.wsConnected = false;
@@ -6891,7 +6891,7 @@ async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
       if (ws.readyState === WebSocket.OPEN) {
         console.log(`⏰ WebSocket超时关闭: ${promptId}`);
         ws.close();
-        
+
         const task = activeInfiniteTalkTasks.get(promptId);
         if (task && task.status !== 'completed') {
           task.status = 'timeout';
@@ -6913,15 +6913,15 @@ async function startInfiniteTalkMonitoring(promptId, clientId, userId) {
 // 获取InfiniteTalk任务结果
 async function getInfiniteTalkResults(promptId) {
   console.log(`🔍 获取任务结果: ${promptId}`);
-  
+
   const historyResponse = await fetch(`${XIANGONG_COMFYUI_URL}/history/${promptId}`);
   if (!historyResponse.ok) {
     throw new Error(`无法获取任务历史: ${historyResponse.status}`);
   }
-  
+
   const history = await historyResponse.json();
   const promptHistory = history[promptId];
-  
+
   if (!promptHistory || !promptHistory.outputs) {
     throw new Error('任务历史中未找到输出结果');
   }
@@ -6932,7 +6932,7 @@ async function getInfiniteTalkResults(promptId) {
   // 遍历所有输出节点，查找视频和图像文件
   Object.keys(outputs).forEach(nodeId => {
     const nodeOutputs = outputs[nodeId];
-    
+
     // 查找视频输出
     if (nodeOutputs.gifs) { // ComfyUI视频通常保存为gif
       nodeOutputs.gifs.forEach(gif => {
@@ -6945,7 +6945,7 @@ async function getInfiniteTalkResults(promptId) {
         });
       });
     }
-    
+
     if (nodeOutputs.videos) {
       nodeOutputs.videos.forEach(video => {
         results.push({
@@ -6957,7 +6957,7 @@ async function getInfiniteTalkResults(promptId) {
         });
       });
     }
-    
+
     // 查找图像序列
     if (nodeOutputs.images) {
       nodeOutputs.images.forEach(image => {
@@ -6985,7 +6985,7 @@ async function processInfiniteTalkResults(promptId, results, userId) {
     }
 
     console.log(`🎬 处理视频结果: ${results.length} 个文件`);
-    
+
     let finalVideoUrl = null;
     const processedFiles = [];
 
@@ -6993,20 +6993,20 @@ async function processInfiniteTalkResults(promptId, results, userId) {
       if (result.type === 'video') {
         // 构建下载URL
         const downloadUrl = `${XIANGONG_COMFYUI_URL}/view?filename=${encodeURIComponent(result.filename)}&subfolder=${encodeURIComponent(result.subfolder)}&type=${result.type_folder}`;
-        
+
         console.log('📥 下载视频文件:', result.filename);
         const videoResponse = await fetch(downloadUrl);
-        
+
         if (!videoResponse.ok) {
           console.error('视频下载失败:', downloadUrl);
           continue;
         }
 
         const videoBuffer = await videoResponse.arrayBuffer();
-        
+
         // 生成唯一文件名
         const videoFilename = `infinitetalk_${promptId}_${Date.now()}.${result.filename.split('.').pop()}`;
-        
+
         // 上传到Supabase存储
         if (supabase) {
           console.log('☁️ 上传视频到Supabase...');
@@ -7040,7 +7040,7 @@ async function processInfiniteTalkResults(promptId, results, userId) {
           filename: result.filename,
           size: videoBuffer.byteLength
         });
-        
+
         break; // 只处理第一个视频文件
       }
     }
@@ -7101,39 +7101,39 @@ app.post('/api/xiangong/comfyui/upload', async (req, res) => {
     const multer = require('multer');
     const fs = require('fs');
     const path = require('path');
-    
+
     // 配置multer用于处理文件上传
     const storage = multer.memoryStorage();
     const upload = multer({ storage }).single('file');
-    
+
     upload(req, res, async (err) => {
       if (err) {
         return res.status(400).json({ error: '文件上传失败: ' + err.message });
       }
-      
+
       if (!req.file) {
         return res.status(400).json({ error: '未找到上传文件' });
       }
-      
+
       console.log('📁 上传文件到ComfyUI:', req.file.originalname);
-      
+
       // 准备上传到ComfyUI
       const formData = new FormData();
       const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
       formData.append('image', blob, req.file.originalname);
-      
+
       const uploadResponse = await fetch(`${XIANGONG_COMFYUI_URL}/upload/image`, {
         method: 'POST',
         body: formData
       });
-      
+
       if (!uploadResponse.ok) {
         throw new Error(`ComfyUI上传失败: ${uploadResponse.status}`);
       }
-      
+
       const result = await uploadResponse.json();
       console.log('✅ 文件上传成功:', result);
-      
+
       res.json({
         success: true,
         filename: result.name,
@@ -7142,7 +7142,7 @@ app.post('/api/xiangong/comfyui/upload', async (req, res) => {
         message: '文件上传成功'
       });
     });
-    
+
   } catch (error) {
     console.error('文件上传失败:', error);
     res.status(500).json({
@@ -7156,24 +7156,24 @@ app.post('/api/xiangong/comfyui/upload', async (req, res) => {
 app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
   try {
     console.log('🔍 查询ComfyUI节点类型...');
-    
+
     const response = await fetch(`${XIANGONG_COMFYUI_URL}/object_info`);
     if (!response.ok) {
       throw new Error(`无法获取节点信息: ${response.status}`);
     }
-    
+
     const nodeInfo = await response.json();
-    
+
     // 查找TTS和数字人相关节点
     const ttsNodes = [];
     const digitalHumanNodes = [];
     const textInputNodes = [];
     const videoOutputNodes = [];
-    
+
     Object.keys(nodeInfo).forEach(nodeType => {
       const info = nodeInfo[nodeType];
       const lowerType = nodeType.toLowerCase();
-      
+
       if (lowerType.includes('tts') || lowerType.includes('speech') || lowerType.includes('audio')) {
         ttsNodes.push({
           type: nodeType,
@@ -7182,7 +7182,7 @@ app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
           outputs: info.output || []
         });
       }
-      
+
       if (lowerType.includes('infinitetalk') || lowerType.includes('digital') || lowerType.includes('avatar')) {
         digitalHumanNodes.push({
           type: nodeType,
@@ -7191,7 +7191,7 @@ app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
           outputs: info.output || []
         });
       }
-      
+
       if (lowerType.includes('text') && info.input?.required?.text) {
         textInputNodes.push({
           type: nodeType,
@@ -7200,7 +7200,7 @@ app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
           outputs: info.output || []
         });
       }
-      
+
       if (lowerType.includes('video') || lowerType.includes('save') || lowerType.includes('output')) {
         videoOutputNodes.push({
           type: nodeType,
@@ -7210,9 +7210,9 @@ app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
         });
       }
     });
-    
+
     console.log(`✅ 找到节点: ${ttsNodes.length}个TTS, ${digitalHumanNodes.length}个数字人, ${textInputNodes.length}个文本输入`);
-    
+
     res.json({
       success: true,
       data: {
@@ -7228,7 +7228,7 @@ app.get('/api/xiangong/comfyui/nodes', async (req, res) => {
         preferredTextInput: textInputNodes.length > 0 ? textInputNodes[0].type : null
       }
     });
-    
+
   } catch (error) {
     console.error('节点查询失败:', error);
     res.status(500).json({
@@ -7243,7 +7243,7 @@ app.get('/api/task/status/:taskId', (req, res) => {
   try {
     const { taskId } = req.params;
     const task = activeInfiniteTalkTasks.get(taskId);
-    
+
     if (!task) {
       return res.status(404).json({
         status: 'not_found',
@@ -7266,7 +7266,7 @@ app.get('/api/task/status/:taskId', (req, res) => {
         lastUpdate: task.lastUpdate
       }
     });
-    
+
   } catch (error) {
     console.error('状态查询失败:', error);
     res.status(500).json({
@@ -7280,7 +7280,7 @@ app.get('/api/task/status/:taskId', (req, res) => {
 setInterval(() => {
   const now = new Date();
   const cutoff = new Date(now.getTime() - 2 * 60 * 60 * 1000); // 2小时前
-  
+
   let cleaned = 0;
   for (const [taskId, task] of activeInfiniteTalkTasks.entries()) {
     if (task.createdAt < cutoff && (task.status === 'completed' || task.status === 'failed')) {
@@ -7288,7 +7288,7 @@ setInterval(() => {
       cleaned++;
     }
   }
-  
+
   if (cleaned > 0) {
     console.log(`🧹 清理了 ${cleaned} 个已完成的任务`);
   }
@@ -7299,12 +7299,12 @@ app.post('/api/xiangong/indextts2', async (req, res) => {
   try {
     const { text, speaker_id, language, speed, pitch } = req.body;
 
-    console.log('🔊 仙宫云IndexTTS2请求:', { 
-      textLength: text?.length, 
-      speaker_id, 
-      language, 
-      speed, 
-      pitch 
+    console.log('🔊 仙宫云IndexTTS2请求:', {
+      textLength: text?.length,
+      speaker_id,
+      language,
+      speed,
+      pitch
     });
 
     if (!text) {
@@ -7334,8 +7334,8 @@ app.post('/api/xiangong/indextts2', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('仙宫云IndexTTS2错误:', response.status, errorText);
-      return res.status(response.status).json({ 
-        error: `仙宫云API调用失败: ${errorText}` 
+      return res.status(response.status).json({
+        error: `仙宫云API调用失败: ${errorText}`
       });
     }
 
@@ -7351,8 +7351,8 @@ app.post('/api/xiangong/indextts2', async (req, res) => {
 
   } catch (error) {
     console.error('IndexTTS2合成失败:', error);
-    res.status(500).json({ 
-      error: error.message || '语音合成失败' 
+    res.status(500).json({
+      error: error.message || '语音合成失败'
     });
   }
 });
@@ -7371,9 +7371,9 @@ app.get('/api/xiangong/health', async (req, res) => {
 
     if (response.ok) {
       const result = await response.json();
-      res.json({ 
-        healthy: true, 
-        services: result.available_services || ['infinitetalk', 'indextts2'] 
+      res.json({
+        healthy: true,
+        services: result.available_services || ['infinitetalk', 'indextts2']
       });
     } else {
       res.json({ healthy: false, error: `服务不可用 (${response.status})` });
@@ -7386,38 +7386,38 @@ app.get('/api/xiangong/health', async (req, res) => {
 // A2E Digital Human Video Generation API
 app.post('/api/digital-human/generate', async (req, res) => {
   try {
-    const { 
-      userId, 
+    const {
+      userId,
       trainingId,
-      textScript, 
-      voiceModel = 'minimax', 
+      textScript,
+      voiceModel = 'minimax',
       emotion = 'professional',
       language = 'zh-CN',
       duration = 60,
-      credits 
+      credits
     } = req.body;
 
-    console.log('🎬 Digital human video generation request:', { 
-      userId, 
-      textLength: textScript?.length, 
-      voiceModel, 
-      emotion, 
-      language, 
-      duration, 
-      credits 
+    console.log('🎬 Digital human video generation request:', {
+      userId,
+      textLength: textScript?.length,
+      voiceModel,
+      emotion,
+      language,
+      duration,
+      credits
     });
 
     // Validate required parameters
     if (!userId || !imageUrl || !textScript) {
-      return res.status(400).json({ 
-        error: 'Missing required parameters: userId, imageUrl, textScript' 
+      return res.status(400).json({
+        error: 'Missing required parameters: userId, imageUrl, textScript'
       });
     }
 
     // Check if user has sufficient credits
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      
+
       // Check user balance
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -7430,8 +7430,8 @@ app.post('/api/digital-human/generate', async (req, res) => {
       }
 
       if (userData.balance < credits) {
-        return res.status(400).json({ 
-          error: `Insufficient credits. Required: ${credits}, Available: ${userData.balance}` 
+        return res.status(400).json({
+          error: `Insufficient credits. Required: ${credits}, Available: ${userData.balance}`
         });
       }
 
@@ -7452,7 +7452,7 @@ app.post('/api/digital-human/generate', async (req, res) => {
     // For MVP, we'll simulate A2E API call
     // In production, you would integrate with actual A2E API
     console.log('🎥 Simulating A2E API call...');
-    
+
     // Simulate processing time
     const processingDelay = Math.random() * 2000 + 1000; // 1-3 seconds
     await new Promise(resolve => setTimeout(resolve, processingDelay));
@@ -7460,7 +7460,7 @@ app.post('/api/digital-human/generate', async (req, res) => {
     // For now, return a mock video URL
     // In production, this would be the actual A2E API response
     const mockVideoUrl = `https://mock-a2e-cdn.com/videos/${userId}_${Date.now()}.mp4`;
-    
+
     console.log('✅ Digital human video generated (simulated):', mockVideoUrl);
 
     res.json({
@@ -7481,9 +7481,9 @@ app.post('/api/digital-human/generate', async (req, res) => {
 
   } catch (error) {
     console.error('Digital human video generation error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error during video generation',
-      details: error.message 
+      details: error.message
     });
   }
 });
@@ -7497,7 +7497,7 @@ async function uploadImageToA2E(imageUrl, a2eApiKey) {
   // const response = await fetch(imageUrl);
   // const buffer = await response.buffer();
   // formData.append('file', buffer, 'image.jpg');
-  
+
   // const uploadResponse = await fetch('https://api.a2e.ai/upload', {
   //   method: 'POST',
   //   headers: {
@@ -7505,7 +7505,7 @@ async function uploadImageToA2E(imageUrl, a2eApiKey) {
   //   },
   //   body: formData
   // });
-  
+
   // return await uploadResponse.json();
   console.log('📤 A2E Image upload (simulated)');
   return { url: imageUrl };
@@ -7514,7 +7514,7 @@ async function uploadImageToA2E(imageUrl, a2eApiKey) {
 async function generateA2EVideo(params, a2eApiKey) {
   // TODO: Implement actual A2E video generation
   // const { imageUrl, textScript, voiceModel, emotion, language } = params;
-  
+
   // const payload = {
   //   image_url: imageUrl,
   //   text: textScript,
@@ -7544,7 +7544,7 @@ async function checkA2EVideoStatus(taskId, a2eApiKey) {
   //     'Authorization': `Bearer ${a2eApiKey}`
   //   }
   // });
-  
+
   // return await response.json();
   console.log('🔍 A2E Status check (simulated)');
   return { status: 'completed', result_url: `https://mock-a2e-cdn.com/videos/${taskId}.mp4` };
@@ -7554,13 +7554,13 @@ async function checkA2EVideoStatus(taskId, a2eApiKey) {
 app.post('/api/video/webhook/complete', async (req, res) => {
   try {
     const { sessionId, finalvideourl, status = 'completed' } = req.body;
-    
+
     console.log('🎬 Video webhook callback received:', { sessionId, finalvideourl, status });
-    
+
     if (!sessionId) {
       return res.status(400).json({ error: 'Missing sessionId' });
     }
-    
+
     // Store result in memory for polling (backwards compatibility)
     videoResults.set(sessionId, {
       sessionId,
@@ -7569,29 +7569,29 @@ app.post('/api/video/webhook/complete', async (req, res) => {
       timestamp: new Date().toISOString(),
       receivedAt: new Date().toISOString()
     });
-    
+
     console.log('✅ Video result stored in memory for polling:', sessionId);
-    
+
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       console.log('⚠️ Database not configured, only storing in memory');
       res.json({ success: true, message: 'Video status updated in memory' });
       return;
     }
-    
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     // Complete video generation using existing balance system
     const { data: success, error: completeError } = await supabase.rpc('complete_video_generation', {
       session_id_param: sessionId,
       final_status: status,
       video_url_param: finalvideourl
     });
-    
+
     if (completeError || !success) {
       console.error('Error completing video generation:', completeError);
       return res.status(500).json({ error: 'Failed to complete video generation' });
     }
-    
+
     console.log('✅ Video webhook processing completed (both memory and database updated)');
     res.json({ success: true, message: 'Video status updated' });
   } catch (error) {
@@ -7603,28 +7603,32 @@ app.post('/api/video/webhook/complete', async (req, res) => {
 // 静态文件服务
 app.use(express.static(path.join(dirname, 'dist')));
 
-// SPA 路由 - 必须在所有API路由之后
+// SPA 路由 - 必须在所有API路由之后，只处理非API请求
 app.get('*', (req, res) => {
- res.sendFile(path.join(dirname, 'dist', 'index.html'));
+  // 不要处理 API 请求
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  res.sendFile(path.join(dirname, 'dist', 'index.html'));
 });
 
 // Test endpoint to debug conversation saving
 app.post('/api/test-save-conversation', async (req, res) => {
   const { conversationId, difyId } = req.body;
-  
+
   console.log('🧪 TEST SAVE CONVERSATION called with:', { conversationId, difyId });
-  
+
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     await ensureConversationExists(supabase, conversationId, difyId, null);
-    
+
     // Verify it was saved
     const { data, error } = await supabase
       .from('conversations')
       .select('id, dify_conversation_id')
       .eq('id', conversationId)
       .single();
-    
+
     res.json({ success: true, saved: data, error });
   } catch (error) {
     console.error('❌ TEST SAVE failed:', error);
@@ -7635,17 +7639,17 @@ app.post('/api/test-save-conversation', async (req, res) => {
 // 🔍 DEBUG ENDPOINT: 测试不同的Dify API调用方式
 app.post('/api/debug/dify-test', async (req, res) => {
   console.log('🔍 [DEBUG] Starting comprehensive Dify API test...');
-  
+
   const testMessage = req.body.message || "Hello, this is a test message to check token usage.";
   const testUser = `debug-user-${Date.now()}`;
-  
+
   const results = {
     timestamp: new Date().toISOString(),
     testMessage,
     testUser,
     tests: []
   };
-  
+
   // 测试1: 标准chat-messages调用
   try {
     console.log('🔍 [TEST 1] Standard chat-messages call...');
@@ -7663,7 +7667,7 @@ app.post('/api/debug/dify-test', async (req, res) => {
         response_mode: 'blocking'
       })
     });
-    
+
     const test1Data = await test1Response.json();
     results.tests.push({
       name: 'Standard chat-messages',
@@ -7674,7 +7678,7 @@ app.post('/api/debug/dify-test', async (req, res) => {
       tokensFound: !!(test1Data?.metadata?.usage?.total_tokens),
       tokensValue: test1Data?.metadata?.usage?.total_tokens || 0
     });
-    
+
   } catch (error) {
     results.tests.push({
       name: 'Standard chat-messages',
@@ -7682,7 +7686,7 @@ app.post('/api/debug/dify-test', async (req, res) => {
       error: error.message
     });
   }
-  
+
   // 测试2: 检查app参数
   try {
     console.log('🔍 [TEST 2] App parameters...');
@@ -7693,7 +7697,7 @@ app.post('/api/debug/dify-test', async (req, res) => {
         'Content-Type': 'application/json',
       }
     });
-    
+
     const test2Data = await test2Response.json();
     results.tests.push({
       name: 'App parameters',
@@ -7701,7 +7705,7 @@ app.post('/api/debug/dify-test', async (req, res) => {
       success: test2Response.ok,
       data: test2Data
     });
-    
+
   } catch (error) {
     results.tests.push({
       name: 'App parameters',
@@ -7709,7 +7713,7 @@ app.post('/api/debug/dify-test', async (req, res) => {
       error: error.message
     });
   }
-  
+
   console.log('🔍 [DEBUG] Test completed, sending results...');
   console.log('🔍 [DEBUG] Full results:', JSON.stringify(results, null, 2));
   res.json(results);
@@ -7720,16 +7724,16 @@ console.log('🚀 [BOOT 2] About to start server listening...');
 app.listen(port, async () => {
   console.log('✅ [BOOT 3] Server is listening!');
   console.log(`🌐 Server is running on port ${port}`);
-  
+
   console.log('🔍 [BOOT 4] Starting database health check...');
-  
+
   // Perform database health check on startup
   if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
     console.log('🔍 Performing database health check...');
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const isHealthy = await checkDatabaseHealth(supabase);
-      
+
       if (!isHealthy) {
         console.error('⚠️ WARNING: Database is not healthy. Workflows may fail.');
         console.error('Please ensure database migrations have been run.');
@@ -7742,7 +7746,7 @@ app.listen(port, async () => {
   } else {
     console.log('⚠️ Supabase not configured - database features disabled');
   }
-  
+
   console.log('🎉 [BOOT 5] Server startup complete!');
 });
 
