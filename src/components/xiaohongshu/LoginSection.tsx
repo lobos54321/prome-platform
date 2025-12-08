@@ -349,17 +349,27 @@ export function LoginSection({
 
           <Button
             onClick={() => {
-              // 自动下载扩展
-              window.open(EXTENSION_DOWNLOAD_URL, '_blank');
-              // 3秒后提示用户
-              setTimeout(() => {
-                alert('下载完成后，请解压并在 chrome://extensions 中加载插件。\n\n完成后刷新此页面即可。');
-              }, 1000);
+              // Chrome 商店审核中，显示手动安装说明
+              const instructions = `🔌 Prome 插件安装说明
+
+插件正在 Chrome 商店审核中（1-3个工作日）。
+
+【临时安装方法】
+1. 访问 GitHub 下载扩展代码
+2. 解压后，打开 chrome://extensions
+3. 开启"开发者模式"
+4. 点击"加载已解压的扩展程序"
+5. 选择解压后的文件夹
+
+完成后刷新此页面即可使用！`;
+              alert(instructions);
+              // 打开主仓库的 extension 目录
+              window.open('https://github.com/lobos54321/xiaohongshu-worker', '_blank');
             }}
             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 h-12 text-lg"
           >
             <Download className="mr-2 h-5 w-5" />
-            立即安装插件
+            查看安装说明
           </Button>
 
           <div className="flex gap-2 justify-center">
