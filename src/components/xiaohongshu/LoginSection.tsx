@@ -230,7 +230,7 @@ export function LoginSection({
       console.log('✅ [LoginSection] 获取到Cookie:', result.data.cookies.length, '个');
 
       // 3. 将 Cookie 发送到 xhs-worker 后端保存（按架构设计：auth 归 xhs-worker 负责）
-      const workerUrl = (import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app';
+      const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
       const workerSecret = (import.meta as any).env?.VITE_WORKER_SECRET;
 
       const saveResponse = await fetch(`${workerUrl}/api/v1/sync`, {
