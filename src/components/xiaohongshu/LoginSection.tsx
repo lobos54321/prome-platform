@@ -233,7 +233,7 @@ export function LoginSection({
       const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
       const workerSecret = (import.meta as any).env?.VITE_WORKER_SECRET;
 
-      const saveResponse = await fetch(`${workerUrl}/api/v1/sync`, {
+      const saveResponse = await fetch(`${workerUrl}/api/v1/login/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
