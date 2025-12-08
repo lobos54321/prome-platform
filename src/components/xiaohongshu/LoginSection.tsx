@@ -23,8 +23,13 @@ const isChromeBrowser = (): boolean => {
   return /Chrome/.test(userAgent) && !/Edge|Edg|OPR|Opera/.test(userAgent);
 };
 
-// 检测插件是否安装
+// 检测插件是否安装（bridge.js 会注入 #prome-extension-installed 元素）
 const isExtensionInstalled = (): boolean => {
+  // 方法1：检查 DOM 元素（bridge.js 注入的标识）
+  const marker = document.getElementById('prome-extension-installed');
+  if (marker) return true;
+
+  // 方法2：兼容旧版（检查全局变量）
   return !!(window as any).__PROME_EXTENSION_INSTALLED__;
 };
 
