@@ -471,16 +471,29 @@ export function LoginSection({
               </AlertDescription>
             </Alert>
           ) : (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
               <AlertDescription>
                 <div className="space-y-3">
-                  <p className="font-medium">❌ 未检测到登录状态</p>
+                  <p className="font-medium text-blue-800">🔐 请先登录小红书</p>
+                  <p className="text-sm text-blue-700">
+                    点击下方按钮打开小红书创作者后台，登录后回到此页面点击"同步登录状态"
+                  </p>
                   <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => {
+                        window.open('https://creator.xiaohongshu.com/', '_blank');
+                      }}
+                      className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      打开小红书后台登录
+                    </Button>
                     <Button
                       onClick={handleExtensionLogin}
                       disabled={checking}
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                      variant="outline"
+                      className="border-purple-300 text-purple-600 hover:bg-purple-50"
                     >
                       {checking ? (
                         <>
@@ -488,12 +501,15 @@ export function LoginSection({
                           同步中...
                         </>
                       ) : (
-                        '🔌 使用插件登录'
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          同步登录状态
+                        </>
                       )}
                     </Button>
                   </div>
-                  <p className="text-sm text-red-700">
-                    提示：请确保已安装 Prome 插件，并在浏览器中登录过小红书
+                  <p className="text-xs text-blue-600">
+                    ✅ 插件已检测到 | 登录后点击"同步登录状态"即可自动完成
                   </p>
                 </div>
               </AlertDescription>
