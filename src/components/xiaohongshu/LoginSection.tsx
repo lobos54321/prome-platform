@@ -181,7 +181,7 @@ export function LoginSection({
   };
 
   /**
-   * 插件登录：从浏览器已登录的小红书获取Cookie并同步到后端
+   * 插件登录：从浏览器扩展获取Cookie并同步到后端
    */
   const handleExtensionLogin = async () => {
     try {
@@ -194,17 +194,60 @@ export function LoginSection({
         return;
       }
 
-      // 2. 调用后端的 autoImportCookies 接口（插件会自动注入Cookie）
-      console.log('📡 [LoginSection] 调用 autoImportCookies...');
-      const response = await xiaohongshuAPI.autoImportCookies(xhsUserId);
-      console.log('📥 [LoginSection] autoImportCookies 响应:', response);
+      // 2. 通过 postMessage 向扩展请求 Cookie
+      console.log('📡 [LoginSection] 向扩展请求Cookie...');
 
-      if (response.success) {
-        console.log('✅ [LoginSection] Cookie导入成功，检查登录状态');
+      const cookiePromise = new Promise<{ success: boolean; cookies?: any[]; msg?: string }>((resolve) => {
+        // 设置超时
+        const timeout = setTimeout(() => {
+          resolve({ success: false, msg: '扩展响应超时，请刷新页面重试' });
+        }, 10000);
+
+        // 监听扩展响应
+        const handler = (event: MessageEvent) => {
+          if (event.source !== window) return;
+          if (event.data?.type === 'SYNC_XHS_RESPONSE') {
+            clearTimeout(timeout);
+            window.removeEventListener('message', handler);
+            console.log('📥 [LoginSection] 收到扩展响应:', event.data);
+            resolve(event.data);
+          }
+        };
+        window.addEventListener('message', handler);
+
+        // 发送请求给扩展
+        window.postMessage({ type: 'SYNC_XHS_REQUEST' }, '*');
+      });
+
+      const result = await cookiePromise;
+
+      if (!result.success || !result.data?.cookies?.length) {
+        console.log('❌ [LoginSection] 未获取到Cookie:', result);
+        onError('请先在浏览器中打开 creator.xiaohongshu.com 并登录，然后点击同步');
+        return;
+      }
+
+      console.log('✅ [LoginSection] 获取到Cookie:', result.data.cookies.length, '个');
+
+      // 3. 将 Cookie 发送到后端保存
+      const saveResponse = await fetch(`${(import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/save-cookies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: xhsUserId,
+          cookies: result.data.cookies,
+          source: 'extension'
+        })
+      });
+
+      const saveResult = await saveResponse.json();
+      console.log('📥 [LoginSection] 保存Cookie响应:', saveResult);
+
+      if (saveResult.success) {
+        console.log('✅ [LoginSection] Cookie保存成功，检查登录状态');
         await checkLoginStatus();
       } else {
-        // 如果Cookie导入失败，提示用户去小红书网站登录
-        onError('请先在浏览器中打开 xiaohongshu.com 并登录，然后刷新此页面重试');
+        onError(saveResult.error || '保存Cookie失败');
       }
     } catch (error) {
       console.error('❌ [LoginSection] 插件登录失败:', error);
