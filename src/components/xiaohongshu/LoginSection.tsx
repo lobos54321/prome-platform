@@ -133,8 +133,8 @@ export function LoginSection({
       // 按架构设计：auth/login 由 xhs-worker 负责
       const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
 
-      // 先从 xhs-worker 检查登录状态（Cookie 存在那里）
-      const workerResponse = await fetch(`${workerUrl}/api/v1/login/status/${encodeURIComponent(xhsUserId)}`);
+      // 从 xhs-worker 检查登录状态（检查已保存的 Cookie）
+      const workerResponse = await fetch(`${workerUrl}/api/v1/login/check-web/${encodeURIComponent(xhsUserId)}`);
       const workerStatus = await workerResponse.json();
 
       console.log('🔍 [LoginSection] xhs-worker 登录状态:', workerStatus);
