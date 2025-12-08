@@ -188,9 +188,8 @@ export function LoginSection({
       console.log('🔌 [LoginSection] 开始插件登录...');
       setChecking(true);
 
-      // 1. 检查插件是否已安装
-      const extensionInstalled = !!(window as any).__PROME_EXTENSION_INSTALLED__;
-      if (!extensionInstalled) {
+      // 1. 检查插件是否已安装（使用统一的检测方法）
+      if (!isExtensionInstalled()) {
         onError('请先安装 Prome Chrome 插件，并在小红书网站登录后再试');
         return;
       }
