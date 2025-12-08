@@ -129,9 +129,17 @@ export function LoginSection({
   const checkLoginStatus = async () => {
     try {
       setChecking(true);
-      const status = await xiaohongshuAPI.checkLoginStatus(xhsUserId);
 
-      if (status.isLoggedIn) {
+      // 按架构设计：auth/login 由 xhs-worker 负责
+      const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
+
+      // 先从 xhs-worker 检查登录状态（Cookie 存在那里）
+      const workerResponse = await fetch(`${workerUrl}/api/v1/login/status/${encodeURIComponent(xhsUserId)}`);
+      const workerStatus = await workerResponse.json();
+
+      console.log('🔍 [LoginSection] xhs-worker 登录状态:', workerStatus);
+
+      if (workerStatus.status === 'logged_in' || workerStatus.is_logged_in) {
         setIsLoggedIn(true);
         await xiaohongshuSupabase.addActivityLog({
           supabase_uuid: supabaseUuid,
@@ -143,9 +151,6 @@ export function LoginSection({
         onLoginSuccess();
       } else {
         setIsLoggedIn(false);
-        // ❌ 移除自动导入Cookie的逻辑
-        // 退出登录后不应该自动重新登录
-        // await tryAutoImport();
       }
     } catch (error) {
       console.error('Check login error:', error);
