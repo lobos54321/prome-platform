@@ -349,27 +349,32 @@ export function LoginSection({
 
           <Button
             onClick={() => {
-              // Chrome 商店审核中，显示手动安装说明
-              const instructions = `🔌 Prome 插件安装说明
+              // 直接下载 ZIP 文件
+              const downloadLink = document.createElement('a');
+              downloadLink.href = '/prome-extension.zip';
+              downloadLink.download = 'prome-extension.zip';
+              document.body.appendChild(downloadLink);
+              downloadLink.click();
+              document.body.removeChild(downloadLink);
 
-插件正在 Chrome 商店审核中（1-3个工作日）。
+              // 显示简单的安装说明
+              setTimeout(() => {
+                alert(`✅ 下载已开始！
 
-【临时安装方法】
-1. 访问 GitHub 下载扩展代码
-2. 解压后，打开 chrome://extensions
-3. 开启"开发者模式"
+安装步骤：
+1. 解压下载的 ZIP 文件
+2. 打开 chrome://extensions
+3. 打开右上角"开发者模式"
 4. 点击"加载已解压的扩展程序"
 5. 选择解压后的文件夹
 
-完成后刷新此页面即可使用！`;
-              alert(instructions);
-              // 打开主仓库的 extension 目录
-              window.open('https://github.com/lobos54321/xiaohongshu-worker', '_blank');
+完成后刷新此页面即可！`);
+              }, 500);
             }}
             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 h-12 text-lg"
           >
             <Download className="mr-2 h-5 w-5" />
-            查看安装说明
+            立即安装插件
           </Button>
 
           <div className="flex gap-2 justify-center">
