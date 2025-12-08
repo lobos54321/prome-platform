@@ -197,7 +197,7 @@ export function LoginSection({
       // 2. 通过 postMessage 向扩展请求 Cookie
       console.log('📡 [LoginSection] 向扩展请求Cookie...');
 
-      const cookiePromise = new Promise<{ success: boolean; cookies?: any[]; msg?: string }>((resolve) => {
+      const cookiePromise = new Promise<{ success: boolean; data?: { cookies: any[]; ua: string }; msg?: string }>((resolve) => {
         // 设置超时
         const timeout = setTimeout(() => {
           resolve({ success: false, msg: '扩展响应超时，请刷新页面重试' });
@@ -229,25 +229,31 @@ export function LoginSection({
 
       console.log('✅ [LoginSection] 获取到Cookie:', result.data.cookies.length, '个');
 
-      // 3. 将 Cookie 发送到后端保存
-      const saveResponse = await fetch(`${(import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/xiaohongshu/save-cookies`, {
+      // 3. 将 Cookie 发送到 xhs-worker 后端保存（按架构设计：auth 归 xhs-worker 负责）
+      const workerUrl = (import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app';
+      const workerSecret = (import.meta as any).env?.VITE_WORKER_SECRET;
+
+      const saveResponse = await fetch(`${workerUrl}/api/v1/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(workerSecret ? { 'Authorization': `Bearer ${workerSecret}` } : {})
+        },
         body: JSON.stringify({
-          userId: xhsUserId,
+          user_id: xhsUserId,
           cookies: result.data.cookies,
-          source: 'extension'
+          ua: navigator.userAgent
         })
       });
 
       const saveResult = await saveResponse.json();
       console.log('📥 [LoginSection] 保存Cookie响应:', saveResult);
 
-      if (saveResult.success) {
+      if (saveResult.success || saveResponse.ok) {
         console.log('✅ [LoginSection] Cookie保存成功，检查登录状态');
         await checkLoginStatus();
       } else {
-        onError(saveResult.error || '保存Cookie失败');
+        onError(saveResult.error || saveResult.detail || '保存Cookie失败');
       }
     } catch (error) {
       console.error('❌ [LoginSection] 插件登录失败:', error);
