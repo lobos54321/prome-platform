@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, LayoutGrid, User } from 'lucide-react';
 import type { UserProfile, AutomationStatus, ContentStrategy, WeeklyPlan } from '@/types/xiaohongshu';
 
-type Step = 'login' | 'config' | 'dashboard';
+type Step = 'config' | 'accounts' | 'dashboard';
 type ViewMode = 'single' | 'matrix';
 
 export default function XiaohongshuAutomation() {
@@ -29,7 +29,7 @@ export default function XiaohongshuAutomation() {
   const navigate = useNavigate();
   const user = authService.getCurrentUserSync();
 
-  const [currentStep, setCurrentStep] = useState<Step>('login');
+  const [currentStep, setCurrentStep] = useState<Step>('config'); // 默认显示配置页面
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -61,14 +61,14 @@ export default function XiaohongshuAutomation() {
       setLoading(true);
       setError('');
 
-      // 🔥 测试模式：跳过所有API调用，直接显示登录界面
+      // 🔥 测试模式：跳过所有API调用，直接显示配置页面
       const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
       if (isTestMode) {
         console.log('🧪 [XHS] 测试模式：跳过初始化API调用');
         setSupabaseUuid('test-user-id');
         setXhsUserId('test-xhs-user');
         setLoading(false);
-        setCurrentStep('login');
+        setCurrentStep('config');
         return;
       }
 
@@ -81,69 +81,70 @@ export default function XiaohongshuAutomation() {
       console.log('🚀 [XHS] 设置 supabaseUuid:', user.id);
       setSupabaseUuid(user.id);
 
-      // 🔥 新逻辑：优先获取绑定的小红书账号ID
-      let userId: string;
+      // 🔥 新流程：先加载产品配置，不检查小红书登录状态
+      // 获取用户ID映射（如果有绑定账号的话）
+      let userId: string | null = null;
+      let hasBindedAccounts = false;
+
       try {
         const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
         const response = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${user.id}`);
         const data = await response.json();
 
         if (data.success && data.data.accounts.length > 0) {
-          // 有绑定账号，使用绑定的 xhs_account_id
+          hasBindedAccounts = true;
           const defaultAccount = data.data.accounts.find((a: any) => a.is_default);
           userId = (defaultAccount || data.data.accounts[0]).xhs_account_id;
-          console.log('✅ [XHS] 使用绑定的小红书账号ID:', userId);
+          console.log('✅ [XHS] 找到绑定账号:', userId);
         } else {
-          // 没有绑定账号，使用旧的映射逻辑（向后兼容）
-          console.log('⚠️ [XHS] 未找到绑定账号，使用旧的映射逻辑');
+          console.log('📋 [XHS] 未找到绑定账号，用户需要先配置产品再添加账号');
+          // 即使没有账号也创建映射用于后续流程
           userId = await userMappingService.getOrCreateMapping(user.id);
         }
       } catch (accountErr) {
-        console.error('❌ [XHS] 获取绑定账号失败，降级到旧逻辑:', accountErr);
+        console.log('⚠️ [XHS] 获取账号失败，继续显示配置页面:', accountErr);
         userId = await userMappingService.getOrCreateMapping(user.id);
       }
 
-      console.log('✅ [XHS] 最终使用的 xhsUserId:', userId);
-      setXhsUserId(userId);
-
-      // 🔥 修复：只检查登录状态，不再检查退出保护期
-      // 退出保护期只用于阻止"自动Cookie导入"，不应该阻止用户手动登录
-      // 如果Cookie被正确删除，登录状态检查会返回未登录
-      console.log('🔒 [XHS] 检查登录状态...');
-      try {
-        const loginStatus = await xiaohongshuAPI.checkLoginStatus(userId);
-        console.log('🔍 [XHS] 登录状态检查结果:', loginStatus);
-
-        // 🔥 如果未登录，立即停止
-        if (!loginStatus.isLoggedIn) {
-          console.log('⚠️ [XHS] 用户未登录，停止初始化');
-          setLoading(false);
-          setCurrentStep('login');
-          return; // 🔥 立即返回，不加载任何数据
-        }
-
-        console.log('✅ [XHS] 已登录，继续初始化');
-      } catch (statusCheckError) {
-        console.error('❌ [XHS] 状态检查失败:', statusCheckError);
-        // 🔥 检查失败时，为安全起见，不加载数据，显示登录界面
-        setError('检查登录状态失败，请刷新页面重试');
-        setLoading(false);
-        setCurrentStep('login');
-        return; // 🔥 立即返回
+      if (userId) {
+        setXhsUserId(userId);
       }
 
-      // 🔥 只有通过所有检查后，才加载数据
-      const [profile, status] = await Promise.all([
-        xiaohongshuSupabase.getUserProfile(user.id),
-        xiaohongshuSupabase.getAutomationStatus(user.id),
-      ]);
-
+      // 🔥 加载用户配置（产品信息）
+      const profile = await xiaohongshuSupabase.getUserProfile(user.id);
       setUserProfile(profile);
+
+      // 🔥 新流程决策：
+      // 1. 如果有配置 + 有绑定账号 + 正在运营 → dashboard
+      // 2. 如果有配置 + 有绑定账号 + 未运营 → accounts (可以启动运营)
+      // 3. 如果有配置 + 无绑定账号 → accounts (需要添加账号)
+      // 4. 如果无配置 → config (需要先配置产品)
+
+      if (!profile?.product_name) {
+        console.log('📋 [XHS] 未配置产品信息，显示配置页面');
+        setLoading(false);
+        setCurrentStep('config');
+        return;
+      }
+
+      // 有配置，检查是否有绑定账号
+      if (!hasBindedAccounts) {
+        console.log('📋 [XHS] 已配置产品，但未绑定账号，显示账号页面');
+        setLoading(false);
+        setCurrentStep('accounts');
+        return;
+      }
+
+      // 有配置且有账号，检查运营状态
+      console.log('✅ [XHS] 已配置产品且有账号，检查运营状态...');
+
+      // 获取运营状态
+      const status = await xiaohongshuSupabase.getAutomationStatus(user.id);
       setAutomationStatus(status);
 
       // 🔥 修复：检查后端是否有数据，即使Supabase中没有is_running状态
       // 因为后端重启后可能从文件恢复了数据，但Supabase状态未同步
-      if (status?.is_running) {
+      if (status?.is_running && userId) {
         // Supabase显示正在运行，直接加载Dashboard
         setCurrentStep('dashboard');
         await loadDashboardData(user.id, userId);
@@ -171,10 +172,10 @@ export default function XiaohongshuAutomation() {
             try {
               const logoutCheckAgain = await xiaohongshuAPI.checkLogoutStatus(userId);
               if (logoutCheckAgain.data?.inProtection) {
-                console.warn('⚠️ [XHS] 检测到退出保护期，忽略后端数据，显示登录界面');
+                console.warn('⚠️ [XHS] 检测到退出保护期，忽略后端数据，显示账号界面');
                 setError(`退出保护期：请等待 ${logoutCheckAgain.data.remainingSeconds} 秒后重新登录`);
                 setLoading(false);
-                setCurrentStep('login');
+                setCurrentStep('accounts');
                 return;
               }
             } catch (err) {
@@ -202,12 +203,15 @@ export default function XiaohongshuAutomation() {
             if (!profile) {
               console.log('📝 创建虚拟profile以支持Dashboard显示');
               setUserProfile({
+                id: 'temp-' + user.id,
                 supabase_uuid: user.id,
-                xhs_user_id: userId,
-                product_name: '未配置', // 从后端数据推断或使用默认值
-                product_description: '',
-                target_audience: '',
-                brand_tone: '',
+                xhs_user_id: userId!,
+                product_name: '未配置',
+                target_audience: null,
+                marketing_goal: 'brand',
+                post_frequency: 'daily',
+                brand_style: 'warm',
+                review_mode: 'manual',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               });
@@ -215,20 +219,14 @@ export default function XiaohongshuAutomation() {
           } else {
             console.log('⚠️ 后端无数据，显示配置页面');
             // 后端也没数据
-            if (profile) {
-              setCurrentStep('config');
-            } else {
-              setCurrentStep('login');
-            }
+            // 无配置，显示配置页面
+            setCurrentStep('config');
           }
         } catch (err) {
           console.error('检查后端数据失败:', err);
           // 出错时按原逻辑处理
-          if (profile) {
-            setCurrentStep('config');
-          } else {
-            setCurrentStep('login');
-          }
+          // 出错时显示配置页面
+          setCurrentStep('config');
         }
       }
     } catch (err) {
@@ -496,7 +494,7 @@ export default function XiaohongshuAutomation() {
       // 🔥 关键修复：设置 justLoggedOut 标志，防止 LoginSection 自动重新登录
       // 并且不要刷新页面，避免触发 initializePage 循环
       setJustLoggedOut(true);
-      setCurrentStep('login');
+      setCurrentStep('accounts');
       // 注意：我们需要通过某种方式将 justLoggedOut 传递给 LoginSection
       // 这里我们使用一个临时状态或通过 props 传递
       // 由于 LoginSection 是在 render 中渲染的，我们可以添加一个 state
@@ -559,8 +557,8 @@ export default function XiaohongshuAutomation() {
                       }
                     }}
                     onAddAccount={() => {
-                      // 点击添加账号时，跳转到登录流程
-                      setCurrentStep('login');
+                      // 点击添加账号时，跳转到账号管理
+                      setCurrentStep('accounts');
                     }}
                   />
 
@@ -612,7 +610,7 @@ export default function XiaohongshuAutomation() {
                       ⚙️ 重新配置
                     </Button>
                   )}
-                  {currentStep !== 'login' && (
+                  {currentStep !== 'config' && (
                     <Button
                       onClick={handleLogout}
                       variant="destructive"
@@ -636,7 +634,7 @@ export default function XiaohongshuAutomation() {
               supabaseUuid={supabaseUuid}
               onAddAccount={() => {
                 setViewMode('single');
-                setCurrentStep('login');
+                setCurrentStep('accounts');
               }}
               onConfigureAccount={(account) => {
                 console.log('配置账号:', account);
@@ -654,31 +652,68 @@ export default function XiaohongshuAutomation() {
           {/* 单账号视图 */}
           {viewMode === 'single' && (
             <>
-              {/* Step 1: Login */}
-              {(currentStep === 'login') && supabaseUuid && xhsUserId && (
-                <LoginSection
+              {/* Step 1: Config - 产品配置 */}
+              {(currentStep === 'config') && supabaseUuid && (
+                <ConfigSection
                   supabaseUuid={supabaseUuid}
-                  xhsUserId={xhsUserId}
-                  onLoginSuccess={handleLoginSuccess}
-                  onError={setError}
-                  onLogout={() => {
-                    // 🔥 退出登录后，重置所有状态
-                    console.log('🔄 [Page] 收到退出登录通知，重置状态');
-                    setCurrentStep('login');
-                    setContentStrategy(null);
-                    setWeeklyPlan(null);
-                    setAutomationStatus(null);
-                    setUserProfile(null);
-                    setError(''); // 清除错误信息
-                    setLoading(false); // 停止加载状态
-                    setJustLoggedOut(true); // 防止自动重新登录
+                  xhsUserId={xhsUserId || ''}
+                  initialConfig={userProfile}
+                  onConfigSaved={(profile) => {
+                    handleConfigSaved(profile);
+                    // 配置保存后进入账号管理步骤
+                    setCurrentStep('accounts');
                   }}
-                  justLoggedOut={justLoggedOut}
+                  onStartOperation={handleStartOperation}
                 />
               )}
 
-              {/* Step 2: Config */}
-              {(currentStep === 'config' || currentStep === 'dashboard') && supabaseUuid && xhsUserId && (
+              {/* Step 2: Accounts - 添加/管理账号 */}
+              {(currentStep === 'accounts') && supabaseUuid && xhsUserId && (
+                <>
+                  {/* 显示产品配置摘要 */}
+                  {userProfile?.product_name && (
+                    <Card className="mb-4">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-semibold">产品: {userProfile.product_name}</h3>
+                            <p className="text-sm text-muted-foreground">{userProfile.target_audience}</p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => setCurrentStep('config')}>
+                            修改配置
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* 登录/账号管理组件 */}
+                  <LoginSection
+                    supabaseUuid={supabaseUuid}
+                    xhsUserId={xhsUserId}
+                    onLoginSuccess={() => {
+                      // 登录成功后进入 dashboard
+                      handleLoginSuccess();
+                      setCurrentStep('dashboard');
+                    }}
+                    onError={setError}
+                    onLogout={() => {
+                      console.log('🔄 [Page] 收到退出登录通知，重置状态');
+                      setCurrentStep('accounts');
+                      setContentStrategy(null);
+                      setWeeklyPlan(null);
+                      setAutomationStatus(null);
+                      setError('');
+                      setLoading(false);
+                      setJustLoggedOut(true);
+                    }}
+                    justLoggedOut={justLoggedOut}
+                  />
+                </>
+              )}
+
+              {/* Step 3: Dashboard - 显示配置和运营状态 */}
+              {(currentStep === 'dashboard') && supabaseUuid && xhsUserId && (
                 <ConfigSection
                   supabaseUuid={supabaseUuid}
                   xhsUserId={xhsUserId}
