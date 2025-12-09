@@ -2673,6 +2673,165 @@ ${accounts.map((a, i) => `${i + 1}. ${a.nickname || '账号' + (i + 1)} (ID: ${a
   }
 });
 
+// 🔧 新增：内容创作生成端点 - 统一文案和视频/图文生成
+app.post('/api/content/generate', async (req, res) => {
+  const {
+    supabase_uuid,
+    productName,
+    productDescription,
+    targetAudience,
+    productImages,
+    materialAnalysis,
+    marketingGoal,
+    wordCount,
+    platform,
+    contentFormat,
+    videoType,
+    videoConfig,
+    accountId,
+    accountPersona,
+  } = req.body;
+
+  console.log('[Content Generation] Starting:', {
+    supabase_uuid,
+    productName,
+    marketingGoal,
+    contentFormat,
+    videoType,
+    wordCount
+  });
+
+  if (!DIFY_API_URL || !DIFY_API_KEY) {
+    return res.status(500).json({
+      success: false,
+      error: '服务器配置错误：缺少 Dify API 配置'
+    });
+  }
+
+  if (!productName || !productDescription) {
+    return res.status(400).json({
+      success: false,
+      error: '请提供产品名称和描述'
+    });
+  }
+
+  try {
+    // 构建 Dify 文案生成 prompt
+    const marketingGoalMap = {
+      'awareness': '提高用户认知',
+      'consideration': '解决用户疑惑、说服购买',
+      'conversion': '直接促进销售转化'
+    };
+
+    const platformToneMap = {
+      'xiaohongshu': '小红书风格：种草、真实、生活化、使用emoji',
+      'douyin': '抖音风格：快节奏、娱乐、hook强',
+      'x': 'X/Twitter风格：简洁、犀利、话题性',
+      'tiktok': 'TikTok风格：国际化、娱乐、挑战'
+    };
+
+    const prompt = `你是一位顶级小红书营销文案专家。请根据以下信息创作一篇爆款营销文案：
+
+## 产品信息
+- 产品名称：${productName}
+- 产品描述：${productDescription}
+- 目标受众：${targetAudience || '通用'}
+${materialAnalysis ? `- 产品分析：${materialAnalysis}` : ''}
+${accountPersona ? `- 账号人设：${accountPersona}` : ''}
+
+## 创作要求
+- 营销目标：${marketingGoalMap[marketingGoal] || '提高认知'}
+- 平台调性：${platformToneMap[platform] || '小红书风格'}
+- 目标字数：${wordCount || 500}字
+
+## 输出要求
+请以JSON格式返回：
+{
+  "title": "爆款标题（使用认知缺口/恐惧/挑战常识等心理武器）",
+  "titleVariants": ["备选标题1", "备选标题2"],
+  "hook": "开头钩子（第一句话）",
+  "painPoints": ["痛点1", "痛点2", "痛点3"],
+  "solution": "解决方案描述",
+  "callToAction": "行动号召",
+  "fullContent": "完整文案正文（包含emoji和分段）",
+  "hashtags": ["标签1", "标签2", "标签3"],
+  "psychologyWeapons": ["使用的心理武器"]
+}`;
+
+    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: prompt,
+        user: supabase_uuid || 'content-generator',
+        response_mode: 'blocking'
+      })
+    }, 120000, 2);
+
+    if (!difyResponse.ok) {
+      const errorText = await difyResponse.text();
+      throw new Error(`Dify API 错误: ${errorText}`);
+    }
+
+    const difyData = await difyResponse.json();
+    const answer = difyData.answer || '';
+
+    // 解析 JSON 结果
+    let copywriteResult;
+    try {
+      const jsonMatch = answer.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        copywriteResult = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('未找到 JSON');
+      }
+    } catch (parseErr) {
+      // 如果解析失败，构造基础结果
+      copywriteResult = {
+        title: productName + ' 使用心得分享',
+        titleVariants: [],
+        hook: productDescription.substring(0, 50) + '...',
+        painPoints: [],
+        solution: productDescription,
+        callToAction: '快来试试吧！',
+        fullContent: answer,
+        hashtags: [productName, '种草', '分享'],
+        psychologyWeapons: ['默认']
+      };
+    }
+
+    // 添加字数统计
+    copywriteResult.wordCount = copywriteResult.fullContent?.length || 0;
+
+    // 如果是视频内容，后续可以调用视频生成 API
+    let videoResult = null;
+    if (contentFormat === 'video' && videoType === 'ugc_n8n' && videoConfig) {
+      // TODO: 调用 n8n UGC 工作流
+      console.log('[Content Generation] Video generation requested, skipping for now:', videoType);
+      // videoResult = await callN8NWorkflow(copywriteResult, videoConfig, productImages);
+    }
+
+    res.json({
+      success: true,
+      copywrite: copywriteResult,
+      video: videoResult,
+      contentFormat,
+      videoType: contentFormat === 'video' ? videoType : null
+    });
+
+  } catch (error) {
+    console.error('[Content Generation] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '内容生成失败'
+    });
+  }
+});
+
 // 🔧 新增：纯聊天模式端点 - 专门处理简单对话而非工作流
 app.post('/api/dify/chat/simple', async (req, res) => {
   const { message, conversationId: clientConvId, userId } = req.body;
