@@ -8,6 +8,7 @@ import { LoginSection } from '@/components/xiaohongshu/LoginSection';
 import { ConfigSection } from '@/components/xiaohongshu/ConfigSection';
 import { DashboardSection } from '@/components/xiaohongshu/DashboardSection';
 import { AccountSelector } from '@/components/xiaohongshu/AccountSelector';
+import { AccountManager } from '@/components/xiaohongshu/AccountManager';
 import { MatrixDashboard } from '@/components/xiaohongshu/MatrixDashboard';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
@@ -687,12 +688,28 @@ export default function XiaohongshuAutomation() {
                     </Card>
                   )}
 
-                  {/* 登录/账号管理组件 */}
+                  {/* 账号矩阵管理组件 */}
+                  <AccountManager
+                    supabaseUuid={supabaseUuid}
+                    productName={userProfile?.product_name}
+                    targetAudience={userProfile?.target_audience || ''}
+                    marketingGoal={userProfile?.marketing_goal}
+                    materialAnalysis={userProfile?.material_analysis}
+                    onAddAccount={() => {
+                      // 触发登录流程添加新账号
+                      console.log('👤 [Page] 添加新账号');
+                    }}
+                    onStrategyGenerated={(personas) => {
+                      console.log('🤖 [Page] AI策略已生成:', personas);
+                    }}
+                  />
+
+                  {/* 登录/账号管理组件 - 用于添加新账号 */}
                   <LoginSection
                     supabaseUuid={supabaseUuid}
                     xhsUserId={xhsUserId}
                     onLoginSuccess={() => {
-                      // 登录成功后进入 dashboard
+                      // 登录成功后刷新账号列表
                       handleLoginSuccess();
                       setCurrentStep('dashboard');
                     }}
