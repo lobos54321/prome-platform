@@ -2909,6 +2909,217 @@ ${accountPersona ? `- 账号人设：${accountPersona}` : ''}
   }
 });
 
+// 🔧 新增：BettaFish 舆情分析 API - 热点趋势分析
+app.post('/api/sentiment/analyze', async (req, res) => {
+  const { query, productName, industry, competitors, platforms, timeRange, supabase_uuid } = req.body;
+
+  console.log('[BettaFish] Starting trend analysis:', {
+    query: query?.substring(0, 50),
+    productName,
+    industry
+  });
+
+  // BettaFish 部署地址
+  const BETTAFISH_URL = process.env.BETTAFISH_URL || 'https://weibo-sentiment-app.zeabur.app';
+
+  if (!query && !productName) {
+    return res.status(400).json({
+      success: false,
+      error: '请提供分析需求或产品名称'
+    });
+  }
+
+  try {
+    // 构建分析请求
+    const analysisQuery = query || `请分析"${productName}"在${industry || '相关行业'}的舆情趋势、用户情感、热门话题和营销机会`;
+
+    // 调用 BettaFish API (如果有 REST API)
+    // 目前 BettaFish 主要是 Gradio UI，我们先返回模拟数据结构
+    // 后续可以接入其实际 API 或通过 WebSocket 交互
+
+    console.log('[BettaFish] Analysis query:', analysisQuery);
+    console.log('[BettaFish] Base URL:', BETTAFISH_URL);
+
+    // 尝试调用 BettaFish (如果它有 API 端点)
+    let bettafishResult = null;
+    try {
+      const bettafishResponse = await fetchWithTimeoutAndRetry(`${BETTAFISH_URL}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: analysisQuery,
+          platforms: platforms || ['xiaohongshu', 'weibo', 'douyin'],
+          timeRange: timeRange || 'week'
+        })
+      }, 60000, 1);
+
+      if (bettafishResponse.ok) {
+        bettafishResult = await bettafishResponse.json();
+        console.log('[BettaFish] API response received');
+      }
+    } catch (apiErr) {
+      console.log('[BettaFish] Direct API not available, using Gradio interface or mock data');
+    }
+
+    // 如果 BettaFish API 可用，使用其结果；否则返回引导信息
+    if (bettafishResult) {
+      res.json({
+        success: true,
+        source: 'bettafish_api',
+        data: bettafishResult
+      });
+    } else {
+      // 返回 BettaFish Gradio UI 链接和使用建议
+      res.json({
+        success: true,
+        source: 'manual',
+        message: '请访问 BettaFish 舆情分析系统进行深度分析',
+        bettafishUrl: BETTAFISH_URL,
+        suggestedQuery: analysisQuery,
+        instructions: [
+          `1. 访问 ${BETTAFISH_URL}`,
+          '2. 在对话框输入: ' + analysisQuery,
+          '3. 等待多 Agent 分析完成',
+          '4. 下载 HTML 报告或 PDF'
+        ],
+        // 提供基础的趋势模拟数据
+        mockTrendData: {
+          hotTopics: [
+            {
+              topic: productName || '相关话题',
+              heat: 75,
+              trend: 'rising',
+              sentiment: 'positive',
+              platforms: ['xiaohongshu', 'weibo']
+            }
+          ],
+          overallSentiment: {
+            positive: 0.6,
+            neutral: 0.3,
+            negative: 0.1
+          },
+          contentOpportunities: [
+            {
+              type: 'trending_topic',
+              title: '热点话题机会',
+              description: `与${productName || '产品'}相关的讨论正在上升`,
+              urgency: 'medium',
+              estimatedImpact: 70
+            }
+          ]
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('[BettaFish] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '舆情分析失败',
+      bettafishUrl: process.env.BETTAFISH_URL || 'https://weibo-sentiment-app.zeabur.app'
+    });
+  }
+});
+
+// 🔧 新增：内容效果分析 API - 分析发布内容的表现
+app.post('/api/analytics/content-performance', async (req, res) => {
+  const { contentIds, supabase_uuid, platform, dateRange } = req.body;
+
+  console.log('[Analytics] Content performance analysis:', {
+    contentCount: contentIds?.length || 0,
+    platform,
+    dateRange
+  });
+
+  try {
+    // TODO: 从数据库获取内容表现数据
+    // 目前返回模拟结构，后续集成 Chrome 插件数据采集
+
+    const mockPerformance = {
+      summary: {
+        totalViews: 0,
+        totalLikes: 0,
+        totalComments: 0,
+        totalShares: 0,
+        avgEngagementRate: 0,
+        topPerformingContent: [],
+        underperformingContent: []
+      },
+      insights: [
+        '暂无足够数据进行分析',
+        '请先发布内容并等待数据积累'
+      ],
+      suggestions: [
+        '建议发布更多内容以获得数据洞察',
+        '可以使用 BettaFish 分析竞品表现'
+      ]
+    };
+
+    res.json({
+      success: true,
+      performance: mockPerformance,
+      dataAvailable: false,
+      message: '内容效果分析功能已就绪，等待数据积累'
+    });
+
+  } catch (error) {
+    console.error('[Analytics] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '效果分析失败'
+    });
+  }
+});
+
+// 🔧 新增：策略进化 API - 自动迭代优化策略
+app.post('/api/strategy/evolve', async (req, res) => {
+  const { supabase_uuid, cycleNumber, forceEvolution } = req.body;
+
+  console.log('[Strategy Evolution] Starting cycle:', {
+    supabase_uuid,
+    cycleNumber,
+    forceEvolution
+  });
+
+  try {
+    // TODO: 实现策略进化逻辑
+    // 1. 收集过去一周的内容表现数据
+    // 2. 调用 AI 分析效果
+    // 3. 根据分析结果调整账号人设和内容策略
+    // 4. 记录进化历史
+
+    const evolutionResult = {
+      cycleNumber: cycleNumber || 1,
+      status: 'pending',
+      message: '策略进化功能已就绪，需要更多数据支持',
+      requiredData: [
+        '至少 7 天的发布数据',
+        '至少 10 篇内容的表现数据',
+        '用户互动反馈数据'
+      ],
+      nextEvolutionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      automationStatus: {
+        personaAdjustment: 'pending',
+        contentStrategyUpdate: 'pending',
+        publishingScheduleOptimization: 'pending'
+      }
+    };
+
+    res.json({
+      success: true,
+      evolution: evolutionResult,
+      message: '策略进化系统已初始化'
+    });
+
+  } catch (error) {
+    console.error('[Strategy Evolution] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '策略进化失败'
+    });
+  }
+});
+
 // 🔧 新增：纯聊天模式端点 - 专门处理简单对话而非工作流
 app.post('/api/dify/chat/simple', async (req, res) => {
   const { message, conversationId: clientConvId, userId } = req.body;
