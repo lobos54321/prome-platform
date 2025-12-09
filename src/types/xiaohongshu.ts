@@ -25,6 +25,10 @@ export interface UserProfile {
   post_frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
   brand_style: 'professional' | 'warm' | 'humorous' | 'minimalist';
   review_mode: 'auto' | 'manual';
+  // 素材上传字段
+  material_images?: string[];     // 产品图片URL列表
+  material_documents?: string[];  // 文档URL列表
+  material_analysis?: string;     // AI分析结果
   created_at: string;
   updated_at: string;
 }

@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Save, Play, CheckCircle } from 'lucide-react';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
+import { MaterialUpload } from './MaterialUpload';
 import type { UserProfile } from '@/types/xiaohongshu';
 
 interface ConfigSectionProps {
@@ -32,11 +33,16 @@ export function ConfigSection({
   const [postFrequency, setPostFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('daily');
   const [brandStyle, setBrandStyle] = useState<'professional' | 'warm' | 'humorous' | 'minimalist'>('warm');
   const [reviewMode, setReviewMode] = useState<'auto' | 'manual'>('auto');
-  
+
   const [saving, setSaving] = useState(false);
   const [starting, setStarting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  // 素材上传状态
+  const [materialImages, setMaterialImages] = useState<string[]>([]);
+  const [materialDocuments, setMaterialDocuments] = useState<string[]>([]);
+  const [materialAnalysis, setMaterialAnalysis] = useState<string>('');
 
   useEffect(() => {
     if (initialConfig) {
@@ -46,9 +52,25 @@ export function ConfigSection({
       setPostFrequency(initialConfig.post_frequency);
       setBrandStyle(initialConfig.brand_style);
       setReviewMode(initialConfig.review_mode);
+      // 素材状态
+      setMaterialImages(initialConfig.material_images || []);
+      setMaterialDocuments(initialConfig.material_documents || []);
+      setMaterialAnalysis(initialConfig.material_analysis || '');
       setSaved(true);
     }
   }, [initialConfig]);
+
+  // 素材更新处理
+  const handleMaterialsChange = (materials: {
+    images: string[];
+    documents: string[];
+    analysis: string;
+  }) => {
+    setMaterialImages(materials.images);
+    setMaterialDocuments(materials.documents);
+    setMaterialAnalysis(materials.analysis);
+    setSaved(false); // 标记为未保存
+  };
 
   const validateForm = (): boolean => {
     if (!productName.trim()) {
@@ -64,14 +86,14 @@ export function ConfigSection({
 
   const handleSave = async () => {
     setError('');
-    
+
     if (!validateForm()) {
       return;
     }
 
     try {
       setSaving(true);
-      
+
       const profile: Partial<UserProfile> = {
         supabase_uuid: supabaseUuid,
         xhs_user_id: xhsUserId,
@@ -81,10 +103,14 @@ export function ConfigSection({
         post_frequency: postFrequency,
         brand_style: brandStyle,
         review_mode: reviewMode,
+        // 素材字段
+        material_images: materialImages,
+        material_documents: materialDocuments,
+        material_analysis: materialAnalysis,
       };
 
       await xiaohongshuSupabase.saveUserProfile(profile);
-      
+
       await xiaohongshuSupabase.addActivityLog({
         supabase_uuid: supabaseUuid,
         xhs_user_id: xhsUserId,
@@ -94,7 +120,7 @@ export function ConfigSection({
       });
 
       setSaved(true);
-      
+
       const savedProfile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
       if (savedProfile) {
         onConfigSaved(savedProfile);
@@ -127,6 +153,10 @@ export function ConfigSection({
           post_frequency: postFrequency,
           brand_style: brandStyle,
           review_mode: reviewMode,
+          // 素材字段
+          material_images: materialImages,
+          material_documents: materialDocuments,
+          material_analysis: materialAnalysis,
         };
 
         await xiaohongshuSupabase.saveUserProfile(profile);
@@ -278,6 +308,17 @@ export function ConfigSection({
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        {/* 素材上传组件 */}
+        <div className="pt-4 border-t">
+          <MaterialUpload
+            supabaseUuid={supabaseUuid}
+            initialImages={materialImages}
+            initialDocuments={materialDocuments}
+            initialAnalysis={materialAnalysis}
+            onMaterialsChange={handleMaterialsChange}
+          />
         </div>
 
         {error && (

@@ -2484,6 +2484,91 @@ if (!global.billingTracker) {
   };
 }
 
+// 🔧 新增：素材分析端点 - 分析用户上传的产品图片和文档
+app.post('/api/dify/analyze-materials', async (req, res) => {
+  const { supabaseUuid, images, documents } = req.body;
+
+  console.log('[Material Analysis] Processing analysis request:', {
+    supabaseUuid,
+    imageCount: images?.length || 0,
+    documentCount: documents?.length || 0
+  });
+
+  if (!DIFY_API_URL || !DIFY_API_KEY) {
+    return res.status(500).json({
+      success: false,
+      error: 'Server configuration error: Missing Dify API configuration'
+    });
+  }
+
+  try {
+    // 构建分析提示词
+    let analysisPrompt = '请分析以下产品素材，提取产品特点、卖点、适合的目标人群和营销角度：\n\n';
+
+    if (images && images.length > 0) {
+      analysisPrompt += `产品图片 (${images.length}张):\n`;
+      images.forEach((url, i) => {
+        analysisPrompt += `- 图片${i + 1}: ${url}\n`;
+      });
+      analysisPrompt += '\n';
+    }
+
+    if (documents && documents.length > 0) {
+      analysisPrompt += `产品资料 (${documents.length}个文档):\n`;
+      documents.forEach((url, i) => {
+        analysisPrompt += `- 文档${i + 1}: ${url}\n`;
+      });
+      analysisPrompt += '\n';
+    }
+
+    analysisPrompt += `
+请提供以下分析结果：
+1. 产品主要特点 (3-5个)
+2. 核心卖点
+3. 推荐目标人群
+4. 适合的营销角度
+5. 内容创作建议`;
+
+    // 调用 Dify AI 进行分析
+    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: analysisPrompt,
+        user: supabaseUuid || 'material-analysis-user',
+        response_mode: 'blocking'
+      })
+    }, 60000, 2);
+
+    if (!difyResponse.ok) {
+      const errorText = await difyResponse.text();
+      console.error('[Material Analysis] Dify API error:', errorText);
+      throw new Error(`Dify API error: ${errorText}`);
+    }
+
+    const difyData = await difyResponse.json();
+    const analysis = difyData.answer || difyData.text || '';
+
+    console.log('[Material Analysis] Analysis completed, length:', analysis.length);
+
+    res.json({
+      success: true,
+      analysis: analysis
+    });
+
+  } catch (error) {
+    console.error('[Material Analysis] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || '素材分析失败'
+    });
+  }
+});
+
 // 🔧 新增：纯聊天模式端点 - 专门处理简单对话而非工作流
 app.post('/api/dify/chat/simple', async (req, res) => {
   const { message, conversationId: clientConvId, userId } = req.body;
