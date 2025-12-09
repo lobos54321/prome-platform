@@ -2807,12 +2807,89 @@ ${accountPersona ? `- 账号人设：${accountPersona}` : ''}
     // 添加字数统计
     copywriteResult.wordCount = copywriteResult.fullContent?.length || 0;
 
-    // 如果是视频内容，后续可以调用视频生成 API
+    // 如果是视频内容，调用 n8n UGC 工作流
     let videoResult = null;
     if (contentFormat === 'video' && videoType === 'ugc_n8n' && videoConfig) {
-      // TODO: 调用 n8n UGC 工作流
-      console.log('[Content Generation] Video generation requested, skipping for now:', videoType);
-      // videoResult = await callN8NWorkflow(copywriteResult, videoConfig, productImages);
+      console.log('[Content Generation] Starting n8n UGC video workflow...');
+
+      // n8n UGC webhook URL
+      const n8nWebhookUrl = process.env.VITE_N8N_WEBHOOK_URL ||
+        'https://n8n-worker-k4m9.zeabur.app/webhook/9d5986f5-fcba-42bf-b3d7-5fd94660943a/chat';
+
+      const sessionId = `content_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+
+      // 构建视频请求参数
+      const videoFormData = {
+        duration: String(videoConfig.duration),
+        productDescription: `${productName}: ${productDescription}`,
+        imageUrl: productImages && productImages.length > 0 ? productImages[0] : '',
+        characterGender: videoConfig.gender === 'male' ? '男性' : '女性',
+        language: videoConfig.language === 'zh-CN' ? '中文' : videoConfig.language === 'en-US' ? '英文' : '日语'
+      };
+
+      // 构建 Chat Trigger 格式消息
+      const chatInput = `视频创作需求表单：
+
+| 字段 | 值 |
+|------|-----|
+| 🎬 视频时长 | ${videoFormData.duration}秒 |
+| 📝 产品描述 | ${videoFormData.productDescription} |
+| 🖼️ 图片链接 | ${videoFormData.imageUrl} |
+| 👤 人物性别 | ${videoFormData.characterGender} |
+| 🌍 视频语言 | ${videoFormData.language} |
+| 📄 文案内容 | ${copywriteResult.fullContent?.substring(0, 200)}... |
+
+请根据以上表单信息创建视频内容。`;
+
+      try {
+        console.log('[Content Generation] Sending to n8n webhook:', n8nWebhookUrl);
+
+        const n8nResponse = await fetchWithTimeoutAndRetry(n8nWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'sendMessage',
+            sessionId: sessionId,
+            chatInput: chatInput,
+            callbackUrl: `${process.env.VITE_CALLBACK_DOMAIN || 'https://www.prome.live'}/api/video/webhook/complete`,
+            metadata: {
+              ...videoFormData,
+              copywrite: copywriteResult.title,
+              supabase_uuid: supabase_uuid,
+              source: 'content_creation_form'
+            }
+          })
+        }, 30000, 2);
+
+        if (n8nResponse.ok) {
+          const n8nData = await n8nResponse.json().catch(() => ({}));
+          console.log('[Content Generation] n8n response:', n8nData);
+
+          videoResult = {
+            status: 'processing',
+            sessionId: sessionId,
+            message: 'UGC 视频生成已启动，完成后将通知您',
+            estimatedTime: `${videoConfig.duration * 2}秒`,
+            webhookSent: true
+          };
+        } else {
+          console.error('[Content Generation] n8n error:', n8nResponse.status);
+          videoResult = {
+            status: 'error',
+            message: '视频生成启动失败，请稍后重试',
+            webhookSent: false
+          };
+        }
+      } catch (n8nError) {
+        console.error('[Content Generation] n8n call failed:', n8nError);
+        videoResult = {
+          status: 'error',
+          message: 'n8n 工作流连接失败: ' + n8nError.message,
+          webhookSent: false
+        };
+      }
     }
 
     res.json({
