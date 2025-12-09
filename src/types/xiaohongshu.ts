@@ -29,6 +29,8 @@ export interface UserProfile {
   material_images?: string[];     // 产品图片URL列表
   material_documents?: string[];  // 文档URL列表
   material_analysis?: string;     // AI分析结果
+  // 地区字段 (支持全球市场)
+  region?: string;                // 用户自填: "武汉", "Sydney", "California" 等
   created_at: string;
   updated_at: string;
 }

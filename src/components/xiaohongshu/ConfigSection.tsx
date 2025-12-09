@@ -44,6 +44,9 @@ export function ConfigSection({
   const [materialDocuments, setMaterialDocuments] = useState<string[]>([]);
   const [materialAnalysis, setMaterialAnalysis] = useState<string>('');
 
+  // 地区字段
+  const [region, setRegion] = useState<string>('');
+
   useEffect(() => {
     if (initialConfig) {
       setProductName(initialConfig.product_name);
@@ -56,6 +59,8 @@ export function ConfigSection({
       setMaterialImages(initialConfig.material_images || []);
       setMaterialDocuments(initialConfig.material_documents || []);
       setMaterialAnalysis(initialConfig.material_analysis || '');
+      // 地区
+      setRegion(initialConfig.region || '');
       setSaved(true);
     }
   }, [initialConfig]);
@@ -107,6 +112,8 @@ export function ConfigSection({
         material_images: materialImages,
         material_documents: materialDocuments,
         material_analysis: materialAnalysis,
+        // 地区
+        region: region || undefined,
       };
 
       await xiaohongshuSupabase.saveUserProfile(profile);
@@ -249,6 +256,18 @@ export function ConfigSection({
               placeholder="例如：25-35岁女性白领..."
               disabled={saving || starting}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="region">目标地区</Label>
+            <Input
+              id="region"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              placeholder="输入目标地区，如: 武汉、Sydney、California"
+              disabled={saving || starting}
+            />
+            <p className="text-xs text-muted-foreground">可选，用于舆情分析定位热点</p>
           </div>
 
           <div className="space-y-2">

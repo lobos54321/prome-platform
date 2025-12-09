@@ -2930,15 +2930,28 @@ app.post('/api/sentiment/analyze', async (req, res) => {
   }
 
   try {
-    // 构建分析请求
-    const analysisQuery = query || `请分析"${productName}"在${industry || '相关行业'}的舆情趋势、用户情感、热门话题和营销机会`;
+    // 构建完整的分析查询 (包含地区、AI上下文、爆款拆解)
+    const analysisQuery = query || `请分析"${productName}"在${region || '目标市场'}${industry ? '的' + industry + '行业' : ''}的舆情趋势。
 
-    // 调用 BettaFish API (如果有 REST API)
-    // 目前 BettaFish 主要是 Gradio UI，我们先返回模拟数据结构
-    // 后续可以接入其实际 API 或通过 WebSocket 交互
+【产品信息】
+- 产品: ${productName}
+- 行业: ${industry || '未指定'}
+- 地区: ${region || '全球'}
+
+【分析需求】
+1. 找出3-5个相关热点话题
+2. 🔥 拆解1-2个爆款案例:
+   - 标题结构 (如何吸引点击)
+   - 开头钩子 (前3秒/首段)
+   - 内容框架 (叙事结构)
+   - 互动设计 (引导点赞/评论)
+   - 可复用模板
+3. 分析竞品动态
+4. 给出内容创作建议`;
 
     console.log('[BettaFish] Analysis query:', analysisQuery);
     console.log('[BettaFish] Base URL:', BETTAFISH_URL);
+    console.log('[BettaFish] Region:', region);
 
     // 尝试调用 BettaFish (如果它有 API 端点)
     let bettafishResult = null;
@@ -2949,7 +2962,8 @@ app.post('/api/sentiment/analyze', async (req, res) => {
         body: JSON.stringify({
           query: analysisQuery,
           platforms: platforms || ['xiaohongshu', 'weibo', 'douyin'],
-          timeRange: timeRange || 'week'
+          timeRange: timeRange || 'week',
+          region: region
         })
       }, 60000, 1);
 
@@ -2976,9 +2990,10 @@ app.post('/api/sentiment/analyze', async (req, res) => {
         message: '请访问 BettaFish 舆情分析系统进行深度分析',
         bettafishUrl: BETTAFISH_URL,
         suggestedQuery: analysisQuery,
+        region: region,
         instructions: [
           `1. 访问 ${BETTAFISH_URL}`,
-          '2. 在对话框输入: ' + analysisQuery,
+          '2. 在对话框输入查询 (包含爆款拆解需求)',
           '3. 等待多 Agent 分析完成',
           '4. 下载 HTML 报告或 PDF'
         ],
@@ -2990,13 +3005,25 @@ app.post('/api/sentiment/analyze', async (req, res) => {
               heat: 75,
               trend: 'rising',
               sentiment: 'positive',
-              platforms: ['xiaohongshu', 'weibo']
+              platforms: ['xiaohongshu', 'weibo'],
+              region: region || '全球'
             }
           ],
           overallSentiment: {
             positive: 0.6,
             neutral: 0.3,
             negative: 0.1
+          },
+          // 爆款拆解模板 (待 BettaFish 返回实际数据)
+          viralBreakdown: {
+            available: false,
+            message: '请通过 BettaFish 获取实际爆款案例拆解',
+            template: {
+              titleStructure: '【痛点】+【解决方案】+【数字/时间】',
+              hookDesign: '前3秒抛出问题或惊人事实',
+              contentFramework: '问题 → 原因 → 方案 → 效果 → 行动',
+              interactionDesign: '结尾提问引导评论'
+            }
           },
           contentOpportunities: [
             {
