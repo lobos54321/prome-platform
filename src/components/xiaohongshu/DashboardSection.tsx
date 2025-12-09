@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings, LogOut, Pause, FileText, Target, TrendingUp } from 'lucide-react';
+import { RefreshCw, Settings, LogOut, Pause, FileText, Target, TrendingUp, Sparkles } from 'lucide-react';
 import { StatusCard } from './StatusCard';
 import { StrategyCard } from './StrategyCard';
 import { WeeklyPlanCard } from './WeeklyPlanCard';
@@ -9,9 +9,10 @@ import { ContentPreviewCard } from './ContentPreviewCard';
 import { ReadyQueueCard } from './ReadyQueueCard';
 import { PerformanceCard } from './PerformanceCard';
 import { AccountBadge } from './AccountBadge';
+import { ContentCreationForm } from './ContentCreationForm';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
-import type { AutomationStatus, ContentStrategy, WeeklyPlan } from '@/types/xiaohongshu';
+import type { AutomationStatus, ContentStrategy, WeeklyPlan, UserProfile } from '@/types/xiaohongshu';
 
 interface DashboardSectionProps {
   supabaseUuid: string;
@@ -19,6 +20,7 @@ interface DashboardSectionProps {
   automationStatus: AutomationStatus | null;
   contentStrategy: ContentStrategy | null;
   weeklyPlan: WeeklyPlan | null;
+  userProfile?: UserProfile | null;  // 新增：传递用户配置给 ContentCreationForm
   onRefresh: () => void;
   onReconfigure?: () => void;
   onLogout?: () => void;
@@ -30,6 +32,7 @@ export function DashboardSection({
   automationStatus: initialStatus,
   contentStrategy: initialStrategy,
   weeklyPlan: initialPlan,
+  userProfile,
   onRefresh,
   onReconfigure,
   onLogout,
@@ -47,6 +50,9 @@ export function DashboardSection({
 
   // 🔥 发布作业状态
   const [publishJob, setPublishJob] = useState<any>(null);
+
+  // 🌟 内容创作弹窗
+  const [showContentCreation, setShowContentCreation] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -108,13 +114,13 @@ export function DashboardSection({
         const hasActiveTasks = planData?.tasks?.some(
           (t: any) => t.status === 'in-progress' || t.status === 'pending'
         ) ?? false;
-        
+
         // 如果后端明确返回了is_running，优先使用后端的状态
         // 否则根据是否有活跃任务判断
-        const isRunning = statusRes.data?.is_running !== undefined 
-          ? statusRes.data.is_running 
+        const isRunning = statusRes.data?.is_running !== undefined
+          ? statusRes.data.is_running
           : hasActiveTasks;
-        
+
         console.log('🔄 [fetchData] is_running 计算结果:', isRunning);
         console.log('🔍 [fetchData] statusData:', {
           hasStatusData: !!statusRes.data,
@@ -224,7 +230,7 @@ export function DashboardSection({
       return;
     }
 
-    const content = readyQueue.map((item, i) => 
+    const content = readyQueue.map((item, i) =>
       `${i + 1}. ${item.title}\n   时间: ${item.scheduledTime}\n   状态: ${item.status}`
     ).join('\n\n');
 
@@ -445,8 +451,8 @@ export function DashboardSection({
         </div>
         <div className="flex items-center gap-3">
           {/* 显示绑定的小红书账号 */}
-          <AccountBadge 
-            xhsUserId={xhsUserId} 
+          <AccountBadge
+            xhsUserId={xhsUserId}
             onSwitchAccount={() => {
               if (confirm('切换账号将退出当前登录，是否继续？')) {
                 onLogout?.();
@@ -536,7 +542,15 @@ export function DashboardSection({
           <CardTitle className="text-lg">⚙️ 控制面板</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-5 gap-4">
+            {/* 🌟 新增：创建内容按钮 */}
+            <Button
+              onClick={() => setShowContentCreation(true)}
+              className="w-full bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 text-white"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              创建内容
+            </Button>
             <Button
               onClick={handlePause}
               variant="secondary"
@@ -572,6 +586,40 @@ export function DashboardSection({
           </div>
         </CardContent>
       </Card>
+
+      {/* 🌟 内容创作弹窗 */}
+      {showContentCreation && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-pink-500" />
+                AI 内容创作
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowContentCreation(false)}
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="p-4">
+              <ContentCreationForm
+                supabaseUuid={supabaseUuid}
+                userProfile={userProfile}
+                onContentGenerated={(result) => {
+                  console.log('Content generated:', result);
+                  // 刷新数据
+                  fetchData();
+                  // 可选：关闭弹窗
+                  // setShowContentCreation(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

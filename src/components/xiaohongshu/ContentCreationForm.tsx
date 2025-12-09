@@ -36,6 +36,7 @@ import type {
 } from '@/types/content';
 import { VIDEO_TYPE_CONFIG, UGC_CREDITS } from '@/types/content';
 import type { UserProfile } from '@/types/xiaohongshu';
+import { MaterialUpload } from './MaterialUpload';
 
 interface ContentCreationFormProps {
     supabaseUuid: string;
@@ -78,6 +79,10 @@ export function ContentCreationForm({
     const [error, setError] = useState('');
     const [copywriteResult, setCopywriteResult] = useState<CopywriteResult | null>(null);
 
+    // 视频素材
+    const [videoMaterials, setVideoMaterials] = useState<string[]>([]);
+    const [documentMaterials, setDocumentMaterials] = useState<string[]>([]);
+
     // 从 userProfile 导入数据
     useEffect(() => {
         if (userProfile) {
@@ -85,6 +90,8 @@ export function ContentCreationForm({
             setTargetAudience(userProfile.target_audience || '');
             setProductImages(userProfile.material_images || []);
             setMaterialAnalysis(userProfile.material_analysis || '');
+            // 加载已有的文档素材
+            setDocumentMaterials(userProfile.material_documents || []);
         }
     }, [userProfile]);
 
@@ -264,8 +271,8 @@ export function ContentCreationForm({
                     <button
                         onClick={() => setContentFormat('image_text')}
                         className={`p-4 rounded-lg border-2 transition-all ${contentFormat === 'image_text'
-                                ? 'border-pink-500 bg-pink-50'
-                                : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-pink-500 bg-pink-50'
+                            : 'border-gray-200 hover:border-gray-300'
                             }`}
                     >
                         <Image className="h-8 w-8 mx-auto mb-2 text-pink-500" />
@@ -276,8 +283,8 @@ export function ContentCreationForm({
                     <button
                         onClick={() => setContentFormat('video')}
                         className={`p-4 rounded-lg border-2 transition-all ${contentFormat === 'video'
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
                             }`}
                     >
                         <Video className="h-8 w-8 mx-auto mb-2 text-blue-500" />
@@ -376,6 +383,34 @@ export function ContentCreationForm({
                                 <SelectItem value="ja-JP">日语</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    {/* 视频素材上传 */}
+                    <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                            <Video className="h-4 w-4" />
+                            视频/图片素材 (可选)
+                        </Label>
+                        <p className="text-xs text-muted-foreground mb-2">
+                            上传产品图片或视频素材，AI 将利用这些素材制作视频
+                        </p>
+                        <MaterialUpload
+                            supabaseUuid={supabaseUuid}
+                            initialImages={productImages}
+                            initialDocuments={documentMaterials}
+                            onMaterialsChange={({ images, documents, analysis }) => {
+                                setProductImages(images);
+                                setDocumentMaterials(documents);
+                                if (analysis) setMaterialAnalysis(analysis);
+                            }}
+                            compact={true}
+                        />
+                        {productImages.length > 0 && (
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                                <Check className="h-4 w-4" />
+                                已上传 {productImages.length} 个素材
+                            </div>
+                        )}
                     </div>
 
                     {/* 算力预估 */}
@@ -508,10 +543,10 @@ export function ContentCreationForm({
                         >
                             <div
                                 className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${currentStep === step
-                                        ? 'bg-pink-500 text-white'
-                                        : currentStep === 'result' || (currentStep === 'format' && i === 0)
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-gray-200'
+                                    ? 'bg-pink-500 text-white'
+                                    : currentStep === 'result' || (currentStep === 'format' && i === 0)
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-gray-200'
                                     }`}
                             >
                                 {currentStep === 'result' || (currentStep === 'format' && i === 0) ? (

@@ -15,6 +15,7 @@ interface MaterialUploadProps {
         documents: string[];
         analysis: string;
     }) => void;
+    compact?: boolean;  // 紧凑模式，用于嵌入其他组件
 }
 
 export function MaterialUpload({
@@ -23,6 +24,7 @@ export function MaterialUpload({
     initialDocuments = [],
     initialAnalysis = '',
     onMaterialsChange,
+    compact = false,
 }: MaterialUploadProps) {
     const [images, setImages] = useState<string[]>(initialImages);
     const [documents, setDocuments] = useState<string[]>(initialDocuments);
@@ -184,6 +186,67 @@ export function MaterialUpload({
         // 移除时间戳前缀
         return fileName.replace(/^\d+-/, '');
     };
+
+    // 紧凑模式 UI
+    if (compact) {
+        return (
+            <div className="space-y-3">
+                {error && (
+                    <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                )}
+
+                {/* 图片上传 - 紧凑版 */}
+                <div className="flex items-center gap-2">
+                    <label className="cursor-pointer flex-1">
+                        <input
+                            type="file"
+                            accept="image/*,video/*"
+                            multiple
+                            onChange={handleImageUpload}
+                            disabled={uploading || images.length >= 10}
+                            className="hidden"
+                        />
+                        <div className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${uploading ? 'bg-gray-100 border-gray-300' : 'border-gray-300 hover:border-pink-400'
+                            }`}>
+                            {uploading ? (
+                                <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
+                            ) : (
+                                <>
+                                    <Upload className="w-5 h-5 mx-auto text-gray-400 mb-1" />
+                                    <span className="text-xs text-gray-500">
+                                        点击上传图片/视频 ({images.length}/10)
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </label>
+                </div>
+
+                {/* 图片预览 - 紧凑版 */}
+                {images.length > 0 && (
+                    <div className="grid grid-cols-6 gap-1">
+                        {images.map((url, index) => (
+                            <div key={index} className="relative aspect-square rounded overflow-hidden border">
+                                <img
+                                    src={url}
+                                    alt={`素材 ${index + 1}`}
+                                    className="w-full h-full object-cover"
+                                />
+                                <button
+                                    onClick={() => removeImage(index)}
+                                    className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 hover:bg-red-600"
+                                >
+                                    <X className="w-2 h-2" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <Card>
