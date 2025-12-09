@@ -2569,6 +2569,110 @@ app.post('/api/dify/analyze-materials', async (req, res) => {
   }
 });
 
+// 🔧 新增：矩阵策略生成端点 - AI生成账号人设和任务分配
+app.post('/api/dify/matrix/generate-strategy', async (req, res) => {
+  const { supabase_uuid, product_name, target_audience, marketing_goal, material_analysis, accounts } = req.body;
+
+  console.log('[Matrix Strategy] Generating strategy for:', {
+    supabase_uuid,
+    product_name,
+    accountCount: accounts?.length || 0
+  });
+
+  if (!DIFY_API_URL || !DIFY_API_KEY) {
+    return res.status(500).json({
+      success: false,
+      error: 'Server configuration error: Missing Dify API configuration'
+    });
+  }
+
+  if (!accounts || accounts.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: '请先添加小红书账号'
+    });
+  }
+
+  try {
+    const prompt = `你是一个小红书矩阵运营专家。请为以下产品和账号矩阵制定运营策略：
+
+## 产品信息
+- 产品名称：${product_name}
+- 目标受众：${target_audience || '通用'}
+- 营销目标：${marketing_goal || '品牌曝光'}
+${material_analysis ? `- 产品分析：${material_analysis}` : ''}
+
+## 账号列表
+${accounts.map((a, i) => `${i + 1}. ${a.nickname || '账号' + (i + 1)} (ID: ${a.id})`).join('\n')}
+
+## 请为每个账号分配：
+1. 人设定位（种草达人/专业测评/品牌官方/生活分享/教程分享）
+2. 内容风格（温暖亲切/专业权威/幽默风趣/简约清新）
+3. 细分受众
+4. 每周发布数（1-7篇）
+
+请以JSON格式返回：
+{"account_personas":[{"xhs_account_id":"ID","persona":"人设","content_style":"风格","target_audience":"受众","weekly_post_count":3}]}`;
+
+    const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: prompt,
+        user: supabase_uuid || 'matrix-strategy-user',
+        response_mode: 'blocking'
+      })
+    }, 90000, 2);
+
+    if (!difyResponse.ok) {
+      throw new Error(`Dify API error: ${await difyResponse.text()}`);
+    }
+
+    const difyData = await difyResponse.json();
+    const answer = difyData.answer || '';
+
+    let parsedResult;
+    try {
+      const jsonMatch = answer.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedResult = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found');
+      }
+    } catch (parseErr) {
+      parsedResult = {
+        account_personas: accounts.map((a, i) => ({
+          xhs_account_id: a.id,
+          persona: i === 0 ? '种草达人' : '专业测评',
+          content_style: '温暖亲切',
+          target_audience: target_audience || '通用受众',
+          weekly_post_count: 3
+        }))
+      };
+    }
+
+    if (parsedResult.account_personas) {
+      parsedResult.account_personas = parsedResult.account_personas.map(p => ({
+        ...p,
+        supabase_uuid,
+        id: `persona-${p.xhs_account_id}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+    }
+
+    res.json({ success: true, ...parsedResult });
+
+  } catch (error) {
+    console.error('[Matrix Strategy] Error:', error);
+    res.status(500).json({ success: false, error: error.message || '策略生成失败' });
+  }
+});
+
 // 🔧 新增：纯聊天模式端点 - 专门处理简单对话而非工作流
 app.post('/api/dify/chat/simple', async (req, res) => {
   const { message, conversationId: clientConvId, userId } = req.body;
