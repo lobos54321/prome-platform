@@ -2911,12 +2911,14 @@ ${accountPersona ? `- 账号人设：${accountPersona}` : ''}
 
 // 🔧 新增：BettaFish 舆情分析 API - 热点趋势分析
 app.post('/api/sentiment/analyze', async (req, res) => {
-  const { query, productName, industry, competitors, platforms, timeRange, supabase_uuid } = req.body;
+  const { query, productName, industry, competitors, platforms, timeRange, supabase_uuid, region } = req.body;
 
   console.log('[BettaFish] Starting trend analysis:', {
     query: query?.substring(0, 50),
     productName,
-    industry
+    industry,
+    region,
+    supabase_uuid
   });
 
   // BettaFish 部署地址
@@ -2929,6 +2931,62 @@ app.post('/api/sentiment/analyze', async (req, res) => {
     });
   }
 
+  // 🔧 Phase 3: 获取完整上下文 (用户配置 + 历史数据 + AI分析)
+  let historyContext = '';
+  let strategyContext = '';
+  let userProfile = null;
+
+  if (supabase_uuid && supabaseClient) {
+    try {
+      // 获取用户配置 (包含产品信息和策略)
+      const { data: profile } = await supabaseClient
+        .from('user_profiles')
+        .select('*')
+        .eq('supabase_uuid', supabase_uuid)
+        .single();
+
+      if (profile) {
+        userProfile = profile;
+        strategyContext = `
+- 营销目标: ${profile.marketing_goal}
+- 发布频率: ${profile.post_frequency}
+- 品牌风格: ${profile.brand_style}
+- 目标受众: ${profile.target_audience || '未设置'}
+- 素材分析: ${profile.material_analysis ? profile.material_analysis.substring(0, 200) + '...' : '无'}`;
+      }
+
+      // 获取历史内容任务和表现 (最近7天)
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: tasks } = await supabaseClient
+        .from('daily_tasks')
+        .select('title, theme, status, created_at')
+        .eq('supabase_uuid', supabase_uuid)
+        .gte('created_at', weekAgo)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (tasks && tasks.length > 0) {
+        const publishedCount = tasks.filter(t => t.status === 'published').length;
+        const themes = [...new Set(tasks.map(t => t.theme).filter(Boolean))];
+        historyContext = `
+- 过去7天发布内容: ${publishedCount}篇
+- 任务总数: ${tasks.length}
+- 主要主题: ${themes.slice(0, 3).join('、') || '无'}
+- 最近标题: ${tasks[0]?.title || '无'}`;
+      } else {
+        historyContext = '\n- 历史数据: 暂无发布记录';
+      }
+
+      console.log('[BettaFish] Context loaded:', {
+        hasProfile: !!userProfile,
+        historyItems: tasks?.length || 0
+      });
+
+    } catch (dbErr) {
+      console.log('[BettaFish] Context fetch error (non-critical):', dbErr.message);
+    }
+  }
+
   try {
     // 构建完整的分析查询 (包含地区、AI上下文、爆款拆解)
     const analysisQuery = query || `请分析"${productName}"在${region || '目标市场'}${industry ? '的' + industry + '行业' : ''}的舆情趋势。
@@ -2937,6 +2995,10 @@ app.post('/api/sentiment/analyze', async (req, res) => {
 - 产品: ${productName}
 - 行业: ${industry || '未指定'}
 - 地区: ${region || '全球'}
+${strategyContext ? `
+【当前策略】${strategyContext}` : ''}
+${historyContext ? `
+【历史表现】${historyContext}` : ''}
 
 【分析需求】
 1. 找出3-5个相关热点话题
