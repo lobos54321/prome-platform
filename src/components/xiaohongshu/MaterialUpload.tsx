@@ -283,6 +283,80 @@ export function MaterialUpload({
                         })}
                     </div>
                 )}
+
+                {/* 文档上传 - 紧凑版 */}
+                <div className="flex items-center gap-2">
+                    <label className="cursor-pointer flex-1">
+                        <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+                            multiple
+                            onChange={handleDocumentUpload}
+                            disabled={uploading || documents.length >= 5}
+                            className="hidden"
+                        />
+                        <div className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${uploading ? 'bg-gray-100 border-gray-300' : 'border-gray-300 hover:border-blue-400'
+                            }`}>
+                            {uploading ? (
+                                <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" />
+                            ) : (
+                                <>
+                                    <FileText className="w-5 h-5 mx-auto text-gray-400 mb-1" />
+                                    <span className="text-xs text-gray-500">
+                                        点击上传文档 ({documents.length}/5)
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </label>
+                </div>
+
+                {/* 文档列表 - 紧凑版 */}
+                {documents.length > 0 && (
+                    <div className="space-y-1">
+                        {documents.map((url, index) => (
+                            <div key={index} className="flex items-center gap-2 text-xs bg-gray-50 rounded px-2 py-1">
+                                <FileText className="w-3 h-3 text-blue-500" />
+                                <span className="flex-1 truncate">{getFileName(url)}</span>
+                                <button
+                                    onClick={() => removeDocument(index)}
+                                    className="text-red-500 hover:text-red-700"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* AI 分析按钮 - 紧凑版 */}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAnalyze}
+                    disabled={analyzing || (images.length === 0 && documents.length === 0)}
+                    className="w-full"
+                >
+                    {analyzing ? (
+                        <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            AI 分析中...
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            AI 分析素材
+                        </>
+                    )}
+                </Button>
+
+                {/* 分析结果 - 紧凑版 */}
+                {analysis && (
+                    <div className="text-xs bg-purple-50 border border-purple-100 rounded-lg p-2 max-h-32 overflow-y-auto">
+                        <div className="font-medium text-purple-700 mb-1">📊 AI 分析结果</div>
+                        <div className="text-gray-600 whitespace-pre-wrap">{analysis}</div>
+                    </div>
+                )}
             </div>
         );
     }
