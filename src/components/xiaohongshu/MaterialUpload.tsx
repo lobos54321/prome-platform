@@ -231,24 +231,41 @@ export function MaterialUpload({
                     </label>
                 </div>
 
-                {/* 图片预览 - 紧凑版 */}
+                {/* 图片/视频预览 - 紧凑版 */}
                 {images.length > 0 && (
                     <div className="grid grid-cols-6 gap-1">
-                        {images.map((url, index) => (
-                            <div key={index} className="relative aspect-square rounded overflow-hidden border">
-                                <img
-                                    src={url}
-                                    alt={`素材 ${index + 1}`}
-                                    className="w-full h-full object-cover"
-                                />
-                                <button
-                                    onClick={() => removeImage(index)}
-                                    className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 hover:bg-red-600"
-                                >
-                                    <X className="w-2 h-2" />
-                                </button>
-                            </div>
-                        ))}
+                        {images.map((url, index) => {
+                            const isVideo = /\.(mp4|mov|webm|avi|mkv)$/i.test(url);
+                            return (
+                                <div key={index} className="relative aspect-square rounded overflow-hidden border">
+                                    {isVideo ? (
+                                        <video
+                                            src={url}
+                                            className="w-full h-full object-cover"
+                                            muted
+                                            playsInline
+                                        />
+                                    ) : (
+                                        <img
+                                            src={url}
+                                            alt={`素材 ${index + 1}`}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    )}
+                                    <button
+                                        onClick={() => removeImage(index)}
+                                        className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 hover:bg-red-600"
+                                    >
+                                        <X className="w-2 h-2" />
+                                    </button>
+                                    {isVideo && (
+                                        <div className="absolute bottom-0 left-0 bg-black/50 text-white text-xs px-1">
+                                            🎬
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
