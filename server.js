@@ -2485,153 +2485,49 @@ if (!global.billingTracker) {
   };
 }
 
-// 🔧 新增：素材分析端点 - 使用 Gemini 多模态 AI 分析图片/视频/文档
+// 🔧 新增：素材分析端点 - 转发至 claude-agent-service 的 Gemini 多模态分析
 app.post('/api/dify/analyze-materials', async (req, res) => {
   const { supabaseUuid, images, documents } = req.body;
 
-  console.log('[Material Analysis] Processing analysis request:', {
+  console.log('[Material Analysis] Forwarding to claude-agent-service:', {
     supabaseUuid,
     imageCount: images?.length || 0,
     documentCount: documents?.length || 0
   });
 
-  // 检查 Gemini API Key
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) {
-    console.warn('[Material Analysis] No GEMINI_API_KEY, falling back to Dify');
-    // Fallback to Dify if no Gemini key
-    return handleDifyMaterialAnalysis(req, res);
-  }
+  // claude-agent-service URL
+  const CLAUDE_AGENT_URL = process.env.XHS_BACKEND_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
 
   try {
-    // 初始化 Gemini
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    // 使用最新的 Gemini 模型 (支持多模态)
-    const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || 'gemini-1.5-pro'
-    });
+    // 转发请求到 claude-agent-service 的 Gemini 多模态端点
+    const agentResponse = await fetchWithTimeoutAndRetry(`${CLAUDE_AGENT_URL}/api/materials/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        supabaseUuid,
+        images,
+        documents,
+        // 可以携带更多上下文信息
+        productName: req.body.productName,
+        targetAudience: req.body.targetAudience
+      })
+    }, 120000, 2); // 120秒超时，多模态分析需要更长时间
 
-    console.log('[Material Analysis] Using Gemini model:', process.env.GEMINI_MODEL || 'gemini-1.5-pro');
-
-    // 准备多模态内容
-    const parts = [];
-
-    // 添加分析提示词
-    parts.push({
-      text: `你是一位专业的产品营销分析师。请仔细分析以下产品素材（图片/视频/文档），并提供详细的营销建议。
-
-请提供以下分析结果：
-
-## 1. 产品概述
-基于素材识别产品类型和核心功能
-
-## 2. 产品主要特点 (3-5个)
-- 列出从素材中识别到的产品特点
-
-## 3. 核心卖点
-- 最吸引人的卖点是什么
-
-## 4. 推荐目标人群
-- 适合哪些用户群体
-
-## 5. 营销角度建议
-- 适合在社交媒体上从哪些角度推广
-
-## 6. 内容创作建议
-- 小红书/抖音等平台的内容创作方向
-
-以下是产品素材：
-`
-    });
-
-    // 处理图片 - 下载并转换为 base64
-    if (images && images.length > 0) {
-      console.log('[Material Analysis] Processing', images.length, 'images...');
-
-      for (let i = 0; i < Math.min(images.length, 5); i++) { // 最多处理5张图
-        const imageUrl = images[i];
-        try {
-          console.log(`[Material Analysis] Downloading image ${i + 1}:`, imageUrl.substring(0, 80) + '...');
-
-          // 下载图片
-          const imageResponse = await fetch(imageUrl);
-          if (!imageResponse.ok) {
-            console.warn(`[Material Analysis] Failed to download image ${i + 1}`);
-            continue;
-          }
-
-          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-          const arrayBuffer = await imageResponse.arrayBuffer();
-          const base64 = Buffer.from(arrayBuffer).toString('base64');
-
-          // 检查是否是视频
-          if (contentType.startsWith('video/')) {
-            parts.push({ text: `\n[视频 ${i + 1}]: 这是一个视频文件，请基于可用信息分析\n` });
-          } else {
-            // 添加图片到 Gemini 请求
-            parts.push({
-              inlineData: {
-                mimeType: contentType,
-                data: base64
-              }
-            });
-            parts.push({ text: `\n[图片 ${i + 1}]\n` });
-          }
-
-          console.log(`[Material Analysis] Image ${i + 1} processed, size: ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB`);
-
-        } catch (imgErr) {
-          console.warn(`[Material Analysis] Error processing image ${i + 1}:`, imgErr.message);
-          parts.push({ text: `\n[图片 ${i + 1}]: 无法加载\n` });
-        }
-      }
+    if (!agentResponse.ok) {
+      const errorText = await agentResponse.text();
+      console.error('[Material Analysis] claude-agent-service error:', errorText);
+      // 失败时回退到 Dify
+      return handleDifyMaterialAnalysis(req, res);
     }
 
-    // 处理文档 - 提取文档 URL 信息
-    if (documents && documents.length > 0) {
-      parts.push({ text: `\n\n## 产品文档信息\n` });
-      for (let i = 0; i < documents.length; i++) {
-        const docUrl = documents[i];
-        const fileName = docUrl.split('/').pop() || `文档${i + 1}`;
+    const result = await agentResponse.json();
+    console.log('[Material Analysis] Analysis completed via claude-agent-service, provider:', result.provider);
 
-        // 尝试下载文档内容 (仅限文本类型)
-        try {
-          if (docUrl.endsWith('.txt')) {
-            const docResponse = await fetch(docUrl);
-            if (docResponse.ok) {
-              const textContent = await docResponse.text();
-              parts.push({ text: `\n[文档 ${i + 1}: ${fileName}]\n内容:\n${textContent.substring(0, 2000)}...\n` });
-              continue;
-            }
-          }
-        } catch (docErr) {
-          console.warn(`[Material Analysis] Error reading document ${i + 1}:`, docErr.message);
-        }
-
-        parts.push({ text: `\n[文档 ${i + 1}: ${fileName}] - 请基于文件名推断内容\n` });
-      }
-    }
-
-    // 调用 Gemini API
-    console.log('[Material Analysis] Calling Gemini API with', parts.length, 'parts...');
-
-    const result = await model.generateContent(parts);
-    const response = await result.response;
-    const analysis = response.text();
-
-    console.log('[Material Analysis] Gemini analysis completed, length:', analysis.length);
-
-    res.json({
-      success: true,
-      analysis: analysis,
-      provider: 'gemini'
-    });
+    res.json(result);
 
   } catch (error) {
-    console.error('[Material Analysis] Gemini Error:', error);
-
-    // 如果 Gemini 失败，尝试回退到 Dify
-    console.log('[Material Analysis] Falling back to Dify...');
+    console.error('[Material Analysis] Error calling claude-agent-service:', error);
+    // 失败时回退到 Dify
     return handleDifyMaterialAnalysis(req, res);
   }
 });
