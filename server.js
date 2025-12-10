@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import * as cheerio from 'cheerio';
 import multer from 'multer';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Load environment variables
 dotenv.config();
@@ -2484,7 +2485,7 @@ if (!global.billingTracker) {
   };
 }
 
-// 🔧 新增：素材分析端点 - 分析用户上传的产品图片和文档
+// 🔧 新增：素材分析端点 - 使用 Gemini 多模态 AI 分析图片/视频/文档
 app.post('/api/dify/analyze-materials', async (req, res) => {
   const { supabaseUuid, images, documents } = req.body;
 
@@ -2494,16 +2495,160 @@ app.post('/api/dify/analyze-materials', async (req, res) => {
     documentCount: documents?.length || 0
   });
 
+  // 检查 Gemini API Key
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    console.warn('[Material Analysis] No GEMINI_API_KEY, falling back to Dify');
+    // Fallback to Dify if no Gemini key
+    return handleDifyMaterialAnalysis(req, res);
+  }
+
+  try {
+    // 初始化 Gemini
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    // 使用最新的 Gemini 模型 (支持多模态)
+    const model = genAI.getGenerativeModel({
+      model: process.env.GEMINI_MODEL || 'gemini-1.5-pro'
+    });
+
+    console.log('[Material Analysis] Using Gemini model:', process.env.GEMINI_MODEL || 'gemini-1.5-pro');
+
+    // 准备多模态内容
+    const parts = [];
+
+    // 添加分析提示词
+    parts.push({
+      text: `你是一位专业的产品营销分析师。请仔细分析以下产品素材（图片/视频/文档），并提供详细的营销建议。
+
+请提供以下分析结果：
+
+## 1. 产品概述
+基于素材识别产品类型和核心功能
+
+## 2. 产品主要特点 (3-5个)
+- 列出从素材中识别到的产品特点
+
+## 3. 核心卖点
+- 最吸引人的卖点是什么
+
+## 4. 推荐目标人群
+- 适合哪些用户群体
+
+## 5. 营销角度建议
+- 适合在社交媒体上从哪些角度推广
+
+## 6. 内容创作建议
+- 小红书/抖音等平台的内容创作方向
+
+以下是产品素材：
+`
+    });
+
+    // 处理图片 - 下载并转换为 base64
+    if (images && images.length > 0) {
+      console.log('[Material Analysis] Processing', images.length, 'images...');
+
+      for (let i = 0; i < Math.min(images.length, 5); i++) { // 最多处理5张图
+        const imageUrl = images[i];
+        try {
+          console.log(`[Material Analysis] Downloading image ${i + 1}:`, imageUrl.substring(0, 80) + '...');
+
+          // 下载图片
+          const imageResponse = await fetch(imageUrl);
+          if (!imageResponse.ok) {
+            console.warn(`[Material Analysis] Failed to download image ${i + 1}`);
+            continue;
+          }
+
+          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+          const arrayBuffer = await imageResponse.arrayBuffer();
+          const base64 = Buffer.from(arrayBuffer).toString('base64');
+
+          // 检查是否是视频
+          if (contentType.startsWith('video/')) {
+            parts.push({ text: `\n[视频 ${i + 1}]: 这是一个视频文件，请基于可用信息分析\n` });
+          } else {
+            // 添加图片到 Gemini 请求
+            parts.push({
+              inlineData: {
+                mimeType: contentType,
+                data: base64
+              }
+            });
+            parts.push({ text: `\n[图片 ${i + 1}]\n` });
+          }
+
+          console.log(`[Material Analysis] Image ${i + 1} processed, size: ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB`);
+
+        } catch (imgErr) {
+          console.warn(`[Material Analysis] Error processing image ${i + 1}:`, imgErr.message);
+          parts.push({ text: `\n[图片 ${i + 1}]: 无法加载\n` });
+        }
+      }
+    }
+
+    // 处理文档 - 提取文档 URL 信息
+    if (documents && documents.length > 0) {
+      parts.push({ text: `\n\n## 产品文档信息\n` });
+      for (let i = 0; i < documents.length; i++) {
+        const docUrl = documents[i];
+        const fileName = docUrl.split('/').pop() || `文档${i + 1}`;
+
+        // 尝试下载文档内容 (仅限文本类型)
+        try {
+          if (docUrl.endsWith('.txt')) {
+            const docResponse = await fetch(docUrl);
+            if (docResponse.ok) {
+              const textContent = await docResponse.text();
+              parts.push({ text: `\n[文档 ${i + 1}: ${fileName}]\n内容:\n${textContent.substring(0, 2000)}...\n` });
+              continue;
+            }
+          }
+        } catch (docErr) {
+          console.warn(`[Material Analysis] Error reading document ${i + 1}:`, docErr.message);
+        }
+
+        parts.push({ text: `\n[文档 ${i + 1}: ${fileName}] - 请基于文件名推断内容\n` });
+      }
+    }
+
+    // 调用 Gemini API
+    console.log('[Material Analysis] Calling Gemini API with', parts.length, 'parts...');
+
+    const result = await model.generateContent(parts);
+    const response = await result.response;
+    const analysis = response.text();
+
+    console.log('[Material Analysis] Gemini analysis completed, length:', analysis.length);
+
+    res.json({
+      success: true,
+      analysis: analysis,
+      provider: 'gemini'
+    });
+
+  } catch (error) {
+    console.error('[Material Analysis] Gemini Error:', error);
+
+    // 如果 Gemini 失败，尝试回退到 Dify
+    console.log('[Material Analysis] Falling back to Dify...');
+    return handleDifyMaterialAnalysis(req, res);
+  }
+});
+
+// Dify 素材分析回退函数
+async function handleDifyMaterialAnalysis(req, res) {
+  const { supabaseUuid, images, documents } = req.body;
+
   if (!DIFY_API_URL || !DIFY_API_KEY) {
     return res.status(500).json({
       success: false,
-      error: 'Server configuration error: Missing Dify API configuration'
+      error: 'Server configuration error: Missing AI API configuration'
     });
   }
 
   try {
-    // 构建分析提示词
-    let analysisPrompt = '请分析以下产品素材，提取产品特点、卖点、适合的目标人群和营销角度：\n\n';
+    let analysisPrompt = '请分析以下产品素材链接，提取产品特点、卖点、适合的目标人群和营销角度：\n\n';
 
     if (images && images.length > 0) {
       analysisPrompt += `产品图片 (${images.length}张):\n`;
@@ -2518,18 +2663,10 @@ app.post('/api/dify/analyze-materials', async (req, res) => {
       documents.forEach((url, i) => {
         analysisPrompt += `- 文档${i + 1}: ${url}\n`;
       });
-      analysisPrompt += '\n';
     }
 
-    analysisPrompt += `
-请提供以下分析结果：
-1. 产品主要特点 (3-5个)
-2. 核心卖点
-3. 推荐目标人群
-4. 适合的营销角度
-5. 内容创作建议`;
+    analysisPrompt += `\n请提供：产品特点、核心卖点、目标人群、营销角度、内容创作建议`;
 
-    // 调用 Dify AI 进行分析
     const difyResponse = await fetchWithTimeoutAndRetry(`${DIFY_API_URL}/chat-messages`, {
       method: 'POST',
       headers: {
@@ -2545,29 +2682,24 @@ app.post('/api/dify/analyze-materials', async (req, res) => {
     }, 60000, 2);
 
     if (!difyResponse.ok) {
-      const errorText = await difyResponse.text();
-      console.error('[Material Analysis] Dify API error:', errorText);
-      throw new Error(`Dify API error: ${errorText}`);
+      throw new Error('Dify API error');
     }
 
     const difyData = await difyResponse.json();
-    const analysis = difyData.answer || difyData.text || '';
-
-    console.log('[Material Analysis] Analysis completed, length:', analysis.length);
-
     res.json({
       success: true,
-      analysis: analysis
+      analysis: difyData.answer || difyData.text || '分析完成',
+      provider: 'dify'
     });
 
   } catch (error) {
-    console.error('[Material Analysis] Error:', error);
+    console.error('[Material Analysis] Dify Error:', error);
     res.status(500).json({
       success: false,
-      error: error.message || '素材分析失败'
+      error: '素材分析失败，请稍后重试'
     });
   }
-});
+}
 
 // 🔧 新增：矩阵策略生成端点 - AI生成账号人设和任务分配
 app.post('/api/dify/matrix/generate-strategy', async (req, res) => {
