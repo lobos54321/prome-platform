@@ -41,7 +41,10 @@ export function MaterialUpload({
 
         const { data, error } = await supabase.storage
             .from('product-materials')
-            .upload(filePath, file);
+            .upload(filePath, file, {
+                // 添加 upsert 选项避免 RLS 问题
+                upsert: true
+            });
 
         if (error) {
             throw new Error(`上传失败: ${error.message}`);
@@ -58,12 +61,16 @@ export function MaterialUpload({
     // 上传文档到 Supabase Storage
     const uploadDocument = async (file: File) => {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${file.name}`;
-        const filePath = `${supabaseUuid}/documents/${fileName}`;
+        // 生成安全的文件名，避免中文字符导致 invalid key
+        const safeFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${supabaseUuid}/documents/${safeFileName}`;
 
         const { data, error } = await supabase.storage
             .from('product-materials')
-            .upload(filePath, file);
+            .upload(filePath, file, {
+                // 添加 upsert 选项避免重复文件冲突
+                upsert: true
+            });
 
         if (error) {
             throw new Error(`上传失败: ${error.message}`);
