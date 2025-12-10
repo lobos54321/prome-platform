@@ -146,6 +146,12 @@ export function ConfigSection({
       return;
     }
 
+    // 🔧 检查是否已绑定小红书账号
+    if (!xhsUserId || xhsUserId === 'temp_user' || xhsUserId.startsWith('virtual_')) {
+      setError('请先绑定小红书账号后再启动自动运营。点击返回账号页面进行扫码登录。');
+      return;
+    }
+
     try {
       setStarting(true);
 
