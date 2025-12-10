@@ -33,7 +33,9 @@ interface ProductConfig {
     targetAudience: string;
     region: string;
     marketingGoal: 'brand' | 'sales' | 'traffic' | 'community';
+    postFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
     brandStyle: 'professional' | 'warm' | 'humorous' | 'minimalist';
+    reviewMode: 'auto' | 'manual';
     materialImages: string[];
     materialDocuments: string[];
     materialAnalysis: string;
@@ -53,7 +55,9 @@ export default function AutoMarketing() {
         targetAudience: '',
         region: '',
         marketingGoal: 'brand',
+        postFrequency: 'daily',
         brandStyle: 'warm',
+        reviewMode: 'manual',
         materialImages: [],
         materialDocuments: [],
         materialAnalysis: '',
@@ -124,8 +128,8 @@ export default function AutoMarketing() {
                     material_images: config.materialImages,
                     material_documents: config.materialDocuments,
                     material_analysis: config.materialAnalysis,
-                    post_frequency: 'daily',
-                    review_mode: 'manual',
+                    post_frequency: config.postFrequency,
+                    review_mode: config.reviewMode,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'supabase_uuid' });
 
@@ -195,10 +199,10 @@ export default function AutoMarketing() {
                             <div className={`w-12 h-0.5 ${isPast ? 'bg-green-500' : 'bg-gray-200'}`} />
                         )}
                         <div className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${isActive
-                                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                                : isPast
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-gray-100 text-gray-500'
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                            : isPast
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-500'
                             }`}>
                             {isPast ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                             <span className="font-medium">{step.label}</span>
@@ -306,6 +310,26 @@ export default function AutoMarketing() {
                                 </div>
 
                                 <div className="space-y-2">
+                                    <Label>发布频率</Label>
+                                    <Select
+                                        value={config.postFrequency}
+                                        onValueChange={(v: any) => setConfig(prev => ({ ...prev, postFrequency: v }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="daily">📅 每日一篇</SelectItem>
+                                            <SelectItem value="weekly">📆 每周2-3篇</SelectItem>
+                                            <SelectItem value="biweekly">🗓️ 每两周一篇</SelectItem>
+                                            <SelectItem value="monthly">📅 每月一篇</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
                                     <Label>品牌风格</Label>
                                     <Select
                                         value={config.brandStyle}
@@ -319,6 +343,22 @@ export default function AutoMarketing() {
                                             <SelectItem value="warm">🤗 温暖亲切</SelectItem>
                                             <SelectItem value="humorous">😄 幽默有趣</SelectItem>
                                             <SelectItem value="minimalist">✨ 简约高级</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>审核模式</Label>
+                                    <Select
+                                        value={config.reviewMode}
+                                        onValueChange={(v: any) => setConfig(prev => ({ ...prev, reviewMode: v }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="auto">🤖 自动发布</SelectItem>
+                                            <SelectItem value="manual">👁️ 人工审核</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -399,10 +439,10 @@ export default function AutoMarketing() {
                                             key={platform.id}
                                             onClick={() => togglePlatform(platform.id)}
                                             className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer ${!isReady
-                                                    ? 'opacity-60 cursor-not-allowed bg-gray-50 border-gray-200'
-                                                    : isSelected
-                                                        ? 'border-purple-500 bg-purple-50 shadow-lg'
-                                                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50/50'
+                                                ? 'opacity-60 cursor-not-allowed bg-gray-50 border-gray-200'
+                                                : isSelected
+                                                    ? 'border-purple-500 bg-purple-50 shadow-lg'
+                                                    : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50/50'
                                                 }`}
                                         >
                                             {/* 选中标记 */}
