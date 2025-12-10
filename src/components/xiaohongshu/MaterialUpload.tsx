@@ -83,14 +83,29 @@ export function MaterialUpload({
         return urlData.publicUrl;
     };
 
-    // 处理图片上传
+    // 处理图片/视频上传
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
         if (images.length + files.length > 10) {
-            setError('最多上传 10 张图片');
+            setError('最多上传 10 个文件');
             return;
+        }
+
+        // 检查文件大小限制
+        const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+        const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+
+        for (const file of Array.from(files)) {
+            const isVideo = file.type.startsWith('video/');
+            const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+            const sizeLabel = isVideo ? '50MB' : '10MB';
+
+            if (file.size > maxSize) {
+                setError(`文件 "${file.name}" 超过 ${sizeLabel} 限制，当前大小: ${(file.size / 1024 / 1024).toFixed(1)}MB`);
+                return;
+            }
         }
 
         setError('');
