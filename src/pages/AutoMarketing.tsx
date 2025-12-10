@@ -114,9 +114,9 @@ export default function AutoMarketing() {
         try {
             setSaving(true);
 
-            // 保存到 Supabase user_profiles
+            // 保存到 Supabase xhs_user_profiles
             const { error: saveError } = await supabase
-                .from('user_profiles')
+                .from('xhs_user_profiles')
                 .upsert({
                     supabase_uuid: currentUser.id,
                     xhs_user_id: 'pending', // 待绑定
@@ -128,7 +128,8 @@ export default function AutoMarketing() {
                     material_images: config.materialImages,
                     material_documents: config.materialDocuments,
                     material_analysis: config.materialAnalysis,
-                    posts_per_day: config.postsPerDay,
+                    post_frequency: 'daily', // 暂时映射为 daily，数据库可能没有 posts_per_day
+                    // posts_per_day: config.postsPerDay, // 移除导致 400 的字段
                     review_mode: config.reviewMode,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'supabase_uuid' });
