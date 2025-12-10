@@ -33,7 +33,7 @@ interface ProductConfig {
     targetAudience: string;
     region: string;
     marketingGoal: 'brand' | 'sales' | 'traffic' | 'community';
-    postFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+    postsPerDay: number; // 1-10 篇/天
     brandStyle: 'professional' | 'warm' | 'humorous' | 'minimalist';
     reviewMode: 'auto' | 'manual';
     materialImages: string[];
@@ -55,7 +55,7 @@ export default function AutoMarketing() {
         targetAudience: '',
         region: '',
         marketingGoal: 'brand',
-        postFrequency: 'daily',
+        postsPerDay: 1,
         brandStyle: 'warm',
         reviewMode: 'manual',
         materialImages: [],
@@ -128,7 +128,7 @@ export default function AutoMarketing() {
                     material_images: config.materialImages,
                     material_documents: config.materialDocuments,
                     material_analysis: config.materialAnalysis,
-                    post_frequency: config.postFrequency,
+                    posts_per_day: config.postsPerDay,
                     review_mode: config.reviewMode,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'supabase_uuid' });
@@ -310,21 +310,21 @@ export default function AutoMarketing() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label>发布频率</Label>
-                                    <Select
-                                        value={config.postFrequency}
-                                        onValueChange={(v: any) => setConfig(prev => ({ ...prev, postFrequency: v }))}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="daily">📅 每日一篇</SelectItem>
-                                            <SelectItem value="weekly">📆 每周2-3篇</SelectItem>
-                                            <SelectItem value="biweekly">🗓️ 每两周一篇</SelectItem>
-                                            <SelectItem value="monthly">📅 每月一篇</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <Label>每日发布篇数</Label>
+                                    <div className="flex items-center gap-4">
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="10"
+                                            value={config.postsPerDay}
+                                            onChange={(e) => setConfig(prev => ({ ...prev, postsPerDay: parseInt(e.target.value) }))}
+                                            className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                        />
+                                        <span className="w-16 text-center font-bold text-purple-600 bg-purple-50 rounded-lg py-2">
+                                            {config.postsPerDay} 篇/天
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">滑动选择每天发布 1-10 篇内容</p>
                                 </div>
                             </div>
 
@@ -364,8 +364,14 @@ export default function AutoMarketing() {
                                 </div>
                             </div>
 
-                            {/* 素材上传 */}
+                            {/* 产品素材：文档+图片+视频 */}
                             <div className="pt-4 border-t">
+                                <div className="mb-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        📦 产品素材
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">上传文档、图片、视频，然后 AI 分析</p>
+                                </div>
                                 <MaterialUpload
                                     supabaseUuid={currentUser?.id || ''}
                                     initialImages={config.materialImages}
