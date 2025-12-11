@@ -282,14 +282,16 @@ export default function XiaohongshuAutomation() {
       const profile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
       setUserProfile(profile);
 
-      if (profile) {
-        setCurrentStep('config');
+      // 登录成功且有配置，进入Dashboard
+      if (profile?.product_name) {
+        setCurrentStep('dashboard');
       } else {
+        // 无配置才去配置页
         setCurrentStep('config');
       }
     } catch (err) {
       console.error('Handle login success error:', err);
-      setCurrentStep('config');
+      // 出错保持当前状态，或给提示
     }
   };
 
@@ -709,9 +711,14 @@ export default function XiaohongshuAutomation() {
                     supabaseUuid={supabaseUuid}
                     xhsUserId={xhsUserId}
                     onLoginSuccess={() => {
-                      // 登录成功后刷新账号列表
+                      // 登录成功后刷新账号列表和用户信息
                       handleLoginSuccess();
-                      setCurrentStep('dashboard');
+                      // 重新初始化以获取新绑定的账号ID
+                      initializePage();
+                      // 注意：initializePage 也是异步的，它最终会根据状态决定跳转
+                      // 所以这里不需要强制 setCurrentStep('dashboard')，依靠 initializePage 的逻辑即可
+                      // 但为了UI即时反馈，可以设为 loading
+                      setLoading(true);
                     }}
                     onError={setError}
                     onLogout={() => {
