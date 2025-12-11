@@ -279,6 +279,19 @@ export default function XiaohongshuAutomation() {
     if (!supabaseUuid) return;
 
     try {
+      console.log('🔄 [LoginSuccess] 正在同步用户信息...');
+      // 关键修复：登录成功后，强制调用一次后端 getUserProfile
+      // 这会触发后端从 Cookie 获取最新的头像、昵称，并保存到 accounts 表中
+      // 从而确保 initializePage 能在 accounts/list 中查到此账号
+      if (xhsUserId) {
+        try {
+          await xiaohongshuAPI.getUserProfile(xhsUserId);
+          console.log('✅ [LoginSuccess] 用户信息同步完成');
+        } catch (e) {
+          console.warn('⚠️ [LoginSuccess] 用户信息同步非致命错误:', e);
+        }
+      }
+
       const profile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
       setUserProfile(profile);
 
