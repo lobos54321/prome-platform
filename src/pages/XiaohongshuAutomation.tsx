@@ -283,532 +283,542 @@ export default function XiaohongshuAutomation() {
       // 1. 强制同步：触发后端从 Cookie 获取最新的头像、昵称
       if (xhsUserId) {
         try {
-          const syncRes = await xiaohongshuAPI.getUserProfile(xhsUserId);
-          console.log('✅ [LoginSuccess] 用户信息同步请求结果:', syncRes);
+          // 🔥 Use Worker URL directly (since we implemented the endpoint in xhs-worker)
+          const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
+          console.log(`[LoginSuccess] Syncing profile via Worker: ${workerUrl}`);
+
+          const syncRes = await fetch(`${workerUrl}/agent/xiaohongshu/profile?userId=${encodeURIComponent(xhsUserId)}`, {
+            headers: {
+              'Authorization': `Bearer ${(import.meta as any).env?.VITE_WORKER_SECRET || 'default_secret_key'}`
+            }
+          });
+          const syncData = await syncRes.json();
+          console.log('✅ [LoginSuccess] 用户信息同步请求结果:', syncData);
         } catch (e) {
           console.warn('⚠️ [LoginSuccess] 用户信息同步非致命错误:', e);
         }
       }
+    }
 
       // 2. 轮询等待：确保账号真正出现在 accounts 列表中
       // (防止 initializePage 再次检测不到账号而跳回 Accounts 页面)
       console.log('⏳ [LoginSuccess] 等待账号数据生效...');
-      const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+    const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
 
-      let accountFound = false;
-      for (let i = 0; i < 5; i++) { // 尝试5次，每次1秒
-        try {
-          const response = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${supabaseUuid}`);
-          const data = await response.json();
-          if (data.success && data.data.accounts.length > 0) {
-            console.log('✅ [LoginSuccess] 账号数据已确认生效！');
-            accountFound = true;
-            break;
-          }
-        } catch (err) {
-          console.warn('轮询账号列表失败:', err);
+    let accountFound = false;
+    for (let i = 0; i < 5; i++) { // 尝试5次，每次1秒
+      try {
+        const response = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${supabaseUuid}`);
+        const data = await response.json();
+        if (data.success && data.data.accounts.length > 0) {
+          console.log('✅ [LoginSuccess] 账号数据已确认生效！');
+          accountFound = true;
+          break;
         }
-        await new Promise(r => setTimeout(r, 1000));
+      } catch (err) {
+        console.warn('轮询账号列表失败:', err);
       }
-
-      if (!accountFound) {
-        console.warn('⚠️ [LoginSuccess] 5秒超时仍未检测到账号，可能导致循环跳转，建议手动刷新');
-      }
-
-      const profile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
-      setUserProfile(profile);
-
-      // 登录成功且有配置，强制进入Dashboard
-      if (profile?.product_name) {
-        // 直接设置 Step 防止 initializePage 竞态
-        console.log('🚀 [LoginSuccess] 强制跳转 Dashboard');
-        setCurrentStep('dashboard');
-        // 同时加载数据
-        if (xhsUserId) loadDashboardData(supabaseUuid, xhsUserId);
-      } else {
-        // 无配置才去配置页
-        setCurrentStep('config');
-      }
-    } catch (err) {
-      console.error('Handle login success error:', err);
-      // 出错保持当前状态，或给提示
+      await new Promise(r => setTimeout(r, 1000));
     }
-  };
 
-  const handleConfigSaved = (profile: UserProfile) => {
+    if (!accountFound) {
+      console.warn('⚠️ [LoginSuccess] 5秒超时仍未检测到账号，可能导致循环跳转，建议手动刷新');
+    }
+
+    const profile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
     setUserProfile(profile);
-  };
 
-  const handleStartOperation = async () => {
-    if (!supabaseUuid) return;
-
-    try {
-      // 立即切换到dashboard并显示加载状态
+    // 登录成功且有配置，强制进入Dashboard
+    if (profile?.product_name) {
+      // 直接设置 Step 防止 initializePage 竞态
+      console.log('🚀 [LoginSuccess] 强制跳转 Dashboard');
       setCurrentStep('dashboard');
-      setLoading(true);
+      // 同时加载数据
+      if (xhsUserId) loadDashboardData(supabaseUuid, xhsUserId);
+    } else {
+      // 无配置才去配置页
+      setCurrentStep('config');
+    }
+  } catch (err) {
+    console.error('Handle login success error:', err);
+    // 出错保持当前状态，或给提示
+  }
+};
 
-      // 显示提示信息
-      alert('🚀 自动运营已启动！\n\n系统正在后台生成内容，这需要2-5分钟时间。\n\n页面将自动刷新数据，请耐心等待。');
+const handleConfigSaved = (profile: UserProfile) => {
+  setUserProfile(profile);
+};
 
-      // 等待5秒让后端开始处理
-      await new Promise(resolve => setTimeout(resolve, 5000));
+const handleStartOperation = async () => {
+  if (!supabaseUuid) return;
 
-      // 开始轮询数据 - 最多100次，每10秒一次 = 1000秒（约16分钟）
-      const maxAttempts = 100;
-      let attempts = 0;
+  try {
+    // 立即切换到dashboard并显示加载状态
+    setCurrentStep('dashboard');
+    setLoading(true);
 
-      const pollData = async (): Promise<boolean> => {
-        attempts++;
-        console.log(`🔄 [${new Date().toLocaleTimeString()}] 数据轮询第 ${attempts}/${maxAttempts} 次尝试`);
+    // 显示提示信息
+    alert('🚀 自动运营已启动！\n\n系统正在后台生成内容，这需要2-5分钟时间。\n\n页面将自动刷新数据，请耐心等待。');
 
-        try {
-          // 从后端API获取数据
-          const statusRes = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/status/${xhsUserId}`);
+    // 等待5秒让后端开始处理
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
-          if (statusRes.ok) {
-            const statusData = await statusRes.json();
-            console.log('✅ 获取到运营状态:', statusData);
+    // 开始轮询数据 - 最多100次，每10秒一次 = 1000秒（约16分钟）
+    const maxAttempts = 100;
+    let attempts = 0;
 
-            if (statusData.success && statusData.data) {
-              // 加载完整的Dashboard数据（传入xhsUserId以确保有值）
-              await loadDashboardData(supabaseUuid, xhsUserId || undefined);
+    const pollData = async (): Promise<boolean> => {
+      attempts++;
+      console.log(`🔄 [${new Date().toLocaleTimeString()}] 数据轮询第 ${attempts}/${maxAttempts} 次尝试`);
 
-              // 更新状态
-              const status = await xiaohongshuSupabase.getAutomationStatus(supabaseUuid);
-              if (status) {
-                setAutomationStatus(status);
-                console.log('✅ 数据加载成功！');
-                return true; // 成功获取到数据
-              }
+      try {
+        // 从后端API获取数据
+        const statusRes = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/status/${xhsUserId}`);
+
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          console.log('✅ 获取到运营状态:', statusData);
+
+          if (statusData.success && statusData.data) {
+            // 加载完整的Dashboard数据（传入xhsUserId以确保有值）
+            await loadDashboardData(supabaseUuid, xhsUserId || undefined);
+
+            // 更新状态
+            const status = await xiaohongshuSupabase.getAutomationStatus(supabaseUuid);
+            if (status) {
+              setAutomationStatus(status);
+              console.log('✅ 数据加载成功！');
+              return true; // 成功获取到数据
             }
-          } else if (statusRes.status === 404) {
-            console.log('⏳ 数据尚未生成，继续等待...');
           }
-        } catch (err) {
-          console.warn(`⚠️ 轮询失败 (${attempts}/${maxAttempts}):`, err);
+        } else if (statusRes.status === 404) {
+          console.log('⏳ 数据尚未生成，继续等待...');
         }
-
-        return false;
-      };
-
-      // 第一次尝试
-      const success = await pollData();
-
-      if (!success && attempts < maxAttempts) {
-        // 如果第一次失败，继续轮询
-        console.log('🔄 开始持续轮询，每10秒检查一次，最多持续1000秒');
-
-        const interval = setInterval(async () => {
-          const result = await pollData();
-
-          if (result) {
-            clearInterval(interval);
-            setLoading(false);
-            alert('✅ 自动运营启动成功！\n\n内容已生成完毕，可以在Dashboard查看详情。');
-          } else if (attempts >= maxAttempts) {
-            clearInterval(interval);
-            setLoading(false);
-            alert('⚠️ 数据加载超时\n\n后台可能还在处理中，请稍后手动刷新页面查看。\n\n如果长时间没有数据，请检查后端日志。');
-          }
-        }, 10000); // 每10秒轮询一次
-
-        // 保存interval ID以便在组件卸载时清理
-        return () => clearInterval(interval);
-      } else if (success) {
-        setLoading(false);
-        alert('✅ 自动运营启动成功！\n\n内容已生成完毕。');
-      } else {
-        setLoading(false);
+      } catch (err) {
+        console.warn(`⚠️ 轮询失败 (${attempts}/${maxAttempts}):`, err);
       }
 
-    } catch (err) {
-      console.error('Handle start operation error:', err);
-      setError('启动自动运营失败: ' + (err instanceof Error ? err.message : String(err)));
+      return false;
+    };
+
+    // 第一次尝试
+    const success = await pollData();
+
+    if (!success && attempts < maxAttempts) {
+      // 如果第一次失败，继续轮询
+      console.log('🔄 开始持续轮询，每10秒检查一次，最多持续1000秒');
+
+      const interval = setInterval(async () => {
+        const result = await pollData();
+
+        if (result) {
+          clearInterval(interval);
+          setLoading(false);
+          alert('✅ 自动运营启动成功！\n\n内容已生成完毕，可以在Dashboard查看详情。');
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          setLoading(false);
+          alert('⚠️ 数据加载超时\n\n后台可能还在处理中，请稍后手动刷新页面查看。\n\n如果长时间没有数据，请检查后端日志。');
+        }
+      }, 10000); // 每10秒轮询一次
+
+      // 保存interval ID以便在组件卸载时清理
+      return () => clearInterval(interval);
+    } else if (success) {
+      setLoading(false);
+      alert('✅ 自动运营启动成功！\n\n内容已生成完毕。');
+    } else {
       setLoading(false);
     }
-  };
 
-  const handleRefresh = async () => {
-    if (!supabaseUuid) return;
+  } catch (err) {
+    console.error('Handle start operation error:', err);
+    setError('启动自动运营失败: ' + (err instanceof Error ? err.message : String(err)));
+    setLoading(false);
+  }
+};
 
-    try {
-      const status = await xiaohongshuSupabase.getAutomationStatus(supabaseUuid);
-      setAutomationStatus(status);
-    } catch (err) {
-      console.error('Handle refresh error:', err);
+const handleRefresh = async () => {
+  if (!supabaseUuid) return;
+
+  try {
+    const status = await xiaohongshuSupabase.getAutomationStatus(supabaseUuid);
+    setAutomationStatus(status);
+  } catch (err) {
+    console.error('Handle refresh error:', err);
+  }
+};
+
+const handleReconfigure = async () => {
+  if (!confirm('确定要重新配置吗？\n\n这将：\n✅ 停止当前的自动运营\n✅ 清除所有运营数据和策略\n✅ 保留您的登录状态（无需重新扫码）\n\n您可以立即重新配置产品信息。')) {
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    if (supabaseUuid && xhsUserId) {
+      // 1. 清除Supabase数据
+      console.log('🧹 清除Supabase数据...');
+      await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
+
+      // 2. 调用后端重置自动运营（清除策略、计划等）
+      console.log('🧹 调用后端重置API...');
+      const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/reset/${xhsUserId}`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        console.log('✅ 后端运营数据已清除');
+      } else {
+        console.warn('⚠️ 后端重置失败，状态码:', response.status);
+      }
     }
-  };
 
-  const handleReconfigure = async () => {
-    if (!confirm('确定要重新配置吗？\n\n这将：\n✅ 停止当前的自动运营\n✅ 清除所有运营数据和策略\n✅ 保留您的登录状态（无需重新扫码）\n\n您可以立即重新配置产品信息。')) {
-      return;
-    }
+    // 3. 重置前端状态（但保留登录状态）
+    console.log('🧹 重置前端状态...');
+    setUserProfile(null);
+    setAutomationStatus(null);
+    setContentStrategy(null);
+    setWeeklyPlan(null);
+    setCurrentStep('config');
 
-    try {
-      setLoading(true);
+    console.log('✅ 重新配置完成，返回配置页面');
+    alert('✅ 已清除运营数据！\n\n您可以重新配置产品信息。\n\n您的登录状态已保留，无需重新扫码。');
 
-      if (supabaseUuid && xhsUserId) {
-        // 1. 清除Supabase数据
-        console.log('🧹 清除Supabase数据...');
-        await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
+  } catch (err) {
+    console.error('Reconfigure error:', err);
+    setError('重新配置失败: ' + (err instanceof Error ? err.message : String(err)));
+  } finally {
+    setLoading(false);
+  }
+};
 
-        // 2. 调用后端重置自动运营（清除策略、计划等）
-        console.log('🧹 调用后端重置API...');
-        const response = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/reset/${xhsUserId}`, {
+const handleLogout = async () => {
+  // 🔥 Remove double confirm - DashboardSection already confirms
+  // if (!confirm('确定要退出登录吗？这将清除所有本地数据和服务器端运营配置。')) {
+  //   return;
+  // }
+
+  try {
+    // 调用后端清除Cookie
+    if (supabaseUuid && xhsUserId) {
+      console.log('🧹 [Logout] 开始清理...');
+
+      // 1. 清除 Supabase 数据
+      await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
+
+      // 2. 🔥 调用 Claude Agent Service 的 logout 端点
+      // Use env var with localhost fallback for development
+      const apiUrl = process.env.VITE_XHS_API_URL || 'http://localhost:8080';
+      const logoutUrl = `${apiUrl}/agent/xiaohongshu/logout`;
+      console.log(`🔄 [Logout] 准备调用 logout API: ${logoutUrl}`);
+
+      try {
+        const response = await fetch(logoutUrl, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId: xhsUserId }),
         });
 
         if (response.ok) {
-          console.log('✅ 后端运营数据已清除');
+          console.log('✅ [Logout] MCP Router 完整清理成功');
         } else {
-          console.warn('⚠️ 后端重置失败，状态码:', response.status);
+          console.error('❌ [Logout] MCP Router 清理失败');
         }
+      } catch (fetchError) {
+        console.error('❌ [Logout] Fetch 调用失败:', fetchError);
       }
-
-      // 3. 重置前端状态（但保留登录状态）
-      console.log('🧹 重置前端状态...');
-      setUserProfile(null);
-      setAutomationStatus(null);
-      setContentStrategy(null);
-      setWeeklyPlan(null);
-      setCurrentStep('config');
-
-      console.log('✅ 重新配置完成，返回配置页面');
-      alert('✅ 已清除运营数据！\n\n您可以重新配置产品信息。\n\n您的登录状态已保留，无需重新扫码。');
-
-    } catch (err) {
-      console.error('Reconfigure error:', err);
-      setError('重新配置失败: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setLoading(false);
     }
-  };
 
-  const handleLogout = async () => {
-    // 🔥 Remove double confirm - DashboardSection already confirms
-    // if (!confirm('确定要退出登录吗？这将清除所有本地数据和服务器端运营配置。')) {
-    //   return;
-    // }
+    // 清除本地存储
+    localStorage.removeItem('xhs_logged_in');
+    localStorage.removeItem('lastLogoutTime');
+    localStorage.setItem('lastLogoutTime', Date.now().toString());
 
-    try {
-      // 调用后端清除Cookie
-      if (supabaseUuid && xhsUserId) {
-        console.log('🧹 [Logout] 开始清理...');
+    // 重置所有状态
+    setUserProfile(null);
+    setAutomationStatus(null);
+    setContentStrategy(null);
+    setWeeklyPlan(null);
 
-        // 1. 清除 Supabase 数据
-        await xiaohongshuSupabase.clearUserData(supabaseUuid).catch(console.error);
-
-        // 2. 🔥 调用 Claude Agent Service 的 logout 端点
-        // Use env var with localhost fallback for development
-        const apiUrl = process.env.VITE_XHS_API_URL || 'http://localhost:8080';
-        const logoutUrl = `${apiUrl}/agent/xiaohongshu/logout`;
-        console.log(`🔄 [Logout] 准备调用 logout API: ${logoutUrl}`);
-
-        try {
-          const response = await fetch(logoutUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ userId: xhsUserId }),
-          });
-
-          if (response.ok) {
-            console.log('✅ [Logout] MCP Router 完整清理成功');
-          } else {
-            console.error('❌ [Logout] MCP Router 清理失败');
-          }
-        } catch (fetchError) {
-          console.error('❌ [Logout] Fetch 调用失败:', fetchError);
-        }
-      }
-
-      // 清除本地存储
-      localStorage.removeItem('xhs_logged_in');
-      localStorage.removeItem('lastLogoutTime');
-      localStorage.setItem('lastLogoutTime', Date.now().toString());
-
-      // 重置所有状态
-      setUserProfile(null);
-      setAutomationStatus(null);
-      setContentStrategy(null);
-      setWeeklyPlan(null);
-
-      // 🔥 关键修复：设置 justLoggedOut 标志，防止 LoginSection 自动重新登录
-      // 并且不要刷新页面，避免触发 initializePage 循环
-      setJustLoggedOut(true);
-      setCurrentStep('accounts');
-      // 注意：我们需要通过某种方式将 justLoggedOut 传递给 LoginSection
-      // 这里我们使用一个临时状态或通过 props 传递
-      // 由于 LoginSection 是在 render 中渲染的，我们可以添加一个 state
-    } catch (err) {
-      console.error('Logout error:', err);
-      setError('退出登录失败，请刷新页面重试');
-    }
-  };
-
-  // 在测试模式下绕过用户检查
-  const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
-  if (!user && !isTestMode) {
-    return null;
+    // 🔥 关键修复：设置 justLoggedOut 标志，防止 LoginSection 自动重新登录
+    // 并且不要刷新页面，避免触发 initializePage 循环
+    setJustLoggedOut(true);
+    setCurrentStep('accounts');
+    // 注意：我们需要通过某种方式将 justLoggedOut 传递给 LoginSection
+    // 这里我们使用一个临时状态或通过 props 传递
+    // 由于 LoginSection 是在 render 中渲染的，我们可以添加一个 state
+  } catch (err) {
+    console.error('Logout error:', err);
+    setError('退出登录失败，请刷新页面重试');
   }
+};
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-12 w-12 animate-spin text-purple-600 mx-auto" />
-          <p className="text-gray-600">正在加载...</p>
-        </div>
-      </div>
-    );
-  }
+// 在测试模式下绕过用户检查
+const isTestMode = import.meta.env.VITE_TEST_MODE === 'true';
+if (!user && !isTestMode) {
+  return null;
+}
 
+if (loading) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Header */}
-        <div className="text-center text-gray-800 mb-8">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            🤖 小红书全自动运营系统
-          </h1>
-          <p className="text-lg opacity-90">一次设置，终身自动 - 让AI为你打理一切</p>
-        </div>
-
-        {/* Error Alert */}
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* 🔥 全局顶部工具栏 - 始终可见 */}
-        {supabaseUuid && xhsUserId && (
-          <Card className="mb-6">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  {/* 账号选择器 - 支持多账号切换 */}
-                  <AccountSelector
-                    supabaseUuid={supabaseUuid}
-                    onAccountChange={(account) => {
-                      if (account) {
-                        console.log('🔄 切换到账号:', account.nickname || account.id);
-                        // 切换账号后重新初始化页面
-                        initializePage();
-                      }
-                    }}
-                    onAddAccount={() => {
-                      // 点击添加账号时，跳转到账号管理
-                      setCurrentStep('accounts');
-                    }}
-                  />
-
-                  <div className="flex items-center">
-                    <span className={`w-2 h-2 rounded-full mr-2 ${currentStep === 'dashboard' ? 'bg-green-400' :
-                      currentStep === 'config' ? 'bg-yellow-400 animate-pulse' :
-                        'bg-gray-400 animate-pulse'
-                      }`}></span>
-                    <span className={`text-sm ${currentStep === 'dashboard' ? 'text-green-600 font-medium' :
-                      currentStep === 'config' ? 'text-yellow-600' :
-                        'text-gray-600'
-                      }`}>
-                      {currentStep === 'dashboard' ? '运营中' :
-                        currentStep === 'config' ? '配置中' :
-                          '未登录'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {/* 视图切换按钮 */}
-                  <div className="flex rounded-lg border border-gray-200 p-0.5">
-                    <Button
-                      variant={viewMode === 'matrix' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="text-xs px-2"
-                      onClick={() => setViewMode('matrix')}
-                    >
-                      <LayoutGrid className="w-3 h-3 mr-1" />
-                      矩阵
-                    </Button>
-                    <Button
-                      variant={viewMode === 'single' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="text-xs px-2"
-                      onClick={() => setViewMode('single')}
-                    >
-                      <User className="w-3 h-3 mr-1" />
-                      单账号
-                    </Button>
-                  </div>
-
-                  {currentStep === 'dashboard' && viewMode === 'single' && (
-                    <Button
-                      onClick={handleReconfigure}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      ⚙️ 重新配置
-                    </Button>
-                  )}
-                  {currentStep !== 'config' && (
-                    <Button
-                      onClick={handleLogout}
-                      variant="destructive"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      🚪 退出登录
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Content */}
-        <div className="space-y-6">
-          {/* 矩阵视图 - 同时管理所有账号 */}
-          {viewMode === 'matrix' && supabaseUuid && (
-            <MatrixDashboard
-              supabaseUuid={supabaseUuid}
-              onAddAccount={() => {
-                setViewMode('single');
-                setCurrentStep('accounts');
-              }}
-              onConfigureAccount={(account) => {
-                console.log('配置账号:', account);
-                setViewMode('single');
-                setCurrentStep('config');
-              }}
-              onViewDetails={(account) => {
-                console.log('查看详情:', account);
-                setViewMode('single');
-                setCurrentStep('dashboard');
-              }}
-            />
-          )}
-
-          {/* 单账号视图 */}
-          {viewMode === 'single' && (
-            <>
-              {/* Step 1: Config - 产品配置 */}
-              {(currentStep === 'config') && supabaseUuid && (
-                <ConfigSection
-                  supabaseUuid={supabaseUuid}
-                  xhsUserId={xhsUserId || ''}
-                  initialConfig={userProfile}
-                  onConfigSaved={(profile) => {
-                    handleConfigSaved(profile);
-                    // 配置保存后进入账号管理步骤
-                    setCurrentStep('accounts');
-                  }}
-                  onStartOperation={handleStartOperation}
-                />
-              )}
-
-              {/* Step 2: Accounts - 添加/管理账号 */}
-              {(currentStep === 'accounts') && supabaseUuid && xhsUserId && (
-                <>
-                  {/* 显示产品配置摘要 */}
-                  {userProfile?.product_name && (
-                    <Card className="mb-4">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h3 className="font-semibold">产品: {userProfile.product_name}</h3>
-                            <p className="text-sm text-muted-foreground">{userProfile.target_audience}</p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => setCurrentStep('config')}>
-                            修改配置
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* 账号矩阵管理组件 */}
-                  <AccountManager
-                    supabaseUuid={supabaseUuid}
-                    productName={userProfile?.product_name}
-                    targetAudience={userProfile?.target_audience || ''}
-                    marketingGoal={userProfile?.marketing_goal}
-                    materialAnalysis={userProfile?.material_analysis}
-                    onAddAccount={() => {
-                      // 触发登录流程添加新账号
-                      console.log('👤 [Page] 添加新账号');
-                    }}
-                    onStrategyGenerated={(personas) => {
-                      console.log('🤖 [Page] AI策略已生成:', personas);
-                    }}
-                  />
-
-                  {/* 登录/账号管理组件 - 用于添加新账号 */}
-                  <LoginSection
-                    supabaseUuid={supabaseUuid}
-                    xhsUserId={xhsUserId}
-                    onLoginSuccess={() => {
-                      // 登录成功后刷新账号列表和用户信息
-                      handleLoginSuccess();
-                      // 重新初始化以获取新绑定的账号ID
-                      initializePage();
-                      // 注意：initializePage 也是异步的，它最终会根据状态决定跳转
-                      // 所以这里不需要强制 setCurrentStep('dashboard')，依靠 initializePage 的逻辑即可
-                      // 但为了UI即时反馈，可以设为 loading
-                      setLoading(true);
-                    }}
-                    onError={setError}
-                    onLogout={() => {
-                      console.log('🔄 [Page] 收到退出登录通知，重置状态');
-                      setCurrentStep('accounts');
-                      setContentStrategy(null);
-                      setWeeklyPlan(null);
-                      setAutomationStatus(null);
-                      setError('');
-                      setLoading(false);
-                      setJustLoggedOut(true);
-                    }}
-                    justLoggedOut={justLoggedOut}
-                  />
-                </>
-              )}
-
-              {/* Step 3: Dashboard - 显示配置和运营状态 */}
-              {(currentStep === 'dashboard') && supabaseUuid && xhsUserId && (
-                <ConfigSection
-                  supabaseUuid={supabaseUuid}
-                  xhsUserId={xhsUserId}
-                  initialConfig={userProfile}
-                  onConfigSaved={handleConfigSaved}
-                  onStartOperation={handleStartOperation}
-                />
-              )}
-
-              {/* Step 3: Dashboard */}
-              {currentStep === 'dashboard' && supabaseUuid && xhsUserId && (
-                <DashboardSection
-                  supabaseUuid={supabaseUuid}
-                  xhsUserId={xhsUserId}
-                  automationStatus={automationStatus}
-                  contentStrategy={contentStrategy}
-                  weeklyPlan={weeklyPlan}
-                  onRefresh={handleRefresh}
-                  onReconfigure={handleReconfigure}
-                  onLogout={handleLogout}
-                />
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-12 text-center text-sm text-gray-500">
-          <p>由 Claude AI 驱动 | 安全可靠的自动化运营</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-purple-600 mx-auto" />
+        <p className="text-gray-600">正在加载...</p>
       </div>
     </div>
   );
+}
+
+return (
+  <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Header */}
+      <div className="text-center text-gray-800 mb-8">
+        <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+          🤖 小红书全自动运营系统
+        </h1>
+        <p className="text-lg opacity-90">一次设置，终身自动 - 让AI为你打理一切</p>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* 🔥 全局顶部工具栏 - 始终可见 */}
+      {supabaseUuid && xhsUserId && (
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                {/* 账号选择器 - 支持多账号切换 */}
+                <AccountSelector
+                  supabaseUuid={supabaseUuid}
+                  onAccountChange={(account) => {
+                    if (account) {
+                      console.log('🔄 切换到账号:', account.nickname || account.id);
+                      // 切换账号后重新初始化页面
+                      initializePage();
+                    }
+                  }}
+                  onAddAccount={() => {
+                    // 点击添加账号时，跳转到账号管理
+                    setCurrentStep('accounts');
+                  }}
+                />
+
+                <div className="flex items-center">
+                  <span className={`w-2 h-2 rounded-full mr-2 ${currentStep === 'dashboard' ? 'bg-green-400' :
+                    currentStep === 'config' ? 'bg-yellow-400 animate-pulse' :
+                      'bg-gray-400 animate-pulse'
+                    }`}></span>
+                  <span className={`text-sm ${currentStep === 'dashboard' ? 'text-green-600 font-medium' :
+                    currentStep === 'config' ? 'text-yellow-600' :
+                      'text-gray-600'
+                    }`}>
+                    {currentStep === 'dashboard' ? '运营中' :
+                      currentStep === 'config' ? '配置中' :
+                        '未登录'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {/* 视图切换按钮 */}
+                <div className="flex rounded-lg border border-gray-200 p-0.5">
+                  <Button
+                    variant={viewMode === 'matrix' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="text-xs px-2"
+                    onClick={() => setViewMode('matrix')}
+                  >
+                    <LayoutGrid className="w-3 h-3 mr-1" />
+                    矩阵
+                  </Button>
+                  <Button
+                    variant={viewMode === 'single' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="text-xs px-2"
+                    onClick={() => setViewMode('single')}
+                  >
+                    <User className="w-3 h-3 mr-1" />
+                    单账号
+                  </Button>
+                </div>
+
+                {currentStep === 'dashboard' && viewMode === 'single' && (
+                  <Button
+                    onClick={handleReconfigure}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    ⚙️ 重新配置
+                  </Button>
+                )}
+                {currentStep !== 'config' && (
+                  <Button
+                    onClick={handleLogout}
+                    variant="destructive"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    🚪 退出登录
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Content */}
+      <div className="space-y-6">
+        {/* 矩阵视图 - 同时管理所有账号 */}
+        {viewMode === 'matrix' && supabaseUuid && (
+          <MatrixDashboard
+            supabaseUuid={supabaseUuid}
+            onAddAccount={() => {
+              setViewMode('single');
+              setCurrentStep('accounts');
+            }}
+            onConfigureAccount={(account) => {
+              console.log('配置账号:', account);
+              setViewMode('single');
+              setCurrentStep('config');
+            }}
+            onViewDetails={(account) => {
+              console.log('查看详情:', account);
+              setViewMode('single');
+              setCurrentStep('dashboard');
+            }}
+          />
+        )}
+
+        {/* 单账号视图 */}
+        {viewMode === 'single' && (
+          <>
+            {/* Step 1: Config - 产品配置 */}
+            {(currentStep === 'config') && supabaseUuid && (
+              <ConfigSection
+                supabaseUuid={supabaseUuid}
+                xhsUserId={xhsUserId || ''}
+                initialConfig={userProfile}
+                onConfigSaved={(profile) => {
+                  handleConfigSaved(profile);
+                  // 配置保存后进入账号管理步骤
+                  setCurrentStep('accounts');
+                }}
+                onStartOperation={handleStartOperation}
+              />
+            )}
+
+            {/* Step 2: Accounts - 添加/管理账号 */}
+            {(currentStep === 'accounts') && supabaseUuid && xhsUserId && (
+              <>
+                {/* 显示产品配置摘要 */}
+                {userProfile?.product_name && (
+                  <Card className="mb-4">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="font-semibold">产品: {userProfile.product_name}</h3>
+                          <p className="text-sm text-muted-foreground">{userProfile.target_audience}</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentStep('config')}>
+                          修改配置
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* 账号矩阵管理组件 */}
+                <AccountManager
+                  supabaseUuid={supabaseUuid}
+                  productName={userProfile?.product_name}
+                  targetAudience={userProfile?.target_audience || ''}
+                  marketingGoal={userProfile?.marketing_goal}
+                  materialAnalysis={userProfile?.material_analysis}
+                  onAddAccount={() => {
+                    // 触发登录流程添加新账号
+                    console.log('👤 [Page] 添加新账号');
+                  }}
+                  onStrategyGenerated={(personas) => {
+                    console.log('🤖 [Page] AI策略已生成:', personas);
+                  }}
+                />
+
+                {/* 登录/账号管理组件 - 用于添加新账号 */}
+                <LoginSection
+                  supabaseUuid={supabaseUuid}
+                  xhsUserId={xhsUserId}
+                  onLoginSuccess={() => {
+                    // 登录成功后刷新账号列表和用户信息
+                    handleLoginSuccess();
+                    // 重新初始化以获取新绑定的账号ID
+                    initializePage();
+                    // 注意：initializePage 也是异步的，它最终会根据状态决定跳转
+                    // 所以这里不需要强制 setCurrentStep('dashboard')，依靠 initializePage 的逻辑即可
+                    // 但为了UI即时反馈，可以设为 loading
+                    setLoading(true);
+                  }}
+                  onError={setError}
+                  onLogout={() => {
+                    console.log('🔄 [Page] 收到退出登录通知，重置状态');
+                    setCurrentStep('accounts');
+                    setContentStrategy(null);
+                    setWeeklyPlan(null);
+                    setAutomationStatus(null);
+                    setError('');
+                    setLoading(false);
+                    setJustLoggedOut(true);
+                  }}
+                  justLoggedOut={justLoggedOut}
+                />
+              </>
+            )}
+
+            {/* Step 3: Dashboard - 显示配置和运营状态 */}
+            {(currentStep === 'dashboard') && supabaseUuid && xhsUserId && (
+              <ConfigSection
+                supabaseUuid={supabaseUuid}
+                xhsUserId={xhsUserId}
+                initialConfig={userProfile}
+                onConfigSaved={handleConfigSaved}
+                onStartOperation={handleStartOperation}
+              />
+            )}
+
+            {/* Step 3: Dashboard */}
+            {currentStep === 'dashboard' && supabaseUuid && xhsUserId && (
+              <DashboardSection
+                supabaseUuid={supabaseUuid}
+                xhsUserId={xhsUserId}
+                automationStatus={automationStatus}
+                contentStrategy={contentStrategy}
+                weeklyPlan={weeklyPlan}
+                onRefresh={handleRefresh}
+                onReconfigure={handleReconfigure}
+                onLogout={handleLogout}
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-12 text-center text-sm text-gray-500">
+        <p>由 Claude AI 驱动 | 安全可靠的自动化运营</p>
+      </div>
+    </div>
+  </div>
+);
 }
