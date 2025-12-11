@@ -280,24 +280,51 @@ export default function XiaohongshuAutomation() {
 
     try {
       console.log('🔄 [LoginSuccess] 正在同步用户信息...');
-      // 关键修复：登录成功后，强制调用一次后端 getUserProfile
-      // 这会触发后端从 Cookie 获取最新的头像、昵称，并保存到 accounts 表中
-      // 从而确保 initializePage 能在 accounts/list 中查到此账号
+      // 1. 强制同步：触发后端从 Cookie 获取最新的头像、昵称
       if (xhsUserId) {
         try {
-          await xiaohongshuAPI.getUserProfile(xhsUserId);
-          console.log('✅ [LoginSuccess] 用户信息同步完成');
+          const syncRes = await xiaohongshuAPI.getUserProfile(xhsUserId);
+          console.log('✅ [LoginSuccess] 用户信息同步请求结果:', syncRes);
         } catch (e) {
           console.warn('⚠️ [LoginSuccess] 用户信息同步非致命错误:', e);
         }
       }
 
+      // 2. 轮询等待：确保账号真正出现在 accounts 列表中
+      // (防止 initializePage 再次检测不到账号而跳回 Accounts 页面)
+      console.log('⏳ [LoginSuccess] 等待账号数据生效...');
+      const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+
+      let accountFound = false;
+      for (let i = 0; i < 5; i++) { // 尝试5次，每次1秒
+        try {
+          const response = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${supabaseUuid}`);
+          const data = await response.json();
+          if (data.success && data.data.accounts.length > 0) {
+            console.log('✅ [LoginSuccess] 账号数据已确认生效！');
+            accountFound = true;
+            break;
+          }
+        } catch (err) {
+          console.warn('轮询账号列表失败:', err);
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      if (!accountFound) {
+        console.warn('⚠️ [LoginSuccess] 5秒超时仍未检测到账号，可能导致循环跳转，建议手动刷新');
+      }
+
       const profile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
       setUserProfile(profile);
 
-      // 登录成功且有配置，进入Dashboard
+      // 登录成功且有配置，强制进入Dashboard
       if (profile?.product_name) {
+        // 直接设置 Step 防止 initializePage 竞态
+        console.log('🚀 [LoginSuccess] 强制跳转 Dashboard');
         setCurrentStep('dashboard');
+        // 同时加载数据
+        if (xhsUserId) loadDashboardData(supabaseUuid, xhsUserId);
       } else {
         // 无配置才去配置页
         setCurrentStep('config');
