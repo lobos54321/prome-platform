@@ -281,23 +281,11 @@ export default function XiaohongshuAutomation() {
     try {
       console.log('🔄 [LoginSuccess] 正在同步用户信息...');
 
-      // 🔥 Step 0: 先同步 Cookies 到后端
-      if (xhsUserId) {
-        console.log(`[LoginSuccess] 🍪 正在同步 Cookies 到后端, userId: ${xhsUserId}`);
-        try {
-          // 通过 postMessage 触发插件同步 cookies 到后端
-          window.postMessage({
-            type: 'PROME_SYNC_COOKIES_TO_BACKEND',
-            data: { userId: xhsUserId }
-          }, '*');
-
-          // 等待一小段时间让同步完成
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          console.log('✅ [LoginSuccess] Cookies 同步请求已发送');
-        } catch (cookieSyncError) {
-          console.warn('⚠️ [LoginSuccess] Cookie 同步失败 (非致命):', cookieSyncError);
-        }
-      }
+      // 🔥 NOTE: Cookie sync is handled by the frontend's LoginSection via /api/v1/login/sync-web
+      // We do NOT use the extension's SYNC_COOKIES_TO_BACKEND here because:
+      // 1. chrome.cookies.getAll() cannot access HttpOnly cookies like web_session
+      // 2. The extension sync would overwrite the valid cookies from sync-web
+      // The frontend's direct sync already has web_session, so we just proceed to profile sync
 
       // 1. 强制同步：触发后端从 Cookie 获取最新的头像、昵称
       if (xhsUserId) {
