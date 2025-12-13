@@ -270,8 +270,11 @@ export default function XiaohongshuAutomation() {
       } else {
         console.log('⚠️ 没有获取到 plan 数据');
       }
+      setLoading(false); // 🔥 Ensure loading is cleared after data load
     } catch (err) {
       console.error('❌ Load dashboard data error:', err);
+      // Ensure loading is cleared even on error
+      setLoading(false);
     }
   };
 
@@ -279,40 +282,19 @@ export default function XiaohongshuAutomation() {
     if (!supabaseUuid) return;
 
     try {
-      console.log('🔄 [LoginSuccess] 正在同步用户信息...');
+      console.log('🔄 [LoginSuccess] 登录成功，准备跳转...');
 
-      // 🔥 NOTE: Cookie sync is handled by the frontend's LoginSection via /api/v1/login/sync-web
-      // We do NOT use the extension's SYNC_COOKIES_TO_BACKEND here because:
-      // 1. chrome.cookies.getAll() cannot access HttpOnly cookies like web_session
-      // 2. The extension sync would overwrite the valid cookies from sync-web
-      // The frontend's direct sync already has web_session, so we just proceed to profile sync
+      // 🔥 NOTE: We skip the profile fetch from xhs-worker because:
+      // 1. XHS API rejects requests from server IP (different from user's browser IP)
+      // 2. Profile info (avatar, nickname) is nice-to-have, not required for publishing
+      // 3. The failing profile fetch was causing infinite loops
 
-      // 1. 强制同步：触发后端从 Cookie 获取最新的头像、昵称
-      if (xhsUserId) {
-        try {
-          // 🔥 Use Worker URL directly (since we implemented the endpoint in xhs-worker)
-          const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
-          console.log(`[LoginSuccess] Syncing profile via Worker: ${workerUrl}`);
-
-          const syncRes = await fetch(`${workerUrl}/agent/xiaohongshu/profile?userId=${encodeURIComponent(xhsUserId)}`, {
-            headers: {
-              'Authorization': `Bearer ${(import.meta as any).env?.VITE_WORKER_SECRET || 'default_secret_key'}`
-            }
-          });
-          const syncData = await syncRes.json();
-          console.log('✅ [LoginSuccess] 用户信息同步请求结果:', syncData);
-        } catch (e) {
-          console.warn('⚠️ [LoginSuccess] 用户信息同步非致命错误:', e);
-        }
-      }
-
-      // 2. 轮询等待：确保账号真正出现在 accounts 列表中
-      // (防止 initializePage 再次检测不到账号而跳回 Accounts 页面)
+      // Just wait briefly for account binding to propagate
       console.log('⏳ [LoginSuccess] 等待账号数据生效...');
       const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
 
       let accountFound = false;
-      for (let i = 0; i < 5; i++) { // 尝试5次，每次1秒
+      for (let i = 0; i < 3; i++) { // 🔥 Reduced from 5 to 3 attempts
         try {
           const response = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${supabaseUuid}`);
           const data = await response.json();
@@ -328,7 +310,7 @@ export default function XiaohongshuAutomation() {
       }
 
       if (!accountFound) {
-        console.warn('⚠️ [LoginSuccess] 5秒超时仍未检测到账号，可能导致循环跳转，建议手动刷新');
+        console.warn('⚠️ [LoginSuccess] 账号未立即检测到，但继续跳转（可能稍后生效）');
       }
 
       const profile = await xiaohongshuSupabase.getUserProfile(supabaseUuid);
@@ -336,10 +318,8 @@ export default function XiaohongshuAutomation() {
 
       // 登录成功且有配置，强制进入Dashboard
       if (profile?.product_name) {
-        // 直接设置 Step 防止 initializePage 竞态
         console.log('🚀 [LoginSuccess] 强制跳转 Dashboard');
         setCurrentStep('dashboard');
-        // 同时加载数据
         if (xhsUserId) loadDashboardData(supabaseUuid, xhsUserId);
       } else {
         // 无配置才去配置页
@@ -347,7 +327,8 @@ export default function XiaohongshuAutomation() {
       }
     } catch (err) {
       console.error('Handle login success error:', err);
-      // 出错保持当前状态，或给提示
+      // 🔥 On error, still try to proceed instead of looping
+      setCurrentStep('config');
     }
   };
 
