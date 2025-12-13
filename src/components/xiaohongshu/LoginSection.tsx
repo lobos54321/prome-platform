@@ -305,7 +305,38 @@ export function LoginSection({
       console.log('📥 [LoginSection] 保存Cookie响应:', saveResult);
 
       if (saveResult.success || saveResponse.ok) {
-        console.log('✅ [LoginSection] Cookie保存成功，检查登录状态');
+        console.log('✅ [LoginSection] Cookie保存成功');
+
+        // 🔥 关键修复：绑定账号到用户
+        // 这样 /agent/accounts/list 才会返回这个账号
+        const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+        try {
+          console.log('🔗 [LoginSection] 绑定账号到用户...');
+          const bindResponse = await fetch(`${BACKEND_URL}/agent/accounts/bind`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              supabaseUuid: supabaseUuid,
+              cookies: result.data.cookies,
+              isDefault: true,  // 第一个账号设为默认
+              accountInfo: {}   // 可选的账号信息
+            })
+          });
+
+          const bindResult = await bindResponse.json();
+          console.log('📥 [LoginSection] 绑定账号响应:', bindResult);
+
+          if (bindResult.success) {
+            console.log('✅ [LoginSection] 账号绑定成功');
+          } else {
+            console.warn('⚠️ [LoginSection] 账号绑定失败:', bindResult.error);
+            // 继续检查登录状态，不阻止流程
+          }
+        } catch (bindError) {
+          console.warn('⚠️ [LoginSection] 账号绑定请求失败:', bindError);
+          // 继续检查登录状态，不阻止流程
+        }
+
         await checkLoginStatus();
       } else {
         onError(saveResult.error || saveResult.detail || '保存Cookie失败');
