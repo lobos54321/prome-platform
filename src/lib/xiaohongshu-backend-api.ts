@@ -342,12 +342,40 @@ export class XiaohongshuBackendAPI {
 
   /**
    * 获取用户资料（当前登录的小红书账号信息）
+   * 注意：此接口在 xhs-worker 服务上，不是 automation-ai
    */
   async getUserProfile(userId: string): Promise<APIResponse<any>> {
-    return await this.request(
-      `/agent/xiaohongshu/profile?userId=${encodeURIComponent(userId)}`,
-      { method: 'GET' }
-    );
+    const workerUrl = ((import.meta as any).env?.VITE_XHS_WORKER_URL || 'https://xiaohongshu-worker.zeabur.app').replace(/\/$/, '');
+    const fullURL = `${workerUrl}/agent/xiaohongshu/profile?userId=${encodeURIComponent(userId)}`;
+
+    console.log(`📤 [BackendAPI] GET ${fullURL} (via Worker)`);
+
+    try {
+      const response = await fetch(fullURL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log(`📥 [BackendAPI] ${response.status} ${fullURL}`);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error(`❌ [BackendAPI] Error Response:`, errorText);
+        throw new APIError(
+          `HTTP ${response.status}: ${response.statusText}`,
+          response.status
+        );
+      }
+
+      const data = await response.json();
+      console.log(`✅ [BackendAPI] Success:`, data);
+      return data;
+    } catch (error) {
+      console.error(`❌ [BackendAPI] getUserProfile Failed:`, error);
+      throw error;
+    }
   }
 
   /**

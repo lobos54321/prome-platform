@@ -140,6 +140,56 @@ export function LoginSection({
       console.log('🔍 [LoginSection] xhs-worker 登录状态:', workerStatus);
 
       if (workerStatus.status === 'logged_in' || workerStatus.is_logged_in) {
+        // 🔥 关键修复：即使 Worker 显示已登录，也要同步最新的 Cookie
+        // 因为浏览器的 Cookie 可能比 Worker 保存的更新（例如 web_session）
+        console.log('🔄 [LoginSection] Worker 显示已登录，同步最新 Cookie...');
+
+        if (isExtensionInstalled()) {
+          try {
+            // 请求扩展获取最新 Cookie
+            const cookiePromise = new Promise<{ success: boolean; data?: { cookies: any[]; ua: string }; msg?: string }>((resolve) => {
+              const timeout = setTimeout(() => {
+                resolve({ success: false, msg: '扩展响应超时' });
+              }, 5000);
+
+              const handler = (event: MessageEvent) => {
+                if (event.source !== window) return;
+                if (event.data?.type === 'SYNC_XHS_RESPONSE') {
+                  clearTimeout(timeout);
+                  window.removeEventListener('message', handler);
+                  resolve(event.data);
+                }
+              };
+              window.addEventListener('message', handler);
+              window.postMessage({ type: 'SYNC_XHS_REQUEST' }, '*');
+            });
+
+            const result = await cookiePromise;
+
+            if (result.success && result.data?.cookies?.length) {
+              console.log('✅ [LoginSection] 获取到最新 Cookie:', result.data.cookies.length, '个');
+
+              // 检查是否有 web_session
+              const hasWebSession = result.data.cookies.some((c: any) => c.name === 'web_session');
+              console.log('🔍 [LoginSection] 是否有 web_session:', hasWebSession);
+
+              // 同步到 Worker
+              await fetch(`${workerUrl}/api/v1/login/sync-web`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  user_id: xhsUserId,
+                  cookies: result.data.cookies,
+                  ua: navigator.userAgent
+                })
+              });
+              console.log('✅ [LoginSection] Cookie 已同步到 Worker');
+            }
+          } catch (syncError) {
+            console.warn('⚠️ [LoginSection] Cookie 同步失败，继续使用 Worker 现有数据:', syncError);
+          }
+        }
+
         setIsLoggedIn(true);
         await xiaohongshuSupabase.addActivityLog({
           supabase_uuid: supabaseUuid,
@@ -443,6 +493,17 @@ export function LoginSection({
             >
               <RefreshCw className="mr-1 h-3 w-3" />
               已安装？刷新检测
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-400 hover:text-gray-600"
+              onClick={() => {
+                setHasExtension(true);
+                setSetupStep('ready');
+              }}
+            >
+              已安装但检测失败？跳过
             </Button>
           </div>
         </CardContent>
