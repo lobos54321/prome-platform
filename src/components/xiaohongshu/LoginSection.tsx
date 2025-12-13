@@ -307,34 +307,53 @@ export function LoginSection({
       if (saveResult.success || saveResponse.ok) {
         console.log('✅ [LoginSection] Cookie保存成功');
 
-        // 🔥 关键修复：绑定账号到用户
-        // 这样 /agent/accounts/list 才会返回这个账号
+        // 🔥 关键修复：绑定账号到用户（带幂等检查）
         const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+
         try {
-          console.log('🔗 [LoginSection] 绑定账号到用户...');
-          const bindResponse = await fetch(`${BACKEND_URL}/agent/accounts/bind`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              supabaseUuid: supabaseUuid,
-              cookies: result.data.cookies,
-              isDefault: true,  // 第一个账号设为默认
-              accountInfo: {}   // 可选的账号信息
-            })
-          });
+          // 1) 幂等检查：如果已有绑定账号，跳过 bind
+          console.log('🔍 [LoginSection] 检查是否已有绑定账号...');
+          const listResponse = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${encodeURIComponent(supabaseUuid)}`);
+          const listData = await listResponse.json().catch(() => null);
 
-          const bindResult = await bindResponse.json();
-          console.log('📥 [LoginSection] 绑定账号响应:', bindResult);
-
-          if (bindResult.success) {
-            console.log('✅ [LoginSection] 账号绑定成功');
+          if (listData?.success && Array.isArray(listData?.data?.accounts) && listData.data.accounts.length > 0) {
+            console.log('ℹ️ [LoginSection] 已存在绑定账号，跳过 bind:', listData.data.accounts.length, '个');
+            // 账号已存在，直接继续
           } else {
-            console.warn('⚠️ [LoginSection] 账号绑定失败:', bindResult.error);
-            // 继续检查登录状态，不阻止流程
+            // 2) 执行 bind
+            console.log('🔗 [LoginSection] 绑定账号到用户...');
+            const bindResponse = await fetch(`${BACKEND_URL}/agent/accounts/bind`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                supabaseUuid: supabaseUuid,
+                cookies: result.data.cookies,
+                isDefault: true,
+                accountInfo: {}
+              })
+            });
+
+            const bindText = await bindResponse.text();
+            let bindResult: any = null;
+            try { bindResult = JSON.parse(bindText); } catch { /* ignore */ }
+
+            console.log('📥 [LoginSection] 绑定账号响应:', bindResult || bindText);
+
+            if (!bindResponse.ok || !bindResult?.success) {
+              const errorMsg = bindResult?.error || bindResult?.detail || `账号绑定失败 (HTTP ${bindResponse.status})`;
+              console.error('❌ [LoginSection] 账号绑定失败:', errorMsg);
+              // 🔥 显示错误给用户，而不是静默继续
+              onError(`Cookie 已同步，但账号绑定失败: ${errorMsg}`);
+              return;
+            }
+
+            console.log('✅ [LoginSection] 账号绑定成功');
           }
         } catch (bindError) {
-          console.warn('⚠️ [LoginSection] 账号绑定请求失败:', bindError);
-          // 继续检查登录状态，不阻止流程
+          console.error('❌ [LoginSection] 账号绑定请求异常:', bindError);
+          // 网络错误等也要提示用户
+          onError(`账号绑定请求失败: ${bindError instanceof Error ? bindError.message : String(bindError)}`);
+          return;
         }
 
         await checkLoginStatus();
