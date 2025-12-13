@@ -160,8 +160,7 @@ export function MatrixDashboard({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    // 🔥 后端要求的参数
-                    userId: accountId,  // 使用 xhs_account_id 作为 userId
+                    userId: accountId,
                     productName: userProfile.product_name,
                     targetAudience: userProfile.target_audience,
                     marketingGoal: userProfile.marketing_goal,
@@ -173,8 +172,16 @@ export function MatrixDashboard({
             const data = await response.json();
 
             if (data.success) {
-                toast({ title: '启动成功', description: '正在后台生成内容策略...' });
+                toast({
+                    title: '🚀 启动成功',
+                    description: '正在后台生成内容策略（约2-5分钟）...'
+                });
+
+                // 🔥 立即刷新状态
                 await loadStatuses();
+
+                // 🔥 开始轮询等待生成完成
+                pollForCompletion(accountId);
             } else {
                 throw new Error(data.error);
             }
@@ -185,6 +192,53 @@ export function MatrixDashboard({
         }
     };
 
+    // 🔥 轮询检查生成状态
+    const pollForCompletion = async (accountId: string) => {
+        const maxAttempts = 24; // 最多轮询2分钟（每5秒一次）
+        let attempts = 0;
+
+        const poll = async () => {
+            try {
+                const response = await fetch(`${backendUrl}/agent/auto/status/${accountId}`);
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    const status = data.data.status || data.data.generationStatus;
+                    console.log(`📊 [轮询] 账号 ${accountId} 状态:`, status);
+
+                    // 如果生成完成或失败，停止轮询
+                    if (status === 'completed' || status === 'idle' || status === 'failed') {
+                        await loadStatuses();
+                        if (status === 'completed' || status === 'idle') {
+                            toast({
+                                title: '✅ 策略生成完成',
+                                description: '内容策略和周计划已就绪！'
+                            });
+                        } else {
+                            toast({
+                                title: '⚠️ 生成失败',
+                                description: '请重试或检查配置',
+                                variant: 'destructive'
+                            });
+                        }
+                        return;
+                    }
+
+                    // 还在生成中，继续轮询
+                    if (status === 'generating' && attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(poll, 5000);
+                    }
+                }
+            } catch (err) {
+                console.error('轮询状态失败:', err);
+            }
+        };
+
+        // 延迟3秒后开始轮询（给后端一点时间）
+        setTimeout(poll, 3000);
+    };
+
     // 停止单个账号
     const handleStopAccount = async (accountId: string) => {
         setActionLoading(accountId);
@@ -192,7 +246,7 @@ export function MatrixDashboard({
             const response = await fetch(`${backendUrl}/agent/auto/stop`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountId }),
+                body: JSON.stringify({ userId: accountId }),  // 🔥 后端期望 userId
             });
             const data = await response.json();
 
