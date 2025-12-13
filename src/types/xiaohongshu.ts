@@ -46,6 +46,20 @@ export interface LoginStatus {
 }
 
 // ============================================
+// Cookie 数据
+// ============================================
+export interface XhsCookie {
+  name: string;
+  value: string;
+  domain?: string;
+  path?: string;
+  expires?: number;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'Strict' | 'Lax' | 'None';
+}
+
+// ============================================
 // 二维码数据
 // ============================================
 export interface QRCodeData {

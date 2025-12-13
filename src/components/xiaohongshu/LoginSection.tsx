@@ -8,6 +8,28 @@ import { ManualCookieForm } from './ManualCookieForm';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
 import { useToast } from '@/hooks/use-toast';
+import type { XhsCookie } from '@/types/xiaohongshu';
+
+// Constants
+const BACKEND_URL = ((import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app').replace(/\/$/, '');
+
+// Toast message constants
+const TOAST_MESSAGES = {
+  BIND_SUCCESS: {
+    title: "账号绑定成功",
+    description: "小红书账号已成功绑定到您的用户",
+  },
+  BIND_FAILED: (errorMsg: string) => ({
+    title: "账号绑定失败",
+    description: `无法将账号绑定到用户: ${errorMsg}`,
+    variant: "destructive" as const,
+  }),
+  BIND_NETWORK_ERROR: (errorMsg: string) => ({
+    title: "账号绑定失败",
+    description: `网络错误: ${errorMsg}`,
+    variant: "destructive" as const,
+  }),
+};
 
 interface LoginSectionProps {
   supabaseUuid: string;
@@ -244,9 +266,7 @@ export function LoginSection({
    * 绑定账号到用户
    * 返回 true 表示成功，false 表示失败
    */
-  const bindAccountToUser = async (cookies: any[]): Promise<boolean> => {
-    const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
-    
+  const bindAccountToUser = async (cookies: XhsCookie[]): Promise<boolean> => {
     try {
       console.log('🔗 [LoginSection] 绑定账号到用户...');
       const bindResponse = await fetch(`${BACKEND_URL}/agent/accounts/bind`, {
@@ -266,46 +286,24 @@ export function LoginSection({
       if (!bindResponse.ok) {
         const errorMsg = bindResult.error || bindResult.message || `HTTP ${bindResponse.status}`;
         console.error('❌ [LoginSection] 账号绑定失败:', errorMsg, '完整响应:', bindResult);
-        
-        toast({
-          title: "账号绑定失败",
-          description: `无法将账号绑定到用户: ${errorMsg}`,
-          variant: "destructive",
-        });
-        
+        toast(TOAST_MESSAGES.BIND_FAILED(errorMsg));
         return false;
       }
 
       if (!bindResult.success) {
         const errorMsg = bindResult.error || bindResult.message || '未知错误';
         console.error('❌ [LoginSection] 账号绑定失败:', errorMsg, '完整响应:', bindResult);
-        
-        toast({
-          title: "账号绑定失败",
-          description: `无法将账号绑定到用户: ${errorMsg}`,
-          variant: "destructive",
-        });
-        
+        toast(TOAST_MESSAGES.BIND_FAILED(errorMsg));
         return false;
       }
 
       console.log('✅ [LoginSection] 账号绑定成功');
-      toast({
-        title: "账号绑定成功",
-        description: "小红书账号已成功绑定到您的用户",
-      });
-      
+      toast(TOAST_MESSAGES.BIND_SUCCESS);
       return true;
     } catch (bindError) {
       const errorMsg = bindError instanceof Error ? bindError.message : '网络请求失败';
       console.error('❌ [LoginSection] 账号绑定请求异常:', bindError);
-      
-      toast({
-        title: "账号绑定失败",
-        description: `网络错误: ${errorMsg}`,
-        variant: "destructive",
-      });
-      
+      toast(TOAST_MESSAGES.BIND_NETWORK_ERROR(errorMsg));
       return false;
     }
   };
