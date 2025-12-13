@@ -690,6 +690,7 @@ export default function XiaohongshuAutomation() {
           {viewMode === 'matrix' && supabaseUuid && (
             <MatrixDashboard
               supabaseUuid={supabaseUuid}
+              userProfile={userProfile}
               onAddAccount={() => {
                 setViewMode('single');
                 setCurrentStep('accounts');

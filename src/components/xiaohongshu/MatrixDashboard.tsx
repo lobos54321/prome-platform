@@ -51,6 +51,15 @@ interface AccountStatus {
 interface MatrixDashboardProps {
     supabaseUuid: string;
     backendUrl?: string;
+    // 🔥 新增：用户配置（包含 productName 等）
+    userProfile?: {
+        product_name?: string;
+        target_audience?: string;
+        marketing_goal?: string;
+        post_frequency?: string;
+        brand_style?: string;
+        review_mode?: string;
+    } | null;
     onAddAccount: () => void;
     onConfigureAccount: (account: XhsAccount) => void;
     onViewDetails: (account: XhsAccount) => void;
@@ -59,6 +68,7 @@ interface MatrixDashboardProps {
 export function MatrixDashboard({
     supabaseUuid,
     backendUrl = 'https://xiaohongshu-automation-ai.zeabur.app',
+    userProfile,
     onAddAccount,
     onConfigureAccount,
     onViewDetails,
@@ -134,17 +144,36 @@ export function MatrixDashboard({
 
     // 启动单个账号
     const handleStartAccount = async (accountId: string) => {
+        // 🔥 检查是否有产品配置
+        if (!userProfile?.product_name) {
+            toast({
+                title: '无法启动',
+                description: '请先配置产品信息（productName）再启动自动运营',
+                variant: 'destructive'
+            });
+            return;
+        }
+
         setActionLoading(accountId);
         try {
             const response = await fetch(`${backendUrl}/agent/auto/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountId }),
+                body: JSON.stringify({
+                    // 🔥 后端要求的参数
+                    userId: accountId,  // 使用 xhs_account_id 作为 userId
+                    productName: userProfile.product_name,
+                    targetAudience: userProfile.target_audience,
+                    marketingGoal: userProfile.marketing_goal,
+                    postFrequency: userProfile.post_frequency,
+                    brandStyle: userProfile.brand_style,
+                    reviewMode: userProfile.review_mode,
+                }),
             });
             const data = await response.json();
 
             if (data.success) {
-                toast({ title: '启动成功' });
+                toast({ title: '启动成功', description: '正在后台生成内容策略...' });
                 await loadStatuses();
             } else {
                 throw new Error(data.error);
