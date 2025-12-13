@@ -3,7 +3,7 @@
  * 支持用户管理多个小红书账号
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, Check, Trash2, Star, User } from 'lucide-react';
 import {
     DropdownMenu,
@@ -60,6 +60,10 @@ export function AccountSelector({
     const [editingAlias, setEditingAlias] = useState<string | null>(null);
     const [aliasInput, setAliasInput] = useState('');
 
+    // 🔥 防止初始加载时触发 onAccountChange（避免循环）
+    const isInitialLoadRef = useRef(true);
+    const lastSelectedIdRef = useRef<string | null>(null);
+
     // 加载账号列表
     useEffect(() => {
         loadAccounts();
@@ -78,12 +82,23 @@ export function AccountSelector({
 
                 // 设置默认选中账号
                 const defaultAccount = data.data.accounts.find((a: AccountBinding) => a.is_default);
-                if (defaultAccount) {
-                    setSelectedAccount(defaultAccount);
-                    onAccountChange?.(defaultAccount.account || null);
-                } else if (data.data.accounts.length > 0) {
-                    setSelectedAccount(data.data.accounts[0]);
-                    onAccountChange?.(data.data.accounts[0].account || null);
+                const accountToSelect = defaultAccount || data.data.accounts[0];
+
+                if (accountToSelect) {
+                    const newId = accountToSelect.xhs_account_id;
+
+                    // 🔥 只有在账号真正变化时才触发 onAccountChange
+                    // 初始加载时不触发，避免循环
+                    if (!isInitialLoadRef.current && lastSelectedIdRef.current !== newId) {
+                        console.log('🔄 AccountSelector: 账号变化，触发 onAccountChange:', newId);
+                        onAccountChange?.(accountToSelect.account || null);
+                    } else if (isInitialLoadRef.current) {
+                        console.log('ℹ️ AccountSelector: 初始加载，跳过 onAccountChange');
+                        isInitialLoadRef.current = false;
+                    }
+
+                    setSelectedAccount(accountToSelect);
+                    lastSelectedIdRef.current = newId;
                 }
             }
         } catch (error: any) {
@@ -98,9 +113,19 @@ export function AccountSelector({
         }
     };
 
-    // 切换账号
+    // 切换账号（用户手动选择时触发）
     const handleSelectAccount = async (binding: AccountBinding) => {
+        const newId = binding.xhs_account_id;
+
+        // 🔥 幂等检查：账号没变就不做任何事
+        if (lastSelectedIdRef.current === newId) {
+            console.log('ℹ️ AccountSelector: 账号未变化，跳过:', newId);
+            return;
+        }
+
+        console.log('🔄 AccountSelector: 用户切换账号:', newId);
         setSelectedAccount(binding);
+        lastSelectedIdRef.current = newId;
         onAccountChange?.(binding.account || null);
 
         toast({

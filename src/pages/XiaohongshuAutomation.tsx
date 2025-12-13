@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/lib/auth';
 import { userMappingService } from '@/lib/xiaohongshu-user-mapping';
@@ -43,6 +43,9 @@ export default function XiaohongshuAutomation() {
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
   const [justLoggedOut, setJustLoggedOut] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('matrix'); // 默认显示矩阵视图
+
+  // 🔥 防止账号切换时重复调用 initializePage
+  const lastAccountIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Force test mode for now to allow access
@@ -596,9 +599,19 @@ export default function XiaohongshuAutomation() {
                     supabaseUuid={supabaseUuid}
                     onAccountChange={(account) => {
                       if (account) {
+                        const accountId = account.id;
+
+                        // 🔥 幂等检查：如果账号没变，不要重新初始化
+                        if (lastAccountIdRef.current === accountId) {
+                          console.log('ℹ️ [XHS] 账号未变化，跳过 initializePage:', accountId);
+                          return;
+                        }
+
                         console.log('🔄 切换到账号:', account.nickname || account.id);
-                        // 切换账号后重新初始化页面
-                        initializePage();
+                        lastAccountIdRef.current = accountId;
+
+                        // 🔥 只刷新数据，不要重新 setLoading(true) 整个页面
+                        loadDashboardData(supabaseUuid!, xhsUserId!);
                       }
                     }}
                     onAddAccount={() => {
