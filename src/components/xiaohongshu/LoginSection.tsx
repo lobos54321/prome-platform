@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -60,6 +60,9 @@ export function LoginSection({
   const [isChrome, setIsChrome] = useState(true);
   const [hasExtension, setHasExtension] = useState(false);
   const [setupStep, setSetupStep] = useState<'checking' | 'need-chrome' | 'need-extension' | 'need-xhs-login' | 'ready'>('checking');
+
+  // 🔥 防止并发 bind 请求的锁
+  const bindingInFlight = useRef(false);
 
   // 检测浏览器和插件
   useEffect(() => {
@@ -311,6 +314,14 @@ export function LoginSection({
         const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
 
         try {
+          // 🔥 检查并发锁：防止重复 bind 请求
+          if (bindingInFlight.current) {
+            console.log('⏳ [LoginSection] 账号绑定已在进行中，跳过');
+            await checkLoginStatus();
+            return;
+          }
+          bindingInFlight.current = true;
+
           // 1) 幂等检查：如果已有绑定账号，跳过 bind
           console.log('🔍 [LoginSection] 检查是否已有绑定账号...');
           const listResponse = await fetch(`${BACKEND_URL}/agent/accounts/list?supabaseUuid=${encodeURIComponent(supabaseUuid)}`);
@@ -340,9 +351,12 @@ export function LoginSection({
             console.log('📥 [LoginSection] 绑定账号响应:', bindResult || bindText);
 
             if (!bindResponse.ok || !bindResult?.success) {
-              const errorMsg = bindResult?.error || bindResult?.detail || `账号绑定失败 (HTTP ${bindResponse.status})`;
+              // 🔥 处理 detail 可能是对象的情况
+              let errorMsg = bindResult?.error || bindResult?.detail || `账号绑定失败 (HTTP ${bindResponse.status})`;
+              if (typeof errorMsg === 'object') {
+                errorMsg = errorMsg.message || JSON.stringify(errorMsg);
+              }
               console.error('❌ [LoginSection] 账号绑定失败:', errorMsg);
-              // 🔥 显示错误给用户，而不是静默继续
               onError(`Cookie 已同步，但账号绑定失败: ${errorMsg}`);
               return;
             }
@@ -351,9 +365,10 @@ export function LoginSection({
           }
         } catch (bindError) {
           console.error('❌ [LoginSection] 账号绑定请求异常:', bindError);
-          // 网络错误等也要提示用户
           onError(`账号绑定请求失败: ${bindError instanceof Error ? bindError.message : String(bindError)}`);
           return;
+        } finally {
+          bindingInFlight.current = false;
         }
 
         await checkLoginStatus();
