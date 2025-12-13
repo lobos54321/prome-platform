@@ -95,8 +95,13 @@ export default function XiaohongshuAutomation() {
         if (data.success && data.data.accounts.length > 0) {
           hasBindedAccounts = true;
           const defaultAccount = data.data.accounts.find((a: any) => a.is_default);
-          userId = (defaultAccount || data.data.accounts[0]).xhs_account_id;
-          console.log('✅ [XHS] 找到绑定账号:', userId);
+          // 🔥 注意：xhs_account_id 是账号 UUID，不是 cookies 存储的 ID
+          // cookies 存储在 user_xxx_prome 格式下，所以 xhsUserId 应使用 userMappingService
+          const accountId = (defaultAccount || data.data.accounts[0]).xhs_account_id;
+          console.log('✅ [XHS] 找到绑定账号:', accountId);
+          // 🔥 仍然使用 userMappingService 来获取正确的 cookie session ID
+          userId = await userMappingService.getOrCreateMapping(user.id);
+          console.log('✅ [XHS] 使用 cookie session ID:', userId);
         } else {
           console.log('📋 [XHS] 未找到绑定账号，用户需要先配置产品再添加账号');
           // 即使没有账号也创建映射用于后续流程
