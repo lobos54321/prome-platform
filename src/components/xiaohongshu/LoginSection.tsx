@@ -7,6 +7,7 @@ import { AutoLoginModal } from './AutoLoginModal';
 import { ManualCookieForm } from './ManualCookieForm';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
+import { useToast } from '@/hooks/use-toast';
 
 interface LoginSectionProps {
   supabaseUuid: string;
@@ -45,6 +46,7 @@ export function LoginSection({
   onLogout,
   justLoggedOut = false,
 }: LoginSectionProps) {
+  const { toast } = useToast();
   const [checking, setChecking] = useState(!justLoggedOut);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -184,6 +186,9 @@ export function LoginSection({
                 })
               });
               console.log('✅ [LoginSection] Cookie 已同步到 Worker');
+
+              // 🔥 绑定账号到用户（避免 /agent/accounts/list 为空）
+              await bindAccountToUser(result.data.cookies);
             }
           } catch (syncError) {
             console.warn('⚠️ [LoginSection] Cookie 同步失败，继续使用 Worker 现有数据:', syncError);
@@ -232,6 +237,76 @@ export function LoginSection({
       }
     } catch (error) {
       console.error('Auto import cookies error:', error);
+    }
+  };
+
+  /**
+   * 绑定账号到用户
+   * 返回 true 表示成功，false 表示失败
+   */
+  const bindAccountToUser = async (cookies: any[]): Promise<boolean> => {
+    const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+    
+    try {
+      console.log('🔗 [LoginSection] 绑定账号到用户...');
+      const bindResponse = await fetch(`${BACKEND_URL}/agent/accounts/bind`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supabaseUuid: supabaseUuid,
+          cookies: cookies,
+          isDefault: true,  // 第一个账号设为默认
+          accountInfo: {}   // 可选的账号信息
+        })
+      });
+
+      const bindResult = await bindResponse.json();
+      console.log('📥 [LoginSection] 绑定账号响应:', bindResult);
+
+      if (!bindResponse.ok) {
+        const errorMsg = bindResult.error || bindResult.message || `HTTP ${bindResponse.status}`;
+        console.error('❌ [LoginSection] 账号绑定失败:', errorMsg, '完整响应:', bindResult);
+        
+        toast({
+          title: "账号绑定失败",
+          description: `无法将账号绑定到用户: ${errorMsg}`,
+          variant: "destructive",
+        });
+        
+        return false;
+      }
+
+      if (!bindResult.success) {
+        const errorMsg = bindResult.error || bindResult.message || '未知错误';
+        console.error('❌ [LoginSection] 账号绑定失败:', errorMsg, '完整响应:', bindResult);
+        
+        toast({
+          title: "账号绑定失败",
+          description: `无法将账号绑定到用户: ${errorMsg}`,
+          variant: "destructive",
+        });
+        
+        return false;
+      }
+
+      console.log('✅ [LoginSection] 账号绑定成功');
+      toast({
+        title: "账号绑定成功",
+        description: "小红书账号已成功绑定到您的用户",
+      });
+      
+      return true;
+    } catch (bindError) {
+      const errorMsg = bindError instanceof Error ? bindError.message : '网络请求失败';
+      console.error('❌ [LoginSection] 账号绑定请求异常:', bindError);
+      
+      toast({
+        title: "账号绑定失败",
+        description: `网络错误: ${errorMsg}`,
+        variant: "destructive",
+      });
+      
+      return false;
     }
   };
 
@@ -309,32 +384,11 @@ export function LoginSection({
 
         // 🔥 关键修复：绑定账号到用户
         // 这样 /agent/accounts/list 才会返回这个账号
-        const BACKEND_URL = (import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
-        try {
-          console.log('🔗 [LoginSection] 绑定账号到用户...');
-          const bindResponse = await fetch(`${BACKEND_URL}/agent/accounts/bind`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              supabaseUuid: supabaseUuid,
-              cookies: result.data.cookies,
-              isDefault: true,  // 第一个账号设为默认
-              accountInfo: {}   // 可选的账号信息
-            })
-          });
-
-          const bindResult = await bindResponse.json();
-          console.log('📥 [LoginSection] 绑定账号响应:', bindResult);
-
-          if (bindResult.success) {
-            console.log('✅ [LoginSection] 账号绑定成功');
-          } else {
-            console.warn('⚠️ [LoginSection] 账号绑定失败:', bindResult.error);
-            // 继续检查登录状态，不阻止流程
-          }
-        } catch (bindError) {
-          console.warn('⚠️ [LoginSection] 账号绑定请求失败:', bindError);
-          // 继续检查登录状态，不阻止流程
+        const bindSuccess = await bindAccountToUser(result.data.cookies);
+        
+        if (!bindSuccess) {
+          // 绑定失败，错误已通过 toast 显示，但不阻止后续流程
+          console.warn('⚠️ [LoginSection] 账号绑定失败，但继续检查登录状态');
         }
 
         await checkLoginStatus();
