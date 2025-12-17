@@ -138,7 +138,7 @@ const App = () => {
   }, []);
 
   // Push Supabase config to extension
-  // Push Supabase config to extension
+
   useEffect(() => {
     // Expose global config
     const updateConfig = () => {

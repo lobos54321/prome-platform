@@ -409,6 +409,37 @@ export class XiaohongshuBackendAPI {
   }
 
   /**
+   * 🔥 获取发布数据（供插件使用）
+   * 直接返回发布数据，由前端通过 postMessage 发送给插件
+   */
+  async getPublishDataForExtension(userId: string, postId: string): Promise<ApiResponse<any>> {
+    try {
+      console.log(`🔌 [BackendAPI] 获取发布数据 - userId: ${userId}, postId: ${postId}`);
+
+      const response = await fetch(`${this.baseURL}/agent/auto/approve-for-extension/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ taskId: postId }),
+      });
+
+      console.log(`📥 [BackendAPI] 发布数据响应状态: ${response.status}`);
+      const data = await response.json();
+      console.log(`📥 [BackendAPI] 发布数据:`, data);
+
+      return {
+        success: response.ok && data.success,
+        data: data,
+        error: data.error
+      };
+    } catch (error) {
+      console.error(`❌ [BackendAPI] 获取发布数据失败:`, error);
+      return this.handleError(error);
+    }
+  }
+
+  /**
    * 查询发布作业状态
    */
   async getPublishJobStatus(jobId: string, userId: string): Promise<ApiResponse<any>> {

@@ -288,36 +288,107 @@ export function DashboardSection({
       return;
     }
 
-    if (!confirm('确认批准发布此内容？')) {
+    // 检查插件是否安装
+    const extensionMarker = document.getElementById('prome-extension-installed');
+    if (!extensionMarker) {
+      alert('❌ 未检测到 Prome 助手插件！\n\n请确保已安装插件并刷新页面。');
+      return;
+    }
+
+    if (!confirm('确认批准发布此内容？\n\n将通过浏览器插件发布到小红书')) {
       return;
     }
 
     try {
-      console.log('📤 [handleApprovePost] 调用 API - userId:', xhsUserId, 'postId:', postId);
-      // 调用批准发布API
-      const response = await xiaohongshuAPI.approvePost(xhsUserId, postId);
+      console.log('📤 [handleApprovePost] 调用 API 获取发布数据 - userId:', xhsUserId, 'postId:', postId);
+
+      // 🔥 使用 approve-for-extension 端点获取发布数据
+      const response = await xiaohongshuAPI.getPublishDataForExtension(xhsUserId, postId);
       console.log('📥 [handleApprovePost] API 响应:', response);
 
-      if (response.success && response.data) {
-        const { jobId, status: jobStatus, message } = response.data;
+      if (!response.success || !response.data?.publishData) {
+        throw new Error(response.error || '获取发布数据失败');
+      }
 
-        // 🔥 设置初始作业状态
+      const publishData = response.data.publishData;
+
+      // 🔥 设置监听器等待插件响应
+      console.log('📤 [handleApprovePost] Setting up extension response listener');
+
+      const publishPromise = new Promise<{ success: boolean, message: string }>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('message', handleResponse);
+          reject(new Error('插件响应超时（5分钟），请确保插件已启用'));
+        }, 300000); // 5分钟超时
+
+        const handleResponse = (event: MessageEvent) => {
+          if (event.source !== window) return;
+
+          // 接收确认消息
+          if (event.data.type === 'PROME_PUBLISH_ACKNOWLEDGED') {
+            console.log('📥 [handleApprovePost] Extension acknowledged:', event.data);
+            // 继续等待最终结果
+          }
+
+          // 接收发布结果
+          if (event.data.type === 'PROME_PUBLISH_RESULT') {
+            console.log('📥 [handleApprovePost] Received publish result:', event.data);
+            clearTimeout(timeout);
+            window.removeEventListener('message', handleResponse);
+            resolve(event.data);
+          }
+        };
+
+        window.addEventListener('message', handleResponse);
+      });
+
+      // 🔥 通过 postMessage 发送发布任务给插件
+      console.log('📤 [handleApprovePost] Sending task to extension via postMessage');
+      window.postMessage({
+        type: 'PROME_PUBLISH_TASK',
+        data: publishData
+      }, '*');
+
+      // 🔥 设置初始状态
+      setPublishJob({
+        jobId: `ext_${Date.now()}`,
+        status: 'running',
+        progress: 10,
+      });
+
+      alert(
+        `📝 发布任务已发送到插件！\n\n` +
+        `插件将自动：\n` +
+        `1. 打开小红书发布页面\n` +
+        `2. 填写内容并发布\n\n` +
+        `请保持浏览器窗口打开。`
+      );
+
+      // 等待插件完成
+      const publishResult = await publishPromise;
+
+      if (publishResult.success) {
+        console.log('✅ [handleApprovePost] Publish successful');
         setPublishJob({
-          jobId,
-          status: jobStatus || 'pending',
+          jobId: `ext_${Date.now()}`,
+          status: 'completed',
+          progress: 100,
+        });
+        alert(`✅ 发布成功！\n${publishResult.message || ''}`);
+        await fetchData(); // 刷新数据
+      } else {
+        console.log('❌ [handleApprovePost] Publish failed:', publishResult.message);
+        setPublishJob({
+          jobId: `ext_${Date.now()}`,
+          status: 'failed',
           progress: 0,
         });
-
-        console.log('✅ [handleApprovePost] 发布作业已创建:', jobId);
-        alert(`✅ ${message || '发布作业已创建'}\n作业ID: ${jobId}`);
-
-        // 🔥 启动轮询查询作业状态
-        startJobPolling(jobId);
-      } else {
-        alert('批准失败：' + (response.error || '未知错误'));
+        alert(`❌ 发布失败：${publishResult.message || '未知错误'}`);
       }
+
     } catch (error: any) {
       console.error('❌ [handleApprovePost] 批准发布失败:', error);
+      setPublishJob(null);
       alert('批准失败：' + error.message);
     }
   };
