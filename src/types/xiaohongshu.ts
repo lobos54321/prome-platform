@@ -31,6 +31,16 @@ export interface UserProfile {
   material_analysis?: string;     // AI分析结果
   // 地区字段 (支持全球市场)
   region?: string;                // 用户自填: "武汉", "Sydney", "California" 等
+  // 内容形式偏好
+  content_mode_preference?: 'IMAGE_TEXT' | 'UGC_VIDEO' | 'AVATAR_VIDEO';
+  // 数字人视频素材 (AVATAR_VIDEO 模式需要)
+  avatar_photo_url?: string;      // 数字人照片 URL
+  voice_sample_url?: string;      // 语音样本 URL
+  // UGC 视频参数 (UGC_VIDEO 模式)
+  ugc_gender?: 'male' | 'female';
+  ugc_age_range?: 'young' | 'middle' | 'senior';
+  ugc_language?: string;          // "zh-CN", "en-US" 等
+  ugc_duration?: number;          // 视频时长秒数，默认 60
   created_at: string;
   updated_at: string;
 }

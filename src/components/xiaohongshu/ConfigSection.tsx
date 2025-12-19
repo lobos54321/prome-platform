@@ -10,6 +10,7 @@ import { Loader2, Save, Play, CheckCircle } from 'lucide-react';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
 import { MaterialUpload } from './MaterialUpload';
+import { ContentModeConfig } from './ContentModeConfig';
 import type { UserProfile } from '@/types/xiaohongshu';
 
 interface ConfigSectionProps {
@@ -47,6 +48,16 @@ export function ConfigSection({
   // 地区字段
   const [region, setRegion] = useState<string>('');
 
+  // 内容形式配置
+  type ContentMode = 'IMAGE_TEXT' | 'UGC_VIDEO' | 'AVATAR_VIDEO';
+  const [contentAutoMode, setContentAutoMode] = useState(false);
+  const [selectedContentModes, setSelectedContentModes] = useState<ContentMode[]>(['IMAGE_TEXT']);
+  const [avatarPhotoUrl, setAvatarPhotoUrl] = useState('');
+  const [voiceSampleUrl, setVoiceSampleUrl] = useState('');
+  const [ugcGender, setUgcGender] = useState<'male' | 'female'>('female');
+  const [ugcLanguage, setUgcLanguage] = useState('zh-CN');
+  const [ugcDuration, setUgcDuration] = useState(60);
+
   useEffect(() => {
     if (initialConfig) {
       setProductName(initialConfig.product_name);
@@ -61,6 +72,15 @@ export function ConfigSection({
       setMaterialAnalysis(initialConfig.material_analysis || '');
       // 地区
       setRegion(initialConfig.region || '');
+      // 内容形式配置
+      setAvatarPhotoUrl(initialConfig.avatar_photo_url || '');
+      setVoiceSampleUrl(initialConfig.voice_sample_url || '');
+      if (initialConfig.content_mode_preference) {
+        setSelectedContentModes([initialConfig.content_mode_preference]);
+      }
+      setUgcGender(initialConfig.ugc_gender || 'female');
+      setUgcLanguage(initialConfig.ugc_language || 'zh-CN');
+      setUgcDuration(initialConfig.ugc_duration || 60);
       setSaved(true);
     }
   }, [initialConfig]);
@@ -114,6 +134,13 @@ export function ConfigSection({
         material_analysis: materialAnalysis,
         // 地区
         region: region || undefined,
+        // 内容形式配置
+        content_mode_preference: selectedContentModes[0],
+        avatar_photo_url: avatarPhotoUrl || undefined,
+        voice_sample_url: voiceSampleUrl || undefined,
+        ugc_gender: ugcGender,
+        ugc_language: ugcLanguage,
+        ugc_duration: ugcDuration,
       };
 
       await xiaohongshuSupabase.saveUserProfile(profile);
@@ -343,6 +370,30 @@ export function ConfigSection({
             initialDocuments={materialDocuments}
             initialAnalysis={materialAnalysis}
             onMaterialsChange={handleMaterialsChange}
+          />
+        </div>
+
+        {/* 内容形式配置 */}
+        <div className="pt-4 border-t">
+          <ContentModeConfig
+            supabaseUuid={supabaseUuid}
+            initialModes={selectedContentModes}
+            initialAutoMode={contentAutoMode}
+            initialAvatarPhoto={avatarPhotoUrl}
+            initialVoiceSample={voiceSampleUrl}
+            initialUgcGender={ugcGender}
+            initialUgcLanguage={ugcLanguage}
+            initialUgcDuration={ugcDuration}
+            onConfigChange={(config) => {
+              setContentAutoMode(config.autoMode);
+              setSelectedContentModes(config.selectedModes);
+              setAvatarPhotoUrl(config.avatarPhotoUrl || '');
+              setVoiceSampleUrl(config.voiceSampleUrl || '');
+              setUgcGender(config.ugcGender || 'female');
+              setUgcLanguage(config.ugcLanguage || 'zh-CN');
+              setUgcDuration(config.ugcDuration || 60);
+              setSaved(false);
+            }}
           />
         </div>
 
