@@ -3,24 +3,25 @@
 // ============================================
 
 import { supabase } from './supabase';
-import type { 
-  UserMapping, 
-  UserProfile, 
+import type {
+  UserMapping,
+  UserProfile,
+  GlobalProductProfile,
   AutomationStatus,
   ContentStrategy,
   WeeklyPlan,
-  ActivityLog 
+  ActivityLog
 } from '@/types/xiaohongshu';
 
 /**
  * Supabase 数据库服务
  */
 export class XiaohongshuSupabaseService {
-  
+
   // ============================================
   // 用户映射管理
   // ============================================
-  
+
   async getUserMapping(supabaseUuid: string): Promise<UserMapping | null> {
     console.log('🔍 [Supabase] 查询用户映射, UUID:', supabaseUuid);
 
@@ -95,6 +96,38 @@ export class XiaohongshuSupabaseService {
     if (error) {
       console.error('Error saving user profile:', error);
       throw new Error('Failed to save user profile');
+    }
+  }
+
+  // ============================================
+  // 全局产品配置管理 (Global Product Profile)
+  // ============================================
+
+  async getGlobalProductProfile(supabaseUuid: string): Promise<GlobalProductProfile | null> {
+    const { data, error } = await supabase
+      .from('global_product_profiles')
+      .select('*')
+      .eq('supabase_uuid', supabaseUuid)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching global product profile:', error);
+      throw new Error('Failed to fetch global product profile');
+    }
+
+    return data;
+  }
+
+  async saveGlobalProductProfile(profile: Partial<GlobalProductProfile>): Promise<void> {
+    const { error } = await supabase
+      .from('global_product_profiles')
+      .upsert(profile, {
+        onConflict: 'supabase_uuid'
+      });
+
+    if (error) {
+      console.error('Error saving global product profile:', error);
+      throw new Error('Failed to save global product profile');
     }
   }
 

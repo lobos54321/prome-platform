@@ -46,6 +46,23 @@ export interface UserProfile {
 }
 
 // ============================================
+// 全局产品配置 (所有平台共享)
+// ============================================
+export interface GlobalProductProfile {
+  id: string;
+  supabase_uuid: string;
+  product_name: string;
+  product_description?: string;
+  target_audience?: string;
+  material_images?: string[];
+  material_documents?: string[];
+  material_analysis?: string;
+  region?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
 // 登录状态
 // ============================================
 export interface LoginStatus {
