@@ -266,6 +266,9 @@ export function ConfigSection({
       const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       setCurrentTaskId(taskId);
 
+      // 🔥 立即显示进度面板
+      setShowProgressPanel(true);
+
       const response = await xiaohongshuAPI.startAutoOperation(xhsUserId, {
         productName,
         targetAudience,
@@ -295,8 +298,6 @@ export function ConfigSection({
           metadata: { productName, marketingGoal, postFrequency, taskId },
         });
 
-        // 显示进度面板
-        setShowProgressPanel(true);
         onStartOperation();
       } else {
         setError(response.message || '启动失败');
