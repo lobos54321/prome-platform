@@ -1,0 +1,8 @@
+{
+  "name": "Prome Smart Content Orchestrator",
+  "description": "An interactive UI for visualizing complex AI Agent content production workflows, including image-text, avatar videos, and UGC video generation stages.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
