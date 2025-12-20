@@ -37,6 +37,8 @@ import type {
 import { VIDEO_TYPE_CONFIG, UGC_CREDITS } from '@/types/content';
 import type { UserProfile } from '@/types/xiaohongshu';
 import { MaterialUpload } from './MaterialUpload';
+import { AgentProgressPanel } from '@/components/workflow';
+import { WorkflowMode } from '@/types/workflow';
 
 interface ContentCreationFormProps {
     supabaseUuid: string;
@@ -79,6 +81,10 @@ export function ContentCreationForm({
     const [error, setError] = useState('');
     const [copywriteResult, setCopywriteResult] = useState<CopywriteResult | null>(null);
 
+    // Agent 进度面板
+    const [showProgressPanel, setShowProgressPanel] = useState(false);
+    const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+
     // 视频素材
     const [videoMaterials, setVideoMaterials] = useState<string[]>([]);
     const [documentMaterials, setDocumentMaterials] = useState<string[]>([]);
@@ -113,6 +119,11 @@ export function ContentCreationForm({
         setGenerating(true);
         setCopywriteResult(null);
 
+        // 生成临时任务 ID 用于进度跟踪
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        setCurrentTaskId(taskId);
+        setShowProgressPanel(true);
+
         try {
             const request: ContentCreationRequest = {
                 productName,
@@ -140,6 +151,7 @@ export function ContentCreationForm({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     supabase_uuid: supabaseUuid,
+                    task_id: taskId,
                     ...request,
                 }),
             });
@@ -148,6 +160,7 @@ export function ContentCreationForm({
 
             if (data.success) {
                 setCopywriteResult(data.copywrite);
+                setShowProgressPanel(false);
                 setCurrentStep('result');
                 onContentGenerated?.(data);
             } else {
@@ -155,9 +168,18 @@ export function ContentCreationForm({
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : '生成失败');
+            setShowProgressPanel(false);
         } finally {
             setGenerating(false);
         }
+    };
+
+    // 获取当前工作流模式
+    const getWorkflowMode = (): WorkflowMode => {
+        if (contentFormat === 'video') {
+            return videoType === 'ugc_n8n' ? WorkflowMode.UGC_VIDEO : WorkflowMode.AVATAR_VIDEO;
+        }
+        return WorkflowMode.IMAGE_TEXT;
     };
 
     // 渲染产品信息步骤
@@ -517,6 +539,26 @@ export function ContentCreationForm({
             </div>
         </div>
     );
+
+    // 如果显示进度面板，渲染全屏进度视图
+    if (showProgressPanel) {
+        return (
+            <div className="fixed inset-0 z-50 bg-white">
+                <AgentProgressPanel
+                    taskId={currentTaskId || undefined}
+                    mode={getWorkflowMode()}
+                    onClose={() => {
+                        setShowProgressPanel(false);
+                        setGenerating(false);
+                    }}
+                    onComplete={(result) => {
+                        console.log('Workflow completed:', result);
+                        setShowProgressPanel(false);
+                    }}
+                />
+            </div>
+        );
+    }
 
     return (
         <Card>
