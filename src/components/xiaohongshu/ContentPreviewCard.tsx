@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, Image as ImageIcon, Check, Edit, RefreshCw } from 'lucide-react';
+import { VariantSelector } from './VariantSelector';
 
 interface PublishJobStatus {
   jobId: string;
@@ -20,11 +21,23 @@ interface ContentPreviewCardProps {
     type: string;
     imageUrls?: string[];
     hashtags?: string[];
+    status?: string;
+    // 新增：变体选择相关
+    goldenQuotes?: string[];
+    copyStrategy?: 'variant' | 'split';
+    copyVariants?: {
+      motherCopy: { title: string; text: string };
+      variants?: Array<{ type: string; title: string; text: string; estimatedWords?: number }>;
+      segments?: Array<{ type: string; title: string; text: string; estimatedWords?: number }>;
+    };
   } | null;
   publishJob?: PublishJobStatus | null;
+  /** 是否为审核模式 (true=用户选择变体, false=自动选择) */
+  reviewMode?: boolean;
   onApprove?: (id: string) => void;
   onEdit?: (id: string) => void;
   onRegenerate?: (id: string) => void;
+  onSelectVariant?: (variant: { title: string; text: string; type: string }) => void;
 }
 
 // 格式化时间显示
@@ -57,7 +70,15 @@ function formatScheduledTime(timeStr: string | undefined | null): string {
   }
 }
 
-export function ContentPreviewCard({ content, publishJob, onApprove, onEdit, onRegenerate }: ContentPreviewCardProps) {
+export function ContentPreviewCard({
+  content,
+  publishJob,
+  reviewMode = true,
+  onApprove,
+  onEdit,
+  onRegenerate,
+  onSelectVariant,
+}: ContentPreviewCardProps) {
   if (!content) {
     return (
       <Card>
@@ -123,6 +144,17 @@ export function ContentPreviewCard({ content, publishJob, onApprove, onEdit, onR
               </Badge>
             ))}
           </div>
+        )}
+
+        {/* 🔥 变体选择器 (审核模式下显示) */}
+        {reviewMode && content.copyVariants && (
+          <VariantSelector
+            copyVariants={content.copyVariants}
+            goldenQuotes={content.goldenQuotes}
+            copyStrategy={content.copyStrategy}
+            reviewMode={reviewMode}
+            onSelectVariant={onSelectVariant}
+          />
         )}
 
         <div className="flex items-center gap-2 text-sm text-gray-500 pt-2 border-t">
