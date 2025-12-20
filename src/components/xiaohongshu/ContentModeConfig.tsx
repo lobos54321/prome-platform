@@ -490,7 +490,7 @@ export function ContentModeConfig({
                                                             </label>
                                                         </Button>
                                                         <p className="text-xs text-gray-400 mt-1">
-                                                            MP3/WAV/M4A 格式，1-2 分钟清晰语音，无背景噪音
+                                                            MP3/WAV/M4A 格式，15-30 秒清晰语音，无背景噪音
                                                         </p>
                                                     </div>
                                                 )}
