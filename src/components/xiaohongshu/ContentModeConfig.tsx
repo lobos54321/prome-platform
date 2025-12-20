@@ -278,46 +278,14 @@ export function ContentModeConfig({
                                         <FileText className="h-4 w-4 text-blue-500" />
                                         <span className="font-medium">图文</span>
                                     </Label>
-                                    <p className="text-sm text-gray-500 mt-1">AI 自动生成图文内容，可选择性上传产品图片</p>
-
-                                    {isModeSelected('IMAGE_TEXT') && (
-                                        <div className="mt-4">
-                                            <Label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                                                <ImagePlus className="h-3 w-3" /> 产品图片（可选）
-                                            </Label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {productImages.map((url, index) => (
-                                                    <div key={index} className="relative group">
-                                                        <img src={url} alt={`产品图 ${index + 1}`} className="w-16 h-16 rounded-lg object-cover" />
-                                                        <button
-                                                            onClick={() => removeProductImage(index)}
-                                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                {productImages.length < 10 && (
-                                                    <div>
-                                                        <Input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            onChange={handleProductImageUpload}
-                                                            className="hidden"
-                                                            id="product-upload"
-                                                            disabled={uploading}
-                                                        />
-                                                        <label
-                                                            htmlFor="product-upload"
-                                                            className="w-16 h-16 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50"
-                                                        >
-                                                            <Upload className="h-5 w-5 text-gray-400" />
-                                                        </label>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        AI 自动生成图文内容
+                                        {productImages.length > 0 && (
+                                            <span className="text-green-600 ml-2">
+                                                ✓ 已有 {productImages.length} 张产品图片
+                                            </span>
+                                        )}
+                                    </p>
                                 </div>
                             </div>
                         </div>
