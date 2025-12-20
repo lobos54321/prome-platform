@@ -13,7 +13,7 @@ import { MaterialUpload } from './MaterialUpload';
 import { ContentModeConfig } from './ContentModeConfig';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
-import type { UserProfile } from '@/types/xiaohongshu';
+import type { UserProfile, GlobalProductProfile } from '@/types/xiaohongshu';
 
 interface ConfigSectionProps {
   supabaseUuid: string;
@@ -42,13 +42,16 @@ export function ConfigSection({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // 素材上传状态
+  // 素材上传状态 (全局产品配置)
   const [materialImages, setMaterialImages] = useState<string[]>([]);
   const [materialDocuments, setMaterialDocuments] = useState<string[]>([]);
   const [materialAnalysis, setMaterialAnalysis] = useState<string>('');
 
-  // 地区字段
+  // 地区字段 (全局产品配置)
   const [region, setRegion] = useState<string>('');
+
+  // 产品描述 (全局产品配置新字段)
+  const [productDescription, setProductDescription] = useState<string>('');
 
   // 内容形式配置
   type ContentMode = 'IMAGE_TEXT' | 'UGC_VIDEO' | 'AVATAR_VIDEO';
@@ -64,20 +67,35 @@ export function ConfigSection({
   const [showProgressPanel, setShowProgressPanel] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
 
+  // 加载全局产品配置
+  useEffect(() => {
+    const loadGlobalProduct = async () => {
+      try {
+        const globalProduct = await xiaohongshuSupabase.getGlobalProductProfile(supabaseUuid);
+        if (globalProduct) {
+          setProductName(globalProduct.product_name);
+          setProductDescription(globalProduct.product_description || '');
+          setTargetAudience(globalProduct.target_audience || '');
+          setMaterialImages(globalProduct.material_images || []);
+          setMaterialDocuments(globalProduct.material_documents || []);
+          setMaterialAnalysis(globalProduct.material_analysis || '');
+          setRegion(globalProduct.region || '');
+        }
+      } catch (err) {
+        console.error('Failed to load global product profile:', err);
+      }
+    };
+    loadGlobalProduct();
+  }, [supabaseUuid]);
+
+  // 加载平台偏好配置
   useEffect(() => {
     if (initialConfig) {
-      setProductName(initialConfig.product_name);
-      setTargetAudience(initialConfig.target_audience || '');
+      // 平台偏好字段
       setMarketingGoal(initialConfig.marketing_goal);
       setPostFrequency(initialConfig.post_frequency);
       setBrandStyle(initialConfig.brand_style);
       setReviewMode(initialConfig.review_mode);
-      // 素材状态
-      setMaterialImages(initialConfig.material_images || []);
-      setMaterialDocuments(initialConfig.material_documents || []);
-      setMaterialAnalysis(initialConfig.material_analysis || '');
-      // 地区
-      setRegion(initialConfig.region || '');
       // 内容形式配置
       setAvatarPhotoUrl(initialConfig.avatar_photo_url || '');
       setVoiceSampleUrl(initialConfig.voice_sample_url || '');
@@ -125,22 +143,29 @@ export function ConfigSection({
     try {
       setSaving(true);
 
-      const profile: Partial<UserProfile> = {
+      // 1. 保存全局产品配置
+      const globalProduct: Partial<GlobalProductProfile> = {
+        supabase_uuid: supabaseUuid,
+        product_name: productName,
+        product_description: productDescription,
+        target_audience: targetAudience,
+        material_images: materialImages,
+        material_documents: materialDocuments,
+        material_analysis: materialAnalysis,
+        region: region || undefined,
+      };
+      await xiaohongshuSupabase.saveGlobalProductProfile(globalProduct);
+
+      // 2. 保存平台偏好配置
+      const platformPrefs: Partial<UserProfile> = {
         supabase_uuid: supabaseUuid,
         xhs_user_id: xhsUserId,
-        product_name: productName,
-        target_audience: targetAudience,
+        product_name: productName, // 向后兼容
+        target_audience: targetAudience, // 向后兼容
         marketing_goal: marketingGoal,
         post_frequency: postFrequency,
         brand_style: brandStyle,
         review_mode: reviewMode,
-        // 素材字段
-        material_images: materialImages,
-        material_documents: materialDocuments,
-        material_analysis: materialAnalysis,
-        // 地区
-        region: region || undefined,
-        // 内容形式配置
         content_mode_preference: selectedContentModes[0],
         avatar_photo_url: avatarPhotoUrl || undefined,
         voice_sample_url: voiceSampleUrl || undefined,
@@ -148,15 +173,14 @@ export function ConfigSection({
         ugc_language: ugcLanguage,
         ugc_duration: ugcDuration,
       };
-
-      await xiaohongshuSupabase.saveUserProfile(profile);
+      await xiaohongshuSupabase.saveUserProfile(platformPrefs);
 
       await xiaohongshuSupabase.addActivityLog({
         supabase_uuid: supabaseUuid,
         xhs_user_id: xhsUserId,
         activity_type: 'config',
         message: '保存产品配置',
-        metadata: profile,
+        metadata: { globalProduct, platformPrefs },
       });
 
       setSaved(true);
@@ -190,7 +214,21 @@ export function ConfigSection({
 
       // 🔥 自动保存配置（如果尚未保存）
       if (!saved) {
-        const profile: Partial<UserProfile> = {
+        // 保存全局产品配置
+        const globalProduct: Partial<GlobalProductProfile> = {
+          supabase_uuid: supabaseUuid,
+          product_name: productName,
+          product_description: productDescription,
+          target_audience: targetAudience,
+          material_images: materialImages,
+          material_documents: materialDocuments,
+          material_analysis: materialAnalysis,
+          region: region || undefined,
+        };
+        await xiaohongshuSupabase.saveGlobalProductProfile(globalProduct);
+
+        // 保存平台偏好配置
+        const platformPrefs: Partial<UserProfile> = {
           supabase_uuid: supabaseUuid,
           xhs_user_id: xhsUserId,
           product_name: productName,
@@ -199,20 +237,21 @@ export function ConfigSection({
           post_frequency: postFrequency,
           brand_style: brandStyle,
           review_mode: reviewMode,
-          // 素材字段
-          material_images: materialImages,
-          material_documents: materialDocuments,
-          material_analysis: materialAnalysis,
+          content_mode_preference: selectedContentModes[0],
+          avatar_photo_url: avatarPhotoUrl || undefined,
+          voice_sample_url: voiceSampleUrl || undefined,
+          ugc_gender: ugcGender,
+          ugc_language: ugcLanguage,
+          ugc_duration: ugcDuration,
         };
-
-        await xiaohongshuSupabase.saveUserProfile(profile);
+        await xiaohongshuSupabase.saveUserProfile(platformPrefs);
 
         await xiaohongshuSupabase.addActivityLog({
           supabase_uuid: supabaseUuid,
           xhs_user_id: xhsUserId,
           activity_type: 'config',
           message: '自动保存产品配置',
-          metadata: profile,
+          metadata: { globalProduct, platformPrefs },
         });
 
         setSaved(true);
