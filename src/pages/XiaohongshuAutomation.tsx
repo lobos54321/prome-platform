@@ -347,90 +347,13 @@ export default function XiaohongshuAutomation() {
   const handleStartOperation = async () => {
     if (!supabaseUuid) return;
 
-    try {
-      // 立即切换到dashboard并显示加载状态
-      setCurrentStep('dashboard');
-      setLoading(true);
+    // 🔥 不要在这里切换 step 或显示 alert
+    // ConfigSection 内部会显示 AgentProgressPanel
+    // 这里只需要记录日志
+    console.log('🚀 [XHS] handleStartOperation 被调用，进度面板将在 ConfigSection 中显示');
 
-      // 显示提示信息
-      alert('🚀 自动运营已启动！\n\n系统正在后台生成内容，这需要2-5分钟时间。\n\n页面将自动刷新数据，请耐心等待。');
-
-      // 等待5秒让后端开始处理
-      await new Promise(resolve => setTimeout(resolve, 5000));
-
-      // 开始轮询数据 - 最多100次，每10秒一次 = 1000秒（约16分钟）
-      const maxAttempts = 100;
-      let attempts = 0;
-
-      const pollData = async (): Promise<boolean> => {
-        attempts++;
-        console.log(`🔄 [${new Date().toLocaleTimeString()}] 数据轮询第 ${attempts}/${maxAttempts} 次尝试`);
-
-        try {
-          // 从后端API获取数据
-          const statusRes = await fetch(`${process.env.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app'}/agent/auto/status/${xhsUserId}`);
-
-          if (statusRes.ok) {
-            const statusData = await statusRes.json();
-            console.log('✅ 获取到运营状态:', statusData);
-
-            if (statusData.success && statusData.data) {
-              // 加载完整的Dashboard数据（传入xhsUserId以确保有值）
-              await loadDashboardData(supabaseUuid, xhsUserId || undefined);
-
-              // 更新状态
-              const status = await xiaohongshuSupabase.getAutomationStatus(supabaseUuid);
-              if (status) {
-                setAutomationStatus(status);
-                console.log('✅ 数据加载成功！');
-                return true; // 成功获取到数据
-              }
-            }
-          } else if (statusRes.status === 404) {
-            console.log('⏳ 数据尚未生成，继续等待...');
-          }
-        } catch (err) {
-          console.warn(`⚠️ 轮询失败 (${attempts}/${maxAttempts}):`, err);
-        }
-
-        return false;
-      };
-
-      // 第一次尝试
-      const success = await pollData();
-
-      if (!success && attempts < maxAttempts) {
-        // 如果第一次失败，继续轮询
-        console.log('🔄 开始持续轮询，每10秒检查一次，最多持续1000秒');
-
-        const interval = setInterval(async () => {
-          const result = await pollData();
-
-          if (result) {
-            clearInterval(interval);
-            setLoading(false);
-            alert('✅ 自动运营启动成功！\n\n内容已生成完毕，可以在Dashboard查看详情。');
-          } else if (attempts >= maxAttempts) {
-            clearInterval(interval);
-            setLoading(false);
-            alert('⚠️ 数据加载超时\n\n后台可能还在处理中，请稍后手动刷新页面查看。\n\n如果长时间没有数据，请检查后端日志。');
-          }
-        }, 10000); // 每10秒轮询一次
-
-        // 保存interval ID以便在组件卸载时清理
-        return () => clearInterval(interval);
-      } else if (success) {
-        setLoading(false);
-        alert('✅ 自动运营启动成功！\n\n内容已生成完毕。');
-      } else {
-        setLoading(false);
-      }
-
-    } catch (err) {
-      console.error('Handle start operation error:', err);
-      setError('启动自动运营失败: ' + (err instanceof Error ? err.message : String(err)));
-      setLoading(false);
-    }
+    // 可选：记录后台开始处理
+    // 实际的进度面板和状态管理在 ConfigSection 中完成
   };
 
   const handleRefresh = async () => {
