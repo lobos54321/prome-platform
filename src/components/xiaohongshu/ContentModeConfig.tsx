@@ -477,7 +477,7 @@ export function ContentModeConfig({
                                                     <div>
                                                         <Input
                                                             type="file"
-                                                            accept="audio/mpeg,audio/mp3,audio/wav,audio/wave,audio/x-wav"
+                                                            accept="audio/mpeg,audio/mp3,audio/wav,audio/wave,audio/x-wav,audio/m4a,audio/mp4,audio/x-m4a,video/mp4"
                                                             onChange={handleVoiceUpload}
                                                             className="hidden"
                                                             id="voice-upload"
@@ -490,7 +490,7 @@ export function ContentModeConfig({
                                                             </label>
                                                         </Button>
                                                         <p className="text-xs text-gray-400 mt-1">
-                                                            MP3/WAV 格式，1-2 分钟清晰语音，无背景噪音
+                                                            MP3/WAV/M4A 格式，1-2 分钟清晰语音，无背景噪音
                                                         </p>
                                                     </div>
                                                 )}
