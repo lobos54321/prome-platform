@@ -117,23 +117,40 @@ export function ContentModeConfig({
 
     const uploadFile = async (file: File, type: 'avatar' | 'voice' | 'product'): Promise<string | null> => {
         try {
-            const fileExt = file.name.split('.').pop();
+            const fileExt = file.name.split('.').pop()?.toLowerCase();
             const fileName = `${supabaseUuid}/${type}_${Date.now()}.${fileExt}`;
             const bucketName = type === 'avatar' ? 'avatar-photos' : type === 'voice' ? 'voice-samples' : 'product-images';
+
+            console.log(`[Upload] Starting upload to ${bucketName}:`, { fileName, fileType: file.type, fileSize: file.size });
 
             const { error: uploadError } = await supabase.storage
                 .from(bucketName)
                 .upload(fileName, file, { upsert: true });
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error(`[Upload] Error uploading to ${bucketName}:`, uploadError);
+                // 设置更详细的错误信息
+                if (uploadError.message.includes('Bucket not found')) {
+                    setError(`存储桶 "${bucketName}" 不存在，请联系管理员创建`);
+                } else if (uploadError.message.includes('mime type')) {
+                    setError(`不支持的文件格式: ${file.type}`);
+                } else if (uploadError.message.includes('size')) {
+                    setError('文件太大，请上传更小的文件');
+                } else {
+                    setError(`上传失败: ${uploadError.message}`);
+                }
+                return null;
+            }
 
             const { data: urlData } = supabase.storage
                 .from(bucketName)
                 .getPublicUrl(fileName);
 
+            console.log(`[Upload] Success:`, urlData.publicUrl);
             return urlData.publicUrl;
         } catch (err) {
-            console.error('Upload failed:', err);
+            console.error('[Upload] Unexpected error:', err);
+            setError(err instanceof Error ? `上传错误: ${err.message}` : '上传失败，请重试');
             return null;
         }
     };
@@ -460,7 +477,7 @@ export function ContentModeConfig({
                                                     <div>
                                                         <Input
                                                             type="file"
-                                                            accept="audio/*"
+                                                            accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac"
                                                             onChange={handleVoiceUpload}
                                                             className="hidden"
                                                             id="voice-upload"
@@ -472,6 +489,9 @@ export function ContentModeConfig({
                                                                 {uploading ? '上传中...' : '上传语音'}
                                                             </label>
                                                         </Button>
+                                                        <p className="text-xs text-gray-400 mt-1">
+                                                            支持 MP3/WAV/M4A/OGG，建议 10-30 秒清晰语音
+                                                        </p>
                                                     </div>
                                                 )}
                                             </div>
