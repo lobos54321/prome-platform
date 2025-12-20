@@ -9,13 +9,13 @@ VALUES (
     'voice-samples',
     'voice-samples',
     true,  -- 公开访问
-    10485760,  -- 10MB 限制
-    ARRAY['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/aac', 'audio/webm']::text[]
+    20971520,  -- 20MB 限制 (1-2分钟高质量音频)
+    ARRAY['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 'audio/x-wav']::text[]
 )
 ON CONFLICT (id) DO UPDATE SET
     public = true,
-    file_size_limit = 10485760,
-    allowed_mime_types = ARRAY['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/m4a', 'audio/aac', 'audio/webm']::text[];
+    file_size_limit = 20971520,
+    allowed_mime_types = ARRAY['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 'audio/x-wav']::text[];
 
 -- 2. 创建头像照片 bucket
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
