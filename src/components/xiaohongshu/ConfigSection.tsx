@@ -11,6 +11,8 @@ import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
 import { MaterialUpload } from './MaterialUpload';
 import { ContentModeConfig } from './ContentModeConfig';
+import { AgentProgressPanel } from '@/components/workflow';
+import { WorkflowMode } from '@/types/workflow';
 import type { UserProfile } from '@/types/xiaohongshu';
 
 interface ConfigSectionProps {
@@ -57,6 +59,10 @@ export function ConfigSection({
   const [ugcGender, setUgcGender] = useState<'male' | 'female'>('female');
   const [ugcLanguage, setUgcLanguage] = useState('zh-CN');
   const [ugcDuration, setUgcDuration] = useState(60);
+
+  // Agent 进度面板
+  const [showProgressPanel, setShowProgressPanel] = useState(false);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialConfig) {
@@ -218,6 +224,9 @@ export function ConfigSection({
       }
 
       // 启动自动运营
+      const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      setCurrentTaskId(taskId);
+
       const response = await xiaohongshuAPI.startAutoOperation(xhsUserId, {
         productName,
         targetAudience,
@@ -225,6 +234,7 @@ export function ConfigSection({
         postFrequency,
         brandStyle,
         reviewMode,
+        taskId, // 传递任务ID
       });
 
       if (response.success) {
@@ -243,9 +253,11 @@ export function ConfigSection({
           xhs_user_id: xhsUserId,
           activity_type: 'start',
           message: '启动自动运营',
-          metadata: { productName, marketingGoal, postFrequency },
+          metadata: { productName, marketingGoal, postFrequency, taskId },
         });
 
+        // 显示进度面板
+        setShowProgressPanel(true);
         onStartOperation();
       } else {
         setError(response.message || '启动失败');
@@ -256,6 +268,35 @@ export function ConfigSection({
       setStarting(false);
     }
   };
+
+  // 获取工作流模式
+  const getWorkflowMode = (): WorkflowMode => {
+    const mode = selectedContentModes[0] || 'IMAGE_TEXT';
+    switch (mode) {
+      case 'UGC_VIDEO': return WorkflowMode.UGC_VIDEO;
+      case 'AVATAR_VIDEO': return WorkflowMode.AVATAR_VIDEO;
+      default: return WorkflowMode.IMAGE_TEXT;
+    }
+  };
+
+  // 如果显示进度面板，渲染全屏进度视图
+  if (showProgressPanel) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white">
+        <AgentProgressPanel
+          taskId={currentTaskId || undefined}
+          mode={getWorkflowMode()}
+          onClose={() => {
+            setShowProgressPanel(false);
+          }}
+          onComplete={(result) => {
+            console.log('Workflow completed:', result);
+            setShowProgressPanel(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <Card>
