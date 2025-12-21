@@ -360,13 +360,15 @@ export function MaterialUpload({
                     </label>
                 </div>
 
-                {/* 图片/视频预览 - 紧凑版 */}
+                {/* 图片/视频预览 - 紧凑版 (带 AI 分析状态) */}
                 {images.length > 0 && (
                     <div className="grid grid-cols-6 gap-1">
                         {images.map((url, index) => {
                             const isVideo = /\.(mp4|mov|webm|avi|mkv)$/i.test(url);
+                            const material = materials.find(m => m.file_url === url);
+                            const hasAnalysis = !!material?.ai_description;
                             return (
-                                <div key={index} className="relative aspect-square rounded overflow-hidden border">
+                                <div key={index} className="relative aspect-square rounded overflow-hidden border group">
                                     {isVideo ? (
                                         <video
                                             src={url}
@@ -387,14 +389,48 @@ export function MaterialUpload({
                                     >
                                         <X className="w-2 h-2" />
                                     </button>
+                                    {/* AI 分析状态指示器 */}
+                                    <div className={`absolute bottom-0 left-0 text-xs px-1 ${hasAnalysis ? 'bg-green-500/80 text-white' : 'bg-yellow-500/80 text-white'}`}>
+                                        {hasAnalysis ? '✓ AI' : '⏳'}
+                                    </div>
+                                    {/* 悬停显示 AI 描述 */}
+                                    {hasAnalysis && (
+                                        <div className="absolute inset-0 bg-black/70 text-white text-xs p-1 opacity-0 group-hover:opacity-100 transition-opacity overflow-hidden">
+                                            {material?.ai_description?.substring(0, 60)}...
+                                        </div>
+                                    )}
                                     {isVideo && (
-                                        <div className="absolute bottom-0 left-0 bg-black/50 text-white text-xs px-1">
+                                        <div className="absolute bottom-0 right-0 bg-black/50 text-white text-xs px-1">
                                             🎬
                                         </div>
                                     )}
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* 素材 AI 分析结果列表 */}
+                {materials.filter(m => m.ai_description).length > 0 && (
+                    <div className="text-xs bg-green-50 border border-green-100 rounded-lg p-2 max-h-40 overflow-y-auto">
+                        <div className="font-medium text-green-700 mb-1 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            AI 自动分析 ({materials.filter(m => m.ai_description).length}个素材)
+                        </div>
+                        <div className="space-y-1">
+                            {materials.filter(m => m.ai_description).map((m, idx) => (
+                                <div key={idx} className="text-gray-600 border-l-2 border-green-300 pl-2">
+                                    <span className="text-green-600 font-medium">{m.ai_category || '素材'}:</span> {m.ai_description}
+                                    {m.ai_tags && m.ai_tags.length > 0 && (
+                                        <div className="mt-0.5">
+                                            {m.ai_tags.slice(0, 3).map((tag, i) => (
+                                                <span key={i} className="inline-block bg-green-100 text-green-700 rounded px-1 mr-1">{tag}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
 
