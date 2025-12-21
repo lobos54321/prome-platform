@@ -48,6 +48,11 @@ export function ContentModeStep({
                 <AgentProgressPanel
                     taskId={currentTaskId || undefined}
                     mode={selectedWorkflowMode}
+                    // 🔥 传递完整的用户配置信息
+                    supabaseUuid={supabaseUuid}
+                    productName={userProfile?.product_name}
+                    marketingGoal={userProfile?.marketing_goal as 'brand' | 'sales' | 'traffic' | 'community' | undefined}
+                    postFrequency={userProfile?.post_frequency as 'daily' | 'weekly' | 'biweekly' | 'monthly' | undefined}
                     onClose={() => {
                         setShowProgressPanel(false);
                         setCurrentTaskId(null);
