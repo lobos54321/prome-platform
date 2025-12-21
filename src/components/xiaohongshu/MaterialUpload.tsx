@@ -140,10 +140,38 @@ export function MaterialUpload({
             const urls = await Promise.all(uploadPromises);
             const newImages = [...images, ...urls];
             setImages(newImages);
+
             // 重新加载素材列表
             const updatedMaterials = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
             setMaterials(updatedMaterials);
             onMaterialsChange({ images: newImages, documents, analysis });
+
+            // 异步触发每个图片的 AI 分析（不阻塞UI）
+            urls.forEach(async (url, index) => {
+                const file = files[index];
+                try {
+                    const response = await fetch('/api/material/analyze-single', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            supabaseUuid,
+                            fileUrl: url,
+                            fileType: 'image',
+                            fileName: file.name
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.success && data.analysis) {
+                        // 更新素材分析结果
+                        await xiaohongshuSupabase.updateMaterialAnalysis(supabaseUuid, url, data.analysis);
+                        // 刷新素材列表以显示分析结果
+                        const refreshed = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
+                        setMaterials(refreshed);
+                    }
+                } catch (err) {
+                    console.error('Auto analysis failed for:', url, err);
+                }
+            });
         } catch (err) {
             setError(err instanceof Error ? err.message : '上传失败');
         } finally {
@@ -181,10 +209,36 @@ export function MaterialUpload({
             const urls = await Promise.all(uploadPromises);
             const newDocuments = [...documents, ...urls];
             setDocuments(newDocuments);
+
             // 重新加载素材列表
             const updatedMaterials = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
             setMaterials(updatedMaterials);
             onMaterialsChange({ images, documents: newDocuments, analysis });
+
+            // 异步触发每个文档的 AI 分析（不阻塞UI）
+            urls.forEach(async (url, index) => {
+                const file = files[index];
+                try {
+                    const response = await fetch('/api/material/analyze-single', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            supabaseUuid,
+                            fileUrl: url,
+                            fileType: 'document',
+                            fileName: file.name
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.success && data.analysis) {
+                        await xiaohongshuSupabase.updateMaterialAnalysis(supabaseUuid, url, data.analysis);
+                        const refreshed = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
+                        setMaterials(refreshed);
+                    }
+                } catch (err) {
+                    console.error('Auto analysis failed for:', url, err);
+                }
+            });
         } catch (err) {
             setError(err instanceof Error ? err.message : '上传失败');
         } finally {

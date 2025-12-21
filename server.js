@@ -2597,6 +2597,74 @@ async function handleDifyMaterialAnalysis(req, res) {
   }
 }
 
+// 🔧 新增：单素材分析端点 - 上传时自动分析每个图片/文档
+app.post('/api/material/analyze-single', async (req, res) => {
+  const { supabaseUuid, fileUrl, fileType, fileName } = req.body;
+
+  console.log('[Single Material Analysis] Request:', {
+    supabaseUuid,
+    fileUrl: fileUrl?.substring(0, 50) + '...',
+    fileType,
+    fileName
+  });
+
+  if (!fileUrl) {
+    return res.status(400).json({
+      success: false,
+      error: 'fileUrl is required'
+    });
+  }
+
+  const CLAUDE_AGENT_URL = process.env.XHS_BACKEND_URL || 'https://xiaohongshu-automation-ai.zeabur.app';
+
+  try {
+    // 调用 claude-agent-service 的单素材分析端点
+    const agentResponse = await fetchWithTimeoutAndRetry(`${CLAUDE_AGENT_URL}/api/material/analyze-single`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        supabaseUuid,
+        fileUrl,
+        fileType,
+        fileName
+      })
+    }, 60000, 2); // 60秒超时
+
+    if (!agentResponse.ok) {
+      const errorText = await agentResponse.text();
+      console.error('[Single Material Analysis] Agent error:', errorText);
+
+      // 回退：使用简单描述
+      return res.json({
+        success: true,
+        analysis: {
+          ai_description: `${fileType === 'image' ? '产品图片' : '产品文档'}: ${fileName || '未命名'}`,
+          ai_tags: [fileType === 'image' ? '图片' : '文档'],
+          ai_category: fileType === 'image' ? 'product_photo' : 'document'
+        },
+        provider: 'fallback'
+      });
+    }
+
+    const result = await agentResponse.json();
+    console.log('[Single Material Analysis] Success:', result.provider);
+    res.json(result);
+
+  } catch (error) {
+    console.error('[Single Material Analysis] Error:', error);
+    // 回退：返回基础分析结果
+    res.json({
+      success: true,
+      analysis: {
+        ai_description: `${fileType === 'image' ? '产品图片' : '产品文档'}: ${fileName || '未命名'}`,
+        ai_tags: [fileType === 'image' ? '图片' : '文档'],
+        ai_category: fileType === 'image' ? 'product_photo' : 'document'
+      },
+      provider: 'fallback'
+    });
+  }
+});
+
 // 🔧 新增：矩阵策略生成端点 - AI生成账号人设和任务分配
 app.post('/api/dify/matrix/generate-strategy', async (req, res) => {
   const { supabase_uuid, product_name, target_audience, marketing_goal, material_analysis, accounts } = req.body;
