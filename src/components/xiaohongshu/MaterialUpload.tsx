@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Upload, X, FileText, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
+import type { ProductMaterial } from '@/types/xiaohongshu';
 
 interface MaterialUploadProps {
     supabaseUuid: string;
@@ -29,9 +31,19 @@ export function MaterialUpload({
     const [images, setImages] = useState<string[]>(initialImages);
     const [documents, setDocuments] = useState<string[]>(initialDocuments);
     const [analysis, setAnalysis] = useState<string>(initialAnalysis);
+    const [materials, setMaterials] = useState<ProductMaterial[]>([]);
     const [uploading, setUploading] = useState(false);
     const [analyzing, setAnalyzing] = useState(false);
     const [error, setError] = useState('');
+
+    // 加载已有素材
+    useEffect(() => {
+        const loadMaterials = async () => {
+            const existing = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
+            setMaterials(existing);
+        };
+        loadMaterials();
+    }, [supabaseUuid]);
 
     // 上传图片到 Supabase Storage
     const uploadImage = async (file: File) => {
@@ -112,10 +124,25 @@ export function MaterialUpload({
         setUploading(true);
 
         try {
-            const uploadPromises = Array.from(files).map(uploadImage);
+            const uploadPromises = Array.from(files).map(async (file) => {
+                const url = await uploadImage(file);
+                // 保存到 product_materials 表
+                await xiaohongshuSupabase.addProductMaterial({
+                    supabase_uuid: supabaseUuid,
+                    file_url: url,
+                    file_type: 'image',
+                    file_name: file.name,
+                    file_size_bytes: file.size,
+                    mime_type: file.type,
+                });
+                return url;
+            });
             const urls = await Promise.all(uploadPromises);
             const newImages = [...images, ...urls];
             setImages(newImages);
+            // 重新加载素材列表
+            const updatedMaterials = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
+            setMaterials(updatedMaterials);
             onMaterialsChange({ images: newImages, documents, analysis });
         } catch (err) {
             setError(err instanceof Error ? err.message : '上传失败');
@@ -138,10 +165,25 @@ export function MaterialUpload({
         setUploading(true);
 
         try {
-            const uploadPromises = Array.from(files).map(uploadDocument);
+            const uploadPromises = Array.from(files).map(async (file) => {
+                const url = await uploadDocument(file);
+                // 保存到 product_materials 表
+                await xiaohongshuSupabase.addProductMaterial({
+                    supabase_uuid: supabaseUuid,
+                    file_url: url,
+                    file_type: 'document',
+                    file_name: file.name,
+                    file_size_bytes: file.size,
+                    mime_type: file.type,
+                });
+                return url;
+            });
             const urls = await Promise.all(uploadPromises);
             const newDocuments = [...documents, ...urls];
             setDocuments(newDocuments);
+            // 重新加载素材列表
+            const updatedMaterials = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
+            setMaterials(updatedMaterials);
             onMaterialsChange({ images, documents: newDocuments, analysis });
         } catch (err) {
             setError(err instanceof Error ? err.message : '上传失败');
@@ -151,16 +193,34 @@ export function MaterialUpload({
     };
 
     // 删除图片
-    const removeImage = (index: number) => {
+    const removeImage = async (index: number) => {
+        const urlToRemove = images[index];
         const newImages = images.filter((_, i) => i !== index);
         setImages(newImages);
+        // 同步删除 product_materials 记录
+        try {
+            await xiaohongshuSupabase.deleteProductMaterial(supabaseUuid, urlToRemove);
+            const updatedMaterials = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
+            setMaterials(updatedMaterials);
+        } catch (err) {
+            console.error('Failed to delete material record:', err);
+        }
         onMaterialsChange({ images: newImages, documents, analysis });
     };
 
     // 删除文档
-    const removeDocument = (index: number) => {
+    const removeDocument = async (index: number) => {
+        const urlToRemove = documents[index];
         const newDocuments = documents.filter((_, i) => i !== index);
         setDocuments(newDocuments);
+        // 同步删除 product_materials 记录
+        try {
+            await xiaohongshuSupabase.deleteProductMaterial(supabaseUuid, urlToRemove);
+            const updatedMaterials = await xiaohongshuSupabase.getProductMaterials(supabaseUuid);
+            setMaterials(updatedMaterials);
+        } catch (err) {
+            console.error('Failed to delete material record:', err);
+        }
         onMaterialsChange({ images, documents: newDocuments, analysis });
     };
 
