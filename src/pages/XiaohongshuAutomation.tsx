@@ -191,26 +191,20 @@ export default function XiaohongshuAutomation() {
               console.warn('⚠️ [XHS] 二次退出保护检查失败，继续加载数据');
             }
 
-            console.log('✅ 确认不在保护期，切换到Dashboard');
-            // 🔥 后端有数据，直接显示Dashboard，不管Supabase中是否有profile
+            console.log('✅ 确认不在保护期，加载后端数据...');
+            // 🔥 加载后端数据到 state
             if (strategyRes.success && (strategyRes as any).strategy) {
               setContentStrategy((strategyRes as any).strategy);
             }
             if (planRes.success && (planRes as any).plan) {
               const plan = (planRes as any).plan;
-              // 🔥 始终设置plan，因为DashboardSection需要plan.tasks来显示内容预览
-              // 即使plan格式不符合WeeklyPlan（缺少plan_data），WeeklyPlanCard会显示"暂无计划数据"
-              // 但plan.tasks仍然可以用于ContentPreviewCard和ReadyQueueCard
               console.log('📅 [XHS] 设置plan数据:', plan);
               setWeeklyPlan(plan);
             }
 
-            // 🔥 强制显示dashboard - 因为后端是唯一数据源
-            setCurrentStep('dashboard');
-
-            // 🔥 如果Supabase没有profile，创建一个虚拟profile以满足UI需要
+            // 🔥 如果Supabase没有profile，创建一个虚拟profile
             if (!profile) {
-              console.log('📝 创建虚拟profile以支持Dashboard显示');
+              console.log('📝 创建虚拟profile');
               setUserProfile({
                 id: 'temp-' + user.id,
                 supabase_uuid: user.id,
@@ -225,10 +219,13 @@ export default function XiaohongshuAutomation() {
                 updated_at: new Date().toISOString(),
               });
             }
+
+            // 🔥 有后端数据 → 进入 dashboard 步骤（内容形式偏好配置在 Dashboard 里）
+            console.log('✅ [XHS] 有后端数据，进入 Dashboard');
+            setCurrentStep('dashboard');
           } else {
             console.log('⚠️ 后端无数据，显示配置页面');
-            // 后端也没数据
-            // 无配置，显示配置页面
+            // 后端也没数据，显示配置页面
             setCurrentStep('config');
           }
         } catch (err) {

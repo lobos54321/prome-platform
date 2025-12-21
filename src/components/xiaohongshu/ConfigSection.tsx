@@ -21,6 +21,7 @@ interface ConfigSectionProps {
   initialConfig?: UserProfile | null;
   onConfigSaved: (profile: UserProfile) => void;
   onStartOperation: () => void;
+  onWorkflowComplete?: () => void;  // 调用以切换到 dashboard
 }
 
 export function ConfigSection({
@@ -29,6 +30,7 @@ export function ConfigSection({
   initialConfig,
   onConfigSaved,
   onStartOperation,
+  onWorkflowComplete,
 }: ConfigSectionProps) {
   const [productName, setProductName] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
@@ -336,10 +338,14 @@ export function ConfigSection({
           mode={getWorkflowMode()}
           onClose={() => {
             setShowProgressPanel(false);
+            // 关闭时也切换到 dashboard
+            onWorkflowComplete?.();
           }}
           onComplete={(result) => {
             console.log('Workflow completed:', result);
             setShowProgressPanel(false);
+            // 🔥 工作流完成，通知父组件切换到 dashboard
+            onWorkflowComplete?.();
           }}
         />
       </div>

@@ -13,6 +13,7 @@ import { ReadyQueueCard } from './ReadyQueueCard';
 import { PerformanceCard } from './PerformanceCard';
 import { AccountBadge } from './AccountBadge';
 import { ContentCreationForm } from './ContentCreationForm';
+import { ContentModeConfig } from './ContentModeConfig';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
@@ -607,6 +608,42 @@ export function DashboardSection({
           <div className="mt-6">
             <StrategyHistoryCard userId={xhsUserId} />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 🎨 内容形式偏好配置 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">🎨 内容形式偏好</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ContentModeConfig
+            supabaseUuid={supabaseUuid}
+            initialModes={userProfile?.content_mode_preference ? [userProfile.content_mode_preference as 'IMAGE_TEXT' | 'UGC_VIDEO' | 'AVATAR_VIDEO'] : ['IMAGE_TEXT']}
+            initialAvatarPhoto={userProfile?.avatar_photo_url}
+            initialVoiceSample={userProfile?.voice_sample_url}
+            initialAvatarVideoDuration={userProfile?.avatar_video_duration}
+            initialUgcGender={userProfile?.ugc_gender as 'male' | 'female' | undefined}
+            initialUgcLanguage={userProfile?.ugc_language}
+            initialUgcDuration={userProfile?.ugc_duration}
+            onConfigChange={(config) => {
+              console.log('内容形式偏好已更新:', config);
+              // 更新 selectedWorkflowMode 用于 AgentProgressPanel
+              if (config.selectedModes.length > 0) {
+                const mode = config.selectedModes[0];
+                switch (mode) {
+                  case 'UGC_VIDEO':
+                    setSelectedWorkflowMode(WorkflowMode.UGC_VIDEO);
+                    break;
+                  case 'AVATAR_VIDEO':
+                    setSelectedWorkflowMode(WorkflowMode.AVATAR_VIDEO);
+                    break;
+                  default:
+                    setSelectedWorkflowMode(WorkflowMode.IMAGE_TEXT);
+                }
+              }
+            }}
+          />
         </CardContent>
       </Card>
 
