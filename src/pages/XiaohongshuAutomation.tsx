@@ -10,13 +10,14 @@ import { DashboardSection } from '@/components/xiaohongshu/DashboardSection';
 import { AccountSelector } from '@/components/xiaohongshu/AccountSelector';
 import { AccountManager } from '@/components/xiaohongshu/AccountManager';
 import { MatrixDashboard } from '@/components/xiaohongshu/MatrixDashboard';
+import { ContentModeStep } from '@/components/xiaohongshu/ContentModeStep';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, LayoutGrid, User } from 'lucide-react';
 import type { UserProfile, AutomationStatus, ContentStrategy, WeeklyPlan } from '@/types/xiaohongshu';
 
-type Step = 'config' | 'accounts' | 'dashboard';
+type Step = 'config' | 'accounts' | 'content-mode' | 'dashboard';
 type ViewMode = 'single' | 'matrix';
 
 export default function XiaohongshuAutomation() {
@@ -220,9 +221,9 @@ export default function XiaohongshuAutomation() {
               });
             }
 
-            // 🔥 有后端数据 → 进入 dashboard 步骤（内容形式偏好配置在 Dashboard 里）
-            console.log('✅ [XHS] 有后端数据，进入 Dashboard');
-            setCurrentStep('dashboard');
+            // 🔥 有后端数据 → 进入 content-mode 步骤（先设置内容形式偏好）
+            console.log('✅ [XHS] 有后端数据，进入内容形式偏好设置');
+            setCurrentStep('content-mode');
           } else {
             console.log('⚠️ 后端无数据，显示配置页面');
             // 后端也没数据，显示配置页面
@@ -710,6 +711,23 @@ export default function XiaohongshuAutomation() {
                     justLoggedOut={justLoggedOut}
                   />
                 </>
+              )}
+
+              {/* Step 2.5: Content Mode - 内容形式偏好设置 + AgentProgressPanel */}
+              {currentStep === 'content-mode' && supabaseUuid && xhsUserId && (
+                <ContentModeStep
+                  supabaseUuid={supabaseUuid}
+                  xhsUserId={xhsUserId}
+                  userProfile={userProfile}
+                  onComplete={() => {
+                    console.log('✅ [XHS] 工作流完成，进入 Dashboard');
+                    setCurrentStep('dashboard');
+                  }}
+                  onViewDashboard={() => {
+                    console.log('📊 [XHS] 用户选择查看 Dashboard');
+                    setCurrentStep('dashboard');
+                  }}
+                />
               )}
 
               {/* Step 3: Dashboard - 运营仪表盘 */}
