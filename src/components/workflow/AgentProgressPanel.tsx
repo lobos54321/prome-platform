@@ -8,8 +8,12 @@ import {
     WorkflowStatusResponse,
     MODE_THEMES
 } from '@/types/workflow';
+import type { WeeklyPlan, ContentStrategy } from '@/types/xiaohongshu';
 import { StatusIcon } from './StatusIcon';
 import { LogDetail } from './LogDetail';
+import { StrategyOverview } from './StrategyOverview';
+import { WeeklyPlanTimeline } from './WeeklyPlanTimeline';
+import { TodayContentPreview } from './TodayContentPreview';
 import {
     ChevronRight,
     Cpu,
@@ -22,7 +26,8 @@ import {
     Terminal,
     Activity,
     Zap,
-    X
+    X,
+    LayoutDashboard
 } from 'lucide-react';
 
 // 默认节点配置（使用自有品牌名）
@@ -55,6 +60,25 @@ interface AgentProgressPanelProps {
     wsUrl?: string;
     onClose?: () => void;
     onComplete?: (result: WorkflowStatusResponse) => void;
+    // 新增 Props
+    supabaseUuid?: string;
+    productName?: string;
+    marketingGoal?: 'brand' | 'sales' | 'traffic' | 'community';
+    postFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+    contentStrategy?: ContentStrategy | null;
+    weeklyPlan?: WeeklyPlan | null;
+    todayContent?: {
+        title: string;
+        text: string;
+        imageUrls?: string[];
+        hashtags?: string[];
+        scheduledTime?: string;
+        status?: 'draft' | 'approved' | 'publishing' | 'published' | 'failed';
+        variants?: Array<{ type: string; title: string; text: string }>;
+    } | null;
+    onPublish?: () => Promise<void>;
+    onEditContent?: () => void;
+    onRegenerateContent?: () => void;
 }
 
 export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
@@ -63,12 +87,25 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     wsUrl,
     onClose,
     onComplete,
+    // 新增 Props
+    supabaseUuid,
+    productName,
+    marketingGoal,
+    postFrequency,
+    contentStrategy,
+    weeklyPlan,
+    todayContent,
+    onPublish,
+    onEditContent,
+    onRegenerateContent,
 }) => {
     const [activeMode, setActiveMode] = useState<WorkflowMode>(initialMode);
     const [nodes, setNodes] = useState<WorkflowNode[]>(DEFAULT_NODES[initialMode]);
     const [activeNodeId, setActiveNodeId] = useState<string>(DEFAULT_NODES[initialMode][0].id);
     const [isConnected, setIsConnected] = useState(false);
     const [overallProgress, setOverallProgress] = useState(0);
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [rightPanelView, setRightPanelView] = useState<'logs' | 'content'>('content');
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -178,8 +215,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                 <button
                                     onClick={() => setActiveMode(mode)}
                                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${isActive
-                                            ? 'border-blue-200 shadow-md scale-110 bg-white'
-                                            : 'border-transparent bg-slate-50 hover:bg-slate-100'
+                                        ? 'border-blue-200 shadow-md scale-110 bg-white'
+                                        : 'border-transparent bg-slate-50 hover:bg-slate-100'
                                         }`}
                                 >
                                     <ModeIcon size={22} className={isActive ? theme.color : 'text-slate-400'} />
@@ -203,12 +240,12 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                 </button>
             </aside>
 
-            {/* 2. 中间：任务序列 */}
-            <section className="w-[400px] bg-white border-r border-slate-100 flex flex-col shadow-sm">
-                <header className="p-6 border-b border-slate-50 flex items-center justify-between">
+            {/* 2. 中间：策略+计划+编排 */}
+            <section className="w-[420px] bg-white border-r border-slate-100 flex flex-col shadow-sm">
+                <header className="p-4 border-b border-slate-50 flex items-center justify-between">
                     <div>
                         <h2 className="text-[10px] font-bold tracking-[0.2em] text-slate-400 uppercase mb-1">智能编排引擎</h2>
-                        <span className={`text-xl font-extrabold tracking-tight ${modeTheme.color}`}>
+                        <span className={`text-lg font-extrabold tracking-tight ${modeTheme.color}`}>
                             {modeTheme.label}
                         </span>
                     </div>
@@ -220,95 +257,137 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 relative">
-                    {/* Connector Line */}
-                    <div className="absolute left-[38px] top-12 bottom-12 w-[2px] bg-slate-50 z-0"></div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {/* 策略概览 */}
+                    <StrategyOverview
+                        productName={productName}
+                        marketingGoal={marketingGoal}
+                        postFrequency={postFrequency}
+                        keyThemes={contentStrategy?.key_themes}
+                        hashtags={contentStrategy?.hashtags}
+                    />
 
-                    {nodes.map((node) => {
-                        const isSelected = activeNodeId === node.id;
-                        const isDone = node.status === NodeStatus.COMPLETED;
-                        const isWorking = node.status === NodeStatus.PROCESSING;
-                        const isFailed = node.status === NodeStatus.FAILED;
+                    {/* 本周计划 */}
+                    <WeeklyPlanTimeline weeklyPlan={weeklyPlan} compact />
 
-                        return (
-                            <div
-                                key={node.id}
-                                onClick={() => setActiveNodeId(node.id)}
-                                className={`group relative z-10 cursor-pointer flex items-center gap-5 p-5 rounded-3xl border transition-all duration-300 ${isSelected
-                                        ? 'bg-white border-blue-100 shadow-xl shadow-blue-900/5 ring-1 ring-blue-500/5'
-                                        : 'bg-white border-slate-50 hover:border-slate-100 hover:shadow-sm'
-                                    }`}
-                            >
-                                {/* Node Orb */}
-                                <div className={`flex-shrink-0 w-12 h-12 rounded-2xl border flex items-center justify-center transition-all duration-500 ${isDone ? 'bg-emerald-50 border-emerald-100 text-emerald-500' :
-                                        isWorking ? 'bg-blue-50 border-blue-100 text-blue-500 shadow-inner' :
-                                            isFailed ? 'bg-rose-50 border-rose-100 text-rose-500' :
-                                                'bg-slate-50 border-slate-100 text-slate-300'
-                                    }`}>
-                                    <StatusIcon status={node.status} size={22} />
-                                </div>
+                    {/* 任务节点列表 */}
+                    <div className="relative">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Activity size={14} className="text-blue-500" />
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                                ⚡ 执行进度
+                            </h3>
+                        </div>
 
-                                {/* Info & Progress */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className={`text-sm font-bold truncate ${isSelected ? 'text-slate-800' : 'text-slate-500'}`}>
-                                            {node.title}
-                                        </h3>
+                        {/* Connector Line */}
+                        <div className="absolute left-[11px] top-16 bottom-4 w-0.5 bg-slate-100 z-0"></div>
+
+                        <div className="space-y-2">
+                            {nodes.map((node) => {
+                                const isSelected = activeNodeId === node.id;
+                                const isDone = node.status === NodeStatus.COMPLETED;
+                                const isWorking = node.status === NodeStatus.PROCESSING;
+                                const isFailed = node.status === NodeStatus.FAILED;
+
+                                return (
+                                    <div
+                                        key={node.id}
+                                        onClick={() => setActiveNodeId(node.id)}
+                                        className={`group relative z-10 cursor-pointer flex items-center gap-3 p-3 rounded-xl border transition-all duration-300 ${isSelected
+                                            ? 'bg-white border-blue-100 shadow-md ring-1 ring-blue-500/10'
+                                            : 'bg-white border-slate-50 hover:border-slate-100 hover:shadow-sm'
+                                            }`}
+                                    >
+                                        {/* Node Orb */}
+                                        <div className={`flex-shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${isDone ? 'bg-emerald-50 border-emerald-100 text-emerald-500' :
+                                            isWorking ? 'bg-blue-50 border-blue-100 text-blue-500' :
+                                                isFailed ? 'bg-rose-50 border-rose-100 text-rose-500' :
+                                                    'bg-slate-50 border-slate-100 text-slate-300'
+                                            }`}>
+                                            <StatusIcon status={node.status} size={16} />
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className={`text-xs font-bold truncate ${isSelected ? 'text-slate-800' : 'text-slate-500'}`}>
+                                                {node.title}
+                                            </h4>
+                                            {isWorking && (
+                                                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-1">
+                                                    <div
+                                                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all"
+                                                        style={{ width: `${node.details.progress || 0}%` }}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
                                         {isWorking && (
-                                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{node.details.progress || 0}%</span>
+                                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                                {node.details.progress || 0}%
+                                            </span>
                                         )}
                                     </div>
-
-                                    {isWorking ? (
-                                        <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
-                                                style={{ width: `${node.details.progress || 0}%` }}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1.5">
-                                            <Cpu size={10} /> {node.agent}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className={`transition-all duration-300 ${isSelected ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'}`}>
-                                    <ChevronRight size={18} className="text-blue-400" />
-                                </div>
-                            </div>
-                        );
-                    })}
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            {/* 3. 右侧：终端监控 */}
+            {/* 3. 右侧：内容产出 / 日志切换 */}
             <main className="flex-1 flex flex-col bg-slate-50/30">
-                <header className="h-16 px-8 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md">
-                    <div className="flex items-center gap-3">
-                        <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                            <Terminal size={18} />
-                        </div>
-                        <h1 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">执行监控</h1>
-                        <div className="h-1 w-1 rounded-full bg-slate-300"></div>
-                        <span className="text-[10px] font-mono text-slate-400">NODE: {activeNode?.id}</span>
+                <header className="h-14 px-6 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md">
+                    <div className="flex items-center gap-2">
+                        {/* Tab 切换 */}
+                        <button
+                            onClick={() => setRightPanelView('content')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rightPanelView === 'content'
+                                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                        >
+                            📝 内容产出
+                        </button>
+                        <button
+                            onClick={() => setRightPanelView('logs')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rightPanelView === 'logs'
+                                    ? 'bg-blue-500 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                        >
+                            <Terminal size={12} className="inline mr-1" />
+                            执行日志
+                        </button>
                     </div>
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-                            <span className="text-[10px] font-bold text-slate-600">{isConnected ? '已连接' : '未连接'}</span>
-                        </div>
-                        <div className="h-4 w-px bg-slate-100"></div>
-                        <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
-                            <Activity size={12} className="text-blue-500" />
-                            <span>TASK: {taskId?.slice(0, 8) || 'N/A'}</span>
-                        </div>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                        <span className="font-mono">TASK: {taskId?.slice(0, 8) || 'N/A'}</span>
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-hidden p-8">
-                    <div className="h-full bg-white rounded-[2rem] border border-slate-100 shadow-2xl shadow-blue-900/5 overflow-hidden flex flex-col">
-                        {activeNode && <LogDetail node={activeNode} />}
+                <div className="flex-1 overflow-hidden p-4">
+                    <div className="h-full bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden flex flex-col">
+                        {rightPanelView === 'content' ? (
+                            <TodayContentPreview
+                                content={todayContent}
+                                onPublish={async () => {
+                                    if (onPublish) {
+                                        setIsPublishing(true);
+                                        try {
+                                            await onPublish();
+                                        } finally {
+                                            setIsPublishing(false);
+                                        }
+                                    }
+                                }}
+                                onEdit={onEditContent}
+                                onRegenerate={onRegenerateContent}
+                                isPublishing={isPublishing}
+                            />
+                        ) : (
+                            activeNode && <LogDetail node={activeNode} />
+                        )}
                     </div>
                 </div>
             </main>
