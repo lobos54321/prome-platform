@@ -155,8 +155,9 @@ export default function XiaohongshuAutomation() {
       // 🔥 修复：检查后端是否有数据，即使Supabase中没有is_running状态
       // 因为后端重启后可能从文件恢复了数据，但Supabase状态未同步
       if (status?.is_running && userId) {
-        // Supabase显示正在运行，直接加载Dashboard
-        setCurrentStep('dashboard');
+        // 🔥 即使正在运行，也先进入 content-mode 步骤让用户确认/修改内容形式
+        console.log('✅ [XHS] 运营中，进入内容形式偏好设置');
+        setCurrentStep('content-mode');
         await loadDashboardData(user.id, userId);
       } else {
         // Supabase没有运行状态，尝试从后端API检查是否有历史数据
