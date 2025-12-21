@@ -114,7 +114,26 @@ export default function AutoMarketing() {
         try {
             setSaving(true);
 
-            // 保存到 Supabase xhs_user_profiles
+            // 1. 保存到 global_product_profiles (ConfigSection 读取这个表)
+            const { error: globalError } = await supabase
+                .from('global_product_profiles')
+                .upsert({
+                    supabase_uuid: currentUser.id,
+                    product_name: config.productName,
+                    target_audience: config.targetAudience,
+                    region: config.region,
+                    material_images: config.materialImages,
+                    material_documents: config.materialDocuments,
+                    material_analysis: config.materialAnalysis,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'supabase_uuid' });
+
+            if (globalError) {
+                console.error('保存全局配置失败:', globalError);
+                // 继续执行，不阻断流程
+            }
+
+            // 2. 保存到 xhs_user_profiles (平台偏好)
             const { error: saveError } = await supabase
                 .from('xhs_user_profiles')
                 .upsert({
@@ -128,8 +147,7 @@ export default function AutoMarketing() {
                     material_images: config.materialImages,
                     material_documents: config.materialDocuments,
                     material_analysis: config.materialAnalysis,
-                    post_frequency: 'daily', // 暂时映射为 daily，数据库可能没有 posts_per_day
-                    // posts_per_day: config.postsPerDay, // 移除导致 400 的字段
+                    post_frequency: 'daily',
                     review_mode: config.reviewMode,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'supabase_uuid' });
@@ -137,6 +155,8 @@ export default function AutoMarketing() {
             if (saveError) {
                 throw new Error(saveError.message);
             }
+
+            console.log('✅ 配置已保存到两个表');
 
             // 进入平台选择步骤
             setCurrentStep('platforms');
