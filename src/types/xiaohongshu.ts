@@ -53,6 +53,7 @@ export interface GlobalProductProfile {
   supabase_uuid: string;
   product_name: string;
   product_description?: string;
+  product_features?: string;        // 产品特色
   target_audience?: string;
   material_images?: string[];
   material_documents?: string[];

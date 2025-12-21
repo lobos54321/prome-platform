@@ -53,6 +53,9 @@ export function ConfigSection({
   // 产品描述 (全局产品配置新字段)
   const [productDescription, setProductDescription] = useState<string>('');
 
+  // 产品特色 (全局产品配置新字段)
+  const [productFeatures, setProductFeatures] = useState<string>('');
+
   // 内容形式配置
   type ContentMode = 'IMAGE_TEXT' | 'UGC_VIDEO' | 'AVATAR_VIDEO';
   const [contentAutoMode, setContentAutoMode] = useState(false);
@@ -80,6 +83,7 @@ export function ConfigSection({
           setMaterialDocuments(globalProduct.material_documents || []);
           setMaterialAnalysis(globalProduct.material_analysis || '');
           setRegion(globalProduct.region || '');
+          setProductFeatures(globalProduct.product_features || '');
         }
       } catch (err) {
         console.error('Failed to load global product profile:', err);
@@ -148,6 +152,7 @@ export function ConfigSection({
         supabase_uuid: supabaseUuid,
         product_name: productName,
         product_description: productDescription,
+        product_features: productFeatures,
         target_audience: targetAudience,
         material_images: materialImages,
         material_documents: materialDocuments,
@@ -382,6 +387,19 @@ export function ConfigSection({
               disabled={saving || starting}
             />
             <p className="text-xs text-muted-foreground">可选，用于舆情分析定位热点</p>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="productFeatures">产品特色</Label>
+            <Textarea
+              id="productFeatures"
+              value={productFeatures}
+              onChange={(e) => setProductFeatures(e.target.value)}
+              placeholder="描述产品的核心卖点、差异化优势、独特价值主张..."
+              rows={3}
+              disabled={saving || starting}
+            />
+            <p className="text-xs text-muted-foreground">产品的独特亮点，用于AI生成内容策略</p>
           </div>
 
           <div className="space-y-2">

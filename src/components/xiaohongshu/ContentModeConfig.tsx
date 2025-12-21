@@ -403,7 +403,10 @@ export function ContentModeConfig({
                                                 {avatarPhotoUrl ? (
                                                     <div className="flex items-center gap-2">
                                                         <img src={avatarPhotoUrl} alt="Avatar" className="w-16 h-16 rounded-lg object-cover" />
-                                                        <Button variant="outline" size="sm" onClick={() => setAvatarPhotoUrl('')}>
+                                                        <Button variant="outline" size="sm" onClick={() => {
+                                                            setAvatarPhotoUrl('');
+                                                            notifyChange({ avatarPhotoUrl: '' });
+                                                        }}>
                                                             更换
                                                         </Button>
                                                     </div>
@@ -437,7 +440,10 @@ export function ContentModeConfig({
                                                 {voiceSampleUrl ? (
                                                     <div className="flex items-center gap-2">
                                                         <audio src={voiceSampleUrl} controls className="h-8" />
-                                                        <Button variant="outline" size="sm" onClick={() => setVoiceSampleUrl('')}>
+                                                        <Button variant="outline" size="sm" onClick={() => {
+                                                            setVoiceSampleUrl('');
+                                                            notifyChange({ voiceSampleUrl: '' });
+                                                        }}>
                                                             更换
                                                         </Button>
                                                     </div>
