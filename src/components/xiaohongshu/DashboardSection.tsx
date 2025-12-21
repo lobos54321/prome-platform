@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings, LogOut, Pause, FileText, Target, TrendingUp, Sparkles } from 'lucide-react';
+import { RefreshCw, Settings, LogOut, Pause, FileText, Target, TrendingUp, Sparkles, Play } from 'lucide-react';
 import { StatusCard } from './StatusCard';
 import { StrategyCard } from './StrategyCard';
 import { StrategyEditor } from './StrategyEditor';
@@ -13,6 +13,8 @@ import { ReadyQueueCard } from './ReadyQueueCard';
 import { PerformanceCard } from './PerformanceCard';
 import { AccountBadge } from './AccountBadge';
 import { ContentCreationForm } from './ContentCreationForm';
+import { AgentProgressPanel } from '@/components/workflow';
+import { WorkflowMode } from '@/types/workflow';
 import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
 import type { AutomationStatus, ContentStrategy, WeeklyPlan, UserProfile } from '@/types/xiaohongshu';
@@ -62,6 +64,11 @@ export function DashboardSection({
 
   // 📊 数据分析弹窗
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
+
+  // 🚀 AgentProgressPanel 状态
+  const [showProgressPanel, setShowProgressPanel] = useState(false);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [selectedWorkflowMode, setSelectedWorkflowMode] = useState<WorkflowMode>(WorkflowMode.IMAGE_TEXT);
 
   const fetchData = useCallback(async () => {
     try {
@@ -609,8 +616,20 @@ export function DashboardSection({
           <CardTitle className="text-lg">⚙️ 控制面板</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-5 gap-4">
-            {/* 🌟 新增：创建内容按钮 */}
+          <div className="grid md:grid-cols-6 gap-4">
+            {/* 🚀 启动运营按钮 */}
+            <Button
+              onClick={() => {
+                const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                setCurrentTaskId(taskId);
+                setShowProgressPanel(true);
+              }}
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              启动运营
+            </Button>
+            {/* 🌟 创建内容按钮 */}
             <Button
               onClick={() => setShowContentCreation(true)}
               className="w-full bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 text-white"
@@ -732,6 +751,29 @@ export function DashboardSection({
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 🚀 AgentProgressPanel 全屏进度视图 */}
+      {showProgressPanel && (
+        <div className="fixed inset-0 z-50 bg-white">
+          <AgentProgressPanel
+            taskId={currentTaskId || undefined}
+            mode={selectedWorkflowMode}
+            onClose={() => {
+              setShowProgressPanel(false);
+              setCurrentTaskId(null);
+              // 刷新数据
+              fetchData();
+            }}
+            onComplete={(result) => {
+              console.log('Workflow completed:', result);
+              setShowProgressPanel(false);
+              setCurrentTaskId(null);
+              // 刷新数据
+              fetchData();
+            }}
+          />
         </div>
       )}
     </div>
