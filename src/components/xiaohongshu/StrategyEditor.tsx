@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { X, Plus, Clock, Hash, TrendingUp, Save, Sparkles, GripVertical } from 'lucide-react';
 import type { ContentStrategy } from '@/types/xiaohongshu';
 
@@ -34,6 +34,58 @@ export const StrategyEditor: React.FC<StrategyEditorProps> = ({
     const [newHashtag, setNewHashtag] = useState('');
     const [saving, setSaving] = useState(false);
     const [loadingAI, setLoadingAI] = useState(false);
+
+    // 拖拽状态
+    const [draggedThemeIndex, setDraggedThemeIndex] = useState<number | null>(null);
+    const [draggedHashtagIndex, setDraggedHashtagIndex] = useState<number | null>(null);
+    const dragOverThemeRef = useRef<number | null>(null);
+    const dragOverHashtagRef = useRef<number | null>(null);
+
+    // 主题拖拽处理
+    const handleThemeDragStart = (e: React.DragEvent, index: number) => {
+        setDraggedThemeIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', index.toString());
+    };
+
+    const handleThemeDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        dragOverThemeRef.current = index;
+    };
+
+    const handleThemeDragEnd = () => {
+        if (draggedThemeIndex !== null && dragOverThemeRef.current !== null && draggedThemeIndex !== dragOverThemeRef.current) {
+            const newThemes = [...keyThemes];
+            const [draggedItem] = newThemes.splice(draggedThemeIndex, 1);
+            newThemes.splice(dragOverThemeRef.current, 0, draggedItem);
+            setKeyThemes(newThemes);
+        }
+        setDraggedThemeIndex(null);
+        dragOverThemeRef.current = null;
+    };
+
+    // 标签拖拽处理
+    const handleHashtagDragStart = (e: React.DragEvent, index: number) => {
+        setDraggedHashtagIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', index.toString());
+    };
+
+    const handleHashtagDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        dragOverHashtagRef.current = index;
+    };
+
+    const handleHashtagDragEnd = () => {
+        if (draggedHashtagIndex !== null && dragOverHashtagRef.current !== null && draggedHashtagIndex !== dragOverHashtagRef.current) {
+            const newTags = [...hashtags];
+            const [draggedItem] = newTags.splice(draggedHashtagIndex, 1);
+            newTags.splice(dragOverHashtagRef.current, 0, draggedItem);
+            setHashtags(newTags);
+        }
+        setDraggedHashtagIndex(null);
+        dragOverHashtagRef.current = null;
+    };
 
     // 添加主题
     const addTheme = useCallback(() => {
@@ -119,7 +171,7 @@ export const StrategyEditor: React.FC<StrategyEditorProps> = ({
                 <div className="flex items-center justify-between p-4 border-b">
                     <div>
                         <h2 className="text-lg font-bold text-slate-800">📋 策略编辑器</h2>
-                        <p className="text-xs text-slate-400">调整内容策略，优化发布效果</p>
+                        <p className="text-xs text-slate-400">拖拽调整顺序，优化发布效果</p>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 transition">
                         <X size={20} className="text-slate-400" />
@@ -133,15 +185,20 @@ export const StrategyEditor: React.FC<StrategyEditorProps> = ({
                         <div className="flex items-center gap-2 mb-3">
                             <TrendingUp size={16} className="text-amber-500" />
                             <h3 className="text-sm font-bold text-slate-700">内容主题</h3>
-                            <span className="text-xs text-slate-400">({keyThemes.length})</span>
+                            <span className="text-xs text-slate-400">({keyThemes.length}) 拖拽排序</span>
                         </div>
                         <div className="flex flex-wrap gap-2 mb-3">
                             {keyThemes.map((theme, i) => (
                                 <div
                                     key={i}
-                                    className="group flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm"
+                                    draggable
+                                    onDragStart={(e) => handleThemeDragStart(e, i)}
+                                    onDragOver={(e) => handleThemeDragOver(e, i)}
+                                    onDragEnd={handleThemeDragEnd}
+                                    className={`group flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm cursor-grab active:cursor-grabbing transition-transform ${draggedThemeIndex === i ? 'opacity-50 scale-95' : ''
+                                        }`}
                                 >
-                                    <GripVertical size={12} className="text-amber-300 cursor-grab" />
+                                    <GripVertical size={12} className="text-amber-300" />
                                     <span>{theme}</span>
                                     <button
                                         onClick={() => removeTheme(theme)}
@@ -175,14 +232,20 @@ export const StrategyEditor: React.FC<StrategyEditorProps> = ({
                         <div className="flex items-center gap-2 mb-3">
                             <Hash size={16} className="text-blue-500" />
                             <h3 className="text-sm font-bold text-slate-700">推荐标签</h3>
-                            <span className="text-xs text-slate-400">({hashtags.length})</span>
+                            <span className="text-xs text-slate-400">({hashtags.length}) 拖拽排序</span>
                         </div>
                         <div className="flex flex-wrap gap-2 mb-3">
                             {hashtags.map((tag, i) => (
                                 <div
                                     key={i}
-                                    className="group flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm"
+                                    draggable
+                                    onDragStart={(e) => handleHashtagDragStart(e, i)}
+                                    onDragOver={(e) => handleHashtagDragOver(e, i)}
+                                    onDragEnd={handleHashtagDragEnd}
+                                    className={`group flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm cursor-grab active:cursor-grabbing transition-transform ${draggedHashtagIndex === i ? 'opacity-50 scale-95' : ''
+                                        }`}
                                 >
+                                    <GripVertical size={12} className="text-blue-300" />
                                     <span>#{tag}</span>
                                     <button
                                         onClick={() => removeHashtag(tag)}
@@ -223,8 +286,8 @@ export const StrategyEditor: React.FC<StrategyEditorProps> = ({
                                     key={time}
                                     onClick={() => toggleTime(time)}
                                     className={`px-2 py-1.5 rounded-lg text-xs font-medium transition ${optimalTimes.includes(time)
-                                            ? 'bg-emerald-500 text-white'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                         }`}
                                 >
                                     {time}
