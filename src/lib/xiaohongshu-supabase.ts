@@ -7,6 +7,7 @@ import type {
   UserMapping,
   UserProfile,
   GlobalProductProfile,
+  ProductMaterial,
   AutomationStatus,
   ContentStrategy,
   WeeklyPlan,
@@ -129,6 +130,112 @@ export class XiaohongshuSupabaseService {
       console.error('Error saving global product profile:', error);
       throw new Error('Failed to save global product profile');
     }
+  }
+
+  // ============================================
+  // 产品素材管理 (每个图片/文档独立存储)
+  // ============================================
+
+  async getProductMaterials(supabaseUuid: string): Promise<ProductMaterial[]> {
+    const { data, error } = await supabase
+      .from('product_materials')
+      .select('*')
+      .eq('supabase_uuid', supabaseUuid)
+      .order('uploaded_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching product materials:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  async addProductMaterial(material: Omit<ProductMaterial, 'id' | 'uploaded_at'>): Promise<ProductMaterial | null> {
+    const { data, error } = await supabase
+      .from('product_materials')
+      .upsert({
+        ...material,
+        uploaded_at: new Date().toISOString()
+      }, {
+        onConflict: 'supabase_uuid,file_url'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding product material:', error);
+      return null;
+    }
+    return data;
+  }
+
+  async updateMaterialAnalysis(
+    supabaseUuid: string,
+    fileUrl: string,
+    analysis: { ai_description: string; ai_tags?: string[]; ai_category?: string }
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('product_materials')
+      .update({
+        ai_description: analysis.ai_description,
+        ai_tags: analysis.ai_tags,
+        ai_category: analysis.ai_category,
+        analyzed_at: new Date().toISOString()
+      })
+      .eq('supabase_uuid', supabaseUuid)
+      .eq('file_url', fileUrl);
+
+    if (error) {
+      console.error('Error updating material analysis:', error);
+      throw new Error('Failed to update material analysis');
+    }
+  }
+
+  async deleteProductMaterial(supabaseUuid: string, fileUrl: string): Promise<void> {
+    const { error } = await supabase
+      .from('product_materials')
+      .delete()
+      .eq('supabase_uuid', supabaseUuid)
+      .eq('file_url', fileUrl);
+
+    if (error) {
+      console.error('Error deleting product material:', error);
+      throw new Error('Failed to delete product material');
+    }
+  }
+
+  // 获取素材摘要 (用于传入 AI context)
+  async getMaterialsSummary(supabaseUuid: string): Promise<string> {
+    const materials = await this.getProductMaterials(supabaseUuid);
+
+    if (materials.length === 0) {
+      return '暂无产品素材';
+    }
+
+    const images = materials.filter(m => m.file_type === 'image');
+    const documents = materials.filter(m => m.file_type === 'document');
+
+    let summary = `## 产品素材概览\n\n`;
+
+    if (images.length > 0) {
+      summary += `### 图片素材 (${images.length}张)\n`;
+      images.forEach((img, i) => {
+        summary += `${i + 1}. ${img.file_name || '图片'}: ${img.ai_description || '未分析'}\n`;
+        if (img.ai_tags?.length) {
+          summary += `   标签: ${img.ai_tags.join(', ')}\n`;
+        }
+      });
+      summary += '\n';
+    }
+
+    if (documents.length > 0) {
+      summary += `### 文档素材 (${documents.length}个)\n`;
+      documents.forEach((doc, i) => {
+        summary += `${i + 1}. ${doc.file_name || '文档'}: ${doc.ai_description || '未分析'}\n`;
+      });
+    }
+
+    return summary;
   }
 
   // ============================================

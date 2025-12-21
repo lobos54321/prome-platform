@@ -65,6 +65,24 @@ export interface GlobalProductProfile {
 }
 
 // ============================================
+// 产品素材 (每个图片/文档独立存储)
+// ============================================
+export interface ProductMaterial {
+  id: string;
+  supabase_uuid: string;
+  file_url: string;
+  file_type: 'image' | 'document';
+  file_name?: string;
+  file_size_bytes?: number;
+  mime_type?: string;
+  ai_description?: string;       // AI 对该素材的描述
+  ai_tags?: string[];           // AI 标签数组
+  ai_category?: 'product_photo' | 'packaging' | 'usage_scene' | 'document' | 'certificate' | 'other';
+  uploaded_at: string;
+  analyzed_at?: string;
+}
+
+// ============================================
 // 登录状态
 // ============================================
 export interface LoginStatus {
