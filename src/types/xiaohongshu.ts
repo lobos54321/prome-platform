@@ -36,6 +36,7 @@ export interface UserProfile {
   // 数字人视频素材 (AVATAR_VIDEO 模式需要)
   avatar_photo_url?: string;      // 数字人照片 URL
   voice_sample_url?: string;      // 语音样本 URL
+  avatar_video_duration?: number; // 数字人视频时长（秒），默认150秒(2.5分钟)
   // UGC 视频参数 (UGC_VIDEO 模式)
   ugc_gender?: 'male' | 'female';
   ugc_age_range?: 'young' | 'middle' | 'senior';

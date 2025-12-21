@@ -29,6 +29,7 @@ interface ContentModeConfigProps {
     initialAutoMode?: boolean;
     initialAvatarPhoto?: string;
     initialVoiceSample?: string;
+    initialAvatarVideoDuration?: number;  // 数字人视频时长（秒）
     initialUgcGender?: 'male' | 'female';
     initialUgcLanguage?: string;
     initialUgcDuration?: number;
@@ -41,6 +42,7 @@ interface ContentModeConfigData {
     selectedModes: ContentMode[];
     avatarPhotoUrl?: string;
     voiceSampleUrl?: string;
+    avatarVideoDuration?: number;  // 数字人视频时长（秒）
     ugcGender?: 'male' | 'female';
     ugcLanguage?: string;
     ugcDuration?: number;
@@ -53,6 +55,7 @@ export function ContentModeConfig({
     initialAutoMode = false,
     initialAvatarPhoto,
     initialVoiceSample,
+    initialAvatarVideoDuration = 150,  // 默认 2.5 分钟 (150秒)
     initialUgcGender = 'female',
     initialUgcLanguage = 'zh-CN',
     initialUgcDuration = 60,
@@ -63,6 +66,7 @@ export function ContentModeConfig({
     const [selectedModes, setSelectedModes] = useState<ContentMode[]>(initialModes);
     const [avatarPhotoUrl, setAvatarPhotoUrl] = useState(initialAvatarPhoto || '');
     const [voiceSampleUrl, setVoiceSampleUrl] = useState(initialVoiceSample || '');
+    const [avatarVideoDuration, setAvatarVideoDuration] = useState(initialAvatarVideoDuration);
     const [ugcGender, setUgcGender] = useState<'male' | 'female'>(initialUgcGender);
     const [ugcLanguage, setUgcLanguage] = useState(initialUgcLanguage);
     const [ugcDuration, setUgcDuration] = useState(initialUgcDuration);
@@ -106,6 +110,7 @@ export function ContentModeConfig({
             selectedModes,
             avatarPhotoUrl,
             voiceSampleUrl,
+            avatarVideoDuration,
             ugcGender,
             ugcLanguage,
             ugcDuration,
@@ -470,6 +475,36 @@ export function ContentModeConfig({
                                                 )}
                                             </div>
                                         </div>
+
+                                        {/* 视频时长选择 */}
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex-1">
+                                                <Label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
+                                                    <Clock className="h-3 w-3" /> 视频时长
+                                                </Label>
+                                                <Select
+                                                    value={String(avatarVideoDuration)}
+                                                    onValueChange={(v) => {
+                                                        const duration = parseInt(v);
+                                                        setAvatarVideoDuration(duration);
+                                                        notifyChange({ avatarVideoDuration: duration });
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="60">1 分钟</SelectItem>
+                                                        <SelectItem value="120">2 分钟</SelectItem>
+                                                        <SelectItem value="150">2.5 分钟 ⭐ 推荐</SelectItem>
+                                                        <SelectItem value="180">3 分钟 ⭐ 推荐</SelectItem>
+                                                        <SelectItem value="240">4 分钟</SelectItem>
+                                                        <SelectItem value="300">5 分钟</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <p className="text-xs text-gray-400 mt-1">推荐 2-3 分钟，适合大多数内容</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -497,7 +532,7 @@ export function ContentModeConfig({
                     )}
                 </div>
             </CardContent>
-        </Card>
+        </Card >
     );
 }
 

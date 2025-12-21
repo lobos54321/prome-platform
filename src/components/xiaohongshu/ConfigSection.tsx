@@ -62,6 +62,7 @@ export function ConfigSection({
   const [selectedContentModes, setSelectedContentModes] = useState<ContentMode[]>(['IMAGE_TEXT']);
   const [avatarPhotoUrl, setAvatarPhotoUrl] = useState('');
   const [voiceSampleUrl, setVoiceSampleUrl] = useState('');
+  const [avatarVideoDuration, setAvatarVideoDuration] = useState(150); // 默认2.5分钟
   const [ugcGender, setUgcGender] = useState<'male' | 'female'>('female');
   const [ugcLanguage, setUgcLanguage] = useState('zh-CN');
   const [ugcDuration, setUgcDuration] = useState(60);
@@ -103,6 +104,7 @@ export function ConfigSection({
       // 内容形式配置
       setAvatarPhotoUrl(initialConfig.avatar_photo_url || '');
       setVoiceSampleUrl(initialConfig.voice_sample_url || '');
+      setAvatarVideoDuration(initialConfig.avatar_video_duration || 150);
       if (initialConfig.content_mode_preference) {
         setSelectedContentModes([initialConfig.content_mode_preference]);
       }
@@ -174,6 +176,7 @@ export function ConfigSection({
         content_mode_preference: selectedContentModes[0],
         avatar_photo_url: avatarPhotoUrl || undefined,
         voice_sample_url: voiceSampleUrl || undefined,
+        avatar_video_duration: avatarVideoDuration,
         ugc_gender: ugcGender,
         ugc_language: ugcLanguage,
         ugc_duration: ugcDuration,
@@ -480,6 +483,7 @@ export function ConfigSection({
             initialAutoMode={contentAutoMode}
             initialAvatarPhoto={avatarPhotoUrl}
             initialVoiceSample={voiceSampleUrl}
+            initialAvatarVideoDuration={avatarVideoDuration}
             initialUgcGender={ugcGender}
             initialUgcLanguage={ugcLanguage}
             initialUgcDuration={ugcDuration}
@@ -488,6 +492,7 @@ export function ConfigSection({
               setSelectedContentModes(config.selectedModes);
               setAvatarPhotoUrl(config.avatarPhotoUrl || '');
               setVoiceSampleUrl(config.voiceSampleUrl || '');
+              setAvatarVideoDuration(config.avatarVideoDuration || 150);
               setUgcGender(config.ugcGender || 'female');
               setUgcLanguage(config.ugcLanguage || 'zh-CN');
               setUgcDuration(config.ugcDuration || 60);
