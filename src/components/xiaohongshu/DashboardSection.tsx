@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, Settings, LogOut, Pause, FileText, Target, TrendingUp, Sparkles } from 'lucide-react';
 import { StatusCard } from './StatusCard';
 import { StrategyCard } from './StrategyCard';
+import { StrategyEditor } from './StrategyEditor';
+import { AnalyticsInsightPanel } from './AnalyticsInsightPanel';
 import { WeeklyPlanCard } from './WeeklyPlanCard';
 import { ContentPreviewCard } from './ContentPreviewCard';
 import { ReadyQueueCard } from './ReadyQueueCard';
@@ -53,6 +55,12 @@ export function DashboardSection({
 
   // 🌟 内容创作弹窗
   const [showContentCreation, setShowContentCreation] = useState(false);
+
+  // 🔧 策略编辑器弹窗
+  const [showStrategyEditor, setShowStrategyEditor] = useState(false);
+
+  // 📊 数据分析弹窗
+  const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -237,46 +245,28 @@ export function DashboardSection({
     alert(`📝 待发布内容 (${readyQueue.length}条)\n\n${content}`);
   };
 
-  const handleAdjustStrategy = async () => {
-    const newStrategy = prompt('请输入新的内容策略关键词（用逗号分隔）：');
-    if (!newStrategy) return;
+  const handleAdjustStrategy = () => {
+    setShowStrategyEditor(true);
+  };
 
+  // 保存策略更新
+  const handleSaveStrategy = async (updates: Partial<ContentStrategy>) => {
     try {
-      const keywords = newStrategy.split(',').map(k => k.trim());
-      const response = await xiaohongshuAPI.updateStrategy(xhsUserId, {
-        keywords,
-        updateTime: new Date().toISOString(),
+      await xiaohongshuSupabase.saveContentStrategy({
+        ...strategy,
+        ...updates,
+        supabase_uuid: supabaseUuid,
+        xhs_user_id: xhsUserId,
       });
-
-      if (response.success) {
-        alert('✅ 策略已更新！系统将根据新策略生成内容。');
-        await fetchData();
-      } else {
-        alert('更新失败：' + (response.error || '未知错误'));
-      }
-    } catch (error: any) {
-      console.error('更新策略失败:', error);
-      alert('更新策略失败：' + error.message);
+      await fetchData();
+    } catch (error) {
+      console.error('保存策略失败:', error);
+      throw error;
     }
   };
 
   const handleViewAnalytics = () => {
-    if (!performanceData || performanceData.totalPosts === 0) {
-      alert('暂无运营数据，等待首次发布后可查看统计信息。');
-      return;
-    }
-
-    const stats = `
-📊 运营数据统计
-
-📝 总发布数: ${performanceData.totalPosts || 0}
-👁️ 总浏览量: ${performanceData.totalViews || 0}
-❤️ 总点赞数: ${performanceData.totalLikes || 0}
-💬 总评论数: ${performanceData.totalComments || 0}
-📈 平均互动率: ${((performanceData.avgEngagementRate || 0) * 100).toFixed(2)}%
-    `.trim();
-
-    alert(stats);
+    setShowAnalyticsPanel(true);
   };
 
   const handleApprovePost = async (postId: string) => {
@@ -685,6 +675,53 @@ export function DashboardSection({
                   fetchData();
                   // 可选：关闭弹窗
                   // setShowContentCreation(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔧 策略编辑器弹窗 */}
+      {showStrategyEditor && (
+        <StrategyEditor
+          strategy={strategy}
+          onSave={handleSaveStrategy}
+          onClose={() => setShowStrategyEditor(false)}
+        />
+      )}
+
+      {/* 📊 数据分析弹窗 */}
+      {showAnalyticsPanel && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-hidden">
+            <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                📊 数据洞察
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAnalyticsPanel(false)}
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[calc(80vh-60px)]">
+              <AnalyticsInsightPanel
+                userId={xhsUserId}
+                onApplySuggestion={async (suggestion) => {
+                  // 根据建议类型应用到策略
+                  if (suggestion.type === 'theme') {
+                    await handleSaveStrategy({
+                      key_themes: [...(strategy?.key_themes || []), suggestion.suggestion],
+                    });
+                  } else if (suggestion.type === 'hashtag') {
+                    const tag = suggestion.suggestion.replace(/^#/, '');
+                    await handleSaveStrategy({
+                      hashtags: [...(strategy?.hashtags || []), tag],
+                    });
+                  }
                 }}
               />
             </div>
