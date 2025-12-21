@@ -715,18 +715,7 @@ export default function XiaohongshuAutomation() {
                 </>
               )}
 
-              {/* Step 3: Dashboard - 显示配置和运营状态 */}
-              {(currentStep === 'dashboard') && supabaseUuid && xhsUserId && (
-                <ConfigSection
-                  supabaseUuid={supabaseUuid}
-                  xhsUserId={xhsUserId}
-                  initialConfig={userProfile}
-                  onConfigSaved={handleConfigSaved}
-                  onStartOperation={handleStartOperation}
-                />
-              )}
-
-              {/* Step 3: Dashboard */}
+              {/* Step 3: Dashboard - 运营仪表盘 */}
               {currentStep === 'dashboard' && supabaseUuid && xhsUserId && (
                 <DashboardSection
                   supabaseUuid={supabaseUuid}
@@ -734,6 +723,7 @@ export default function XiaohongshuAutomation() {
                   automationStatus={automationStatus}
                   contentStrategy={contentStrategy}
                   weeklyPlan={weeklyPlan}
+                  userProfile={userProfile}
                   onRefresh={handleRefresh}
                   onReconfigure={handleReconfigure}
                   onLogout={handleLogout}
