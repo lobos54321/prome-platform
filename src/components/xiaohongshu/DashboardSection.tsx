@@ -5,6 +5,7 @@ import { RefreshCw, Settings, LogOut, Pause, FileText, Target, TrendingUp, Spark
 import { StatusCard } from './StatusCard';
 import { StrategyCard } from './StrategyCard';
 import { StrategyEditor } from './StrategyEditor';
+import { StrategyHistoryCard } from './StrategyHistoryCard';
 import { AnalyticsInsightPanel } from './AnalyticsInsightPanel';
 import { WeeklyPlanCard } from './WeeklyPlanCard';
 import { ContentPreviewCard } from './ContentPreviewCard';
@@ -593,6 +594,11 @@ export function DashboardSection({
             />
             <ReadyQueueCard queue={readyQueue} />
             <PerformanceCard data={performanceData} />
+          </div>
+
+          {/* 策略演化历史 */}
+          <div className="mt-6">
+            <StrategyHistoryCard userId={xhsUserId} />
           </div>
         </CardContent>
       </Card>
