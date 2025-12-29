@@ -17,6 +17,7 @@ import { TodayContentPreview } from './TodayContentPreview';
 import {
     ChevronRight,
     Cpu,
+    Calendar,
     Image as ImageIcon,
     User as UserIcon,
     Video as VideoIcon,
