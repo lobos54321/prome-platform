@@ -4,14 +4,17 @@
  * 用户设置内容形式偏好后，点击启动运营
  * 显示 AgentProgressPanel，完成后进入 Dashboard
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Eye, Loader2 } from 'lucide-react';
+import { Play, Eye, Loader2, AlertCircle } from 'lucide-react';
 import { ContentModeConfig } from './ContentModeConfig';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
 import type { UserProfile } from '@/types/xiaohongshu';
+import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
+import { xiaohongshuSupabase } from '@/lib/xiaohongshu-supabase';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ContentModeStepProps {
     supabaseUuid: string;
@@ -30,15 +33,85 @@ export function ContentModeStep({
 }: ContentModeStepProps) {
     const [showProgressPanel, setShowProgressPanel] = useState(false);
     const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-    const [selectedWorkflowMode, setSelectedWorkflowMode] = useState<WorkflowMode>(WorkflowMode.IMAGE_TEXT);
+    const [selectedWorkflowMode, setSelectedWorkflowMode] = useState<WorkflowMode>(() => {
+        const pref = userProfile?.content_mode_preference;
+        if (pref === 'UGC_VIDEO') return WorkflowMode.UGC_VIDEO;
+        if (pref === 'AVATAR_VIDEO') return WorkflowMode.AVATAR_VIDEO;
+        return WorkflowMode.IMAGE_TEXT;
+    });
     const [starting, setStarting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleStartOperation = () => {
-        setStarting(true);
-        const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        setCurrentTaskId(taskId);
-        setShowProgressPanel(true);
-        setStarting(false);
+    // 同步配置变化
+    useEffect(() => {
+        if (userProfile?.content_mode_preference) {
+            const pref = userProfile.content_mode_preference;
+            if (pref === 'UGC_VIDEO') setSelectedWorkflowMode(WorkflowMode.UGC_VIDEO);
+            else if (pref === 'AVATAR_VIDEO') setSelectedWorkflowMode(WorkflowMode.AVATAR_VIDEO);
+            else setSelectedWorkflowMode(WorkflowMode.IMAGE_TEXT);
+        }
+    }, [userProfile?.content_mode_preference]);
+
+    const handleStartOperation = async () => {
+        if (!userProfile?.product_name) {
+            setError('产品信息不完整，请返回重新配置');
+            return;
+        }
+
+        try {
+            setStarting(true);
+            setError(null);
+
+            const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+            // 1. 调用后端 API 启动工作流
+            const response = await xiaohongshuAPI.startAutoOperation(xhsUserId, {
+                productName: userProfile.product_name,
+                targetAudience: userProfile.target_audience || '',
+                marketingGoal: userProfile.marketing_goal as any,
+                postFrequency: userProfile.post_frequency as any,
+                brandStyle: userProfile.brand_style || 'warm',
+                reviewMode: (userProfile.review_mode as any) || 'manual',
+                taskId, // 传递任务ID
+            });
+
+            if (!response.success) {
+                throw new Error(response.message || '启动失败');
+            }
+
+            // 2. 更新 Supabase 中的运营状态
+            await xiaohongshuSupabase.saveAutomationStatus({
+                supabase_uuid: supabaseUuid,
+                xhs_user_id: xhsUserId,
+                is_running: true,
+                is_logged_in: true,
+                has_config: true,
+                last_activity: new Date().toISOString(),
+                uptime_seconds: 0,
+            });
+
+            // 3. 记录活动日志
+            await xiaohongshuSupabase.addActivityLog({
+                supabase_uuid: supabaseUuid,
+                xhs_user_id: xhsUserId,
+                activity_type: 'start',
+                message: '从偏好设置页面启动自动运营',
+                metadata: {
+                    productName: userProfile.product_name,
+                    mode: selectedWorkflowMode,
+                    taskId
+                },
+            });
+
+            // 4. 显示进度面板
+            setCurrentTaskId(taskId);
+            setShowProgressPanel(true);
+        } catch (err) {
+            console.error('Failed to start operation:', err);
+            setError(err instanceof Error ? err.message : '启动失败，请稍后重试');
+        } finally {
+            setStarting(false);
+        }
     };
 
     // 如果显示进度面板，渲染全屏进度视图
@@ -71,6 +144,12 @@ export function ContentModeStep({
 
     return (
         <div className="space-y-6">
+            {error && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            )}
             {/* 头部说明 */}
             <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
                 <CardContent className="p-6">

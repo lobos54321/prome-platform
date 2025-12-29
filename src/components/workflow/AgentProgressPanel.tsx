@@ -112,9 +112,20 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
 
     // WebSocket 连接
     const connectWebSocket = useCallback(() => {
-        if (!wsUrl || !taskId) return;
+        // 🔥 获取默认 WebSocket URL
+        const defaultWsUrl = ((import.meta as any).env?.VITE_XHS_API_URL || 'https://xiaohongshu-automation-ai.zeabur.app')
+            .replace(/^http/, 'ws')
+            .replace(/\/$/, '') + '/ws/workflow';
 
-        const ws = new WebSocket(`${wsUrl}?taskId=${taskId}`);
+        const finalWsUrl = wsUrl || defaultWsUrl;
+
+        if (!taskId) {
+            console.warn('[AgentProgressPanel] Missing taskId, skipping WebSocket connection');
+            return;
+        }
+
+        console.log(`🔌 [AgentProgressPanel] Connecting to WebSocket: ${finalWsUrl}?taskId=${taskId}`);
+        const ws = new WebSocket(`${finalWsUrl}?taskId=${taskId}`);
 
         ws.onopen = () => {
             console.log('[AgentProgressPanel] WebSocket connected');
@@ -343,8 +354,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         <button
                             onClick={() => setRightPanelView('content')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rightPanelView === 'content'
-                                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
                         >
                             📝 内容产出
@@ -352,8 +363,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         <button
                             onClick={() => setRightPanelView('logs')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${rightPanelView === 'logs'
-                                    ? 'bg-blue-500 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                ? 'bg-blue-500 text-white shadow-md'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
                         >
                             <Terminal size={12} className="inline mr-1" />
