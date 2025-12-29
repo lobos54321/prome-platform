@@ -211,12 +211,13 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
 
     // 切换模式时更新节点
     useEffect(() => {
-        setNodes(DEFAULT_NODES[activeMode]);
-        setActiveNodeId(DEFAULT_NODES[activeMode][0].id);
+        const defaultNodes = DEFAULT_NODES[activeMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
+        setNodes(defaultNodes);
+        setActiveNodeId(defaultNodes[0]?.id);
     }, [activeMode]);
 
     const activeNode = nodes.find(n => n.id === activeNodeId) || nodes[0];
-    const modeTheme = MODE_THEMES[activeMode];
+    const modeTheme = MODE_THEMES[activeMode] || MODE_THEMES[WorkflowMode.IMAGE_TEXT];
 
     return (
         <div className="flex h-full bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans">
@@ -229,7 +230,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
 
                 <div className="flex-1 flex flex-col space-y-8">
                     {Object.values(WorkflowMode).map(mode => {
-                        const theme = MODE_THEMES[mode];
+                        const theme = MODE_THEMES[mode as WorkflowMode] || MODE_THEMES[WorkflowMode.IMAGE_TEXT];
                         const isActive = activeMode === mode;
                         const isProcessing = nodes.some(n => n.status === NodeStatus.PROCESSING) && activeMode === mode;
                         const ModeIcon = mode === WorkflowMode.IMAGE_TEXT ? ImageIcon :
