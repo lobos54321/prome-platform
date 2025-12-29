@@ -73,6 +73,7 @@ export function ContentModeStep({
                 brandStyle: userProfile.brand_style || 'warm',
                 reviewMode: (userProfile.review_mode as any) || 'manual',
                 taskId, // 传递任务ID
+                contentModePreference: userProfile.content_mode_preference || 'IMAGE_TEXT', // 传递内容模式
             });
 
             if (!response.success) {
