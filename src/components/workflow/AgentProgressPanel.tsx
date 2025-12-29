@@ -228,6 +228,24 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         }
                     }
 
+                    // 提取变体文案结果
+                    if (updatedNode.id === 'variant-gen' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
+                        try {
+                            const output = typeof updatedNode.details.output === 'string'
+                                ? JSON.parse(updatedNode.details.output)
+                                : updatedNode.details.output;
+                            if (output.variants) {
+                                console.log('[AgentProgressPanel] Extracted variants from variant-gen:', output.variants);
+                                setLocalResult((prev: any) => ({
+                                    ...prev,
+                                    variants: output.variants
+                                }));
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse variant-gen result:', e);
+                        }
+                    }
+
                     // 提取策略结果
                     if (updatedNode.id === 'market-strategy' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
                         try {
