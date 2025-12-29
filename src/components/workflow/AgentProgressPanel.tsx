@@ -120,6 +120,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     const [overallProgress, setOverallProgress] = useState(0);
     const [isPublishing, setIsPublishing] = useState(false);
     const [rightPanelView, setRightPanelView] = useState<'logs' | 'content'>('content');
+    const [localResult, setLocalResult] = useState<any>(null);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -144,6 +145,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
         ws.onopen = () => {
             console.log('[AgentProgressPanel] WebSocket connected');
             setIsConnected(true);
+            // 连接成功后可以请求同步当前状态
+            ws.send(JSON.stringify({ type: 'get_status', taskId }));
         };
 
         ws.onmessage = (event) => {
@@ -168,10 +171,29 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                     if (updatedNode.status === NodeStatus.PROCESSING) {
                         setActiveNodeId(updatedNode.id);
                     }
+
+                    // 如果是最后一个节点任务保存完成，提取内容结果
+                    if (updatedNode.id === 'task-save' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
+                        try {
+                            const output = typeof updatedNode.details.output === 'string'
+                                ? JSON.parse(updatedNode.details.output)
+                                : updatedNode.details.output;
+                            if (output.result) {
+                                console.log('[AgentProgressPanel] Extracted result from task-save:', output.result);
+                                setLocalResult(output.result);
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse node result:', e);
+                        }
+                    }
                 } else if (message.type === 'completed') {
-                    const data = message.data as WorkflowStatusResponse;
-                    setNodes(data.nodes);
+                    const data = message.data as any;
                     setOverallProgress(100);
+                    if (data.nodes) setNodes(data.nodes);
+                    if (data.result) {
+                        console.log('[AgentProgressPanel] Got final result from completed message:', data.result);
+                        setLocalResult(data.result);
+                    }
                     onComplete?.(data);
                 } else if (message.type === 'error') {
                     console.error('[AgentProgressPanel] Error:', message.data);
@@ -396,7 +418,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                     <div className="h-full bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden flex flex-col">
                         {rightPanelView === 'content' ? (
                             <TodayContentPreview
-                                content={todayContent}
+                                content={localResult || todayContent}
                                 onPublish={async () => {
                                     if (onPublish) {
                                         setIsPublishing(true);
