@@ -220,4 +220,6 @@ export interface ProductConfig {
   postFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
   brandStyle: 'professional' | 'warm' | 'humorous' | 'minimalist';
   reviewMode: 'auto' | 'manual';
+  taskId?: string;
+  contentModePreference?: string;
 }

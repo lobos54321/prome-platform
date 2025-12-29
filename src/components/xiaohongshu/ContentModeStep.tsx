@@ -58,13 +58,15 @@ export function ContentModeStep({
             return;
         }
 
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
         try {
+            console.log('🚀 [ContentModeStep] Starting operation sequence...', { xhsUserId, taskId });
             setStarting(true);
             setError(null);
 
-            const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
             // 1. 调用后端 API 启动工作流
+            console.log('📡 [ContentModeStep] Step 1: Calling Backend API...');
             const response = await xiaohongshuAPI.startAutoOperation(xhsUserId, {
                 productName: userProfile.product_name,
                 targetAudience: userProfile.target_audience || '',
@@ -77,10 +79,13 @@ export function ContentModeStep({
             });
 
             if (!response.success) {
+                console.error('❌ [ContentModeStep] Backend API returned error:', response);
                 throw new Error(response.message || '启动失败');
             }
+            console.log('✅ [ContentModeStep] Backend API Success:', response);
 
             // 2. 更新 Supabase 中的运营状态
+            console.log('💾 [ContentModeStep] Step 2: Saving Automation Status...');
             await xiaohongshuSupabase.saveAutomationStatus({
                 supabase_uuid: supabaseUuid,
                 xhs_user_id: xhsUserId,
@@ -92,6 +97,7 @@ export function ContentModeStep({
             });
 
             // 3. 记录活动日志
+            console.log('📝 [ContentModeStep] Step 3: Adding Activity Log...');
             await xiaohongshuSupabase.addActivityLog({
                 supabase_uuid: supabaseUuid,
                 xhs_user_id: xhsUserId,
@@ -105,10 +111,11 @@ export function ContentModeStep({
             });
 
             // 4. 显示进度面板
+            console.log('🏁 [ContentModeStep] Step 4: Activating Progress Panel...');
             setCurrentTaskId(taskId);
             setShowProgressPanel(true);
         } catch (err) {
-            console.error('Failed to start operation:', err);
+            console.error('❌ [ContentModeStep] Operation failed:', err);
             setError(err instanceof Error ? err.message : '启动失败，请稍后重试');
         } finally {
             setStarting(false);
