@@ -28,14 +28,14 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                             <div className="flex items-center gap-4 mb-2">
                                 <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight">{node.title}</h2>
                                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest ${node.status === NodeStatus.COMPLETED ? 'bg-emerald-50 text-emerald-600' :
-                                        node.status === NodeStatus.PROCESSING ? 'bg-blue-50 text-blue-600 animate-pulse' :
-                                            node.status === NodeStatus.FAILED ? 'bg-rose-50 text-rose-600' :
-                                                'bg-slate-50 text-slate-400'
+                                    node.status === NodeStatus.PROCESSING ? 'bg-blue-50 text-blue-600 animate-pulse' :
+                                        node.status === NodeStatus.FAILED ? 'bg-rose-50 text-rose-600' :
+                                            'bg-slate-50 text-slate-400'
                                     }`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${node.status === NodeStatus.COMPLETED ? 'bg-emerald-500' :
-                                            node.status === NodeStatus.PROCESSING ? 'bg-blue-500' :
-                                                node.status === NodeStatus.FAILED ? 'bg-rose-500' :
-                                                    'bg-slate-300'
+                                        node.status === NodeStatus.PROCESSING ? 'bg-blue-500' :
+                                            node.status === NodeStatus.FAILED ? 'bg-rose-500' :
+                                                'bg-slate-300'
                                         }`}></span>
                                     {node.status === NodeStatus.COMPLETED ? '已完成' :
                                         node.status === NodeStatus.PROCESSING ? '处理中' :
@@ -130,7 +130,10 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                     <div className="absolute -top-3 -left-3 p-3 bg-emerald-500 text-white rounded-2xl shadow-lg shadow-emerald-200">
                                         <Zap size={20} fill="white" />
                                     </div>
-                                    {node.details.output}
+                                    {typeof node.details.output === 'object'
+                                        ? <pre className="font-mono text-sm leading-relaxed overflow-x-auto">{JSON.stringify(node.details.output, null, 2)}</pre>
+                                        : node.details.output
+                                    }
                                 </div>
                             </div>
                         )}

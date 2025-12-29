@@ -481,7 +481,17 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                     <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
                                         <Zap className="text-amber-500" /> 内容营销策略
                                     </h2>
-                                    <LogDetail node={activeNode as WorkflowNode} />
+                                    <StrategyOverview
+                                        productName={productName}
+                                        marketingGoal={marketingGoal}
+                                        postFrequency={postFrequency}
+                                        keyThemes={localContentStrategy?.key_themes}
+                                        hashtags={localContentStrategy?.hashtags}
+                                    />
+                                    <div className="mt-8 border-t border-slate-100 pt-8">
+                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">执行详情</h3>
+                                        <LogDetail node={activeNode as WorkflowNode} />
+                                    </div>
                                 </div>
                             ) : activeNodeId === 'weekly-plan' ? (
                                 <div className="p-8 h-full overflow-y-auto">
