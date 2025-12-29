@@ -157,6 +157,7 @@ export default function XiaohongshuAutomation() {
       if (status?.is_running && userId) {
         // 🔥 即使正在运行，也先进入 content-mode 步骤让用户确认/修改内容形式
         console.log('✅ [XHS] 运营中，进入内容形式偏好设置');
+        setViewMode('single'); // 确保进入单账号视图模式
         setCurrentStep('content-mode');
         await loadDashboardData(user.id, userId);
       } else {
@@ -224,6 +225,7 @@ export default function XiaohongshuAutomation() {
 
             // 🔥 有后端数据 → 进入 content-mode 步骤（先设置内容形式偏好）
             console.log('✅ [XHS] 有后端数据，进入内容形式偏好设置');
+            setViewMode('single'); // 确保进入单账号视图模式
             setCurrentStep('content-mode');
           } else {
             console.log('⚠️ 后端无数据，显示配置页面');
