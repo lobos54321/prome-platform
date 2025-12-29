@@ -121,6 +121,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     const [isPublishing, setIsPublishing] = useState(false);
     const [rightPanelView, setRightPanelView] = useState<'logs' | 'content'>('content');
     const [localResult, setLocalResult] = useState<any>(null);
+    const [localContentStrategy, setLocalContentStrategy] = useState<ContentStrategy | null>(contentStrategy || null);
+    const [localWeeklyPlan, setLocalWeeklyPlan] = useState<WeeklyPlan | null>(weeklyPlan || null);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -186,10 +188,66 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                             console.warn('Failed to parse node result:', e);
                         }
                     }
+
+                    // 提取策略结果
+                    if (updatedNode.id === 'market-strategy' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
+                        try {
+                            const output = typeof updatedNode.details.output === 'string'
+                                ? JSON.parse(updatedNode.details.output)
+                                : updatedNode.details.output;
+                            if (output.key_themes) {
+                                console.log('[AgentProgressPanel] Extracted strategy:', output);
+                                setLocalContentStrategy({
+                                    key_themes: output.key_themes,
+                                    hashtags: output.hashtags || [],
+                                    trending_topics: output.trending_topics || [],
+                                    optimal_times: output.optimal_times || []
+                                } as ContentStrategy);
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse strategy result:', e);
+                        }
+                    }
+
+                    // 提取周计划结果
+                    if (updatedNode.id === 'weekly-plan' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
+                        try {
+                            const output = typeof updatedNode.details.output === 'string'
+                                ? JSON.parse(updatedNode.details.output)
+                                : updatedNode.details.output;
+                            if (output.plan_data) {
+                                console.log('[AgentProgressPanel] Extracted weekly plan:', output);
+                                setLocalWeeklyPlan({
+                                    plan_data: output.plan_data,
+                                    week_start_date: output.week_start_date,
+                                    week_end_date: output.week_end_date
+                                } as WeeklyPlan);
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse weekly plan result:', e);
+                        }
+                    }
                 } else if (message.type === 'completed') {
                     const data = message.data as any;
                     setOverallProgress(100);
-                    if (data.nodes) setNodes(data.nodes);
+                    if (data.nodes) {
+                        setNodes(data.nodes);
+                        // 尝试从完成消息中同步所有状态
+                        data.nodes.forEach((n: any) => {
+                            if (n.id === 'market-strategy' && n.status === NodeStatus.COMPLETED && n.details.output) {
+                                try {
+                                    const out = typeof n.details.output === 'string' ? JSON.parse(n.details.output) : n.details.output;
+                                    if (out.key_themes) setLocalContentStrategy(out);
+                                } catch (e) { }
+                            }
+                            if (n.id === 'weekly-plan' && n.status === NodeStatus.COMPLETED && n.details.output) {
+                                try {
+                                    const out = typeof n.details.output === 'string' ? JSON.parse(n.details.output) : n.details.output;
+                                    if (out.plan_data) setLocalWeeklyPlan(out);
+                                } catch (e) { }
+                            }
+                        });
+                    }
                     if (data.result) {
                         console.log('[AgentProgressPanel] Got final result from completed message:', data.result);
                         setLocalResult(data.result);
@@ -235,7 +293,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     useEffect(() => {
         const defaultNodes = DEFAULT_NODES[activeMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
         setNodes(defaultNodes);
-        setActiveNodeId(defaultNodes[0]?.id);
+        setActiveNodeId(defaultNodes[0]?.id || '');
     }, [activeMode]);
 
     const activeNode = nodes.find(n => n.id === activeNodeId) || nodes[0];
@@ -311,12 +369,12 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         productName={productName}
                         marketingGoal={marketingGoal}
                         postFrequency={postFrequency}
-                        keyThemes={contentStrategy?.key_themes}
-                        hashtags={contentStrategy?.hashtags}
+                        keyThemes={localContentStrategy?.key_themes}
+                        hashtags={localContentStrategy?.hashtags}
                     />
 
                     {/* 本周计划 */}
-                    <WeeklyPlanTimeline weeklyPlan={weeklyPlan} compact />
+                    <WeeklyPlanTimeline weeklyPlan={localWeeklyPlan} compact />
 
                     {/* 任务节点列表 */}
                     <div className="relative">
@@ -417,22 +475,38 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                 <div className="flex-1 overflow-hidden p-4">
                     <div className="h-full bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden flex flex-col">
                         {rightPanelView === 'content' ? (
-                            <TodayContentPreview
-                                content={localResult || todayContent}
-                                onPublish={async () => {
-                                    if (onPublish) {
-                                        setIsPublishing(true);
-                                        try {
-                                            await onPublish();
-                                        } finally {
-                                            setIsPublishing(false);
+                            activeNodeId === 'market-strategy' ? (
+                                <div className="p-8 h-full overflow-y-auto">
+                                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                        <Zap className="text-amber-500" /> 内容营销策略
+                                    </h2>
+                                    <LogDetail node={activeNode as WorkflowNode} />
+                                </div>
+                            ) : activeNodeId === 'weekly-plan' ? (
+                                <div className="p-8 h-full overflow-y-auto">
+                                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                        <Calendar className="text-blue-500" /> 本周发布计划规划
+                                    </h2>
+                                    <WeeklyPlanTimeline weeklyPlan={localWeeklyPlan} />
+                                </div>
+                            ) : (
+                                <TodayContentPreview
+                                    content={localResult || todayContent}
+                                    onPublish={async () => {
+                                        if (onPublish) {
+                                            setIsPublishing(true);
+                                            try {
+                                                await onPublish();
+                                            } finally {
+                                                setIsPublishing(false);
+                                            }
                                         }
-                                    }
-                                }}
-                                onEdit={onEditContent}
-                                onRegenerate={onRegenerateContent}
-                                isPublishing={isPublishing}
-                            />
+                                    }}
+                                    onEdit={onEditContent}
+                                    onRegenerate={onRegenerateContent}
+                                    isPublishing={isPublishing}
+                                />
+                            )
                         ) : (
                             activeNode && <LogDetail node={activeNode} />
                         )}
