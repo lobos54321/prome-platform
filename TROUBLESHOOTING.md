@@ -151,7 +151,7 @@ private async validateSessionQuietly(): Promise<void> {
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' data: https: blob:;
-  connect-src 'self' https://api.stripe.com https://checkout.stripe.com https://*.supabase.co wss://*.supabase.co;
+  connect-src 'self' https://api.stripe.com https://checkout.stripe.com https://*.supabase.co wss://*.supabase.co https://*.zeabur.app wss://*.zeabur.app;
   frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com;
   object-src 'none';
   base-uri 'self';

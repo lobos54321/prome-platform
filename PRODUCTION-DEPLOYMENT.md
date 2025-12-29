@@ -88,7 +88,7 @@ For Dify integration and Stripe payments, ensure your CSP allows:
   default-src 'self';
   script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.udify.app;
   frame-src https://js.stripe.com https://*.udify.app;
-  connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.udify.app;
+  connect-src 'self' https://api.stripe.com https://*.supabase.co wss://*.supabase.co https://*.udify.app https://*.zeabur.app wss://*.zeabur.app;
   img-src 'self' data: https:;
   style-src 'self' 'unsafe-inline';
 ">
