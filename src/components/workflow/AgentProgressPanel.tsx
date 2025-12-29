@@ -124,6 +124,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     const [localResult, setLocalResult] = useState<any>(null);
     const [localContentStrategy, setLocalContentStrategy] = useState<ContentStrategy | null>(contentStrategy || null);
     const [localWeeklyPlan, setLocalWeeklyPlan] = useState<WeeklyPlan | null>(weeklyPlan || null);
+    const [isWorkflowCompleted, setIsWorkflowCompleted] = useState(false);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -190,6 +191,43 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         }
                     }
 
+                    // 提取详细计划结果 (显示今日目标标题)
+                    if (updatedNode.id === 'detail-plan' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
+                        try {
+                            const output = typeof updatedNode.details.output === 'string'
+                                ? JSON.parse(updatedNode.details.output)
+                                : updatedNode.details.output;
+                            if (output.today_target) {
+                                setLocalResult((prev: any) => ({
+                                    ...prev,
+                                    title: output.today_target
+                                }));
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse detail-plan result:', e);
+                        }
+                    }
+
+                    // 提取文案生成结果 (中间产物)
+                    if (updatedNode.id === 'copy-gen' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
+                        try {
+                            const output = typeof updatedNode.details.output === 'string'
+                                ? JSON.parse(updatedNode.details.output)
+                                : updatedNode.details.output;
+                            if (output.title || output.content) {
+                                console.log('[AgentProgressPanel] Extracted partial result from copy-gen:', output);
+                                setLocalResult((prev: any) => ({
+                                    ...prev,
+                                    title: output.title || prev?.title,
+                                    text: output.content || prev?.text || output.text,
+                                    hashtags: output.hashtags || prev?.hashtags
+                                }));
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse copy-gen result:', e);
+                        }
+                    }
+
                     // 提取策略结果
                     if (updatedNode.id === 'market-strategy' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
                         try {
@@ -253,7 +291,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         console.log('[AgentProgressPanel] Got final result from completed message:', data.result);
                         setLocalResult(data.result);
                     }
-                    onComplete?.(data);
+                    setIsWorkflowCompleted(true);
                 } else if (message.type === 'error') {
                     console.error('[AgentProgressPanel] Error:', message.data);
                 }
@@ -438,6 +476,28 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                 );
                             })}
                         </div>
+
+                        {/* Completion Message */}
+                        {isWorkflowCompleted && (
+                            <div className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xl animate-in zoom-in-95 duration-500">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="p-2 bg-white/20 rounded-full">
+                                        <Zap size={24} className="text-white fill-white" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-lg">全流程执行完毕</h4>
+                                        <p className="text-emerald-50 opacity-90 text-xs">内容已成功同步至待审任务列表</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => onComplete?.({ nodes, result: localResult })}
+                                    className="w-full py-3 bg-white text-emerald-600 font-black rounded-xl shadow-lg hover:bg-emerald-50 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <LayoutDashboard size={18} />
+                                    进入运营仪表盘
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </section>
