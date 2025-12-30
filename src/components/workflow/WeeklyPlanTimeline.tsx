@@ -80,12 +80,12 @@ export const WeeklyPlanTimeline: React.FC<WeeklyPlanTimelineProps> = ({
                             >
                                 {/* 节点 */}
                                 <div className={`relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${isPast && hasContent
-                                        ? 'bg-emerald-100 text-emerald-600'
-                                        : isToday
-                                            ? 'bg-blue-500 text-white shadow-md shadow-blue-200'
-                                            : hasContent
-                                                ? 'bg-slate-100 text-slate-400'
-                                                : 'bg-slate-50 text-slate-300'
+                                    ? 'bg-emerald-100 text-emerald-600'
+                                    : isToday
+                                        ? 'bg-blue-500 text-white shadow-md shadow-blue-200'
+                                        : hasContent
+                                            ? 'bg-slate-100 text-slate-400'
+                                            : 'bg-slate-50 text-slate-300'
                                     }`}>
                                     {isPast && hasContent ? (
                                         <CheckCircle size={12} />
@@ -114,10 +114,20 @@ export const WeeklyPlanTimeline: React.FC<WeeklyPlanTimelineProps> = ({
                                                 <div className="flex items-center gap-1 mt-0.5">
                                                     <Clock size={10} className="text-slate-300" />
                                                     <span className="text-[10px] text-slate-400">
-                                                        {new Date(dayPlan!.scheduled_time).toLocaleTimeString('zh-CN', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        })}
+                                                        {(() => {
+                                                            const timeStr = dayPlan!.scheduled_time;
+                                                            // 如果是 HH:mm 格式，补全日期以便 parse
+                                                            if (typeof timeStr === 'string' && timeStr.includes(':') && !timeStr.includes('-')) {
+                                                                const [h, m] = timeStr.split(':');
+                                                                return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+                                                            }
+                                                            const d = new Date(timeStr);
+                                                            return isNaN(d.getTime()) ? timeStr : d.toLocaleTimeString('zh-CN', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: false
+                                                            });
+                                                        })()}
                                                     </span>
                                                 </div>
                                             )}

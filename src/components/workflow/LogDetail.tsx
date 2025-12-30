@@ -145,9 +145,35 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                             <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">今日目标: {output.today_target}</div>
                                                         </div>
                                                     </div>
-                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
+
+                                                    {/* 🔥 新增：如果存在任务汇总，显示清单 */}
+                                                    {Array.isArray(output.taskSummaries) && (
+                                                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                                            <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block mb-3">策划任务清单</label>
+                                                            {output.taskSummaries.map((task: any, i: number) => (
+                                                                <div key={i} className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-blue-200 transition-all group">
+                                                                    <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                                                        {i + 1}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="text-sm font-extrabold text-slate-700 truncate">{task.title}</div>
+                                                                        <div className="flex items-center gap-3 mt-1">
+                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-bold">{task.type || '图文'}</span>
+                                                                            <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                                                                                <Clock size={10} />
+                                                                                {new Date(task.scheduledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center gap-3">
                                                         <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                                                        <span className="text-sm font-bold text-slate-600">同步至内容库中...</span>
+                                                        <span className="text-sm font-bold text-slate-600">内容已准备就绪，系统正在进行视觉编排...</span>
                                                     </div>
                                                 </div>
                                             );
