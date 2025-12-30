@@ -562,29 +562,33 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                 <div className="flex-1 overflow-hidden p-4">
                     <div className="h-full bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden flex flex-col">
                         {rightPanelView === 'content' ? (
-                            activeNodeId === 'market-strategy' ? (
+                            ['market-strategy', 'copy-analyze'].includes(activeNodeId) ? (
                                 <div className="p-8 h-full overflow-y-auto">
                                     <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                        <Zap className="text-amber-500" /> 内容营销策略
+                                        <Zap className="text-amber-500" /> 内容营销策略分析
                                     </h2>
                                     <StrategyOverview
                                         productName={productName}
                                         marketingGoal={marketingGoal}
                                         postFrequency={postFrequency}
-                                        keyThemes={localContentStrategy?.key_themes}
-                                        hashtags={localContentStrategy?.hashtags}
+                                        keyThemes={localContentStrategy?.key_themes || (activeNode?.details?.output as any)?.key_themes}
+                                        hashtags={localContentStrategy?.hashtags || (activeNode?.details?.output as any)?.goldenQuotes}
                                     />
                                     <div className="mt-8 border-t border-slate-100 pt-8">
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">执行详情</h3>
                                         <LogDetail node={activeNode as WorkflowNode} />
                                     </div>
                                 </div>
-                            ) : activeNodeId === 'weekly-plan' ? (
+                            ) : ['weekly-plan', 'detail-plan'].includes(activeNodeId) ? (
                                 <div className="p-8 h-full overflow-y-auto">
                                     <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                        <Calendar className="text-blue-500" /> 本周发布计划规划
+                                        <Calendar className="text-blue-500" /> 详细发布计划策划
                                     </h2>
                                     <WeeklyPlanTimeline weeklyPlan={localWeeklyPlan} />
+                                    <div className="mt-8 border-t border-slate-100 pt-8">
+                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">编排详情</h3>
+                                        <LogDetail node={activeNode as WorkflowNode} />
+                                    </div>
                                 </div>
                             ) : (
                                 <TodayContentPreview

@@ -130,10 +130,79 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                     <div className="absolute -top-3 -left-3 p-3 bg-emerald-500 text-white rounded-2xl shadow-lg shadow-emerald-200">
                                         <Zap size={20} fill="white" />
                                     </div>
-                                    {typeof node.details.output === 'object'
-                                        ? <pre className="font-mono text-sm leading-relaxed overflow-x-auto">{JSON.stringify(node.details.output, null, 2)}</pre>
-                                        : node.details.output
-                                    }
+                                    {(() => {
+                                        const output = node.details.output;
+                                        if (typeof output !== 'object' || output === null) return output;
+
+                                        // 1. 详细发布计划 (detail-plan)
+                                        if (node.id === 'detail-plan' && output.today_target) {
+                                            return (
+                                                <div className="space-y-6">
+                                                    <div className="flex items-center gap-4 text-slate-800">
+                                                        <div className="text-4xl font-black text-blue-600">{output.taskCount || output.tasksCount || 0}</div>
+                                                        <div>
+                                                            <div className="text-lg font-extrabold tracking-tight">发布计划已生成</div>
+                                                            <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">今日目标: {output.today_target}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
+                                                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                                                        <span className="text-sm font-bold text-slate-600">同步至内容库中...</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        // 2. 图片智能适配 (image-adapt)
+                                        if (node.id === 'image-adapt' && (output.layout || output.arrangement)) {
+                                            return (
+                                                <div className="space-y-8">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                                                            <label className="text-[10px] uppercase font-black text-amber-600 tracking-wider mb-1 block">推荐布局</label>
+                                                            <div className="text-sm font-bold text-slate-800">{output.layout}</div>
+                                                        </div>
+                                                        <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                                                            <label className="text-[10px] uppercase font-black text-indigo-600 tracking-wider mb-1 block">色彩/光效</label>
+                                                            <div className="text-sm font-bold text-slate-800">{output.lighting}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block px-1">视觉编排路线</label>
+                                                        {Array.isArray(output.arrangement) && output.arrangement.map((step: string, i: number) => (
+                                                            <div key={i} className="flex items-start gap-4 p-3 bg-slate-50/50 rounded-xl border border-slate-100 group hover:border-blue-200 transition-colors">
+                                                                <span className="w-6 h-6 flex-shrink-0 bg-white border border-slate-200 rounded-full flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:text-blue-500">{i + 1}</span>
+                                                                <span className="text-sm font-bold text-slate-600 leading-snug">{step}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        // 3. 策略分析 (copy-analyze)
+                                        if (node.id === 'copy-analyze' && output.strategy) {
+                                            return (
+                                                <div className="space-y-8">
+                                                    <div className="p-6 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2rem] text-white shadow-xl">
+                                                        <div className="text-[10px] uppercase font-black opacity-60 tracking-[0.2em] mb-2">深度策略</div>
+                                                        <div className="text-xl font-black mb-4">{output.strategy}</div>
+                                                        <div className="text-sm opacity-90 leading-relaxed font-medium">{output.insight}</div>
+                                                    </div>
+                                                    {output.key_themes && (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {output.key_themes.map((theme: string, i: number) => (
+                                                                <span key={theme} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-full text-xs font-black">#{theme}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        // 默认 JSON 渲染
+                                        return <pre className="font-mono text-sm leading-relaxed overflow-x-auto">{JSON.stringify(node.details.output, null, 2)}</pre>
+                                    })()}
                                 </div>
                             </div>
                         )}
