@@ -10,6 +10,7 @@ interface TodayContentPreviewProps {
         imageUrls?: string[];
         hashtags?: string[];
         scheduledTime?: string;
+        engine?: string; // 🔥 新增：生成引擎名称
         status?: 'draft' | 'approved' | 'publishing' | 'published' | 'failed';
         variants?: Array<{
             type: string;
@@ -74,7 +75,12 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
                     <div className="p-1.5 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500 text-white">
                         <FileText size={14} />
                     </div>
-                    <h3 className="text-sm font-bold text-slate-700">今日内容</h3>
+                    <div className="flex flex-col">
+                        <h3 className="text-sm font-bold text-slate-700 leading-tight">今日内容产出</h3>
+                        {content.engine && (
+                            <span className="text-[9px] font-medium text-slate-400">Powered by {content.engine}</span>
+                        )}
+                    </div>
                     {getStatusBadge()}
                 </div>
                 {content.scheduledTime && (
@@ -100,8 +106,8 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
                                     onSelectVariant?.(variant);
                                 }}
                                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedVariantIndex === index
-                                        ? 'bg-blue-500 text-white shadow-md'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    ? 'bg-blue-500 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                     }`}
                             >
                                 {variant.type}
@@ -186,8 +192,8 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
                         onClick={onPublish}
                         disabled={isPublishing || content.status === 'publishing'}
                         className={`w-full mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all ${isPublishing || content.status === 'publishing'
-                                ? 'bg-slate-300 cursor-not-allowed'
-                                : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-lg shadow-rose-200'
+                            ? 'bg-slate-300 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-lg shadow-rose-200'
                             }`}
                     >
                         {isPublishing || content.status === 'publishing' ? (

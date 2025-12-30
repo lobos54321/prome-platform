@@ -238,7 +238,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                 console.log('[AgentProgressPanel] Extracted variants from variant-gen:', output.variants);
                                 setLocalResult((prev: any) => ({
                                     ...prev,
-                                    variants: output.variants
+                                    variants: output.variants,
+                                    engine: output.engine || prev?.engine // 保留 engine 属性
                                 }));
                             }
                         } catch (e) {
@@ -472,9 +473,16 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
 
                                         {/* Info */}
                                         <div className="flex-1 min-w-0">
-                                            <h4 className={`text-xs font-bold truncate ${isSelected ? 'text-slate-800' : 'text-slate-500'}`}>
-                                                {node.title}
-                                            </h4>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <h4 className={`text-xs font-bold truncate ${isSelected ? 'text-slate-800' : 'text-slate-500'}`}>
+                                                    {node.title}
+                                                </h4>
+                                                {(node.details.output as any)?.engine && (
+                                                    <span className="flex-shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 font-medium scale-90 origin-right">
+                                                        {(node.details.output as any).engine}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {isWorking && (
                                                 <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-1">
                                                     <div
