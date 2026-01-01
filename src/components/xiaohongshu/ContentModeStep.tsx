@@ -67,6 +67,7 @@ export function ContentModeStep({
 
             // 1. 调用后端 API 启动工作流
             console.log('📡 [ContentModeStep] Step 1: Calling Backend API...');
+            console.log('🎯 [ContentModeStep] Selected Workflow Mode:', selectedWorkflowMode);
             const response = await xiaohongshuAPI.startAutoOperation(xhsUserId, {
                 productName: userProfile.product_name,
                 targetAudience: userProfile.target_audience || '',
@@ -75,7 +76,7 @@ export function ContentModeStep({
                 brandStyle: userProfile.brand_style || 'warm',
                 reviewMode: (userProfile.review_mode as any) || 'manual',
                 taskId, // 传递任务ID
-                contentModePreference: userProfile.content_mode_preference || 'IMAGE_TEXT', // 传递内容模式
+                contentModePreference: selectedWorkflowMode, // 🔥 使用当前选择的模式而非 userProfile 中的旧值
             });
 
             if (!response.success) {
