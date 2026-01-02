@@ -226,8 +226,98 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                             );
                                         }
 
+                                        // 4. 数字人脚本生成 (script-gen)
+                                        if (node.id === 'script-gen') {
+                                            return (
+                                                <div className="space-y-6">
+                                                    <div className="p-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-[2rem] text-white shadow-xl">
+                                                        <div className="text-[10px] uppercase font-black opacity-60 tracking-[0.2em] mb-2">📜 口播脚本</div>
+                                                        <div className="text-xl font-black mb-2">{output.title || '数字人口播脚本'}</div>
+                                                        <div className="flex items-center gap-4 text-sm opacity-80">
+                                                            <span>🎬 时长: {output.duration || '2-5分钟'}</span>
+                                                            <span>📝 脚本数: {output.scriptCount || 1}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-100 flex items-center gap-3">
+                                                        <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
+                                                        <span className="text-sm font-bold text-slate-600">脚本已生成，准备进入语音合成阶段</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        // 5. 语音克隆 (voice-clone)
+                                        if (node.id === 'voice-clone') {
+                                            return (
+                                                <div className="space-y-6">
+                                                    <div className="p-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-[2rem] text-white shadow-xl">
+                                                        <div className="text-[10px] uppercase font-black opacity-60 tracking-[0.2em] mb-2">🎤 语音克隆</div>
+                                                        <div className="text-xl font-black mb-2">高保真语音合成完成</div>
+                                                        <div className="flex items-center gap-2 text-sm opacity-80">
+                                                            <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                                            状态: {output.status === 'success' ? '✅ 成功' : '处理中...'}
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 flex items-center gap-3">
+                                                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                                                        <span className="text-sm font-bold text-slate-600">语音已合成，准备进入视频渲染阶段</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        // 6. 数字人视频渲染 (avatar-render)
+                                        if (node.id === 'avatar-render') {
+                                            return (
+                                                <div className="space-y-6">
+                                                    <div className="p-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-[2rem] text-white shadow-xl">
+                                                        <div className="text-[10px] uppercase font-black opacity-60 tracking-[0.2em] mb-2">🎬 视频渲染</div>
+                                                        <div className="text-xl font-black mb-2">数字人视频合成完成</div>
+                                                        <div className="flex items-center gap-2 text-sm opacity-80">
+                                                            <span className="w-2 h-2 bg-white rounded-full"></span>
+                                                            状态: {output.status === 'success' ? '✅ 渲染成功' : '处理中...'}
+                                                        </div>
+                                                    </div>
+                                                    {output.videoUrl && (
+                                                        <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                                                            <div className="text-[10px] uppercase font-black text-emerald-600 tracking-wider mb-2">视频预览</div>
+                                                            <div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
+                                                                <span className="text-sm">🎥 视频预览区域（即将上线）</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        // 7. 周计划 (weekly-plan) - 数字人模式
+                                        if (node.id === 'weekly-plan' && output.topics) {
+                                            return (
+                                                <div className="space-y-6">
+                                                    <div className="p-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-[2rem] text-white shadow-xl">
+                                                        <div className="text-[10px] uppercase font-black opacity-60 tracking-[0.2em] mb-2">📅 发布计划</div>
+                                                        <div className="text-xl font-black mb-2">数字人视频发布排期</div>
+                                                        <div className="text-sm opacity-80">频率: {output.frequency}</div>
+                                                    </div>
+                                                    {Array.isArray(output.topics) && output.topics.length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest">主题规划</div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {output.topics.map((topic: string, i: number) => (
+                                                                    <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold">
+                                                                        {topic}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
                                         // 默认 JSON 渲染
                                         return <pre className="font-mono text-sm leading-relaxed overflow-x-auto">{JSON.stringify(node.details.output, null, 2)}</pre>
+
                                     })()}
                                 </div>
                             </div>
