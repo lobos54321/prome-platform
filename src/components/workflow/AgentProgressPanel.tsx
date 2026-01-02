@@ -127,6 +127,15 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // 当 mode 发生变化时更新 nodes
+    useEffect(() => {
+        if (initialMode && initialMode !== activeMode) {
+            setActiveMode(initialMode);
+            setNodes(DEFAULT_NODES[initialMode]);
+            setActiveNodeId(DEFAULT_NODES[initialMode][0].id);
+        }
+    }, [initialMode]);
+
     // WebSocket 连接
     const connectWebSocket = useCallback(() => {
         // 🔥 获取默认 WebSocket URL
