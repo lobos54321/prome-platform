@@ -135,18 +135,19 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                         if (typeof output !== 'object' || output === null) return output;
 
                                         // 1. 详细发布计划 (detail-plan)
-                                        if (node.id === 'detail-plan' && output.today_target) {
+                                        if (node.id === 'detail-plan' && (output.today_target || output.target || output.taskCount)) {
+                                            const targetText = output.today_target || output.target || '内容创作任务';
                                             return (
                                                 <div className="space-y-6">
-                                                    <div className="flex items-center gap-4 text-slate-800">
-                                                        <div className="text-4xl font-black text-blue-600">{output.taskCount || output.tasksCount || 0}</div>
-                                                        <div>
-                                                            <div className="text-lg font-extrabold tracking-tight">发布计划已生成</div>
-                                                            <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">今日目标: {output.today_target}</div>
+                                                    <div className="p-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] text-white shadow-xl">
+                                                        <div className="text-[10px] uppercase font-black opacity-60 tracking-[0.2em] mb-2">📝 详细计划</div>
+                                                        <div className="text-xl font-black mb-2">{targetText}</div>
+                                                        <div className="flex items-center gap-4 text-sm opacity-80">
+                                                            <span>📋 任务数: {output.taskCount || output.tasksCount || 1}</span>
                                                         </div>
                                                     </div>
 
-                                                    {/* 🔥 新增：如果存在任务汇总，显示清单 */}
+                                                    {/* 如果存在任务汇总，显示清单 */}
                                                     {Array.isArray(output.taskSummaries) && (
                                                         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                                             <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block mb-3">策划任务清单</label>
@@ -158,11 +159,13 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                     <div className="flex-1 min-w-0">
                                                                         <div className="text-sm font-extrabold text-slate-700 truncate">{task.title}</div>
                                                                         <div className="flex items-center gap-3 mt-1">
-                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-bold">{task.type || '图文'}</span>
-                                                                            <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-                                                                                <Clock size={10} />
-                                                                                {new Date(task.scheduledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                                                                            </span>
+                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-bold">{task.type || '视频'}</span>
+                                                                            {task.scheduledTime && (
+                                                                                <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                                                                                    <Clock size={10} />
+                                                                                    {new Date(task.scheduledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                                                                                </span>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                     <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></div>
@@ -171,13 +174,14 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                         </div>
                                                     )}
 
-                                                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center gap-3">
-                                                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                                                        <span className="text-sm font-bold text-slate-600">内容已准备就绪，系统正在进行视觉编排...</span>
+                                                    <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-center gap-3">
+                                                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
+                                                        <span className="text-sm font-bold text-slate-600">计划已生成，准备进入脚本创作阶段</span>
                                                     </div>
                                                 </div>
                                             );
                                         }
+
 
                                         // 2. 图片智能适配 (image-adapt)
                                         if (node.id === 'image-adapt' && (output.layout || output.arrangement)) {
