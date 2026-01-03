@@ -270,6 +270,18 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                             状态: {output.status === 'success' ? '✅ 成功' : '处理中...'}
                                                         </div>
                                                     </div>
+                                                    {output.audioUrl && (
+                                                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                                                            <div className="text-[10px] uppercase font-black text-amber-600 tracking-wider mb-3">🔊 语音预览</div>
+                                                            <audio
+                                                                controls
+                                                                className="w-full h-10"
+                                                                src={output.audioUrl}
+                                                            >
+                                                                您的浏览器不支持音频播放
+                                                            </audio>
+                                                        </div>
+                                                    )}
                                                     <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 flex items-center gap-3">
                                                         <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
                                                         <span className="text-sm font-bold text-slate-600">语音已合成，准备进入视频渲染阶段</span>
@@ -292,10 +304,15 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                     </div>
                                                     {output.videoUrl && (
                                                         <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                                                            <div className="text-[10px] uppercase font-black text-emerald-600 tracking-wider mb-2">视频预览</div>
-                                                            <div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
-                                                                <span className="text-sm">🎥 视频预览区域（即将上线）</span>
-                                                            </div>
+                                                            <div className="text-[10px] uppercase font-black text-emerald-600 tracking-wider mb-3">🎬 视频预览</div>
+                                                            <video
+                                                                controls
+                                                                className="w-full rounded-xl shadow-lg"
+                                                                src={output.videoUrl}
+                                                                poster=""
+                                                            >
+                                                                您的浏览器不支持视频播放
+                                                            </video>
                                                         </div>
                                                     )}
                                                 </div>
