@@ -242,6 +242,14 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                             <span>📝 脚本数: {output.scriptCount || 1}</span>
                                                         </div>
                                                     </div>
+                                                    {output.script && (
+                                                        <div className="p-5 bg-slate-50 rounded-[1.5rem] border border-slate-100 shadow-inner">
+                                                            <div className="text-[10px] uppercase font-black text-slate-400 tracking-wider mb-3">脚本详情</div>
+                                                            <div className="text-sm text-slate-600 leading-relaxed font-medium whitespace-pre-wrap italic">
+                                                                "{output.script}"
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-100 flex items-center gap-3">
                                                         <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
                                                         <span className="text-sm font-bold text-slate-600">脚本已生成，准备进入语音合成阶段</span>
