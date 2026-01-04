@@ -277,9 +277,13 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                 controls
                                                                 className="w-full h-10"
                                                                 src={output.audioUrl}
+                                                                onError={(e) => console.error('Audio load error:', e, 'URL:', output.audioUrl)}
                                                             >
                                                                 您的浏览器不支持音频播放
                                                             </audio>
+                                                            <div className="text-[10px] text-slate-400 mt-2 break-all">
+                                                                {output.audioUrl}
+                                                            </div>
                                                         </div>
                                                     )}
                                                     <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 flex items-center gap-3">
@@ -309,10 +313,13 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                 controls
                                                                 className="w-full rounded-xl shadow-lg"
                                                                 src={output.videoUrl}
-                                                                poster=""
+                                                                onError={(e) => console.error('Video load error:', e, 'URL:', output.videoUrl)}
                                                             >
                                                                 您的浏览器不支持视频播放
                                                             </video>
+                                                            <div className="text-[10px] text-slate-400 mt-2 break-all">
+                                                                {output.videoUrl}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
