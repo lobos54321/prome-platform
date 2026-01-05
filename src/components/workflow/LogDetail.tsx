@@ -282,18 +282,27 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                             >
                                                                 您的浏览器不支持音频播放
                                                             </audio>
-                                                            <div className="flex items-center justify-between mt-3">
-                                                                <div className="text-[10px] text-slate-400 break-all flex-1 mr-2">
+                                                            <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+                                                                <div className="text-[10px] text-slate-400 break-all flex-1 mr-2 min-w-0">
                                                                     {output.audioUrl.split('/').pop()}
                                                                 </div>
-                                                                <a
-                                                                    href={output.audioUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-amber-600 transition whitespace-nowrap"
-                                                                >
-                                                                    🔗 新窗口打开
-                                                                </a>
+                                                                <div className="flex gap-2 flex-shrink-0">
+                                                                    <a
+                                                                        href={output.audioUrl}
+                                                                        download
+                                                                        className="text-xs bg-purple-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-purple-600 transition whitespace-nowrap"
+                                                                    >
+                                                                        ⬇️ 下载音频
+                                                                    </a>
+                                                                    <a
+                                                                        href={output.audioUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-amber-600 transition whitespace-nowrap"
+                                                                    >
+                                                                        🔗 新窗口打开
+                                                                    </a>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     )}
@@ -329,18 +338,27 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                             >
                                                                 您的浏览器不支持视频播放
                                                             </video>
-                                                            <div className="flex items-center justify-between mt-3">
-                                                                <div className="text-[10px] text-slate-400 break-all flex-1 mr-2">
+                                                            <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+                                                                <div className="text-[10px] text-slate-400 break-all flex-1 mr-2 min-w-0">
                                                                     {output.videoUrl.split('/').pop()}
                                                                 </div>
-                                                                <a
-                                                                    href={output.videoUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-xs bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-emerald-600 transition whitespace-nowrap"
-                                                                >
-                                                                    🔗 新窗口播放
-                                                                </a>
+                                                                <div className="flex gap-2 flex-shrink-0">
+                                                                    <a
+                                                                        href={output.videoUrl}
+                                                                        download
+                                                                        className="text-xs bg-purple-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-purple-600 transition whitespace-nowrap"
+                                                                    >
+                                                                        ⬇️ 下载视频
+                                                                    </a>
+                                                                    <a
+                                                                        href={output.videoUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-xs bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-emerald-600 transition whitespace-nowrap"
+                                                                    >
+                                                                        🔗 新窗口播放
+                                                                    </a>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     )}

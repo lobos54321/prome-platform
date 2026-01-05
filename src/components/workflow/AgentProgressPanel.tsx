@@ -318,6 +318,27 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         setLocalResult(data.result);
                     }
                     setIsWorkflowCompleted(true);
+
+                    // 🔔 发送浏览器通知
+                    if ('Notification' in window) {
+                        if (Notification.permission === 'granted') {
+                            new Notification('🎉 视频生成完成！', {
+                                body: '您的数字人视频已生成完成，可以预览和下载了。',
+                                icon: '/logo.png',
+                                tag: 'video-completed'
+                            });
+                        } else if (Notification.permission !== 'denied') {
+                            Notification.requestPermission().then(permission => {
+                                if (permission === 'granted') {
+                                    new Notification('🎉 视频生成完成！', {
+                                        body: '您的数字人视频已生成完成，可以预览和下载了。',
+                                        icon: '/logo.png',
+                                        tag: 'video-completed'
+                                    });
+                                }
+                            });
+                        }
+                    }
                 } else if (message.type === 'error') {
                     console.error('[AgentProgressPanel] Error:', message.data);
                 }
