@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, Image as ImageIcon, Send, Clock, Eye, Edit2, RefreshCw, CheckCircle } from 'lucide-react';
+import { FileText, Image as ImageIcon, Send, Clock, Eye, Edit2, RefreshCw, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { PlatformSelector } from '../publish/PlatformSelector';
 
 interface TodayContentPreviewProps {
     content?: {
@@ -35,6 +36,7 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
 }) => {
     const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
     const [showPreview, setShowPreview] = useState(false);
+    const [showPlatformSelector, setShowPlatformSelector] = useState(false);
 
     if (!content) {
         return (
@@ -186,28 +188,43 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
                     )}
                 </div>
 
-                {/* 发布按钮 */}
-                {onPublish && content.status !== 'published' && (
-                    <button
-                        onClick={onPublish}
-                        disabled={isPublishing || content.status === 'publishing'}
-                        className={`w-full mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white font-bold text-sm transition-all ${isPublishing || content.status === 'publishing'
-                            ? 'bg-slate-300 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-lg shadow-rose-200'
-                            }`}
-                    >
-                        {isPublishing || content.status === 'publishing' ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                发布中...
-                            </>
-                        ) : (
-                            <>
+                {/* 发布按钮 - 多平台选择 */}
+                {content.status !== 'published' && (
+                    <div className="mt-2">
+                        {!showPlatformSelector ? (
+                            <button
+                                onClick={() => setShowPlatformSelector(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white font-bold text-sm bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-lg shadow-rose-200 transition-all"
+                            >
                                 <Send size={16} />
-                                发布到小红书
-                            </>
+                                🚀 发布到多平台
+                                <ChevronDown size={16} />
+                            </button>
+                        ) : (
+                            <div className="space-y-2">
+                                <button
+                                    onClick={() => setShowPlatformSelector(false)}
+                                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                >
+                                    <ChevronUp size={14} />
+                                    收起
+                                </button>
+                                <PlatformSelector
+                                    content={{
+                                        title: content.title,
+                                        content: content.text || '',
+                                        images: content.imageUrls || [],
+                                        tags: content.hashtags || []
+                                    }}
+                                    onPublishComplete={(platform, result) => {
+                                        console.log(`Published to ${platform}:`, result);
+                                        // 调用原来的 onPublish 刷新数据
+                                        onPublish?.();
+                                    }}
+                                />
+                            </div>
                         )}
-                    </button>
+                    </div>
                 )}
 
                 {content.status === 'published' && (
