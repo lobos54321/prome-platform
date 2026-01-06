@@ -12,6 +12,7 @@ import { usePainPointBranches } from '../../hooks/usePainPointBranches';
 import { PainPointTabNavigation } from './PainPointTabNavigation';
 import { PainPointBranchContent } from './PainPointBranchContent';
 import { useTranslation } from 'react-i18next';
+import { useXiaohongshuPublish } from '../../hooks/useXiaohongshuPublish';
 
 interface Message {
   id: string;
@@ -72,9 +73,9 @@ interface DifyChatInterfaceProps {
 // 获取工作流节点图标的辅助函数
 const getNodeIcon = (nodeType?: string) => {
   if (!nodeType) return Clock;
-  
+
   const type = nodeType.toLowerCase();
-  
+
   if (type.includes('llm') || type.includes('ai') || type.includes('model')) return Bot;
   if (type.includes('code') || type.includes('python') || type.includes('javascript')) return Code;
   if (type.includes('knowledge') || type.includes('retrieval') || type.includes('document')) return FileText;
@@ -85,7 +86,7 @@ const getNodeIcon = (nodeType?: string) => {
   if (type.includes('tool') || type.includes('api') || type.includes('webhook')) return Zap;
   if (type.includes('http') || type.includes('request') || type.includes('url')) return Globe;
   if (type.includes('condition') || type.includes('if') || type.includes('logic')) return Cpu;
-  
+
   return Clock; // 默认图标
 };
 
@@ -110,7 +111,7 @@ export function DifyChatInterface({
     nodes: [],
     completedNodes: 0
   });
-  
+
   // 🔍 专用的模型提取函数 - 基于实际测试发现的Dify API字段
   const extractModelFromResponse = (data: any, source: string): string | null => {
     // 🎯 基于实际测试，发现Dify API在node_finished事件中返回模型信息：
@@ -124,7 +125,7 @@ export function DifyChatInterface({
       'process_data.model_provider',
       // 🔥 用户提到的后台字段
       'model_name',
-      'model_provider', 
+      'model_provider',
       'data.model_name',
       'data.model_provider',
       'metadata.model_name',
@@ -135,7 +136,7 @@ export function DifyChatInterface({
       'node_data.model_name',
       'node_data.model_provider',
       'metadata.usage.model',
-      'metadata.model', 
+      'metadata.model',
       'metadata.llm_model',
       'metadata.provider',
       'model',
@@ -155,13 +156,13 @@ export function DifyChatInterface({
       'workflow_data.model_name',
       'workflow_data.model_provider'
     ];
-    
+
     let extractedModel = null;
     let extractionPath = null;
-    
+
     // 🔍 详细记录所有尝试的路径和值
     const pathResults = [];
-    
+
     for (const path of possiblePaths) {
       const value = path.split('.').reduce((obj, key) => obj?.[key], data);
       pathResults.push({
@@ -170,14 +171,14 @@ export function DifyChatInterface({
         type: typeof value,
         isValid: value && typeof value === 'string' && value !== 'undefined'
       });
-      
+
       if (value && typeof value === 'string' && value !== 'undefined') {
         extractedModel = value;
         extractionPath = path;
         break;
       }
     }
-    
+
     // 🎯 特别处理：如果找到了模型信息，记录成功提取
     if (extractedModel) {
       console.log(`[Model Extraction] ✅ 成功提取模型: ${extractedModel} (来源: ${source}, 路径: ${extractionPath})`);
@@ -192,17 +193,17 @@ export function DifyChatInterface({
         search_attempted: possiblePaths.length
       });
     }
-    
+
     return extractedModel;
   };
-  
+
   // Token monitoring for balance deduction
   const { processTokenUsage } = useTokenMonitoring();
-  
+
   // 🔧 修复：安全的用户ID初始化
   const [userId, setUserId] = useState<string>('');
   const [isUserIdReady, setIsUserIdReady] = useState(false);
-  
+
   // 🆕 痛点分支管理
   const {
     versions: painPointVersions,
@@ -221,7 +222,7 @@ export function DifyChatInterface({
       console.log('🔍 [DifyChatInterface] Pain point versions detected:', painPointVersions.length, painPointVersions.map(v => ({ id: v.id, label: v.label, messageCount: v.messages.length })));
     }
   }, [painPointVersions]);
-  
+
   // 🆕 对话历史管理 (云端版本)
   const [chatHistory, setChatHistory] = useState<ChatHistoryState>({
     conversations: [],
@@ -250,6 +251,54 @@ export function DifyChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 🚀 小红书发布 Hook
+  const {
+    hasExtension,
+    isPublishing,
+    confirmAndPublish,
+    downloadExtension,
+    openPublishPage
+  } = useXiaohongshuPublish({
+    onSuccess: (result) => {
+      console.log('[XHS Publish] Success:', result);
+      toast.success(`发布成功！${result.feedId ? `feedId: ${result.feedId}` : ''}`);
+    },
+    onError: (error) => {
+      console.error('[XHS Publish] Error:', error);
+      toast.error(`发布失败: ${error.message}`);
+    }
+  });
+
+  // 🚀 监听发布请求事件
+  useEffect(() => {
+    const handlePublishRequest = async (event: CustomEvent) => {
+      const { title, content, tags } = event.detail;
+      console.log('[XHS Publish] Received publish request:', { title, tags });
+
+      if (!hasExtension) {
+        const install = window.confirm(
+          '未检测到 Prome 助手插件。\n\n需要安装插件才能自动发布内容。\n\n点击「确定」下载插件。'
+        );
+        if (install) {
+          downloadExtension();
+        }
+        return;
+      }
+
+      // 打开发布页面提示
+      openPublishPage('image');
+
+      // 发布内容
+      await confirmAndPublish({ title, content, tags });
+    };
+
+    window.addEventListener('xhs-publish-request', handlePublishRequest as EventListener);
+    return () => {
+      window.removeEventListener('xhs-publish-request', handlePublishRequest as EventListener);
+    };
+  }, [hasExtension, confirmAndPublish, downloadExtension, openPublishPage]);
+
+
   // 🆕 生成用户专属的localStorage键名（用于数据隔离）
   const getUserStorageKey = (baseKey: string): string => {
     // 如果有认证用户，使用用户ID；否则使用设备ID
@@ -260,17 +309,17 @@ export function DifyChatInterface({
   // 🆕 清理旧用户的localStorage数据（在用户切换时调用）
   const clearUserLocalStorage = () => {
     if (typeof window === 'undefined') return;
-    
+
     console.log('[Chat Debug] 🧹 清理当前用户的localStorage数据');
-    
+
     // 清理所有Dify相关的键
     const keysToClean = ['dify_messages', 'dify_conversation_id', 'dify_workflow_state', 'dify_user_id', 'dify_session_timestamp', 'dify_last_real_activity', 'dify_conversation_id_streaming', 'dify_last_visit'];
-    
+
     keysToClean.forEach(key => {
       // 清理通用键（不带用户ID后缀的）
       localStorage.removeItem(key);
       console.log('[Chat Debug]   ✓ 已清理:', key);
-      
+
       // 清理带用户ID后缀的键（如果存在）
       const userKey = getUserStorageKey(key);
       if (userKey !== key) {
@@ -278,7 +327,7 @@ export function DifyChatInterface({
         console.log('[Chat Debug]   ✓ 已清理:', userKey);
       }
     });
-    
+
     console.log('[Chat Debug] ✅ localStorage清理完成');
   };
 
@@ -296,7 +345,7 @@ export function DifyChatInterface({
         isLoading: isLoading,
         error: error
       };
-      
+
       console.table(debug);
       console.log('[Debug] Full workflow state:', workflowState);
       console.log('[Debug] LocalStorage contents:', {
@@ -304,7 +353,7 @@ export function DifyChatInterface({
         dify_conversation_id: localStorage.getItem('dify_conversation_id'),
         dify_workflow_state: localStorage.getItem('dify_workflow_state')
       });
-      
+
       return debug;
     }
     return null;
@@ -319,7 +368,7 @@ export function DifyChatInterface({
         getCurrentState: () => ({
           conversationId,
           userId,
-          workflowState,  
+          workflowState,
           messages: messages.length,
           isLoading,
           error
@@ -342,10 +391,10 @@ export function DifyChatInterface({
         testWorkflowPath: async (message = '你好') => {
           const userId = 'workflow-test-' + Date.now();
           console.log('🧪 测试工作流路径，用户ID:', userId);
-          
+
           const response = await fetch('/api/dify', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               message: message,
               user: userId,
@@ -353,34 +402,34 @@ export function DifyChatInterface({
               stream: false
             })
           });
-          
+
           const data = await response.json();
           console.log('🧪 工作流测试结果:');
           console.log('- 回答:', data.answer?.substring(0, 200));
           console.log('- 对话ID:', data.conversation_id);
           console.log('- 元数据:', data.metadata);
-          
+
           return data;
         },
-        
+
         // 🔧 新增：检查用户是否真正进行过有意义对话
         checkRealConversation: () => {
-          const hasRealMessages = messages.length > 1 && 
-            messages.some(m => m.role === 'user' && 
-              m.content.length > 2 && 
+          const hasRealMessages = messages.length > 1 &&
+            messages.some(m => m.role === 'user' &&
+              m.content.length > 2 &&
               !['你好', 'hello', 'hi'].includes(m.content.toLowerCase()));
-          
+
           const lastActivity = localStorage.getItem('dify_last_real_activity');
           const now = Date.now();
           const hasRecentActivity = lastActivity && (now - parseInt(lastActivity)) < 30 * 60 * 1000; // 30分钟
-          
+
           return {
             hasRealMessages,
             hasRecentActivity,
             shouldReset: !hasRealMessages && !hasRecentActivity
           };
         },
-        
+
         // 🔧 新增：强制重置所有状态的函数
         hardReset: () => {
           console.log('[Debug] Performing hard reset of all chat state...');
@@ -394,24 +443,24 @@ export function DifyChatInterface({
             nodes: [],
             completedNodes: 0
           });
-          
+
           // 清除所有localStorage和sessionStorage数据
           ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_workflow_state', 'dify_session_timestamp'].forEach(key => {
             localStorage.removeItem(key);
             sessionStorage.removeItem(key);
           });
-          
+
           // 重新初始化用户ID
           const newUserId = generateUUID();
           setUserId(newUserId);
           localStorage.setItem('dify_user_id', newUserId);
           localStorage.setItem('dify_session_timestamp', Date.now().toString());
-          
+
           console.log('[Debug] Hard reset completed. New user ID:', newUserId);
           return { success: true, newUserId };
         }
       };
-      
+
       console.log('[Debug] Chat debugging utilities available at window.debugChat');
     }
   }, [conversationId, userId, workflowState, messages, isLoading, error]);
@@ -420,28 +469,28 @@ export function DifyChatInterface({
   const loadCloudConversations = async (forceRefresh = false) => {
     try {
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
-      
+
       // 🔧 性能优化：检查缓存，避免频繁查询数据库
       const now = new Date();
       const lastSyncTime = chatHistory.lastSyncTime;
       const cacheValidDurationMs = 30000; // 30秒缓存
-      
-      const isCacheValid = !forceRefresh && 
-        lastSyncTime && 
+
+      const isCacheValid = !forceRefresh &&
+        lastSyncTime &&
         chatHistory.conversations.length > 0 &&
         (now.getTime() - lastSyncTime.getTime()) < cacheValidDurationMs;
-      
+
       if (isCacheValid) {
         console.log('[Chat Debug] 📦 使用缓存的对话列表，跳过数据库查询');
         setChatHistory(prev => ({ ...prev, syncStatus: 'idle' }));
         return;
       }
-      
+
       console.log('[Chat Debug] 🔄 从数据库加载对话历史...');
       const cloudConversations = await cloudChatHistory.getAllConversations();
-      
+
       console.log('[Chat Debug] 📦 原始云端数据:', cloudConversations);
-      
+
       // 🔧 确保返回的是数组
       if (!Array.isArray(cloudConversations)) {
         console.warn('[Chat Debug] ⚠️ getAllConversations返回非数组，使用空数组');
@@ -453,7 +502,7 @@ export function DifyChatInterface({
         }));
         return;
       }
-      
+
       const convertedConversations: ConversationHistoryItem[] = cloudConversations.map(conv => ({
         id: conv.id,
         title: conv.title,
@@ -486,12 +535,12 @@ export function DifyChatInterface({
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
 
       const migrationResult = await chatHistoryMigration.migrateToCloud();
-      
+
       if (migrationResult.success) {
         console.log(`✅ 迁移完成: ${migrationResult.migratedConversations} 个对话`);
         await chatHistoryMigration.cleanupLocalData();
         await loadCloudConversations();
-        
+
         setMigrationStatus({
           needsMigration: false,
           isChecking: false,
@@ -520,25 +569,25 @@ export function DifyChatInterface({
 
   const saveConversationToHistory = async () => {
     if (messages.length === 0) return;
-    
+
     // 🔧 修复：防止重复保存相同对话
     const difyConvId = localStorage.getItem('dify_conversation_id');
     const currentConvId = difyConvId || conversationId;
-    
+
     // 检查是否已经保存过这个对话
-    if (currentConvId && chatHistory.conversations.some(conv => 
+    if (currentConvId && chatHistory.conversations.some(conv =>
       conv.difyConversationId === currentConvId && conv.messageCount === messages.length
     )) {
       console.log('[Chat Debug] 🔄 对话已存在且消息数量相同，跳过保存:', currentConvId, messages.length);
       return;
     }
-    
+
     try {
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
-      
+
       const title = generateConversationTitle(messages);
       console.log('[Chat Debug] 💾 保存对话到云端:', title, '消息数:', messages.length);
-      
+
       const cloudConversationId = await cloudChatHistory.saveConversation(
         title,
         messages.map(msg => ({
@@ -567,7 +616,7 @@ export function DifyChatInterface({
       setChatHistory(prev => {
         const existingIndex = prev.conversations.findIndex(c => c.id === conversationItem.id);
         let newConversations;
-        
+
         if (existingIndex >= 0) {
           // 更新现有对话
           newConversations = [...prev.conversations];
@@ -576,7 +625,7 @@ export function DifyChatInterface({
           // 添加新对话到顶部
           newConversations = [conversationItem, ...prev.conversations];
         }
-        
+
         return {
           ...prev,
           conversations: newConversations,
@@ -596,7 +645,7 @@ export function DifyChatInterface({
   const loadConversationFromHistory = async (conversationId: string) => {
     try {
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
-      
+
       // 🔍 调试：记录加载前的状态
       console.log('[Chat Debug] 🔄 开始加载历史对话:', {
         requestedConversationId: conversationId,
@@ -604,16 +653,16 @@ export function DifyChatInterface({
         beforeLoad_localStorage_dify_id: localStorage.getItem('dify_conversation_id'),
         beforeLoad_currentMessages: messages.length
       });
-      
+
       // 使用云端服务的专用函数加载历史对话（包含Dify状态恢复）
       const conversationWithMessages = await cloudChatHistory.loadConversationFromHistory(conversationId);
-      
+
       if (!conversationWithMessages) {
         console.warn('Conversation not found in cloud:', conversationId);
         setChatHistory(prev => ({ ...prev, syncStatus: 'error' }));
         return;
       }
-      
+
       // 🔍 调试：记录从云端获取的数据
       console.log('[Chat Debug] 📥 从云端获取的对话数据:', {
         cloudConversationId: conversationWithMessages.id,
@@ -634,7 +683,7 @@ export function DifyChatInterface({
 
       // 🔧 强制恢复对话状态和Dify连续性
       setMessages(convertedMessages);
-      
+
       // 确保Dify对话ID被正确设置到localStorage和组件状态
       const difyConvId = conversationWithMessages.dify_conversation_id;
       if (difyConvId) {
@@ -642,7 +691,7 @@ export function DifyChatInterface({
         localStorage.setItem('dify_conversation_id_streaming', difyConvId);
         setConversationId(difyConvId);
         console.log('[Chat Debug] ✅ 强制恢复Dify对话ID:', difyConvId);
-        
+
         // 🔍 额外调试：验证localStorage确实被设置
         const verifyStored = localStorage.getItem('dify_conversation_id');
         console.log('[Chat Debug] 🔍 验证localStorage写入:', {
@@ -654,19 +703,19 @@ export function DifyChatInterface({
         setConversationId(conversationWithMessages.id);
         console.log('[Chat Debug] ⚠️ 使用本地对话ID（无Dify ID）:', conversationWithMessages.id);
       }
-      
+
       // 🔧 修复：正确恢复工作流状态，保持节点进度，并修复Date对象问题
       const restoredWorkflowState = conversationWithMessages.workflow_state;
       if (restoredWorkflowState && typeof restoredWorkflowState === 'object') {
         // 🚑 修复Date对象序列化问题：确保startTime和endTime是正确的Date对象
-        const processedNodes = Array.isArray(restoredWorkflowState.nodes) 
+        const processedNodes = Array.isArray(restoredWorkflowState.nodes)
           ? restoredWorkflowState.nodes.map((node: any) => ({
-              ...node,
-              startTime: node.startTime ? new Date(node.startTime) : undefined,
-              endTime: node.endTime ? new Date(node.endTime) : undefined
-            }))
+            ...node,
+            startTime: node.startTime ? new Date(node.startTime) : undefined,
+            endTime: node.endTime ? new Date(node.endTime) : undefined
+          }))
           : [];
-          
+
         const workflowState: WorkflowState = {
           isWorkflow: restoredWorkflowState.isWorkflow || false,
           nodes: processedNodes,
@@ -684,10 +733,10 @@ export function DifyChatInterface({
         });
         console.log('[Chat Debug] 📝 初始化新工作流状态');
       }
-      
+
       // 🚨 关键：防止后续的强制新对话逻辑清除我们刚恢复的状态
       console.log('[Chat Debug] 📋 已恢复历史对话，消息数:', convertedMessages.length);
-      
+
       // 🧪 测试：如果是工作流对话，添加额外信息
       if (conversationWithMessages.workflow_state && conversationWithMessages.workflow_state.isWorkflow) {
         console.log('[Chat Debug] 🔄 这是一个工作流对话，工作流状态:', conversationWithMessages.workflow_state);
@@ -734,34 +783,34 @@ export function DifyChatInterface({
     // 🔥 关键修复：完全清除所有Dify相关状态，包括对话变量
     // 这样确保新对话从LLM18开始，而不是跳到LLM0或LLM3
     const keysToRemove = [
-      'dify_conversation_id', 
-      'dify_conversation_id_streaming', 
-      'dify_session_timestamp', 
-      'dify_workflow_state', 
+      'dify_conversation_id',
+      'dify_conversation_id_streaming',
+      'dify_session_timestamp',
+      'dify_workflow_state',
       'dify_messages',
       'dify_conversation_variables', // 清除可能的对话变量缓存
       'dify_last_real_activity',
       'dify_last_visit'
     ];
-    
+
     keysToRemove.forEach(key => {
       localStorage.removeItem(key);
       sessionStorage.removeItem(key);
     });
-    
+
     // 🔥 关键修复：为新对话生成全新的用户ID，确保Dify服务端完全重置对话变量状态
     const newUserId = user?.id || `fresh-user-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     setUserId(newUserId);
     localStorage.setItem('dify_user_id', newUserId);
     localStorage.setItem('dify_session_timestamp', Date.now().toString());
-    
+
     console.log('[Chat Debug] 🔥 新对话创建 - 完全重置:', {
       newUserId,
       clearedConversationId: true,
       clearedConversationVariables: true,
       workflowWillStartFromLLM18: true
     });
-    
+
     // 更新历史状态
     setChatHistory(prev => ({
       ...prev,
@@ -772,10 +821,10 @@ export function DifyChatInterface({
   const deleteConversation = async (conversationId: string) => {
     try {
       setChatHistory(prev => ({ ...prev, syncStatus: 'syncing' }));
-      
+
       // 从云端删除对话
       await cloudChatHistory.deleteConversation(conversationId);
-      
+
       // 更新本地状态
       setChatHistory(prev => {
         const newConversations = prev.conversations.filter(c => c.id !== conversationId);
@@ -810,15 +859,15 @@ export function DifyChatInterface({
         // 检查当前localStorage中的user_id是否与当前登录用户匹配
         const storedUserId = localStorage.getItem('dify_user_id');
         const currentUserId = user?.id || cloudChatHistory.getDeviceId();
-        
+
         if (storedUserId && storedUserId !== currentUserId) {
           console.log('[Chat Debug] 🔄 检测到用户切换，清理旧用户数据');
           console.log('[Chat Debug] 旧用户ID:', storedUserId);
           console.log('[Chat Debug] 新用户ID:', currentUserId);
-          
+
           // 清理旧用户的localStorage数据
           clearUserLocalStorage();
-          
+
           // 清空当前消息和状态
           setMessages([]);
           setConversationId('');
@@ -828,7 +877,7 @@ export function DifyChatInterface({
             completedNodes: 0
           });
         }
-        
+
         // 🆕 设置当前用户ID到cloudChatHistory（用于数据隔离）
         if (user?.id) {
           cloudChatHistory.setUserId(user.id);
@@ -839,10 +888,10 @@ export function DifyChatInterface({
           localStorage.setItem('dify_user_id', currentUserId);
           console.log('[Chat Debug] ⚠️ 未登录用户，使用设备ID隔离:', currentUserId);
         }
-        
+
         // 检查是否需要迁移
         const migrationInfo = await chatHistoryMigration.getMigrationStatus();
-        
+
         setMigrationStatus({
           needsMigration: migrationInfo.hasLocalData && !migrationInfo.hasMigrated,
           isChecking: false,
@@ -853,7 +902,7 @@ export function DifyChatInterface({
         if (!migrationInfo.hasLocalData || migrationInfo.hasMigrated) {
           await loadCloudConversations();
         }
-        
+
         console.log('📊 聊天历史初始化状态:', migrationInfo);
       } catch (error) {
         console.error('Failed to initialize cloud chat history:', error);
@@ -876,9 +925,9 @@ export function DifyChatInterface({
         saveConversationToHistory();
       }
     };
-    
+
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
+
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       // 🚫 移除组件卸载时的自动保存，避免页面刷新时重复保存
@@ -891,7 +940,7 @@ export function DifyChatInterface({
   // 🔧 修复：只保存localStorage，不自动保存云端历史（避免创建太多对话记录）
   useEffect(() => {
     if (messages.length === 0) return;
-    
+
     // 🆕 立即保存到localStorage用于页面刷新恢复
     try {
       localStorage.setItem('dify_messages', JSON.stringify(messages));
@@ -899,7 +948,7 @@ export function DifyChatInterface({
     } catch (error) {
       console.warn('[Chat Debug] 保存消息到localStorage失败:', error);
     }
-    
+
     // 🚫 移除自动保存云端历史，只在用户主动创建新对话时保存
     // const saveTimer = setTimeout(() => {
     //   saveConversationToHistory();
@@ -913,64 +962,64 @@ export function DifyChatInterface({
       if (user?.id) {
         console.log('[Chat Debug] 🔑 使用认证用户ID:', user.id);
         setUserId(user.id);
-        
+
         if (typeof window !== 'undefined') {
           localStorage.setItem('dify_user_id', user.id);
           localStorage.setItem('dify_session_timestamp', Date.now().toString());
         }
-        
+
         setIsUserIdReady(true);
         return;
       }
-      
+
       if (typeof window !== 'undefined') {
         // 🔥 优先检查是否有稳定的用户ID（不是临时匿名ID）
         const storedUserId = localStorage.getItem('dify_user_id');
         const storedConversationId = localStorage.getItem('dify_conversation_id');
-        
+
         // 🔧 修复：简化用户ID判断逻辑 - 只要有存储的用户ID就恢复对话历史
         // 这样可以确保所有类型的用户（包括匿名用户）都能在页面刷新后恢复对话
         const hasStoredUserId = storedUserId && storedUserId.length > 5;
-        
+
         if (hasStoredUserId) {
           // 页面刷新，保持原有的会话状态
           console.log('[Chat Debug] 🔄 页面刷新 - 恢复用户ID和对话状态:', storedUserId);
           setUserId(storedUserId);
-          
+
           // 🔧 修复：无论是否有conversation_id都恢复消息历史
           if (storedConversationId) {
             setConversationId(storedConversationId);
             console.log('[Chat Debug] 🔄 恢复对话ID:', storedConversationId);
           }
-          
+
           // 🆕 关键修复：页面刷新时立即恢复消息历史（避免延迟）
           try {
             const storedMessages = localStorage.getItem('dify_messages');
             const storedWorkflowState = localStorage.getItem('dify_workflow_state');
-            
+
             if (storedMessages) {
               const parsedMessages = JSON.parse(storedMessages);
               if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
                 console.log('[Chat Debug] 🔄 立即恢复消息历史:', parsedMessages.length, '条消息');
-                
+
                 // 🔧 优化：消息恢复时保持完整的数据结构
                 const restoredMessages = parsedMessages.map((msg: any) => ({
                   ...msg,
                   timestamp: new Date(msg.timestamp)
                 }));
-                
+
                 console.log('[Chat Debug] ✅ 消息历史恢复完成:', restoredMessages.length, '条');
                 setMessages(restoredMessages);
-                
+
                 // 🆕 关键修复：页面刷新后立即将当前对话同步到云端
                 // 避免刷新后历史记录面板显示为空
                 setTimeout(async () => {
                   try {
                     console.log('[Chat Debug] 💾 页面刷新后自动保存当前对话到云端...');
-                    
+
                     // 生成对话标题
                     const title = restoredMessages.find(m => m.role === 'user')?.content.slice(0, 50) || '未命名对话';
-                    
+
                     // 保存到云端（saveConversation会自动处理重复检测）
                     const conversationId = await cloudChatHistory.saveConversation(
                       title,
@@ -978,9 +1027,9 @@ export function DifyChatInterface({
                       storedWorkflowState ? JSON.parse(storedWorkflowState) : undefined,
                       storedConversationId || undefined
                     );
-                    
+
                     console.log('[Chat Debug] ✅ 当前对话已同步到云端，ID:', conversationId);
-                    
+
                     // 刷新云端对话列表
                     await loadCloudConversations(true);
                   } catch (error) {
@@ -989,7 +1038,7 @@ export function DifyChatInterface({
                 }, 1000); // 1秒后执行，避免阻塞页面加载
               }
             }
-            
+
             if (storedWorkflowState) {
               const parsedWorkflowState = JSON.parse(storedWorkflowState);
               console.log('[Chat Debug] 🔄 恢复工作流状态:', parsedWorkflowState);
@@ -1006,14 +1055,14 @@ export function DifyChatInterface({
           } catch (error) {
             console.warn('[Chat Debug] 恢复消息历史失败:', error);
           }
-          
+
           setIsUserIdReady(true);
           return;
         }
-        
+
         // 🚨 仅在真正需要时才清理状态（没有有效用户ID的情况）
         console.log('[Chat Debug] ⚠️ 未认证用户 - 清理所有Dify状态');
-        
+
         // 清理无效的会话数据
         ['dify_conversation_id', 'dify_conversation_id_streaming', 'dify_user_id', 'dify_session_timestamp', 'dify_workflow_state', 'dify_last_real_activity', 'dify_last_visit'].forEach(key => {
           if (localStorage.getItem(key)) {
@@ -1022,33 +1071,33 @@ export function DifyChatInterface({
           }
           sessionStorage.removeItem(key);
         });
-        
+
         // 生成匿名用户ID
         const anonymousUserId = 'anonymous-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
         setUserId(anonymousUserId);
         localStorage.setItem('dify_user_id', anonymousUserId);
         localStorage.setItem('dify_last_visit', Date.now().toString());
         localStorage.setItem('dify_session_timestamp', Date.now().toString());
-        
+
         console.log('[Chat Debug] 🔥 匿名用户ID已生成:', anonymousUserId);
-        
+
         setIsUserIdReady(true);
         return;
       }
-      
+
       // 🔧 修复：为非浏览器环境也生成有效的UUID
       const newId = generateUUID();
       setUserId(newId);
       setIsUserIdReady(true);
-      
+
       if (typeof window !== 'undefined') {
         localStorage.setItem('dify_user_id', newId);
       }
     };
-    
+
     initUserIdAndSession();
   }, [user?.id]); // 🔥 关键：依赖用户ID变化
-  
+
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -1085,33 +1134,33 @@ export function DifyChatInterface({
     const storedMessages = localStorage.getItem('dify_messages');
     const storedUserId = localStorage.getItem('dify_user_id');
     const currentUserId = user?.id || cloudChatHistory.getDeviceId();
-    
+
     if (storedMessages && messages.length === 0) {
       // 🔥 检查localStorage中的user_id是否匹配当前用户
       if (storedUserId !== currentUserId) {
         console.log('[Chat Debug] 🚫 [备用机制] 检测到用户不匹配，跳过恢复');
         console.log('[Chat Debug] localStorage中的user_id:', storedUserId);
         console.log('[Chat Debug] 当前user_id:', currentUserId);
-        
+
         // 清理旧用户的localStorage数据
         localStorage.removeItem('dify_messages');
         localStorage.removeItem('dify_conversation_id');
         localStorage.removeItem('dify_workflow_state');
-        
+
         // 不恢复消息，继续显示欢迎消息
         return;
       }
-      
+
       try {
         const parsedMessages = JSON.parse(storedMessages);
         if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
           // 🔧 修复：过滤掉只有欢迎消息的情况，显示新的欢迎消息
-          const nonWelcomeMessages = parsedMessages.filter((msg: any) => 
-            msg.id !== 'welcome' && 
+          const nonWelcomeMessages = parsedMessages.filter((msg: any) =>
+            msg.id !== 'welcome' &&
             !msg.content.includes('您好！我是您的AI助手') &&
             !msg.content.includes('Hi! I am your marketing content AI assistant')
           );
-          
+
           if (nonWelcomeMessages.length > 0) {
             console.log('[Chat Debug] 🔄 [备用机制] 恢复消息历史:', nonWelcomeMessages.length, '条消息 (user_id:', currentUserId, ')');
             const restoredMessages = nonWelcomeMessages.map((msg: any) => ({
@@ -1129,7 +1178,7 @@ export function DifyChatInterface({
         console.warn('[Chat Debug] [备用机制] 消息历史恢复失败:', error);
       }
     }
-    
+
     // 添加欢迎消息 - 只在没有恢复消息的情况下
     if (messages.length === 0 && welcomeMessage && isUserIdReady) {
       setMessages([{
@@ -1157,11 +1206,11 @@ export function DifyChatInterface({
     if (process.env.NODE_ENV === 'development') {
       console.log('[Workflow] Node update:', nodeUpdate.nodeId, nodeUpdate.status);
     }
-    
+
     setWorkflowState(prev => {
       const existingNodeIndex = prev.nodes.findIndex(n => n.nodeId === nodeUpdate.nodeId);
       const newNodes = [...prev.nodes];
-      
+
       if (existingNodeIndex >= 0) {
         // 更新现有节点
         newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], ...nodeUpdate };
@@ -1181,7 +1230,7 @@ export function DifyChatInterface({
 
       // 计算完成的节点数
       const completedNodes = newNodes.filter(n => n.status === 'completed').length;
-      
+
       const newState = {
         ...prev,
         isWorkflow: true, // 自动启用工作流状态当检测到节点事件时
@@ -1190,7 +1239,7 @@ export function DifyChatInterface({
         completedNodes,
         totalNodes: Math.max(prev.totalNodes || 0, newNodes.length) // 动态更新总节点数
       };
-      
+
       // 🆕 保存工作流状态到localStorage用于页面刷新时恢复
       if (typeof window !== 'undefined') {
         try {
@@ -1200,7 +1249,7 @@ export function DifyChatInterface({
           console.warn('[Workflow] Failed to save state to localStorage:', error);
         }
       }
-      
+
       console.log('[Chat Debug] New workflow state:', newState);
       return newState;
     });
@@ -1209,11 +1258,11 @@ export function DifyChatInterface({
   // 发送消息（支持重试）
   const sendMessageWithRetry = async (messageContent: string, currentRetry = 0): Promise<void> => {
     const maxRetries = enableRetry ? 3 : 0;
-    
+
     // 🔧 修复：只在真正开始新对话时重置工作流状态，不要破坏历史对话恢复的状态
     const hasExistingWorkflow = workflowState.isWorkflow && workflowState.nodes.length > 0;
     const isHistoryConversation = messages.length > 0 && conversationId;
-    
+
     if (currentRetry === 0 && !hasExistingWorkflow && !isHistoryConversation) {
       console.log('[Chat Debug] 🔄 重置工作流状态（新对话）');
       resetWorkflowState();
@@ -1224,18 +1273,18 @@ export function DifyChatInterface({
         currentNode: workflowState.currentNodeId
       });
     }
-    
+
     try {
-      
+
       // Check if we have a valid conversation ID for targeted API calls
       // Always use generic endpoint - let backend handle conversation ID consistency
       const endpoint = '/api/dify';
-      
+
       // Fix 3: Enhanced Error Handling and Debugging - Add comprehensive logging
       const storedConversationId = localStorage.getItem('dify_conversation_id');
       const storedWorkflowState = localStorage.getItem('dify_workflow_state');
       const hasExistingConversation = storedConversationId || conversationId;
-      
+
       console.log('[Chat Debug] 📤 准备发送消息:', {
         endpoint,
         messageContent: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : ''),
@@ -1256,14 +1305,14 @@ export function DifyChatInterface({
       console.log('[Chat Debug] 💡 准备发送消息，等待Dify响应以确定是否为工作流');
 
       // 🆕 智能预测：如果这是一个复杂的请求，预先准备工作流UI
-      const isComplexRequest = messageContent.length > 100 || 
-                              messageContent.includes('分析') || 
-                              messageContent.includes('生成') || 
-                              messageContent.includes('创建') ||
-                              messageContent.includes('explain') ||
-                              messageContent.includes('analyze') ||
-                              messageContent.includes('generate');
-                              
+      const isComplexRequest = messageContent.length > 100 ||
+        messageContent.includes('分析') ||
+        messageContent.includes('生成') ||
+        messageContent.includes('创建') ||
+        messageContent.includes('explain') ||
+        messageContent.includes('analyze') ||
+        messageContent.includes('generate');
+
       if (isComplexRequest) {
         console.log('[Workflow] 🔮 检测到复杂请求，预先准备工作流UI');
         // 预先显示一个通用的处理节点
@@ -1307,14 +1356,14 @@ export function DifyChatInterface({
             const storedConvId = localStorage.getItem('dify_conversation_id');
             const hasMessages = messages.length > 0;
             const hasActiveConversation = conversationId || storedConvId;
-            
+
             // 🚨 新增：严格条件判断是否为新对话
             // 只有在完全没有消息历史且没有任何对话ID时才算新对话
             const isNewConversation = !hasMessages && !hasActiveConversation;
-            
+
             // 🔧 修复：优先使用React state中的conversationId，其次使用localStorage
             const finalConvId = isNewConversation ? null : (conversationId || storedConvId || null);
-            
+
             console.log('[🔍 对话状态调试] conversation_id逻辑详细追踪:', {
               conversationId_react_state: conversationId,
               localStorage_dify_id: storedConvId,
@@ -1332,7 +1381,7 @@ export function DifyChatInterface({
                 user_message: messageContent.substring(0, 30) + '...'
               }
             });
-            
+
             // 🛡️ 安全检查：如果有消息但没有对话ID，这是异常情况
             if (hasMessages && !hasActiveConversation) {
               console.warn('[🚨 对话状态异常] 检测到有消息历史但缺少对话ID，这可能导致工作流重置!', {
@@ -1343,7 +1392,7 @@ export function DifyChatInterface({
                 recommendation: '考虑从消息历史中恢复对话ID或提醒用户重新开始'
               });
             }
-            
+
             return finalConvId;
           })(),
           response_mode: 'streaming', // ✅ 官方API字段：streaming/blocking
@@ -1357,7 +1406,7 @@ export function DifyChatInterface({
       });
 
       clearTimeout(timeoutId);
-      
+
       // 🔍 调试：记录响应信息
       console.log('[Chat Debug] 📥 收到响应:', {
         status: response.status,
@@ -1374,14 +1423,14 @@ export function DifyChatInterface({
         // Fix 3: Enhanced Error Handling - Better error reporting
         let errorText = '';
         let errorData = null;
-        
+
         try {
           errorText = await response.text();
           errorData = JSON.parse(errorText);
         } catch (parseError) {
           errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
         }
-        
+
         console.error('[Chat Error] Response not OK:', {
           status: response.status,
           statusText: response.statusText,
@@ -1389,38 +1438,38 @@ export function DifyChatInterface({
           body: errorText.substring(0, 200) + (errorText.length > 200 ? '...' : ''),
           timestamp: new Date().toISOString()
         });
-        
+
         // 🔧 修复：只在真正的conversation ID错误时才重置，避免误清除
         if (errorData.message && (
-          errorData.message.includes('Conversation Not Exists') || 
+          errorData.message.includes('Conversation Not Exists') ||
           errorData.message.includes('not a valid uuid')
         ) && response.status === 404) {
           console.warn('🔄 Confirmed invalid conversation_id (404), clearing and retrying with new conversation');
           console.warn('🔍 Error details:', errorData.message);
-          
+
           // 只有在确认是404错误且明确是conversation ID问题时才重置
           localStorage.removeItem('dify_conversation_id');
           setConversationId(null);
-          
+
           if (currentRetry < maxRetries) {
             return sendMessageWithRetry(messageContent, currentRetry + 1);
           }
         }
-        
+
         // 检查是否是可重试的错误
         const isRetriableError = response.status >= 500 || response.status === 408 || response.status === 429;
-        
+
         if (isRetriableError && currentRetry < maxRetries) {
           console.warn(`🔄 Request failed with ${response.status}, retrying... (attempt ${currentRetry + 1}/${maxRetries + 1})`);
           setRetryCount(currentRetry + 1);
-          
+
           // 指数退避
           const delay = Math.min(1000 * Math.pow(2, currentRetry), 10000);
           await new Promise(resolve => setTimeout(resolve, delay));
-          
+
           return sendMessageWithRetry(messageContent, currentRetry + 1);
         }
-        
+
         throw new Error(errorData.error || `服务器错误 (${response.status})`);
       }
 
@@ -1434,17 +1483,17 @@ export function DifyChatInterface({
           // 🔧 修复：保持会话连续性的回退机制
           try {
             // 获取或恢复会话ID
-            const fallbackConversationId = conversationId || 
-              localStorage.getItem('dify_conversation_id') || 
+            const fallbackConversationId = conversationId ||
+              localStorage.getItem('dify_conversation_id') ||
               null;
-            
+
             console.log('[Chat Debug] Attempting fallback request with preserved conversation ID:', fallbackConversationId);
-            
+
             // 使用保持会话连续性的endpoint
             const fallbackEndpoint = fallbackConversationId && isValidUUID(fallbackConversationId)
-              ? `/api/dify/${fallbackConversationId}` 
+              ? `/api/dify/${fallbackConversationId}`
               : '/api/dify';
-            
+
             const fallbackResponse = await fetch(fallbackEndpoint, {
               method: 'POST',
               headers: {
@@ -1472,7 +1521,7 @@ export function DifyChatInterface({
             if (data.conversation_id && data.conversation_id !== conversationId) {
               console.log('[Chat Debug] Fallback response updated conversation ID from', conversationId, 'to', data.conversation_id);
               setConversationId(data.conversation_id);
-              
+
               // Store the conversation ID for future requests
               if (typeof window !== 'undefined') {
                 localStorage.setItem('dify_conversation_id', data.conversation_id);
@@ -1480,7 +1529,7 @@ export function DifyChatInterface({
                 console.log('[Chat Debug] Stored fallback conversation ID:', data.conversation_id);
               }
             }
-            
+
             await handleRegularResponse(data, messageContent);
             console.log('[Chat Debug] Fallback request succeeded with preserved session');
           } catch (fallbackError) {
@@ -1491,7 +1540,7 @@ export function DifyChatInterface({
       } else {
         // 处理普通响应
         const data = await response.json();
-        
+
         // 🔍 调试：记录接收到的响应数据
         console.log('[Chat Debug] 📋 收到响应数据:', {
           hasAnswer: !!data.answer,
@@ -1505,30 +1554,30 @@ export function DifyChatInterface({
           responseMode: data.mode || 'unknown',
           timestamp: new Date().toISOString()
         });
-        
+
         await handleRegularResponse(data, messageContent);
       }
 
       // 重置重试计数
       setRetryCount(0);
-      
+
     } catch (error) {
       // Fix 3: Enhanced Error Handling - Better error logging and user messages
       console.error('[Chat] Error sending message:', error);
-      
+
       // 处理取消请求
       if (error instanceof Error && error.name === 'AbortError') {
         const nodeCount = Object.keys(workflowState.nodes).length;
         const isActiveWorkflow = workflowState.isWorkflow && workflowState.nodes.length > 0;
-        const timeoutError = isActiveWorkflow 
+        const timeoutError = isActiveWorkflow
           ? `工作流执行超时（3分钟）。当前工作流包含${nodeCount || 5}个节点，复杂工作流可能需要更多时间。请尝试简化请求或稍后重试。`
           : '请求超时（1分钟），请稍后重试';
         throw new Error(timeoutError);
       }
-      
+
       // Handle specific error cases for better user experience
       let userFriendlyMessage = '发送消息时发生错误，请重试';
-      
+
       if (error instanceof Error) {
         if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
           userFriendlyMessage = '网络连接失败，请检查网络后重试';
@@ -1548,18 +1597,18 @@ export function DifyChatInterface({
           userFriendlyMessage = `错误：${error.message}`;
         }
       }
-      
+
       // 如果还有重试机会且是网络错误
       if (currentRetry < maxRetries && enableRetry) {
         console.warn(`🔄 Network error, retrying... (attempt ${currentRetry + 1}/${maxRetries + 1})`);
         setRetryCount(currentRetry + 1);
-        
+
         const delay = Math.min(1000 * Math.pow(2, currentRetry), 10000);
         await new Promise(resolve => setTimeout(resolve, delay));
-        
+
         return sendMessageWithRetry(messageContent, currentRetry + 1);
       }
-      
+
       throw new Error(userFriendlyMessage);
     }
   };
@@ -1574,12 +1623,12 @@ export function DifyChatInterface({
     let buffer = '';
     let finalResponse = '';
     let detectedConversationId = conversationId; // 保持会话ID连续性
-    
+
     // 🔧 修复：优化SSE解析参数
     const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // 5分钟超时
     const MAX_ITERATIONS = 10000; // 最大迭代次数防止无限循环
     const STALL_TIMEOUT_MS = 90 * 1000; // 90秒无数据则认为停滞 (增加到90秒适应复杂工作流)
-    
+
     let iterationCount = 0;
     let lastProgressTime = Date.now();
     let hasReceivedData = false;
@@ -1614,7 +1663,7 @@ export function DifyChatInterface({
 
       while (iterationCount < MAX_ITERATIONS) {
         iterationCount++;
-        
+
         // 检查是否被中止
         if (streamController.signal.aborted) {
           console.warn('[Chat Debug] Stream processing aborted due to timeout');
@@ -1642,7 +1691,7 @@ export function DifyChatInterface({
         }
 
         const { done, value } = result;
-        
+
         if (done) {
           console.log('[Chat Debug] Stream naturally ended after', iterationCount, 'iterations');
           break;
@@ -1651,7 +1700,7 @@ export function DifyChatInterface({
         if (value && value.length > 0) {
           hasReceivedData = true;
           lastProgressTime = currentTime;
-          
+
           // 🔧 修复：添加原始数据调试日志
           const chunk = decoder.decode(value, { stream: true });
           console.log('[Chat Debug] Raw chunk received:', {
@@ -1659,12 +1708,12 @@ export function DifyChatInterface({
             preview: chunk.substring(0, 200) + (chunk.length > 200 ? '...' : ''),
             iteration: iterationCount
           });
-          
+
           buffer += chunk;
-          
+
           // 🔧 修复：检测响应格式 - SSE还是普通JSON
           const processedLines: string[] = [];
-          
+
           // 如果chunk看起来是完整的JSON而不是SSE格式
           if (chunk.trim().startsWith('{') && !chunk.includes('data:')) {
             console.log('[Chat Debug] Detected JSON response format, processing as single block');
@@ -1674,7 +1723,7 @@ export function DifyChatInterface({
               if (parsed.answer) {
                 finalResponse += parsed.answer;
                 console.log('[Chat Debug] Added JSON answer to final response:', parsed.answer.substring(0, 100) + '...');
-                
+
                 // 标记为已收到内容
                 hasReceivedData = true;
               }
@@ -1683,16 +1732,16 @@ export function DifyChatInterface({
               if (parsed.metadata?.usage && !tokenUsageProcessed) {
                 console.log('[Token] ✅ Received token usage data (already processed by backend):', parsed.metadata.usage);
                 tokenUsageProcessed = true; // 标记已处理，避免重复计费
-                
+
                 // 🔧 修复：后端已经处理积分扣除并发送balance_updated事件
                 // 前端只需要监听balance_updated事件，不需要再次调用processTokenUsage
                 console.log('[Token] Backend handles billing - frontend only listens to balance_updated event');
               }
-              
+
               // 🎯 处理工作流开始事件 - 预先显示所有节点
               if (parsed.event === 'workflow_started' && parsed.data?.nodes) {
                 console.log('[Workflow] 🚀 工作流已开始，预加载所有节点:', parsed.data.nodes);
-                
+
                 // 预先添加所有节点到UI中
                 parsed.data.nodes.forEach((nodeInfo: any, index: number) => {
                   updateWorkflowProgress({
@@ -1717,7 +1766,7 @@ export function DifyChatInterface({
               // 处理工作流事件 - 修复事件数据结构
               if (parsed.event === 'node_started' && parsed.data?.node_id) {
                 console.log('[Chat Debug] Workflow node started:', parsed.data.node_id, parsed.data.title);
-                
+
                 // 🔍 尝试从node_started事件中提取模型信息
                 console.log('[Model Extraction] Node started - 详细数据分析:', {
                   node_id: parsed.data.node_id,
@@ -1737,7 +1786,7 @@ export function DifyChatInterface({
                     'data.metadata': parsed.data.metadata
                   }
                 });
-                
+
                 updateWorkflowProgress({
                   nodeId: parsed.data.node_id,
                   nodeName: parsed.data.title || parsed.data.node_id,
@@ -1746,7 +1795,7 @@ export function DifyChatInterface({
                   status: 'running',
                   startTime: new Date()
                 });
-                
+
                 // 🆕 如果这是第一个节点且还没有设置工作流状态，自动设置并清理预备节点
                 setWorkflowState(prev => {
                   if (!prev.isWorkflow) {
@@ -1765,10 +1814,10 @@ export function DifyChatInterface({
                   }
                 });
               }
-              
+
               if (parsed.event === 'node_finished' && parsed.data?.node_id) {
                 console.log('[Chat Debug] Workflow node finished:', parsed.data.node_id, parsed.data.status);
-                
+
                 // 🔍 从node_finished事件中提取模型信息（最有可能包含usage数据）
                 console.log('[Model Extraction] Node finished - 寻找模型和usage信息:', {
                   node_id: parsed.data.node_id,
@@ -1789,7 +1838,7 @@ export function DifyChatInterface({
                     'data.outputs': parsed.data.outputs
                   }
                 });
-                
+
                 updateWorkflowProgress({
                   nodeId: parsed.data.node_id,
                   nodeName: parsed.data.title || parsed.data.node_id,
@@ -1807,14 +1856,14 @@ export function DifyChatInterface({
                   error: parsed.data.error || '节点执行失败'
                 });
               }
-              
+
               // 继续处理下一个chunk
               continue;
             } catch (jsonError) {
               console.warn('[Chat Debug] Failed to parse as JSON, falling back to SSE processing:', jsonError);
             }
           }
-          
+
           // 传统SSE格式处理
           let lineEndIndex;
           while ((lineEndIndex = buffer.indexOf('\n')) !== -1) {
@@ -1831,7 +1880,7 @@ export function DifyChatInterface({
             // 🔧 修复：增强data:前缀识别和处理
             if (line.startsWith('data:')) {
               const data = line.substring(5).trim(); // 使用substring而不是slice，更明确
-              
+
               if (data === '[DONE]') {
                 console.log('[Chat Debug] Stream ended with [DONE], finalResponse length:', finalResponse.length);
                 clearTimeout(streamTimeoutId);
@@ -1845,7 +1894,7 @@ export function DifyChatInterface({
                   };
                   setMessages(prev => [...prev, assistantMessage]);
                   console.log('[Chat Debug] Added assistant message from stream with conversation ID:', detectedConversationId);
-                  
+
                   // 🤖 检测并自动处理确认阶段（第一处，保留）
                   if (isInfoCollectionConfirmationStage(assistantMessage)) {
                     console.log('🤖 [Auto] 检测到确认阶段，准备自动继续');
@@ -1853,7 +1902,7 @@ export function DifyChatInterface({
                       autoConfirmPainPointGeneration();
                     }, 1000);
                   }
-                  
+
                   // 保存会话ID到localStorage
                   if (detectedConversationId) {
                     localStorage.setItem('dify_conversation_id', detectedConversationId);
@@ -1880,14 +1929,14 @@ export function DifyChatInterface({
                     iteration: iterationCount,
                     dataBlockIndex: processedDataCount
                   });
-                  
+
                   // 🔧 修复：保持会话连续性 - 只在第一次或明确不同时更新会话ID
-                  if (parsed.conversation_id && 
-                      (!detectedConversationId || parsed.conversation_id !== detectedConversationId)) {
+                  if (parsed.conversation_id &&
+                    (!detectedConversationId || parsed.conversation_id !== detectedConversationId)) {
                     console.log('[Chat Debug] Updating conversation ID from', detectedConversationId, 'to', parsed.conversation_id);
                     detectedConversationId = parsed.conversation_id;
                     setConversationId(parsed.conversation_id);
-                    
+
                     // Store conversation ID for continuity
                     if (typeof window !== 'undefined') {
                       localStorage.setItem('dify_conversation_id', parsed.conversation_id);
@@ -1898,7 +1947,7 @@ export function DifyChatInterface({
                   // 🎯 处理工作流开始事件 - 预先显示所有节点 (SSE path)
                   if (parsed.event === 'workflow_started' && parsed.data?.nodes) {
                     console.log('[Workflow] 🚀 工作流已开始，预加载所有节点 (SSE path):', parsed.data.nodes);
-                    
+
                     // 预先添加所有节点到UI中
                     parsed.data.nodes.forEach((nodeInfo: any, index: number) => {
                       updateWorkflowProgress({
@@ -1931,7 +1980,7 @@ export function DifyChatInterface({
                       status: 'running',
                       startTime: new Date()
                     });
-                    
+
                     // 🆕 如果这是第一个节点且还没有设置工作流状态，自动设置并清理预备节点 (SSE path)
                     setWorkflowState(prev => {
                       if (!prev.isWorkflow) {
@@ -1980,17 +2029,17 @@ export function DifyChatInterface({
                       cost: parsed.data?.cost,
                       timestamp: new Date().toISOString()
                     });
-                    
+
                     if (parsed.data.newBalance !== null && parsed.data.newBalance !== undefined) {
                       // 直接更新用户余额（跳过前端token处理）
                       console.log('✅ [Frontend] Updating balance from backend response:', parsed.data.newBalance);
-                      
+
                       // 🔧 关键修复：直接更新authService中的用户余额和localStorage
                       const currentUser = authService.getCurrentUserSync();
                       if (currentUser) {
                         currentUser.balance = parsed.data.newBalance;
                         console.log('✅ [Frontend-Stream] Updated authService balance:', parsed.data.newBalance);
-                        
+
                         // 🔧 安全的localStorage更新 - 只更新余额，不影响其他状态
                         try {
                           const existingUserData = localStorage.getItem('currentUser');
@@ -2004,11 +2053,11 @@ export function DifyChatInterface({
                           console.warn('⚠️ Failed to update localStorage:', storageError);
                         }
                       }
-                      
+
                       // 🔧 确保事件处理稳定性：延迟发射balance-updated事件
                       setTimeout(() => {
                         window.dispatchEvent(new CustomEvent('balance-updated', {
-                          detail: { 
+                          detail: {
                             balance: parsed.data.newBalance,
                             pointsDeducted: parsed.data.pointsDeducted,
                             tokens: parsed.data.tokens,
@@ -2017,7 +2066,7 @@ export function DifyChatInterface({
                         }));
                         console.log('🎯 [Event] balance-updated event dispatched for streaming mode');
                       }, 50);
-                      
+
                       // 🔧 显示稳定的成功提示
                       console.log('🎯 [Toast] Displaying streaming billing success notification');
                       console.log('🎯 [Toast-Debug] About to show toast with data:', {
@@ -2027,7 +2076,7 @@ export function DifyChatInterface({
                         toastFunction: typeof toast,
                         timestamp: new Date().toISOString()
                       });
-                      
+
                       try {
                         toast.success(
                           `✅ 消费 ${parsed.data.tokens} tokens (${parsed.data.pointsDeducted} 积分)`,
@@ -2040,21 +2089,21 @@ export function DifyChatInterface({
                       } catch (toastError) {
                         console.error('❌ [Toast] Failed to display toast notification:', toastError);
                       }
-                      
+
                       // 标记token使用已处理，避免重复处理
                       tokenUsageProcessed = true;
-                      
+
                       console.log('🎯 [Frontend] Backend billing handled - skipping frontend token processing');
                     }
                   }
                   // 🎯 次高优先级：处理结合响应头和响应体的增强token使用信息
                   else if (parsed.event === 'enhanced_token_usage') {
                     console.log('[Chat Debug] 🚨 收到增强的token使用信息 (响应头+响应体):', parsed.data);
-                    
+
                     if (parsed.data.usage && !tokenUsageProcessed) {
                       console.log('[Token] ✅ Processing enhanced token usage (headers + body combined):', parsed.data.usage);
                       tokenUsageProcessed = true; // 标记已处理，避免重复计费
-                      
+
                       // 🔧 修复：后端已处理计费，前端不重复处理
                       console.log('[Token] Enhanced usage data received (already processed by backend):', parsed.data.usage);
                     } else {
@@ -2064,11 +2113,11 @@ export function DifyChatInterface({
                   // 🎯 备用方案：从服务器响应头提取的token使用信息（仅token统计）
                   else if (parsed.event === 'token_usage_extracted') {
                     console.log('[Chat Debug] 🚨 收到从服务器响应头提取的token使用信息:', parsed.data);
-                    
+
                     if (parsed.data.usage && !tokenUsageProcessed) {
                       console.log('[Token] ✅ Processing server-extracted token usage (from Dify response headers):', parsed.data.usage);
                       tokenUsageProcessed = true; // 标记已处理，避免重复计费
-                      
+
                       // 🔧 修复：后端已处理计费，前端不重复处理
                       console.log('[Token] Server-extracted usage data received (already processed by backend):', parsed.data.usage);
                     } else {
@@ -2088,11 +2137,11 @@ export function DifyChatInterface({
                     // 标记消息结束
                     messageEndReceived = true;
                     console.log('[Chat Debug] Message end received, total content length:', finalResponse.length);
-                    
+
                     // 💰 处理message_end事件中的token使用和积分扣减
                     if (parsed.metadata && parsed.metadata.usage && !tokenUsageProcessed) {
                       console.log('[Token] ✅ Processing message_end token usage (with real Dify pricing):', parsed.metadata.usage);
-                      
+
                       // 🔍 详细调试：检查Dify usage数据的完整结构
                       console.log('[DEBUG MESSAGE_END] 🚨 完整的message_end事件数据结构分析:', {
                         event_type: parsed.event,
@@ -2100,7 +2149,7 @@ export function DifyChatInterface({
                         has_usage: !!parsed.metadata?.usage,
                         usage_keys: Object.keys(parsed.metadata?.usage || {}),
                         usage_complete_object: JSON.stringify(parsed.metadata?.usage, null, 2),
-                        
+
                         // 检查价格字段的所有可能命名方式
                         price_fields_check: {
                           'usage.prompt_price': parsed.metadata?.usage?.prompt_price,
@@ -2116,7 +2165,7 @@ export function DifyChatInterface({
                           'usage.pricing': parsed.metadata?.usage?.pricing,
                           'usage.price_breakdown': parsed.metadata?.usage?.price_breakdown
                         },
-                        
+
                         // 检查其他可能的位置
                         other_locations: {
                           'metadata.price': parsed.metadata?.price,
@@ -2129,22 +2178,22 @@ export function DifyChatInterface({
                           'parsed.data.cost': parsed.data?.cost,
                           'parsed.data.usage': parsed.data?.usage
                         },
-                        
+
                         // 检查currency字段
                         currency_info: {
                           'usage.currency': parsed.metadata?.usage?.currency,
                           'metadata.currency': parsed.metadata?.currency,
                           'parsed.currency': parsed.currency
                         },
-                        
+
                         // 完整的事件数据（为了发现新字段）
                         full_parsed_keys: Object.keys(parsed),
                         full_metadata_keys: Object.keys(parsed.metadata || {}),
                         timestamp: new Date().toISOString()
                       });
-                      
+
                       tokenUsageProcessed = true; // 标记已处理，避免重复计费
-                      
+
                       // 🔍 详细记录所有可能包含模型信息的字段
                       console.log('[Model Extraction] 完整metadata分析:', {
                         full_parsed_data: parsed,
@@ -2201,12 +2250,12 @@ export function DifyChatInterface({
                       finalResponse = parsed.data.outputs.answer; // ChatFlow的答案在data.outputs.answer中
                       // ⚠️ 不要在这里设置messageEndReceived = true，因为后续还有message_end事件包含真实token usage
                       // messageEndReceived = true; // 标记消息完成
-                      
+
                       // 🎯 修复：如果workflow_finished包含usage数据，立即处理token计费
                       // 这确保最后节点的积分扣除不会被遗漏
                       if (parsed.data && parsed.data.usage && !tokenUsageProcessed) {
                         console.log('[Token] ✅ Processing workflow_finished token usage (final node billing):', parsed.data.usage);
-                        
+
                         // 🔍 详细调试：检查workflow_finished中的usage数据
                         console.log('[DEBUG WORKFLOW_FINISHED] 🚨 workflow_finished事件数据结构分析:', {
                           event_type: parsed.event,
@@ -2216,10 +2265,10 @@ export function DifyChatInterface({
                           usage_complete_object: JSON.stringify(parsed.data?.usage, null, 2),
                           full_event_data: JSON.stringify(parsed, null, 2)
                         });
-                        
+
                         try {
                           tokenUsageProcessed = true; // 标记为已处理，避免重复计费
-                          
+
                           processTokenUsage(
                             parsed.data.usage,
                             parsed.conversation_id,
@@ -2247,14 +2296,14 @@ export function DifyChatInterface({
                           data_structure: parsed.data ? Object.keys(parsed.data) : 'no data',
                           full_event_data: JSON.stringify(parsed, null, 2)
                         });
-                        
+
                         // 如果没有usage数据，等待可能的message_end事件
                         console.log('[Token] ℹ️ Workflow finished without usage data - waiting for potential message_end with pricing');
                       }
                     }
                   } else if (parsed.answer && !parsed.event) {
                     // 兼容性处理：如果没有event字段但有answer字段
-                    console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');  
+                    console.log('[Chat Debug] Accumulating direct answer:', parsed.answer.length, 'chars');
                     finalResponse += parsed.answer;
                   }
 
@@ -2269,7 +2318,7 @@ export function DifyChatInterface({
             }
           }
         }
-        
+
         // 🚨 关键修复：检查是否应该退出循环
         if (messageEndReceived && finalResponse.trim()) {
           console.log('[Chat Debug] ✅ Workflow completed successfully, breaking loop');
@@ -2302,9 +2351,9 @@ export function DifyChatInterface({
         };
         setMessages(prev => [...prev, assistantMessage]);
         console.log('[Chat Debug] Added assistant message from incomplete stream');
-        
+
         // 🔧 REMOVED: 重复的自动确认逻辑已移除，避免重复触发
-        
+
         // 保存会话ID到localStorage
         if (detectedConversationId) {
           localStorage.setItem('dify_conversation_id', detectedConversationId);
@@ -2365,7 +2414,7 @@ export function DifyChatInterface({
     if (data.conversation_id && typeof data.conversation_id === 'string' && data.conversation_id !== conversationId) {
       console.log('[Chat Debug] Updated conversation ID from', conversationId, 'to', data.conversation_id);
       setConversationId(data.conversation_id);
-      
+
       // 🔧 CRITICAL FIX: Store the Dify conversation ID for future requests
       if (typeof window !== 'undefined') {
         localStorage.setItem('dify_conversation_id', data.conversation_id);
@@ -2398,20 +2447,20 @@ export function DifyChatInterface({
 
     setMessages(prev => [...prev, assistantMessage]);
     console.log('[Chat Debug] Added assistant message from regular response');
-    
+
     // 🔥 最高优先级：处理后端发送的余额更新信息（blocking模式）
     if (data.billing_info && data.billing_info.newBalance !== null && data.billing_info.newBalance !== undefined) {
       console.log('🔥 [Frontend-Blocking] Received balance update from backend:', data.billing_info);
-      
+
       // 直接更新用户余额
       console.log('✅ [Frontend-Blocking] Updating balance from backend response:', data.billing_info.newBalance);
-      
+
       // 🔧 关键修复：直接更新authService中的用户余额和localStorage
       const currentUser = authService.getCurrentUserSync();
       if (currentUser) {
         currentUser.balance = data.billing_info.newBalance;
         console.log('✅ [Frontend-Blocking] Updated authService balance:', data.billing_info.newBalance);
-        
+
         // 同步更新localStorage - 安全方式，避免污染conversation_id状态
         try {
           const existingUserData = localStorage.getItem('currentUser');
@@ -2425,11 +2474,11 @@ export function DifyChatInterface({
           console.warn('⚠️ Failed to update localStorage:', storageError);
         }
       }
-      
+
       // 🔧 确保事件处理稳定性：延迟发射balance-updated事件
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('balance-updated', {
-          detail: { 
+          detail: {
             balance: data.billing_info.newBalance,
             pointsDeducted: data.billing_info.pointsDeducted,
             tokens: data.billing_info.tokens,
@@ -2438,7 +2487,7 @@ export function DifyChatInterface({
         }));
         console.log('🎯 [Event] balance-updated event dispatched for blocking mode');
       }, 50);
-      
+
       // 🔧 显示稳定的成功提示
       console.log('🎯 [Toast] Displaying billing success notification');
       console.log('🎯 [Toast-Debug-Blocking] About to show blocking toast with data:', {
@@ -2448,7 +2497,7 @@ export function DifyChatInterface({
         toastFunction: typeof toast,
         timestamp: new Date().toISOString()
       });
-      
+
       try {
         toast.success(
           `✅ 消费 ${data.billing_info.tokens} tokens (${data.billing_info.pointsDeducted} 积分)`,
@@ -2461,13 +2510,13 @@ export function DifyChatInterface({
       } catch (toastError) {
         console.error('❌ [Toast-Blocking] Failed to display toast notification:', toastError);
       }
-      
+
       console.log('🎯 [Frontend-Blocking] Backend billing handled - skipping frontend token processing');
-      
+
     } else {
       // ⚠️ 后端没有返回billing_info，可能是billing处理失败
       console.warn('⚠️ [Frontend-Blocking] No billing_info received from backend - this might indicate a billing processing issue');
-      
+
       // 🔧 备用方案：尝试刷新前端余额显示
       try {
         const currentUser = authService.getCurrentUserSync();
@@ -2481,7 +2530,7 @@ export function DifyChatInterface({
       } catch (error) {
         console.warn('⚠️ [Frontend-Blocking] Fallback balance refresh failed:', error);
       }
-      
+
       // 💰 回退：处理blocking API的token使用（如果后端没有发送billing_info）
       console.log('[Token Debug] No backend billing_info found, checking for usage data in blocking API response:', {
         hasBillingInfo: !!data.billing_info,
@@ -2494,27 +2543,27 @@ export function DifyChatInterface({
       });
 
       if (data.metadata?.usage) {
-      console.log('[Token] ✅ Processing blocking API token usage:', data.metadata.usage);
-      try {
-        // 异步处理token使用，不阻塞UI
-        processTokenUsage(
-          data.metadata.usage,
-          data.conversation_id as string,
-          data.message_id as string,
-          // 🔍 使用专用提取函数获取模型名称
-          extractModelFromResponse(data, 'blocking_api') || 'dify-blocking'
-        ).then(result => {
-          if (result.success) {
-            console.log('[Token] ✅ Successfully processed blocking API token usage:', result.newBalance);
-          } else {
-            console.warn('[Token] ❌ Failed to process blocking API token usage:', result.error);
-          }
-        }).catch(error => {
-          console.error('[Token] ❌ Error processing blocking API token usage:', error);
-        });
-      } catch (tokenError) {
-        console.error('[Token] ❌ Error preparing blocking API token usage:', tokenError);
-      }
+        console.log('[Token] ✅ Processing blocking API token usage:', data.metadata.usage);
+        try {
+          // 异步处理token使用，不阻塞UI
+          processTokenUsage(
+            data.metadata.usage,
+            data.conversation_id as string,
+            data.message_id as string,
+            // 🔍 使用专用提取函数获取模型名称
+            extractModelFromResponse(data, 'blocking_api') || 'dify-blocking'
+          ).then(result => {
+            if (result.success) {
+              console.log('[Token] ✅ Successfully processed blocking API token usage:', result.newBalance);
+            } else {
+              console.warn('[Token] ❌ Failed to process blocking API token usage:', result.error);
+            }
+          }).catch(error => {
+            console.error('[Token] ❌ Error processing blocking API token usage:', error);
+          });
+        } catch (tokenError) {
+          console.error('[Token] ❌ Error preparing blocking API token usage:', tokenError);
+        }
       } else {
         console.warn('[Token] ⚠️ No usage data found in blocking API response - credits will not be deducted!');
       }
@@ -2538,7 +2587,7 @@ export function DifyChatInterface({
     setIsLoading(true);
     setError(null);
     setRetryCount(0);
-    
+
     // 🔥 记录真实的用户活动时间戳（不是"你好"这种测试消息）
     if (input.length > 2 && !['你好', 'hello', 'hi', 'test'].includes(input.toLowerCase().trim())) {
       localStorage.setItem('dify_last_real_activity', Date.now().toString());
@@ -2550,7 +2599,7 @@ export function DifyChatInterface({
     } catch (error) {
       console.error('[Chat] Final Error:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
-      
+
       // 添加错误消息
       const errorMessage: Message = {
         id: `error_${Date.now()}`,
@@ -2562,10 +2611,10 @@ export function DifyChatInterface({
     } finally {
       setIsLoading(false);
       setWorkflowState(prev => ({ ...prev, isWorkflow: false, currentNodeId: undefined }));
-      
+
       // 🔧 修复：移除自动保存，避免创建重复对话记录
       // 对话历史由用户主动操作时保存（如点击新对话按钮）
-      
+
       // 聚焦输入框
       inputRef.current?.focus();
     }
@@ -2595,17 +2644,17 @@ export function DifyChatInterface({
   const extractPainPointContent = (content: string, painPointNumber: number): string => {
     try {
       console.log('🔍 [Pain Point] Extracting pain point', painPointNumber, 'from content length:', content.length);
-      
+
       // 首先尝试解析完整的JSON响应
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const responseObj = JSON.parse(jsonMatch[0]);
         console.log('📋 [Pain Point] Parsed JSON keys:', Object.keys(responseObj));
-        
+
         // 检查是否有top_3_problems数组
         if (responseObj.top_3_problems && Array.isArray(responseObj.top_3_problems)) {
           console.log('📝 [Pain Point] Found top_3_problems array with length:', responseObj.top_3_problems.length);
-          
+
           const painPoint = responseObj.top_3_problems[painPointNumber - 1];
           if (painPoint && painPoint.problem) {
             // 发送痛点的problem内容给Dify，这是用户的"选择"
@@ -2618,7 +2667,7 @@ export function DifyChatInterface({
         } else {
           console.warn('⚠️ [Pain Point] No top_3_problems array found');
         }
-        
+
         // 备用：直接查找problem字段
         if (responseObj.problem) {
           console.log('✅ [Pain Point] Found direct problem field:', responseObj.problem.substring(0, 100));
@@ -2627,7 +2676,7 @@ export function DifyChatInterface({
       } else {
         console.warn('⚠️ [Pain Point] No JSON match found in content');
       }
-      
+
       // 回退到简单标识
       console.warn('⚠️ [Pain Point] Using fallback for pain point', painPointNumber);
       return `选择痛点${painPointNumber}`;
@@ -2642,49 +2691,49 @@ export function DifyChatInterface({
   const isLLM3Stage = (message: Message): boolean => {
     // LLM3阶段是痛点选择后的确认/修改消息，不是原始痛点消息
     // 特征：通常在用户选择痛点后出现，包含确认或修改内容
-    
+
     // 检查是否是痛点选择后的响应
     const messageIndex = messages.findIndex(m => m.id === message.id);
-    
+
     // 🔧 更精确的痛点选择检测：只识别真正的痛点选择消息
-    const hasUserPainPointSelection = messageIndex > 0 && 
+    const hasUserPainPointSelection = messageIndex > 0 &&
       messages.slice(0, messageIndex).some(m => {
         if (m.role !== 'user') return false;
-        
+
         // 🚨 排除信息收集阶段的消息（这些不是痛点选择）
-        if (m.content.includes('COMPLETENESS') || 
-            m.content.includes('确认开始') || 
-            m.content.includes('开始生成痛点') ||
-            m.content.length < 10) {
+        if (m.content.includes('COMPLETENESS') ||
+          m.content.includes('确认开始') ||
+          m.content.includes('开始生成痛点') ||
+          m.content.length < 10) {
           return false;
         }
-        
+
         // 检查各种痛点选择形式
         return (
           // 简单标识形式
           m.content === '痛点1' || m.content === '痛点2' || m.content === '痛点3' ||
-          m.content.includes('我选择痛点') || 
+          m.content.includes('我选择痛点') ||
           m.content.includes('选择痛点') ||
           // 🔧 更严格的痛点内容检测：必须是在痛点生成后的用户选择
           (m.content.length > 30 && // 痛点描述通常比较长
-           !m.content.includes('课') && // 排除产品描述
-           !m.content.includes('澳币') && // 排除价格信息
-           !m.content.includes('学期') && // 排除产品信息
-           (m.content.includes('产品') || m.content.includes('用户') || 
-            m.content.includes('功能') || m.content.includes('体验') ||
-            m.content.includes('问题') || m.content.includes('挑战') ||
-            m.content.includes('难以') || m.content.includes('无法') ||
-            m.content.includes('困难') || m.content.includes('不够') ||
-            m.content.includes('缺乏') || m.content.includes('不满'))
+            !m.content.includes('课') && // 排除产品描述
+            !m.content.includes('澳币') && // 排除价格信息
+            !m.content.includes('学期') && // 排除产品信息
+            (m.content.includes('产品') || m.content.includes('用户') ||
+              m.content.includes('功能') || m.content.includes('体验') ||
+              m.content.includes('问题') || m.content.includes('挑战') ||
+              m.content.includes('难以') || m.content.includes('无法') ||
+              m.content.includes('困难') || m.content.includes('不够') ||
+              m.content.includes('缺乏') || m.content.includes('不满'))
           )
         );
       });
-    
+
     // 🚨 关键修复：排除原始痛点生成消息（包含JSON格式的top_3_problems）
-    const isOriginalPainPointMessage = message.content.includes('top_3_problems') && 
-                                       message.content.includes('"problem":') && 
-                                       message.content.includes('"justification":');
-    
+    const isOriginalPainPointMessage = message.content.includes('top_3_problems') &&
+      message.content.includes('"problem":') &&
+      message.content.includes('"justification":');
+
     // 🔍 强化调试：记录所有助手消息的按钮显示逻辑
     if (message.role === 'assistant' && message.id !== 'welcome') {
       console.log('[按钮显示调试] 助手消息按钮逻辑分析:', {
@@ -2704,33 +2753,33 @@ export function DifyChatInterface({
         hasProblemField: message.content.includes('"problem":'),
         hasJustificationField: message.content.includes('"justification":'),
         // 🚨 CRITICAL FIX: 移除递归调用，计算最终结果避免无限递归
-        finalIsLLM3StageResult: hasUserPainPointSelection && 
-                               message.role === 'assistant' &&
-                               !isOriginalPainPointMessage &&
-                               (message.content.includes('痛点') ||
-                                message.content.includes('确认') ||
-                                message.content.includes('修改') ||
-                                message.content.includes('revised') ||
-                                message.content.includes('调整'))
-      });
-    }
-    
-    // 🚨 特殊情况：如果消息明确包含revised_pain_point，直接认定为LLM3阶段
-    if (message.role === 'assistant' && 
-        (message.content.includes('revised_pain_point') || message.content.includes('"revised_pain_point"'))) {
-      console.log('🎯 [LLM3 Debug] Direct LLM3 detection: message contains revised_pain_point');
-      return true;
-    }
-    
-    // 🔧 标准LLM3检测逻辑：痛点选择后的AI响应，但排除原始痛点生成消息
-    return hasUserPainPointSelection && 
-           message.role === 'assistant' &&
-           !isOriginalPainPointMessage &&  // 关键：排除包含完整痛点JSON的原始消息
-           (message.content.includes('痛点') ||
+        finalIsLLM3StageResult: hasUserPainPointSelection &&
+          message.role === 'assistant' &&
+          !isOriginalPainPointMessage &&
+          (message.content.includes('痛点') ||
             message.content.includes('确认') ||
             message.content.includes('修改') ||
             message.content.includes('revised') ||
-            message.content.includes('调整'));
+            message.content.includes('调整'))
+      });
+    }
+
+    // 🚨 特殊情况：如果消息明确包含revised_pain_point，直接认定为LLM3阶段
+    if (message.role === 'assistant' &&
+      (message.content.includes('revised_pain_point') || message.content.includes('"revised_pain_point"'))) {
+      console.log('🎯 [LLM3 Debug] Direct LLM3 detection: message contains revised_pain_point');
+      return true;
+    }
+
+    // 🔧 标准LLM3检测逻辑：痛点选择后的AI响应，但排除原始痛点生成消息
+    return hasUserPainPointSelection &&
+      message.role === 'assistant' &&
+      !isOriginalPainPointMessage &&  // 关键：排除包含完整痛点JSON的原始消息
+      (message.content.includes('痛点') ||
+        message.content.includes('确认') ||
+        message.content.includes('修改') ||
+        message.content.includes('revised') ||
+        message.content.includes('调整'));
   };
 
   // 检测当前对话是否处于内容策略等待确认阶段
@@ -2738,43 +2787,43 @@ export function DifyChatInterface({
     // 检查最后几条消息中是否有内容策略报告，且没有确认，且不是最终文案阶段
     const recentMessages = messages.slice(-5);
     const hasStrategyReport = recentMessages.some(m => isContentStrategyStage(m));
-    const hasConfirmation = recentMessages.some(m => 
+    const hasConfirmation = recentMessages.some(m =>
       m.role === 'user' && m.content === '确认'
     );
     const hasFinalContent = recentMessages.some(m => isFinalContentStage(m));
-    
+
     return hasStrategyReport && !hasConfirmation && !hasFinalContent;
   };
 
   // 检测是否为内容策略分析报告阶段（中间阶段）
   const isContentStrategyStage = (message: Message): boolean => {
     const messageIndex = messages.findIndex(m => m.id === message.id);
-    const hasBiubiuInput = messageIndex > 0 && 
-      messages.slice(0, messageIndex).some(m => 
+    const hasBiubiuInput = messageIndex > 0 &&
+      messages.slice(0, messageIndex).some(m =>
         m.role === 'user' && m.content === 'biubiu'
       );
-    
-    return hasBiubiuInput && 
-           message.role === 'assistant' &&
-           (message.content.includes('策略') || 
-            message.content.includes('分析报告')) &&
-           !isFinalContentStage(message); // 排除最终文案输出
+
+    return hasBiubiuInput &&
+      message.role === 'assistant' &&
+      (message.content.includes('策略') ||
+        message.content.includes('分析报告')) &&
+      !isFinalContentStage(message); // 排除最终文案输出
   };
 
   // 检测是否为最终文案输出阶段
   const isFinalContentStage = (message: Message): boolean => {
     const messageIndex = messages.findIndex(m => m.id === message.id);
-    const hasConfirmInput = messageIndex > 0 && 
-      messages.slice(0, messageIndex).some(m => 
+    const hasConfirmInput = messageIndex > 0 &&
+      messages.slice(0, messageIndex).some(m =>
         m.role === 'user' && m.content === '确认'
       );
-    
-    return hasConfirmInput && 
-           message.role === 'assistant' &&
-           (message.content.includes('文案') || 
-            message.content.includes('内容') ||
-            message.content.includes('营销') ||
-            message.content.includes('推广'));
+
+    return hasConfirmInput &&
+      message.role === 'assistant' &&
+      (message.content.includes('文案') ||
+        message.content.includes('内容') ||
+        message.content.includes('营销') ||
+        message.content.includes('推广'));
   };
 
   // 检测是否为信息收集确认阶段（需要自动确认）
@@ -2782,13 +2831,13 @@ export function DifyChatInterface({
     // 检测Dify按工作流逻辑显示的确认阶段
     const isAssistantMessage = message.role === 'assistant';
     const hasCompleteness = message.content.includes('COMPLETENESS: 4');
-    const hasConfirmationText = message.content.includes('请确认') || 
-                               message.content.includes('已收集到全部') ||
-                               message.content.includes('开始痛点生成');
-    
+    const hasConfirmationText = message.content.includes('请确认') ||
+      message.content.includes('已收集到全部') ||
+      message.content.includes('开始痛点生成');
+
     // 🔧 关键修复：排除痛点生成消息，避免重复自动确认
     const isPainPointMessage = message.content.includes('"problem":') && message.content.includes('"justification":');
-    
+
     console.log('[State Debug] 检测信息收集确认阶段:', {
       messageId: message.id,
       isAssistantMessage,
@@ -2798,14 +2847,14 @@ export function DifyChatInterface({
       contentPreview: message.content.substring(0, 100),
       shouldAutoConfirm: isAssistantMessage && hasCompleteness && hasConfirmationText && !isPainPointMessage
     });
-    
+
     // 修复逻辑：只在真正的信息收集确认阶段触发，排除痛点生成消息
     return isAssistantMessage && hasCompleteness && hasConfirmationText && !isPainPointMessage;
   };
 
   // 🔧 添加防重复状态
   const [autoConfirmInProgress, setAutoConfirmInProgress] = useState(false);
-  
+
   // 自动继续痛点生成（绕过确认阶段）
   const autoConfirmPainPointGeneration = async () => {
     // 🔧 防重复检查
@@ -2813,13 +2862,13 @@ export function DifyChatInterface({
       console.log('🤖 [Auto] Skip auto-confirm: loading or already in progress');
       return;
     }
-    
+
     console.log('🤖 [Auto] 检测到确认阶段，自动继续痛点生成');
     setAutoConfirmInProgress(true);
-    
+
     // 模拟用户点击确认，使用现有的工作流按钮处理机制
     const confirmMessage = '确认开始生成痛点';
-    
+
     // 添加用户确认消息
     const userConfirmMessage: Message = {
       id: `user_confirm_${Date.now()}`,
@@ -2828,7 +2877,7 @@ export function DifyChatInterface({
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userConfirmMessage]);
-    
+
     // 调用工作流按钮处理函数
     try {
       setIsLoading(true);
@@ -2849,10 +2898,10 @@ export function DifyChatInterface({
   // 重新生成AI响应 - 保持Dify工作流路由的完整性
   const handleRegenerateResponse = async (messageIndex: number) => {
     if (isLoading || messageIndex < 0 || messageIndex >= messages.length) return;
-    
+
     const targetMessage = messages[messageIndex];
     if (targetMessage.role !== 'assistant') return;
-    
+
     // 找到触发这个AI响应的用户消息
     let triggerUserMessage = null;
     for (let i = messageIndex - 1; i >= 0; i--) {
@@ -2861,13 +2910,13 @@ export function DifyChatInterface({
         break;
       }
     }
-    
+
     if (!triggerUserMessage) return;
-    
+
     setIsLoading(true);
     setError(null);
     setRetryCount(0);
-    
+
     console.log('[Chat Debug] 🔄 重新生成AI响应:', {
       messageIndex,
       triggerMessage: triggerUserMessage.content.substring(0, 50),
@@ -2876,23 +2925,23 @@ export function DifyChatInterface({
       storedConversationId: localStorage.getItem('dify_conversation_id'),
       isCompletenessMessage: targetMessage.content.includes('COMPLETENESS: 4')
     });
-    
+
     try {
       // 获取目标消息前的所有消息
       const messagesBeforeRegenerate = messages.slice(0, messageIndex);
-      
+
       // 🔧 关键修复：只对初始痛点消息使用专用regenerate，最终文案使用标准regenerate
-      const isPainPointMessage = (targetMessage.content.includes('"problem":') || 
-                                 targetMessage.content.includes('"justification":')) &&
-                                 !isFinalContentStage(targetMessage);
-      
+      const isPainPointMessage = (targetMessage.content.includes('"problem":') ||
+        targetMessage.content.includes('"justification":')) &&
+        !isFinalContentStage(targetMessage);
+
       if (isPainPointMessage) {
         console.log('[Regenerate] 🔄 痛点regenerate - 使用后端删除conversation方案');
-        
+
         // 提取产品信息（从用户消息中）
         const userMessages = messagesBeforeRegenerate.filter(m => m.role === 'user');
         const productInfo = userMessages.map(m => m.content).join('. ');
-        
+
         // 添加regenerating标记
         const regeneratingMessage: Message = {
           id: `regenerating_${Date.now()}`,
@@ -2900,10 +2949,10 @@ export function DifyChatInterface({
           role: 'system',
           timestamp: new Date(),
         };
-        
+
         // 移除原痛点消息，添加regenerating消息
         setMessages([...messagesBeforeRegenerate, regeneratingMessage]);
-        
+
         // 调用专用的痛点regenerate endpoint
         const response = await fetch(`/api/dify/${conversationId}/regenerate-painpoints`, {
           method: 'POST',
@@ -2915,49 +2964,49 @@ export function DifyChatInterface({
             userId: userId || localStorage.getItem('dify_user_id'),
           }),
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         // 移除regenerating消息，准备接收新痛点
         setMessages(messagesBeforeRegenerate);
-        
+
         // 处理流式响应
         const reader = response.body?.getReader();
         if (!reader) {
           throw new Error('Failed to get response reader');
         }
-        
+
         let buffer = '';
         let assistantMessage: Message | null = null;
         let newDifyConversationId: string | null = null;
-        
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          
+
           const chunk = new TextDecoder().decode(value);
           buffer += chunk;
-          
+
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
                 const jsonStr = line.substring(6);
                 if (jsonStr === '[DONE]') continue;
-                
+
                 const data = JSON.parse(jsonStr);
-                
+
                 // 🔧 智能conversation ID管理：存储新conversation用于regenerated痛点路由
                 if (data.conversation_id && !newDifyConversationId) {
                   newDifyConversationId = data.conversation_id;
                   console.log('🔄 [SMART ROUTING] Detected new regenerate conversation:', newDifyConversationId);
                   // 不立即更新主conversation ID，但存储新ID用于regenerated消息的路由
                 }
-                
+
                 if (data.event === 'message' && data.answer) {
                   if (!assistantMessage) {
                     assistantMessage = {
@@ -2965,7 +3014,7 @@ export function DifyChatInterface({
                       content: data.answer,
                       role: 'assistant',
                       timestamp: new Date(),
-                      metadata: { 
+                      metadata: {
                         isRegenerated: true, // 🔧 标记为regenerate消息
                         regenerateConversationId: newDifyConversationId // 🎯 存储新conversation ID用于路由
                       }
@@ -2973,9 +3022,9 @@ export function DifyChatInterface({
                     setMessages(prev => [...prev, assistantMessage!]);
                   } else {
                     assistantMessage.content += data.answer;
-                    setMessages(prev => 
-                      prev.map(msg => 
-                        msg.id === assistantMessage!.id 
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === assistantMessage!.id
                           ? { ...msg, content: assistantMessage!.content }
                           : msg
                       )
@@ -3003,18 +3052,18 @@ export function DifyChatInterface({
     }
   };
 
-  
+
   // 🔧 增强的新对话功能 - 集成对话历史管理
   const handleNewConversation = () => {
     console.log('[Chat Debug] Starting new conversation with history management');
-    
+
     // 使用新的对话历史管理函数
     createNewConversation();
-    
+
     // 🔧 关键修复：发送符合chatflow条件的初始消息来触发信息收集流程
     // 根据你的chatflow，条件分支0检查是否包含"biubiu"
     // 但我们应该直接让用户开始信息收集，而不依赖特殊触发词
-    
+
     // 添加欢迎消息，指导用户开始信息收集
     if (welcomeMessage) {
       setMessages([{
@@ -3024,15 +3073,15 @@ export function DifyChatInterface({
         timestamp: new Date(),
       }]);
     }
-    
+
     // 🔥 修复：保持认证用户的ID，不要重新生成
     if (typeof window !== 'undefined') {
       // 只更新session时间戳，保持现有的用户ID
       localStorage.setItem('dify_session_timestamp', Date.now().toString());
-      
+
       console.log('[Chat Debug] ✅ 保持认证用户ID for fresh conversation:', userId);
     }
-    
+
     // 🔧 提供用户反馈
     if (typeof window !== 'undefined') {
       const notification = document.createElement('div');
@@ -3050,9 +3099,9 @@ export function DifyChatInterface({
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         transition: opacity 0.3s ease;
       `;
-      
+
       document.body.appendChild(notification);
-      
+
       // 3秒后自动移除通知
       setTimeout(() => {
         notification.style.opacity = '0';
@@ -3061,7 +3110,7 @@ export function DifyChatInterface({
         }, 300);
       }, 3000);
     }
-    
+
     console.log('[Chat Debug] New conversation initialized with history support');
     inputRef.current?.focus();
   };
@@ -3077,7 +3126,7 @@ export function DifyChatInterface({
   // 处理工作流按钮点击
   const handleWorkflowButtonClick = async (message: string) => {
     console.log('🎯 [Workflow Button] Called with message:', message);
-    
+
     if (isLoading || !isUserIdReady) {
       console.warn('🚫 [Workflow Button] Blocked - isLoading:', isLoading, 'isUserIdReady:', isUserIdReady);
       return;
@@ -3101,10 +3150,10 @@ export function DifyChatInterface({
       console.log('📤 [Workflow Button] Sending message to Dify:', message);
       await sendMessageWithRetry(userMessage.content);
       console.log('✅ [Workflow Button] Message sent successfully');
-      
+
     } catch (error) {
       console.error('❌ [Workflow Button] Error:', error);
-      
+
       // 更详细的错误信息
       const errorMessage = error instanceof Error ? error.message : '工作流按钮处理失败';
       console.error('❌ [Workflow Button] Error details:', {
@@ -3114,9 +3163,9 @@ export function DifyChatInterface({
         conversationId,
         userId
       });
-      
+
       setError(errorMessage);
-      
+
       // 添加错误消息到对话
       const errorMsg: Message = {
         id: `error_${Date.now()}`,
@@ -3125,7 +3174,7 @@ export function DifyChatInterface({
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMsg]);
-      
+
     } finally {
       console.log('🏁 [Workflow Button] Cleaning up');
       setIsLoading(false);
@@ -3220,7 +3269,7 @@ export function DifyChatInterface({
                 最后同步: {chatHistory.lastSyncTime.toLocaleString()}
               </div>
             )}
-            
+
             {chatHistory.syncStatus === 'syncing' ? (
               <div className="text-center py-8">
                 <Loader2 className="w-8 h-8 text-blue-500 mx-auto mb-2 animate-spin" />
@@ -3306,7 +3355,7 @@ export function DifyChatInterface({
                 <Bot className="w-5 h-5 text-blue-600" />
               </div>
             )}
-            
+
             <div className="flex flex-col">
               <div
                 className={cn(
@@ -3320,12 +3369,12 @@ export function DifyChatInterface({
                   {/* 痛点消息显示当前激活版本的内容 */}
                   {message.content.includes('"problem":') && message.content.includes('"justification":') && painPointVersions.length > 0
                     ? (() => {
-                        const activeVersionMessages = getActiveVersionMessages();
-                        const activePainPointMessage = activeVersionMessages.find(m => 
-                          m.content.includes('"problem":') && m.content.includes('"justification":')
-                        );
-                        return activePainPointMessage?.content || message.content;
-                      })()
+                      const activeVersionMessages = getActiveVersionMessages();
+                      const activePainPointMessage = activeVersionMessages.find(m =>
+                        m.content.includes('"problem":') && m.content.includes('"justification":')
+                      );
+                      return activePainPointMessage?.content || message.content;
+                    })()
                     : message.content
                   }
                 </p>
@@ -3336,26 +3385,26 @@ export function DifyChatInterface({
                   {message.timestamp.toLocaleTimeString()}
                 </span>
               </div>
-              
+
               {/* Buttons for assistant messages */}
               {message.role === 'assistant' && message.id !== 'welcome' && (
                 <div className="mt-2 flex gap-2">
                   {/* Standard Regenerate button - disabled for COMPLETENESS, LLM3, content strategy stages, and pain points */}
-                  {!message.content.includes('COMPLETENESS: 4') && 
-                   !isLLM3Stage(message) && 
-                   !isContentStrategyStage(message) && 
-                   !(message.content.includes('"problem":') && message.content.includes('"justification":')) && (
-                    <button
-                      onClick={() => handleRegenerateResponse(messages.indexOf(message))}
-                      disabled={isLoading}
-                      className="inline-flex items-center gap-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded transition-all disabled:opacity-50"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      Regenerate
-                    </button>
-                  )}
-                  
-                  
+                  {!message.content.includes('COMPLETENESS: 4') &&
+                    !isLLM3Stage(message) &&
+                    !isContentStrategyStage(message) &&
+                    !(message.content.includes('"problem":') && message.content.includes('"justification":')) && (
+                      <button
+                        onClick={() => handleRegenerateResponse(messages.indexOf(message))}
+                        disabled={isLoading}
+                        className="inline-flex items-center gap-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded transition-all disabled:opacity-50"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Regenerate
+                      </button>
+                    )}
+
+
                   {/* Workflow stage button - Start Generating Pain Points */}
                   {message.content.includes('COMPLETENESS: 4') && !message.metadata?.isRegenerated && (
                     <button
@@ -3369,7 +3418,7 @@ export function DifyChatInterface({
                             messages_count: messages.length,
                             userId
                           });
-                          
+
                           // 使用同步调用，让handleWorkflowButtonClick内部处理异步逻辑
                           handleWorkflowButtonClick('开始生成痛点');
                         } catch (error) {
@@ -3384,11 +3433,11 @@ export function DifyChatInterface({
                       Start Generating Pain Points
                     </button>
                   )}
-                  
+
                   {/* Pain point selection */}
                   {message.content.includes('"problem":') && message.content.includes('"justification":') && !isLLM3Stage(message) && (
                     <div className="mt-2 space-y-3">
-                      
+
                       {/* Pain point selection buttons - show from current active version */}
                       <div className="flex gap-2 flex-wrap">
                         <button
@@ -3436,24 +3485,24 @@ export function DifyChatInterface({
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Generate content strategy button after LLM3 - but not if this message is already content strategy */}
-                  {isLLM3Stage(message) && 
-                   !isContentStrategyStage(message) && 
-                   !message.content.includes('COMPLETENESS: 4') && 
-                   !messages.slice(messages.indexOf(message) + 1).some(m => isContentStrategyStage(m)) && (
-                    <div className="mt-2">
-                      <button
-                        onClick={() => handleWorkflowButtonClick('biubiu')}
-                        disabled={isLoading}
-                        className="inline-flex items-center gap-1 text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
-                      >
-                        <FileText className="w-3 h-3" />
-                        Generate Content Strategy
-                      </button>
-                    </div>
-                  )}
-                  
+                  {isLLM3Stage(message) &&
+                    !isContentStrategyStage(message) &&
+                    !message.content.includes('COMPLETENESS: 4') &&
+                    !messages.slice(messages.indexOf(message) + 1).some(m => isContentStrategyStage(m)) && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() => handleWorkflowButtonClick('biubiu')}
+                          disabled={isLoading}
+                          className="inline-flex items-center gap-1 text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
+                        >
+                          <FileText className="w-3 h-3" />
+                          Generate Content Strategy
+                        </button>
+                      </div>
+                    )}
+
                   {/* Confirmation button after content strategy report */}
                   {isContentStrategyStage(message) && (
                     <div className="mt-2">
@@ -3467,10 +3516,10 @@ export function DifyChatInterface({
                       </button>
                     </div>
                   )}
-                  
+
                   {/* Regenerate button for final content output - uses standard regenerate */}
                   {isFinalContentStage(message) && (
-                    <div className="mt-2">
+                    <div className="mt-2 flex gap-2">
                       <button
                         onClick={() => {
                           // 🔧 最终文案使用标准regenerate，保持完整context
@@ -3484,260 +3533,289 @@ export function DifyChatInterface({
                         <RotateCcw className="w-3 h-3" />
                         Regenerate Content
                       </button>
-                    </div>
-                  )}
-
-                  {/* New conversation button for explanation messages */}
-                  {message.metadata?.showNewConversationButton && (
-                    <div className="mt-2">
+                      {/* 🚀 发布到小红书按钮 */}
                       <button
-                        onClick={handleNewConversation}
-                        disabled={isLoading}
-                        className="inline-flex items-center gap-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
+                        onClick={() => {
+                          // 提取标题和内容
+                          const content = message.content;
+                          // 尝试从内容中提取标题（通常在开头）
+                          const titleMatch = content.match(/[【「]([^】」]+)[】」]/) ||
+                            content.match(/^#\s*(.+?)\n/) ||
+                            content.match(/标题[：:]/s + (.+?)\n/);
+                      const title = titleMatch ? titleMatch[1].trim().substring(0, 20) : '小红书笔记';
+
+                      // 提取话题标签
+                      const tags = content.match(/#[^#\s]+/g) || [];
+
+                      console.log('[Publish] Preparing to publish:', {title, contentLength: content.length, tags });
+
+                      // 调用发布 hook
+                      window.dispatchEvent(new CustomEvent('xhs-publish-request', {
+                        detail: {title, content, tags}
+                          }));
+                        }}
+                      disabled={isLoading}
+                      className="inline-flex items-center gap-1 text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
                       >
-                        <RotateCcw className="w-3 h-3" />
-                        新对话
-                      </button>
+                      <Globe className="w-3 h-3" />
+                      发布到小红书
+                    </button>
                     </div>
-                  )}
+              )}
+
+              {/* New conversation button for explanation messages */}
+              {message.metadata?.showNewConversationButton && (
+                <div className="mt-2">
+                  <button
+                    onClick={handleNewConversation}
+                    disabled={isLoading}
+                    className="inline-flex items-center gap-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    新对话
+                  </button>
                 </div>
               )}
             </div>
+              )}
+          </div>
             
-            {message.role === 'user' && (
+            {
+            message.role === 'user' && (
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
                 <User className="w-5 h-5 text-gray-600" />
               </div>
-            )}
+            )
+          }
           </div>
         ))}
-        
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div className="flex gap-3 justify-start">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="bg-gray-100 rounded-lg px-4 py-3 max-w-[70%]">
-              <div className="flex items-center gap-2 mb-2">
-                <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
-                <span className="text-gray-600">
-                  {showWorkflowProgress ? '处理复杂工作流中，请耐心等待...' : 'AI思考中...'}
+
+      {/* Loading Indicator */}
+      {isLoading && (
+        <div className="flex gap-3 justify-start">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+            <Bot className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="bg-gray-100 rounded-lg px-4 py-3 max-w-[70%]">
+            <div className="flex items-center gap-2 mb-2">
+              <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+              <span className="text-gray-600">
+                {showWorkflowProgress ? '处理复杂工作流中，请耐心等待...' : 'AI思考中...'}
+              </span>
+              {retryCount > 0 && (
+                <span className="text-xs text-orange-600">
+                  (重试 {retryCount}/3)
                 </span>
-                {retryCount > 0 && (
-                  <span className="text-xs text-orange-600">
-                    (重试 {retryCount}/3)
+              )}
+            </div>
+
+            {/* 工作流进度显示 */}
+            {showWorkflowProgress && workflowState.isWorkflow && (
+              <div className="mt-3 space-y-2">
+                <div className="text-xs text-gray-500 mb-2 flex justify-between items-center">
+                  <span>工作流执行进度</span>
+                  <span className="font-medium">
+                    {workflowState.completedNodes}/{workflowState.totalNodes || workflowState.nodes.length} 个节点已完成
                   </span>
-                )}
-              </div>
-              
-              {/* 工作流进度显示 */}
-              {showWorkflowProgress && workflowState.isWorkflow && (
-                <div className="mt-3 space-y-2">
-                  <div className="text-xs text-gray-500 mb-2 flex justify-between items-center">
-                    <span>工作流执行进度</span>
-                    <span className="font-medium">
-                      {workflowState.completedNodes}/{workflowState.totalNodes || workflowState.nodes.length} 个节点已完成
-                    </span>
+                </div>
+
+                {/* 进度条 */}
+                {workflowState.nodes.length > 0 && (
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${((workflowState.totalNodes || workflowState.nodes.length) > 0)
+                          ? (workflowState.completedNodes / (workflowState.totalNodes || workflowState.nodes.length)) * 100
+                          : 0}%`
+                      }}
+                    />
                   </div>
-                  
-                  {/* 进度条 */}
-                  {workflowState.nodes.length > 0 && (
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${((workflowState.totalNodes || workflowState.nodes.length) > 0) 
-                            ? (workflowState.completedNodes / (workflowState.totalNodes || workflowState.nodes.length)) * 100 
-                            : 0}%` 
-                        }}
-                      />
-                    </div>
-                  )}
+                )}
 
-                  {/* 节点状态列表 - 增强显示 */}
-                  <div className="max-h-40 overflow-y-auto space-y-1">
-                    {workflowState.nodes.map((node) => {
-                      const NodeIcon = getNodeIcon(node.nodeType);
-                      return (
-                        <div 
-                          key={node.nodeId} 
-                          className={cn(
-                            "flex items-center gap-3 text-xs p-2 rounded-lg transition-all duration-200",
-                            node.status === 'running' && "bg-blue-50 border border-blue-200 shadow-sm",
-                            node.status === 'completed' && "bg-green-50 border border-green-200 shadow-sm",
-                            node.status === 'failed' && "bg-red-50 border border-red-200 shadow-sm",
-                            node.status === 'waiting' && "bg-gray-50 border border-gray-100"
-                          )}
-                        >
-                          {/* 节点类型图标 */}
-                          <div className="flex-shrink-0">
-                            <NodeIcon className={cn(
-                              "w-4 h-4",
-                              node.status === 'running' && "text-blue-600",
-                              node.status === 'completed' && "text-green-600", 
-                              node.status === 'failed' && "text-red-600",
-                              node.status === 'waiting' && "text-gray-400"
-                            )} />
-                          </div>
+                {/* 节点状态列表 - 增强显示 */}
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {workflowState.nodes.map((node) => {
+                    const NodeIcon = getNodeIcon(node.nodeType);
+                    return (
+                      <div
+                        key={node.nodeId}
+                        className={cn(
+                          "flex items-center gap-3 text-xs p-2 rounded-lg transition-all duration-200",
+                          node.status === 'running' && "bg-blue-50 border border-blue-200 shadow-sm",
+                          node.status === 'completed' && "bg-green-50 border border-green-200 shadow-sm",
+                          node.status === 'failed' && "bg-red-50 border border-red-200 shadow-sm",
+                          node.status === 'waiting' && "bg-gray-50 border border-gray-100"
+                        )}
+                      >
+                        {/* 节点类型图标 */}
+                        <div className="flex-shrink-0">
+                          <NodeIcon className={cn(
+                            "w-4 h-4",
+                            node.status === 'running' && "text-blue-600",
+                            node.status === 'completed' && "text-green-600",
+                            node.status === 'failed' && "text-red-600",
+                            node.status === 'waiting' && "text-gray-400"
+                          )} />
+                        </div>
 
-                          {/* 状态图标 */}
-                          <div className="flex-shrink-0">
-                            {node.status === 'waiting' && <Clock className="w-3 h-3 text-gray-400" />}
-                            {node.status === 'running' && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
-                            {node.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
-                            {node.status === 'failed' && <AlertCircle className="w-3 h-3 text-red-600" />}
-                          </div>
-                          
-                          {/* 节点信息 */}
-                          <div className="flex-1 min-w-0">
-                            <div className={cn(
-                              "font-medium truncate",
-                              node.status === 'running' && "text-blue-700",
-                              node.status === 'completed' && "text-green-700",
-                              node.status === 'failed' && "text-red-700",
-                              node.status === 'waiting' && "text-gray-600"
-                            )}>
-                              {node.nodeTitle || node.nodeName}
-                            </div>
-                            {node.nodeType && (
-                              <div className="text-gray-500 text-xs truncate">
-                                {node.nodeType}
-                              </div>
-                            )}
-                            {node.error && (
-                              <div className="text-red-600 text-xs mt-1 truncate">
-                                错误: {node.error}
-                              </div>
-                            )}
-                          </div>
+                        {/* 状态图标 */}
+                        <div className="flex-shrink-0">
+                          {node.status === 'waiting' && <Clock className="w-3 h-3 text-gray-400" />}
+                          {node.status === 'running' && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+                          {node.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
+                          {node.status === 'failed' && <AlertCircle className="w-3 h-3 text-red-600" />}
+                        </div>
 
-                          {/* 执行时间 */}
-                          {node.status === 'running' && node.startTime && (
-                            <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
-                              {Math.floor((Date.now() - node.startTime.getTime()) / 1000)}s
+                        {/* 节点信息 */}
+                        <div className="flex-1 min-w-0">
+                          <div className={cn(
+                            "font-medium truncate",
+                            node.status === 'running' && "text-blue-700",
+                            node.status === 'completed' && "text-green-700",
+                            node.status === 'failed' && "text-red-700",
+                            node.status === 'waiting' && "text-gray-600"
+                          )}>
+                            {node.nodeTitle || node.nodeName}
+                          </div>
+                          {node.nodeType && (
+                            <div className="text-gray-500 text-xs truncate">
+                              {node.nodeType}
                             </div>
                           )}
-                          {node.status === 'completed' && node.startTime && node.endTime && (
-                            <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
-                              {Math.floor((node.endTime.getTime() - node.startTime.getTime()) / 1000)}s
-                            </div>
-                          )}
-
-                          {/* 正在运行的动态指示器 */}
-                          {node.status === 'running' && (
-                            <div className="flex-shrink-0">
-                              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+                          {node.error && (
+                            <div className="text-red-600 text-xs mt-1 truncate">
+                              错误: {node.error}
                             </div>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        {/* 执行时间 */}
+                        {node.status === 'running' && node.startTime && (
+                          <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
+                            {Math.floor((Date.now() - node.startTime.getTime()) / 1000)}s
+                          </div>
+                        )}
+                        {node.status === 'completed' && node.startTime && node.endTime && (
+                          <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
+                            {Math.floor((node.endTime.getTime() - node.startTime.getTime()) / 1000)}s
+                          </div>
+                        )}
+
+                        {/* 正在运行的动态指示器 */}
+                        {node.status === 'running' && (
+                          <div className="flex-shrink-0">
+                            <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="flex items-start gap-2 mb-3">
+            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium mb-1">发生错误</p>
+              <p className="text-sm">{error}</p>
             </div>
           </div>
-        )}
-        
-        {/* Enhanced Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            <div className="flex items-start gap-2 mb-3">
-              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium mb-1">发生错误</p>
-                <p className="text-sm">{error}</p>
-              </div>
-            </div>
-            
-            {/* Action buttons */}
-            <div className="flex gap-2 flex-wrap">
-              {enableRetry && (
-                <button
-                  onClick={handleRetry}
-                  disabled={isLoading}
-                  className="inline-flex items-center gap-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded transition-all disabled:opacity-50"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  重试发送
-                </button>
-              )}
-              
+
+          {/* Action buttons */}
+          <div className="flex gap-2 flex-wrap">
+            {enableRetry && (
               <button
-                onClick={handleNewConversation}
+                onClick={handleRetry}
                 disabled={isLoading}
-                className="inline-flex items-center gap-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all disabled:opacity-50 shadow-sm hover:shadow-md"
+                className="inline-flex items-center gap-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded transition-all disabled:opacity-50"
               >
-                <RotateCcw className="w-4 h-4" />
-                新对话
+                <RotateCcw className="w-3 h-3" />
+                重试发送
               </button>
-              
-              {process.env.NODE_ENV === 'development' && (
-                <button
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && (window as any).debugChat) {
-                      (window as any).debugChat.debugWorkflowStatus();
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
-                >
-                  🔧 调试信息
-                </button>
-              )}
-              
+            )}
+
+            <button
+              onClick={handleNewConversation}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all disabled:opacity-50 shadow-sm hover:shadow-md"
+            >
+              <RotateCcw className="w-4 h-4" />
+              新对话
+            </button>
+
+            {process.env.NODE_ENV === 'development' && (
               <button
-                onClick={() => setError(null)}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && (window as any).debugChat) {
+                    (window as any).debugChat.debugWorkflowStatus();
+                  }
+                }}
                 className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
               >
-                ✕ 关闭
+                🔧 调试信息
               </button>
-            </div>
+            )}
+
+            <button
+              onClick={() => setError(null)}
+              className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
+            >
+              ✕ 关闭
+            </button>
           </div>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            disabled={isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
-            className={cn(
-              "px-4 py-2.5 rounded-lg font-medium transition-all",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-              !input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()
-                ? "bg-gray-300 text-gray-500"
-                : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
-            )}
-          >
-            {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-          </button>
         </div>
-        
-        {/* Character count */}
-        <div className="mt-2 text-xs text-gray-500 text-right">
-          {input.length} / 2000 characters
-        </div>
-      </form>
+      )}
 
+      <div ref={messagesEndRef} />
     </div>
+
+      {/* Input Form */ }
+  <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
+    <div className="flex gap-2">
+      <input
+        ref={inputRef}
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+        disabled={isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
+      />
+      <button
+        type="submit"
+        disabled={!input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
+        className={cn(
+          "px-4 py-2.5 rounded-lg font-medium transition-all",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+          !input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()
+            ? "bg-gray-300 text-gray-500"
+            : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+        )}
+      >
+        {isLoading ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : (
+          <Send className="w-5 h-5" />
+        )}
+      </button>
+    </div>
+
+    {/* Character count */}
+    <div className="mt-2 text-xs text-gray-500 text-right">
+      {input.length} / 2000 characters
+    </div>
+  </form>
+
+    </div >
   );
 }
 
@@ -3745,7 +3823,7 @@ export function DifyChatInterface({
 export function ChatWidget() {
   return (
     <div className="fixed bottom-4 right-4 w-96 h-[600px] z-50">
-      <DifyChatInterface 
+      <DifyChatInterface
         className="h-full"
         welcomeMessage="Hi! I'm your AI assistant. How can I help you today?"
       />

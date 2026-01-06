@@ -1,0 +1,73 @@
+{
+    "title": "TikTok Video Upload Workflow",
+    "description": "Automatically upload video content to TikTok",
+    "webhook_callback_url": null,
+    "proxy_location": "RESIDENTIAL",
+    "workflow_definition": {
+        "parameters": [
+            {
+                "parameter_type": "workflow",
+                "key": "title",
+                "description": "Video title/caption",
+                "workflow_parameter_type": "string"
+            },
+            {
+                "parameter_type": "workflow",
+                "key": "content",
+                "description": "Video description text",
+                "workflow_parameter_type": "string"
+            },
+            {
+                "parameter_type": "workflow",
+                "key": "video_url",
+                "description": "URL of the video file to upload",
+                "workflow_parameter_type": "string"
+            },
+            {
+                "parameter_type": "workflow",
+                "key": "tags",
+                "description": "Hashtags as comma-separated string",
+                "workflow_parameter_type": "string"
+            }
+        ],
+        "blocks": [
+            {
+                "block_type": "task",
+                "label": "navigate_to_tiktok",
+                "url": "https://www.tiktok.com/creator#/upload?lang=en",
+                "title": "Navigate to TikTok Upload",
+                "navigation_goal": "Go to TikTok creator upload page. If login is required, wait for user to scan QR code.",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "upload_video",
+                "title": "Upload Video File",
+                "navigation_goal": "Click on the upload button or drag zone. Upload the video from the provided URL: {{video_url}}",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "fill_caption",
+                "title": "Fill Video Caption",
+                "navigation_goal": "Find the caption/description input field and enter: {{title}}\n\n{{content}}\n\n{{tags}}",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "click_post",
+                "title": "Click Post Button",
+                "navigation_goal": "Wait for video processing, then click 'Post' or 'Publish' button",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "extract_post_url",
+                "title": "Extract Post URL",
+                "navigation_goal": "After posting, extract the URL of the published video",
+                "data_extraction_goal": "Extract the post URL and post ID if available",
+                "complete_on_download": false
+            }
+        ]
+    }
+}

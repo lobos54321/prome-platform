@@ -1,0 +1,86 @@
+{
+    "title": "Instagram Post Upload Workflow",
+    "description": "Automatically upload content to Instagram (Reels/Posts)",
+    "webhook_callback_url": null,
+    "proxy_location": "RESIDENTIAL",
+    "workflow_definition": {
+        "parameters": [
+            {
+                "parameter_type": "workflow",
+                "key": "title",
+                "description": "Post caption title",
+                "workflow_parameter_type": "string"
+            },
+            {
+                "parameter_type": "workflow",
+                "key": "content",
+                "description": "Post caption/description",
+                "workflow_parameter_type": "string"
+            },
+            {
+                "parameter_type": "workflow",
+                "key": "video_url",
+                "description": "URL of video file for Reels (optional)",
+                "workflow_parameter_type": "string"
+            },
+            {
+                "parameter_type": "workflow",
+                "key": "images",
+                "description": "Comma-separated image URLs for carousel posts",
+                "workflow_parameter_type": "string"
+            },
+            {
+                "parameter_type": "workflow",
+                "key": "tags",
+                "description": "Hashtags as comma-separated string",
+                "workflow_parameter_type": "string"
+            }
+        ],
+        "blocks": [
+            {
+                "block_type": "task",
+                "label": "navigate_to_instagram",
+                "url": "https://www.instagram.com/",
+                "title": "Navigate to Instagram",
+                "navigation_goal": "Go to Instagram. If login is required, wait for user to login.",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "click_create",
+                "title": "Click Create Button",
+                "navigation_goal": "Click on the 'Create' or '+' button in the sidebar or navigation to start creating a new post",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "upload_media",
+                "title": "Upload Media",
+                "navigation_goal": "If video_url is provided: {{video_url}}, upload it as a Reel. Otherwise upload images: {{images}}",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "add_caption",
+                "title": "Add Caption",
+                "navigation_goal": "Click 'Next' or proceed to the caption step. Enter the caption: {{title}}\n\n{{content}}\n\n{{tags}}",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "share_post",
+                "title": "Share Post",
+                "navigation_goal": "Click 'Share' or 'Post' button to publish the content",
+                "complete_on_download": false
+            },
+            {
+                "block_type": "task",
+                "label": "extract_post_info",
+                "title": "Extract Post Info",
+                "navigation_goal": "After posting, extract the post URL from the confirmation or navigate to profile to find the new post",
+                "data_extraction_goal": "Extract the post URL and any post ID",
+                "complete_on_download": false
+            }
+        ]
+    }
+}

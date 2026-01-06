@@ -810,6 +810,30 @@ export function DashboardSection({
               // 刷新数据
               fetchData();
             }}
+            onPublish={async () => {
+              // 🚀 发布到小红书 - 使用 Chrome 插件
+              console.log('[AgentProgressPanel] onPublish triggered');
+
+              // 检查插件是否安装
+              const extensionMarker = document.getElementById('prome-extension-installed');
+              if (!extensionMarker) {
+                alert('❌ 未检测到 Prome 助手插件！\n\n请确保已安装插件并刷新页面。');
+                return;
+              }
+
+              // 获取当前内容
+              const content = plan?.tasks?.find((t: any) =>
+                t.status === 'pending' || t.status === 'in-progress'
+              );
+
+              if (!content) {
+                alert('❌ 没有待发布的内容');
+                return;
+              }
+
+              // 调用现有的发布逻辑
+              await handleApprovePost(content.id);
+            }}
           />
         </div>
       )}

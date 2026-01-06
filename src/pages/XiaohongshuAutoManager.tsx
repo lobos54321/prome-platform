@@ -24,6 +24,7 @@ import {
   Video
 } from 'lucide-react';
 import { xhsClient } from '@/lib/xhs-worker';
+import { PlatformSelector } from '@/components/publish/PlatformSelector';
 
 // API 配置
 const CLAUDE_API = import.meta.env.VITE_XHS_API_URL || 'http://localhost:8080';
@@ -83,6 +84,9 @@ export default function XiaohongshuAutoManager() {
   const [publishTitle, setPublishTitle] = useState("");
   const [publishDesc, setPublishDesc] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
+
+  // 🚀 多平台发布状态
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
   const loginCheckInterval = useRef<NodeJS.Timeout | null>(null);
@@ -1367,6 +1371,35 @@ export default function XiaohongshuAutoManager() {
                             </>
                           )}
                         </div>
+                      </div>
+
+                      {/* 🚀 多平台发布选择器 */}
+                      {expandedTaskId === (i + 1).toString() && (
+                        <div style={{ marginTop: '1rem' }}>
+                          <PlatformSelector
+                            content={{
+                              title: task.title,
+                              content: task.content || '',
+                              images: task.image_urls || [],
+                              tags: task.hashtags || []
+                            }}
+                            onPublishComplete={(platform, result) => {
+                              console.log(`Published to ${platform}:`, result);
+                              fetchDashboardData();
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setExpandedTaskId(
+                            expandedTaskId === (i + 1).toString() ? null : (i + 1).toString()
+                          )}
+                        >
+                          {expandedTaskId === (i + 1).toString() ? '收起' : '🚀 发布到多平台'}
+                        </Button>
                       </div>
                     </div>
                   ))}

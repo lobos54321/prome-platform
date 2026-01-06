@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { xiangongAPI } from '../lib/xiangongyun-api';
+import { useXiaohongshuPublish } from '../hooks/useXiaohongshuPublish';
 
 interface TrainingData {
   name: string;
@@ -58,7 +59,7 @@ export default function DigitalHumanVideoComplete3() {
   });
   const [digitalHumans, setDigitalHumans] = useState<DigitalHuman[]>([]);
   const [selectedDigitalHuman, setSelectedDigitalHuman] = useState<string | null>(null);
-  const [voiceCloning, setVoiceCloning] = useState<{status: 'idle' | 'cloning' | 'completed' | 'error', message?: string}>({
+  const [voiceCloning, setVoiceCloning] = useState<{ status: 'idle' | 'cloning' | 'completed' | 'error', message?: string }>({
     status: 'idle'
   });
   const [videoGeneration, setVideoGeneration] = useState<VideoGenerationStatus>({
@@ -84,6 +85,15 @@ export default function DigitalHumanVideoComplete3() {
 
   const videoInputRef = useRef<HTMLInputElement>(null);
 
+  // 🚀 小红书发布 Hook
+  const {
+    hasExtension,
+    isPublishing,
+    confirmAndPublish,
+    downloadExtension,
+    openPublishPage
+  } = useXiaohongshuPublish();
+
   // 加载Deep Copywriting结果和数字人列表
   useEffect(() => {
     const loadCopywriting = () => {
@@ -96,7 +106,7 @@ export default function DigitalHumanVideoComplete3() {
             const lastAssistantMessage = parsedMessages
               .filter((msg: any) => msg.role === 'assistant')
               .pop();
-            
+
             if (lastAssistantMessage && lastAssistantMessage.content) {
               setCopywritingContent(lastAssistantMessage.content);
             }
@@ -124,7 +134,7 @@ export default function DigitalHumanVideoComplete3() {
       // Strategy 1: Check localStorage for active training
       const activeTrainingId = localStorage.getItem('activeTrainingId');
       const activeTrainingName = localStorage.getItem('activeTrainingName');
-      
+
       if (activeTrainingId && activeTrainingName) {
         console.log('🔄 Found active training in localStorage:', activeTrainingId);
         await resumeTraining(activeTrainingId, activeTrainingName);
@@ -137,14 +147,14 @@ export default function DigitalHumanVideoComplete3() {
         '68d4c306a8178b003b6b78f9', // Most recent
         '68d4bdb555ed06003bb631e3'  // Previous
       ];
-      
+
       for (const recentTrainingId of recentTrainingIds) {
         console.log('🔍 Checking for recent training status:', recentTrainingId);
-        
+
         try {
           const response = await fetch(`/api/digital-human/status/${recentTrainingId}`);
           const result = await response.json();
-          
+
           if (result.success && result.status && result.status !== 'completed' && result.status !== 'failed') {
             console.log('🎯 Found active training, automatically resuming:', recentTrainingId, result.status);
             const trainingName = result.trainingData?.name || 'Unknown';
@@ -160,7 +170,7 @@ export default function DigitalHumanVideoComplete3() {
           console.error('检查最近训练状态失败:', recentTrainingId, error);
         }
       }
-      
+
       // After checking all training IDs, reload the list
       loadDigitalHumans();
     };
@@ -169,49 +179,49 @@ export default function DigitalHumanVideoComplete3() {
       try {
         const response = await fetch(`/api/digital-human/status/${trainingId}`);
         const result = await response.json();
-        
+
         if (result.success && result.status !== 'completed' && result.status !== 'failed') {
           // Training is still in progress, resume polling
           console.log('▶️ Automatically resuming training status polling:', trainingId, result.status);
-          
+
           setTrainingData(prev => ({
             ...prev,
             name: trainingName
           }));
-          
+
           const statusMessage = result.status === 'processing' ? '自动恢复：正在训练处理中...' :
-                               result.status === 'pending' ? '自动恢复：训练请求排队中...' :
-                               result.status === 'sent' ? '自动恢复：训练请求已发送...' :
-                               result.status === 'initialized' ? '自动恢复：训练初始化中...' :
-                               '自动恢复：数字人训练中...';
-          
+            result.status === 'pending' ? '自动恢复：训练请求排队中...' :
+              result.status === 'sent' ? '自动恢复：训练请求已发送...' :
+                result.status === 'initialized' ? '自动恢复：训练初始化中...' :
+                  '自动恢复：数字人训练中...';
+
           setTrainingStatus({
             status: 'training',
             progress: 80,
             message: statusMessage,
             trainingId: trainingId
           });
-          
+
           setCurrentStep(2);
-          
+
           // Store in localStorage for next time
           localStorage.setItem('activeTrainingId', trainingId);
           localStorage.setItem('activeTrainingName', trainingName);
-          
+
           // Start polling immediately
           setTimeout(() => pollTrainingStatus(trainingId), 1000);
         } else if (result.success && (result.status === 'completed' || result.status === 'failed')) {
           // Training finished while user was away
           localStorage.removeItem('activeTrainingId');
           localStorage.removeItem('activeTrainingName');
-          
+
           if (result.status === 'completed') {
             console.log('✅ Training completed while away, saving result:', trainingId);
             await saveDigitalHuman(trainingId, result);
             // 声音已在训练前克隆完成
             console.log('✅ 数字人训练完成，声音已克隆');
             loadDigitalHumans();
-            
+
             // Show completion message briefly
             setTrainingStatus({
               status: 'completed',
@@ -253,7 +263,7 @@ export default function DigitalHumanVideoComplete3() {
           const lastAssistantMessage = parsedMessages
             .filter((msg: any) => msg.role === 'assistant')
             .pop();
-          
+
           if (lastAssistantMessage && lastAssistantMessage.content) {
             setCopywritingContent(lastAssistantMessage.content);
           }
@@ -292,7 +302,7 @@ export default function DigitalHumanVideoComplete3() {
   const handleVideoDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     const files = event.dataTransfer.files;
     if (files.length > 0) {
       validateAndSetVideoFile(files[0]);
@@ -308,7 +318,7 @@ export default function DigitalHumanVideoComplete3() {
 
   const uploadVideoToSupabase = async (file: File): Promise<string> => {
     console.log('🎬 Starting video upload:', file.name, file.size, 'bytes');
-    
+
     const formData = new FormData();
     formData.append('video', file);
 
@@ -340,7 +350,7 @@ export default function DigitalHumanVideoComplete3() {
     while (attempts < maxAttempts) {
       try {
         console.log(`🔄 Checking voice cloning status (${attempts + 1}/${maxAttempts}):`, voiceId);
-        
+
         const response = await fetch(`/api/voice/status/${voiceId}`);
         if (!response.ok) {
           console.error('❌ Voice status check failed:', response.status);
@@ -387,41 +397,41 @@ export default function DigitalHumanVideoComplete3() {
       console.log('🔄 Frontend polling training status for:', trainingId);
       const response = await fetch(`/api/digital-human/status/${trainingId}`);
       const result = await response.json();
-      
+
       if (result.success) {
         console.log('🔍 Frontend received training status:', result.status, result);
-        
+
         if (result.status === 'completed') {
           // Training completed, save to digital humans list
           await saveDigitalHuman(trainingId, result);
           // 声音已在训练前克隆完成
           console.log('✅ 数字人训练完成，声音已克隆');
-          
+
           // Clear localStorage
           localStorage.removeItem('activeTrainingId');
           localStorage.removeItem('activeTrainingName');
-          
+
           setTrainingStatus({
             status: 'completed',
             progress: 100,
             message: '数字人训练完成！',
             trainingId
           });
-          
+
           // Reload digital humans list
           const listResponse = await fetch(`/api/digital-human/list/${currentUserId}`);
           const listResult = await listResponse.json();
           if (listResult.success) {
             setDigitalHumans(listResult.digitalHumans);
           }
-          
+
           setCurrentStep(3);
           return;
         } else if (result.status === 'failed') {
           // Clear localStorage on failure
           localStorage.removeItem('activeTrainingId');
           localStorage.removeItem('activeTrainingName');
-          
+
           setTrainingStatus({
             status: 'error',
             progress: 0,
@@ -432,13 +442,13 @@ export default function DigitalHumanVideoComplete3() {
           // Still training, continue polling
           console.log(`⏱️ Training status: ${result.status}, continuing to poll in 10 seconds`);
           setTimeout(() => pollTrainingStatus(trainingId), 10000); // Poll every 10 seconds
-          
+
           const statusMessage = result.status === 'processing' ? '正在训练处理中...' :
-                               result.status === 'pending' ? '训练请求排队中...' :
-                               result.status === 'sent' ? '训练请求已发送...' :
-                               result.status === 'initialized' ? '训练初始化中...' :
-                               '数字人训练中，预计5-10分钟...';
-          
+            result.status === 'pending' ? '训练请求排队中...' :
+              result.status === 'sent' ? '训练请求已发送...' :
+                result.status === 'initialized' ? '训练初始化中...' :
+                  '数字人训练中，预计5-10分钟...';
+
           setTrainingStatus(prev => ({
             ...prev,
             progress: Math.min(prev.progress + 3, 90), // Gradually increase progress
@@ -473,7 +483,7 @@ export default function DigitalHumanVideoComplete3() {
           trainingData: statusResult.trainingData
         })
       });
-      
+
       console.log('✅ Digital human saved successfully');
     } catch (error) {
       console.error('保存数字人失败:', error);
@@ -527,7 +537,7 @@ export default function DigitalHumanVideoComplete3() {
 
       const xiangongResult = await xiangongTrainingResponse.json();
       console.log('✅ Xiangong training video uploaded:', xiangongResult);
-      
+
       setTrainingStatus({
         status: 'training',
         progress: 40,
@@ -548,7 +558,7 @@ export default function DigitalHumanVideoComplete3() {
           message: '仙宫云数字人克隆中...'
         });
       }, 2000);
-      
+
       setTrainingStatus({
         status: 'training',
         progress: 60,
@@ -567,7 +577,7 @@ export default function DigitalHumanVideoComplete3() {
       };
 
       console.log('🚀 Sending Xiangong training request:', trainingPayload);
-      
+
       // 这里可以调用一个简化的训练API，主要是保存训练记录
       const response = await fetch('/api/digital-human/train', {
         method: 'POST',
@@ -635,9 +645,9 @@ export default function DigitalHumanVideoComplete3() {
 
     try {
       console.log('🎤 自动启动声音克隆:', trainingName);
-      
+
       const voiceName = `${trainingName}_voice_${Date.now()}`;
-      
+
       // 使用最优默认设置
       const optimalConfig = {
         gender: trainingData.gender || 'male',
@@ -685,7 +695,7 @@ export default function DigitalHumanVideoComplete3() {
       setVoiceCloning({ status: 'cloning', message: '正在克隆声音...' });
 
       const voiceName = `${digitalHuman.name}_voice_${Date.now()}`;
-      
+
       // 使用最优默认设置
       const optimalConfig = {
         gender: digitalHuman.gender || 'male',
@@ -717,7 +727,7 @@ export default function DigitalHumanVideoComplete3() {
 
       console.log('✅ Voice cloning successful:', result);
       setVoiceCloning({ status: 'completed', message: '声音克隆完成！' });
-      
+
       // 刷新数字人列表以显示声音克隆状态
       loadDigitalHumans();
 
@@ -739,7 +749,7 @@ export default function DigitalHumanVideoComplete3() {
             const lastAssistantMessage = parsedMessages
               .filter((msg: any) => msg.role === 'assistant')
               .pop();
-            
+
             if (lastAssistantMessage && lastAssistantMessage.content) {
               setVideoScript(lastAssistantMessage.content);
             }
@@ -814,7 +824,7 @@ export default function DigitalHumanVideoComplete3() {
 
       // 获取当前选中的数字人配置
       const selectedDigitalHumanData = digitalHumans.find(dh => dh.trainingId === selectedDigitalHuman);
-      
+
       // 准备API参数
       const apiParams = {
         text: videoScript || copywritingContent,
@@ -864,7 +874,7 @@ export default function DigitalHumanVideoComplete3() {
           message: `需要手动操作ComfyUI: ${result.message}`,
           generationId: result.comfyuiUrl // 将ComfyUI URL存储在这里以便显示
         });
-        
+
         // 可以在这里显示详细的操作指引
         console.log('🔗 ComfyUI操作指引:', {
           url: result.comfyuiUrl,
@@ -876,10 +886,10 @@ export default function DigitalHumanVideoComplete3() {
 
     } catch (error) {
       console.error('数字人视频生成失败:', error);
-      
+
       // 检查是否是实例启动相关的错误
       const errorMessage = error instanceof Error ? error.message : '视频生成失败，请重试';
-      
+
       if (errorMessage.includes('仙宫云不支持API启动实例') || errorMessage.includes('需要手动启动实例')) {
         setVideoGeneration({
           status: 'error',
@@ -924,7 +934,7 @@ export default function DigitalHumanVideoComplete3() {
     const poll = async () => {
       try {
         const status = await xiangongAPI.getTaskStatus(taskId);
-        
+
         setVideoGeneration({
           status: 'generating',
           progress: Math.min(50 + (status.progress || 0) / 2, 95),
@@ -1012,9 +1022,9 @@ export default function DigitalHumanVideoComplete3() {
                   <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>{step.desc}</div>
                 </div>
                 {index < 3 && (
-                  <div style={{ 
-                    width: '3rem', 
-                    height: '2px', 
+                  <div style={{
+                    width: '3rem',
+                    height: '2px',
                     backgroundColor: currentStep > step.id ? '#10b981' : 'rgba(255,255,255,0.3)',
                     margin: '0 1rem',
                     marginTop: '-2rem'
@@ -1029,17 +1039,17 @@ export default function DigitalHumanVideoComplete3() {
           {/* 主要内容区域 */}
           <div>
             {/* 文案准备 */}
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '1rem', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '1rem',
               boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
               overflow: 'hidden',
               marginBottom: '2rem'
             }}>
-              <div style={{ 
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', 
-                color: 'white', 
-                padding: '1.5rem' 
+              <div style={{
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                color: 'white',
+                padding: '1.5rem'
               }}>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
                   📝 步骤 1: 准备视频文案
@@ -1065,7 +1075,7 @@ export default function DigitalHumanVideoComplete3() {
                     }}
                   />
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   <button
                     onClick={handleImportCopywriting}
@@ -1124,16 +1134,16 @@ export default function DigitalHumanVideoComplete3() {
 
             {/* 数字人训练 */}
             {currentStep === 2 && (
-              <div style={{ 
-                backgroundColor: 'white', 
-                borderRadius: '1rem', 
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '1rem',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
                 overflow: 'hidden'
               }}>
-                <div style={{ 
-                  background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', 
-                  color: 'white', 
-                  padding: '1.5rem' 
+                <div style={{
+                  background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                  color: 'white',
+                  padding: '1.5rem'
                 }}>
                   <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
                     👤 步骤 2: 训练数字人
@@ -1274,10 +1284,10 @@ export default function DigitalHumanVideoComplete3() {
                       <div style={{ fontWeight: '600', fontSize: '1.2rem', marginBottom: '1rem' }}>
                         {trainingStatus.message}
                       </div>
-                      <div style={{ 
-                        width: '100%', 
-                        backgroundColor: '#e5e7eb', 
-                        borderRadius: '1rem', 
+                      <div style={{
+                        width: '100%',
+                        backgroundColor: '#e5e7eb',
+                        borderRadius: '1rem',
                         overflow: 'hidden',
                         marginBottom: '1rem'
                       }}>
@@ -1343,7 +1353,7 @@ export default function DigitalHumanVideoComplete3() {
                       >
                         重新训练
                       </button>
-                      
+
                     </div>
                   )}
 
@@ -1356,8 +1366,8 @@ export default function DigitalHumanVideoComplete3() {
                         style={{
                           padding: '1rem 2rem',
                           border: 'none',
-                          background: trainingData.name && trainingData.videoFile 
-                            ? 'linear-gradient(135deg, #8b5cf6, #ec4899)' 
+                          background: trainingData.name && trainingData.videoFile
+                            ? 'linear-gradient(135deg, #8b5cf6, #ec4899)'
                             : '#d1d5db',
                           color: 'white',
                           borderRadius: '0.5rem',
@@ -1376,17 +1386,17 @@ export default function DigitalHumanVideoComplete3() {
 
             {/* 生成视频步骤 */}
             {currentStep >= 3 && (
-              <div style={{ 
-                backgroundColor: 'white', 
-                borderRadius: '1rem', 
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '1rem',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
                 overflow: 'hidden',
                 marginTop: '2rem'
               }}>
-                <div style={{ 
-                  background: 'linear-gradient(135deg, #ec4899, #f59e0b)', 
-                  color: 'white', 
-                  padding: '1.5rem' 
+                <div style={{
+                  background: 'linear-gradient(135deg, #ec4899, #f59e0b)',
+                  color: 'white',
+                  padding: '1.5rem'
                 }}>
                   <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
                     🎬 步骤 3: 生成视频
@@ -1399,9 +1409,9 @@ export default function DigitalHumanVideoComplete3() {
                         请选择要使用的数字人：
                       </h4>
                       {digitalHumans.length === 0 ? (
-                        <div style={{ 
-                          padding: '2rem', 
-                          backgroundColor: '#f3f4f6', 
+                        <div style={{
+                          padding: '2rem',
+                          backgroundColor: '#f3f4f6',
                           borderRadius: '0.5rem',
                           textAlign: 'center'
                         }}>
@@ -1427,7 +1437,7 @@ export default function DigitalHumanVideoComplete3() {
                       ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
                           {digitalHumans.map((dh) => (
-                            <div 
+                            <div
                               key={dh.trainingId}
                               onClick={() => setSelectedDigitalHuman(dh.trainingId)}
                               style={{
@@ -1495,8 +1505,8 @@ export default function DigitalHumanVideoComplete3() {
                           borderRadius: '0.5rem',
                           padding: '1rem'
                         }}>
-                          <div style={{ 
-                            fontWeight: '600', 
+                          <div style={{
+                            fontWeight: '600',
                             marginBottom: '0.5rem',
                             color: '#374151',
                             display: 'flex',
@@ -1504,8 +1514,8 @@ export default function DigitalHumanVideoComplete3() {
                             gap: '0.5rem'
                           }}>
                             📝 视频文案内容
-                            <span style={{ 
-                              fontSize: '0.8rem', 
+                            <span style={{
+                              fontSize: '0.8rem',
                               color: '#6b7280',
                               fontWeight: 'normal'
                             }}>
@@ -1526,15 +1536,15 @@ export default function DigitalHumanVideoComplete3() {
                       )}
 
                       {/* 视频参数设置 */}
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                        gap: '1rem' 
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '1rem'
                       }}>
                         <div>
-                          <label style={{ 
-                            display: 'block', 
-                            fontWeight: '600', 
+                          <label style={{
+                            display: 'block',
+                            fontWeight: '600',
                             marginBottom: '0.5rem',
                             color: '#374151'
                           }}>
@@ -1560,9 +1570,9 @@ export default function DigitalHumanVideoComplete3() {
                         </div>
 
                         <div>
-                          <label style={{ 
-                            display: 'block', 
-                            fontWeight: '600', 
+                          <label style={{
+                            display: 'block',
+                            fontWeight: '600',
                             marginBottom: '0.5rem',
                             color: '#374151'
                           }}>
@@ -1588,9 +1598,9 @@ export default function DigitalHumanVideoComplete3() {
                         </div>
 
                         <div>
-                          <label style={{ 
-                            display: 'block', 
-                            fontWeight: '600', 
+                          <label style={{
+                            display: 'block',
+                            fontWeight: '600',
                             marginBottom: '0.5rem',
                             color: '#374151'
                           }}>
@@ -1651,17 +1661,17 @@ export default function DigitalHumanVideoComplete3() {
                   ) : videoGeneration.status === 'generating' ? (
                     <div style={{ textAlign: 'center', padding: '2rem' }}>
                       <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎬</div>
-                      <div style={{ 
-                        fontWeight: '600', 
-                        fontSize: '1.2rem', 
-                        marginBottom: '1rem' 
+                      <div style={{
+                        fontWeight: '600',
+                        fontSize: '1.2rem',
+                        marginBottom: '1rem'
                       }}>
                         {videoGeneration.message}
                       </div>
-                      <div style={{ 
-                        width: '100%', 
-                        backgroundColor: '#e5e7eb', 
-                        borderRadius: '1rem', 
+                      <div style={{
+                        width: '100%',
+                        backgroundColor: '#e5e7eb',
+                        borderRadius: '1rem',
                         overflow: 'hidden',
                         marginBottom: '1rem'
                       }}>
@@ -1679,20 +1689,20 @@ export default function DigitalHumanVideoComplete3() {
                   ) : videoGeneration.status === 'completed' ? (
                     <div style={{ textAlign: 'center', padding: '2rem' }}>
                       <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
-                      <div style={{ 
-                        fontWeight: '600', 
-                        fontSize: '1.2rem', 
+                      <div style={{
+                        fontWeight: '600',
+                        fontSize: '1.2rem',
                         marginBottom: '2rem',
                         color: '#10b981'
                       }}>
                         视频生成完成！
                       </div>
-                      
+
                       {videoGeneration.videoUrl && (
                         <div style={{ marginBottom: '2rem' }}>
-                          <video 
-                            src={videoGeneration.videoUrl} 
-                            controls 
+                          <video
+                            src={videoGeneration.videoUrl}
+                            controls
                             style={{
                               width: '100%',
                               maxWidth: '600px',
@@ -1702,8 +1712,8 @@ export default function DigitalHumanVideoComplete3() {
                           />
                         </div>
                       )}
-                      
-                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+
+                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => {
                             if (videoGeneration.videoUrl) {
@@ -1725,6 +1735,44 @@ export default function DigitalHumanVideoComplete3() {
                           }}
                         >
                           📥 下载视频
+                        </button>
+                        {/* 🚀 发布到小红书按钮 */}
+                        <button
+                          onClick={async () => {
+                            if (!hasExtension) {
+                              const install = window.confirm(
+                                '未检测到 Prome 助手插件。\n\n需要安装插件才能自动发布内容。\n\n点击「确定」下载插件。'
+                              );
+                              if (install) {
+                                downloadExtension();
+                              }
+                              return;
+                            }
+
+                            // 打开视频发布页面
+                            openPublishPage('video');
+
+                            // 发布视频
+                            await confirmAndPublish({
+                              title: '数字人视频',
+                              content: videoScript || '',
+                              video: videoGeneration.videoUrl
+                            });
+                          }}
+                          disabled={isPublishing}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: isPublishing ? '#fca5a5' : '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            cursor: isPublishing ? 'not-allowed' : 'pointer',
+                            opacity: isPublishing ? 0.7 : 1
+                          }}
+                        >
+                          {isPublishing ? '发布中...' : '🚀 发布到小红书'}
                         </button>
                         <button
                           onClick={() => {
@@ -1753,34 +1801,34 @@ export default function DigitalHumanVideoComplete3() {
                   ) : (
                     <div style={{ textAlign: 'center', padding: '2rem' }}>
                       <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>❌</div>
-                      <div style={{ 
-                        fontWeight: '600', 
-                        fontSize: '1.2rem', 
+                      <div style={{
+                        fontWeight: '600',
+                        fontSize: '1.2rem',
                         marginBottom: '1rem',
                         color: '#ef4444'
                       }}>
                         {videoGeneration.message}
                       </div>
-                      
+
                       {/* 显示手动步骤 */}
                       {videoGeneration.manualSteps && (
-                        <div style={{ 
-                          textAlign: 'left', 
+                        <div style={{
+                          textAlign: 'left',
                           margin: '1.5rem 0',
                           padding: '1rem',
                           backgroundColor: '#f9fafb',
                           borderRadius: '0.5rem',
                           border: '1px solid #e5e7eb'
                         }}>
-                          <div style={{ 
-                            fontWeight: '600', 
+                          <div style={{
+                            fontWeight: '600',
                             marginBottom: '0.5rem',
                             color: '#374151'
                           }}>
                             请按以下步骤操作：
                           </div>
                           {videoGeneration.manualSteps.map((step, index) => (
-                            <div key={index} style={{ 
+                            <div key={index} style={{
                               marginBottom: '0.25rem',
                               color: '#6b7280',
                               fontSize: '0.9rem'
@@ -1790,7 +1838,7 @@ export default function DigitalHumanVideoComplete3() {
                           ))}
                         </div>
                       )}
-                      
+
                       <button
                         onClick={() => {
                           setVideoGeneration({
@@ -1821,9 +1869,9 @@ export default function DigitalHumanVideoComplete3() {
 
           {/* 侧边栏 */}
           <div>
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '1rem', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '1rem',
               boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
               overflow: 'hidden'
             }}>
@@ -1835,7 +1883,7 @@ export default function DigitalHumanVideoComplete3() {
               <div style={{ padding: '1.5rem' }}>
                 {copywritingContent ? (
                   <div>
-                    <div style={{ 
+                    <div style={{
                       display: 'inline-block',
                       padding: '0.25rem 0.75rem',
                       backgroundColor: '#e0e7ff',
@@ -1860,7 +1908,7 @@ export default function DigitalHumanVideoComplete3() {
                       {copywritingContent.substring(0, 200)}
                       {copywritingContent.length > 200 && '...'}
                     </div>
-                    <button 
+                    <button
                       onClick={handleImportCopywriting}
                       style={{
                         width: '100%',
@@ -1890,9 +1938,9 @@ export default function DigitalHumanVideoComplete3() {
 
             {/* 训练状态侧边栏 */}
             {currentStep >= 2 && trainingStatus.trainingId && (
-              <div style={{ 
-                backgroundColor: 'white', 
-                borderRadius: '1rem', 
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '1rem',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
                 overflow: 'hidden',
                 marginTop: '1.5rem'
@@ -1905,10 +1953,10 @@ export default function DigitalHumanVideoComplete3() {
                 <div style={{ padding: '1.5rem' }}>
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem' }}>训练ID</div>
-                    <div style={{ 
-                      fontSize: '0.8rem', 
-                      fontFamily: 'monospace', 
-                      backgroundColor: '#f3f4f6', 
+                    <div style={{
+                      fontSize: '0.8rem',
+                      fontFamily: 'monospace',
+                      backgroundColor: '#f3f4f6',
                       padding: '0.5rem',
                       borderRadius: '0.25rem',
                       wordBreak: 'break-all'
@@ -1933,8 +1981,8 @@ export default function DigitalHumanVideoComplete3() {
                       backgroundColor: trainingStatus.status === 'completed' ? '#dcfce7' : '#fef3c7',
                       color: trainingStatus.status === 'completed' ? '#16a34a' : '#d97706'
                     }}>
-                      {trainingStatus.status === 'completed' ? '训练完成' : 
-                       trainingStatus.status === 'training' ? '训练中' : '处理中'}
+                      {trainingStatus.status === 'completed' ? '训练完成' :
+                        trainingStatus.status === 'training' ? '训练中' : '处理中'}
                     </div>
                   </div>
                 </div>
@@ -1942,9 +1990,9 @@ export default function DigitalHumanVideoComplete3() {
             )}
 
             {/* 已训练数字人列表 */}
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '1rem', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '1rem',
               boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
               overflow: 'hidden',
               marginTop: '1.5rem'
@@ -1966,7 +2014,7 @@ export default function DigitalHumanVideoComplete3() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {digitalHumans.map((dh) => (
-                      <div 
+                      <div
                         key={dh.trainingId}
                         onClick={() => setSelectedDigitalHuman(dh.trainingId)}
                         style={{
@@ -1991,7 +2039,7 @@ export default function DigitalHumanVideoComplete3() {
                               fontSize: '1.5rem',
                               overflow: 'hidden'
                             }}>
-                              <video 
+                              <video
                                 src={`/api/video-proxy?url=${encodeURIComponent(dh.previewUrl)}`}
                                 style={{
                                   width: '60px',
@@ -2044,10 +2092,10 @@ export default function DigitalHumanVideoComplete3() {
                             </div>
                           )}
                         </div>
-                        
+
                         {selectedDigitalHuman === dh.trainingId && dh.previewUrl && (
-                          <div style={{ 
-                            marginTop: '1rem', 
+                          <div style={{
+                            marginTop: '1rem',
                             padding: '0.5rem',
                             backgroundColor: '#f9fafb',
                             borderRadius: '0.25rem'
@@ -2055,7 +2103,7 @@ export default function DigitalHumanVideoComplete3() {
                             <div style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.5rem' }}>
                               预览效果
                             </div>
-                            <video 
+                            <video
                               src={`/api/video-proxy?url=${encodeURIComponent(dh.previewUrl)}`}
                               controls
                               preload="metadata"
@@ -2078,12 +2126,12 @@ export default function DigitalHumanVideoComplete3() {
                             >
                               您的浏览器不支持视频播放
                             </video>
-                            
+
                             {/* 生成视频按钮 - 声音已自动克隆 */}
                             <div style={{ marginTop: '0.75rem' }}>
-                              <div style={{ 
-                                fontSize: '0.7rem', 
-                                color: '#6b7280', 
+                              <div style={{
+                                fontSize: '0.7rem',
+                                color: '#6b7280',
                                 marginBottom: '0.5rem',
                                 textAlign: 'center'
                               }}>
@@ -2111,7 +2159,7 @@ export default function DigitalHumanVideoComplete3() {
                             </div>
                           </div>
                         )}
-                        
+
                         {/* 调试按钮 */}
                         <div style={{ marginTop: '0.5rem' }}>
                           <button
@@ -2136,7 +2184,7 @@ export default function DigitalHumanVideoComplete3() {
                         </div>
                       </div>
                     ))}
-                    
+
                   </div>
                 )}
               </div>
