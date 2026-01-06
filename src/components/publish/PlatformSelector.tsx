@@ -133,14 +133,14 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
 
         setPublishStatus(prev => ({ ...prev, xiaohongshu: 'publishing' }));
 
-        // 构建发布数据
+        // 构建发布数据 - 🔥 字段名必须与 content.js executePublish 期望的一致
         const publishData = {
+            taskId: Date.now().toString(),  // content.js 需要 taskId
             title: content.title,
             content: content.content || '',
-            imageUrls: content.images || [],
-            hashtags: content.tags || [],
-            publishType: content.video ? 'video' : 'image',
-            videoUrl: content.video || null
+            images: content.images || [],   // content.js 期望 images 而非 imageUrls
+            tags: content.tags || [],       // content.js 期望 tags 而非 hashtags
+            video: content.video || null,   // content.js 期望 video 而非 videoUrl
         };
 
         console.log('[PlatformSelector] Sending publish task to extension:', publishData);
