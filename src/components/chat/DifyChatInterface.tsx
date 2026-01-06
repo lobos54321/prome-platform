@@ -3541,279 +3541,279 @@ export function DifyChatInterface({
                           // 尝试从内容中提取标题（通常在开头）
                           const titleMatch = content.match(/[【「]([^】」]+)[】」]/) ||
                             content.match(/^#\s*(.+?)\n/) ||
-                            content.match(/标题[：:]/s + (.+?)\n/);
-                      const title = titleMatch ? titleMatch[1].trim().substring(0, 20) : '小红书笔记';
+                            content.match(/标题[：:](.+?)\n/);
+                          const title = titleMatch ? titleMatch[1].trim().substring(0, 20) : '小红书笔记';
 
-                      // 提取话题标签
-                      const tags = content.match(/#[^#\s]+/g) || [];
+                          // 提取话题标签
+                          const tags = content.match(/#[^#\s]+/g) || [];
 
-                      console.log('[Publish] Preparing to publish:', {title, contentLength: content.length, tags });
+                          console.log('[Publish] Preparing to publish:', { title, contentLength: content.length, tags });
 
-                      // 调用发布 hook
-                      window.dispatchEvent(new CustomEvent('xhs-publish-request', {
-                        detail: {title, content, tags}
+                          // 调用发布 hook
+                          window.dispatchEvent(new CustomEvent('xhs-publish-request', {
+                            detail: { title, content, tags }
                           }));
                         }}
-                      disabled={isLoading}
-                      className="inline-flex items-center gap-1 text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
+                        disabled={isLoading}
+                        className="inline-flex items-center gap-1 text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
                       >
-                      <Globe className="w-3 h-3" />
-                      发布到小红书
-                    </button>
+                        <Globe className="w-3 h-3" />
+                        发布到小红书
+                      </button>
                     </div>
-              )}
+                  )}
 
-              {/* New conversation button for explanation messages */}
-              {message.metadata?.showNewConversationButton && (
-                <div className="mt-2">
-                  <button
-                    onClick={handleNewConversation}
-                    disabled={isLoading}
-                    className="inline-flex items-center gap-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    新对话
-                  </button>
+                  {/* New conversation button for explanation messages */}
+                  {message.metadata?.showNewConversationButton && (
+                    <div className="mt-2">
+                      <button
+                        onClick={handleNewConversation}
+                        disabled={isLoading}
+                        className="inline-flex items-center gap-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-all disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        新对话
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-              )}
-          </div>
-            
+
             {
-            message.role === 'user' && (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                <User className="w-5 h-5 text-gray-600" />
-              </div>
-            )
-          }
+              message.role === 'user' && (
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                  <User className="w-5 h-5 text-gray-600" />
+                </div>
+              )
+            }
           </div>
         ))}
 
-      {/* Loading Indicator */}
-      {isLoading && (
-        <div className="flex gap-3 justify-start">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Bot className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="bg-gray-100 rounded-lg px-4 py-3 max-w-[70%]">
-            <div className="flex items-center gap-2 mb-2">
-              <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
-              <span className="text-gray-600">
-                {showWorkflowProgress ? '处理复杂工作流中，请耐心等待...' : 'AI思考中...'}
-              </span>
-              {retryCount > 0 && (
-                <span className="text-xs text-orange-600">
-                  (重试 {retryCount}/3)
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="flex gap-3 justify-start">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+              <Bot className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="bg-gray-100 rounded-lg px-4 py-3 max-w-[70%]">
+              <div className="flex items-center gap-2 mb-2">
+                <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+                <span className="text-gray-600">
+                  {showWorkflowProgress ? '处理复杂工作流中，请耐心等待...' : 'AI思考中...'}
                 </span>
+                {retryCount > 0 && (
+                  <span className="text-xs text-orange-600">
+                    (重试 {retryCount}/3)
+                  </span>
+                )}
+              </div>
+
+              {/* 工作流进度显示 */}
+              {showWorkflowProgress && workflowState.isWorkflow && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs text-gray-500 mb-2 flex justify-between items-center">
+                    <span>工作流执行进度</span>
+                    <span className="font-medium">
+                      {workflowState.completedNodes}/{workflowState.totalNodes || workflowState.nodes.length} 个节点已完成
+                    </span>
+                  </div>
+
+                  {/* 进度条 */}
+                  {workflowState.nodes.length > 0 && (
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${((workflowState.totalNodes || workflowState.nodes.length) > 0)
+                            ? (workflowState.completedNodes / (workflowState.totalNodes || workflowState.nodes.length)) * 100
+                            : 0}%`
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* 节点状态列表 - 增强显示 */}
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {workflowState.nodes.map((node) => {
+                      const NodeIcon = getNodeIcon(node.nodeType);
+                      return (
+                        <div
+                          key={node.nodeId}
+                          className={cn(
+                            "flex items-center gap-3 text-xs p-2 rounded-lg transition-all duration-200",
+                            node.status === 'running' && "bg-blue-50 border border-blue-200 shadow-sm",
+                            node.status === 'completed' && "bg-green-50 border border-green-200 shadow-sm",
+                            node.status === 'failed' && "bg-red-50 border border-red-200 shadow-sm",
+                            node.status === 'waiting' && "bg-gray-50 border border-gray-100"
+                          )}
+                        >
+                          {/* 节点类型图标 */}
+                          <div className="flex-shrink-0">
+                            <NodeIcon className={cn(
+                              "w-4 h-4",
+                              node.status === 'running' && "text-blue-600",
+                              node.status === 'completed' && "text-green-600",
+                              node.status === 'failed' && "text-red-600",
+                              node.status === 'waiting' && "text-gray-400"
+                            )} />
+                          </div>
+
+                          {/* 状态图标 */}
+                          <div className="flex-shrink-0">
+                            {node.status === 'waiting' && <Clock className="w-3 h-3 text-gray-400" />}
+                            {node.status === 'running' && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+                            {node.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
+                            {node.status === 'failed' && <AlertCircle className="w-3 h-3 text-red-600" />}
+                          </div>
+
+                          {/* 节点信息 */}
+                          <div className="flex-1 min-w-0">
+                            <div className={cn(
+                              "font-medium truncate",
+                              node.status === 'running' && "text-blue-700",
+                              node.status === 'completed' && "text-green-700",
+                              node.status === 'failed' && "text-red-700",
+                              node.status === 'waiting' && "text-gray-600"
+                            )}>
+                              {node.nodeTitle || node.nodeName}
+                            </div>
+                            {node.nodeType && (
+                              <div className="text-gray-500 text-xs truncate">
+                                {node.nodeType}
+                              </div>
+                            )}
+                            {node.error && (
+                              <div className="text-red-600 text-xs mt-1 truncate">
+                                错误: {node.error}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 执行时间 */}
+                          {node.status === 'running' && node.startTime && (
+                            <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
+                              {Math.floor((Date.now() - node.startTime.getTime()) / 1000)}s
+                            </div>
+                          )}
+                          {node.status === 'completed' && node.startTime && node.endTime && (
+                            <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
+                              {Math.floor((node.endTime.getTime() - node.startTime.getTime()) / 1000)}s
+                            </div>
+                          )}
+
+                          {/* 正在运行的动态指示器 */}
+                          {node.status === 'running' && (
+                            <div className="flex-shrink-0">
+                              <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
+          </div>
+        )}
 
-            {/* 工作流进度显示 */}
-            {showWorkflowProgress && workflowState.isWorkflow && (
-              <div className="mt-3 space-y-2">
-                <div className="text-xs text-gray-500 mb-2 flex justify-between items-center">
-                  <span>工作流执行进度</span>
-                  <span className="font-medium">
-                    {workflowState.completedNodes}/{workflowState.totalNodes || workflowState.nodes.length} 个节点已完成
-                  </span>
-                </div>
-
-                {/* 进度条 */}
-                {workflowState.nodes.length > 0 && (
-                  <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${((workflowState.totalNodes || workflowState.nodes.length) > 0)
-                          ? (workflowState.completedNodes / (workflowState.totalNodes || workflowState.nodes.length)) * 100
-                          : 0}%`
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* 节点状态列表 - 增强显示 */}
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {workflowState.nodes.map((node) => {
-                    const NodeIcon = getNodeIcon(node.nodeType);
-                    return (
-                      <div
-                        key={node.nodeId}
-                        className={cn(
-                          "flex items-center gap-3 text-xs p-2 rounded-lg transition-all duration-200",
-                          node.status === 'running' && "bg-blue-50 border border-blue-200 shadow-sm",
-                          node.status === 'completed' && "bg-green-50 border border-green-200 shadow-sm",
-                          node.status === 'failed' && "bg-red-50 border border-red-200 shadow-sm",
-                          node.status === 'waiting' && "bg-gray-50 border border-gray-100"
-                        )}
-                      >
-                        {/* 节点类型图标 */}
-                        <div className="flex-shrink-0">
-                          <NodeIcon className={cn(
-                            "w-4 h-4",
-                            node.status === 'running' && "text-blue-600",
-                            node.status === 'completed' && "text-green-600",
-                            node.status === 'failed' && "text-red-600",
-                            node.status === 'waiting' && "text-gray-400"
-                          )} />
-                        </div>
-
-                        {/* 状态图标 */}
-                        <div className="flex-shrink-0">
-                          {node.status === 'waiting' && <Clock className="w-3 h-3 text-gray-400" />}
-                          {node.status === 'running' && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
-                          {node.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
-                          {node.status === 'failed' && <AlertCircle className="w-3 h-3 text-red-600" />}
-                        </div>
-
-                        {/* 节点信息 */}
-                        <div className="flex-1 min-w-0">
-                          <div className={cn(
-                            "font-medium truncate",
-                            node.status === 'running' && "text-blue-700",
-                            node.status === 'completed' && "text-green-700",
-                            node.status === 'failed' && "text-red-700",
-                            node.status === 'waiting' && "text-gray-600"
-                          )}>
-                            {node.nodeTitle || node.nodeName}
-                          </div>
-                          {node.nodeType && (
-                            <div className="text-gray-500 text-xs truncate">
-                              {node.nodeType}
-                            </div>
-                          )}
-                          {node.error && (
-                            <div className="text-red-600 text-xs mt-1 truncate">
-                              错误: {node.error}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* 执行时间 */}
-                        {node.status === 'running' && node.startTime && (
-                          <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
-                            {Math.floor((Date.now() - node.startTime.getTime()) / 1000)}s
-                          </div>
-                        )}
-                        {node.status === 'completed' && node.startTime && node.endTime && (
-                          <div className="text-gray-500 text-xs bg-white/50 px-1 py-0.5 rounded">
-                            {Math.floor((node.endTime.getTime() - node.startTime.getTime()) / 1000)}s
-                          </div>
-                        )}
-
-                        {/* 正在运行的动态指示器 */}
-                        {node.status === 'running' && (
-                          <div className="flex-shrink-0">
-                            <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+        {/* Enhanced Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <div className="flex items-start gap-2 mb-3">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">发生错误</p>
+                <p className="text-sm">{error}</p>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          <div className="flex items-start gap-2 mb-3">
-            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium mb-1">发生错误</p>
-              <p className="text-sm">{error}</p>
             </div>
-          </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 flex-wrap">
-            {enableRetry && (
+            {/* Action buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {enableRetry && (
+                <button
+                  onClick={handleRetry}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded transition-all disabled:opacity-50"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  重试发送
+                </button>
+              )}
+
               <button
-                onClick={handleRetry}
+                onClick={handleNewConversation}
                 disabled={isLoading}
-                className="inline-flex items-center gap-1 text-xs bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all disabled:opacity-50 shadow-sm hover:shadow-md"
               >
-                <RotateCcw className="w-3 h-3" />
-                重试发送
+                <RotateCcw className="w-4 h-4" />
+                新对话
               </button>
-            )}
 
-            <button
-              onClick={handleNewConversation}
-              disabled={isLoading}
-              className="inline-flex items-center gap-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all disabled:opacity-50 shadow-sm hover:shadow-md"
-            >
-              <RotateCcw className="w-4 h-4" />
-              新对话
-            </button>
+              {process.env.NODE_ENV === 'development' && (
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).debugChat) {
+                      (window as any).debugChat.debugWorkflowStatus();
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
+                >
+                  🔧 调试信息
+                </button>
+              )}
 
-            {process.env.NODE_ENV === 'development' && (
               <button
-                onClick={() => {
-                  if (typeof window !== 'undefined' && (window as any).debugChat) {
-                    (window as any).debugChat.debugWorkflowStatus();
-                  }
-                }}
+                onClick={() => setError(null)}
                 className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
               >
-                🔧 调试信息
+                ✕ 关闭
               </button>
-            )}
-
-            <button
-              onClick={() => setError(null)}
-              className="inline-flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded transition-all"
-            >
-              ✕ 关闭
-            </button>
+            </div>
           </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Form */}
+      <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            disabled={isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
+            className={cn(
+              "px-4 py-2.5 rounded-lg font-medium transition-all",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              !input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()
+                ? "bg-gray-300 text-gray-500"
+                : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+            )}
+          >
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
+          </button>
         </div>
-      )}
 
-      <div ref={messagesEndRef} />
-    </div>
-
-      {/* Input Form */ }
-  <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50">
-    <div className="flex gap-2">
-      <input
-        ref={inputRef}
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-        disabled={isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
-      />
-      <button
-        type="submit"
-        disabled={!input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()}
-        className={cn(
-          "px-4 py-2.5 rounded-lg font-medium transition-all",
-          "disabled:opacity-50 disabled:cursor-not-allowed",
-          !input.trim() || isLoading || !isUserIdReady || isWaitingForStrategyConfirmation()
-            ? "bg-gray-300 text-gray-500"
-            : "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
-        )}
-      >
-        {isLoading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          <Send className="w-5 h-5" />
-        )}
-      </button>
-    </div>
-
-    {/* Character count */}
-    <div className="mt-2 text-xs text-gray-500 text-right">
-      {input.length} / 2000 characters
-    </div>
-  </form>
+        {/* Character count */}
+        <div className="mt-2 text-xs text-gray-500 text-right">
+          {input.length} / 2000 characters
+        </div>
+      </form>
 
     </div >
   );
