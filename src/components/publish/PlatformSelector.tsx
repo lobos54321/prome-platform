@@ -5,7 +5,6 @@
  */
 
 import React, { useState } from 'react';
-import { useXiaohongshuPublish } from '../../hooks/useXiaohongshuPublish';
 import { publishApi } from '../../lib/publishApi';
 
 // 海外平台配置
@@ -73,22 +72,6 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
     const [publishStatus, setPublishStatus] = useState<Record<string, Platform['status']>>({});
     const [isPublishing, setIsPublishing] = useState(false);
 
-    // 小红书发布 Hook
-    const {
-        hasExtension,
-        confirmAndPublish: publishToXiaohongshu,
-        downloadExtension,
-        openPublishPage
-    } = useXiaohongshuPublish({
-        onSuccess: (result) => {
-            setPublishStatus(prev => ({ ...prev, xiaohongshu: 'completed' }));
-            onPublishComplete?.('xiaohongshu', result);
-        },
-        onError: () => {
-            setPublishStatus(prev => ({ ...prev, xiaohongshu: 'failed' }));
-        }
-    });
-
     const togglePlatform = (platformId: string) => {
         const platform = PLATFORMS.find(p => p.id === platformId);
         if (!platform?.enabled) return;
@@ -98,6 +81,92 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                 ? prev.filter(id => id !== platformId)
                 : [...prev, platformId]
         );
+    };
+
+    // 🔥 小红书发布 - 直接与插件通信
+    const publishToXiaohongshu = async () => {
+        // 检查插件是否安装
+        const extensionMarker = document.getElementById('prome-extension-installed');
+        if (!extensionMarker) {
+            alert('❌ 未检测到 Prome 助手插件！\n\n请确保已安装插件并刷新页面。\n\n如需安装，请在 Chrome 扩展商店搜索 "Prome 助手"。');
+            return false;
+        }
+
+        if (!window.confirm('确认发布此内容到小红书？\n\n将通过浏览器插件自动发布。')) {
+            return false;
+        }
+
+        setPublishStatus(prev => ({ ...prev, xiaohongshu: 'publishing' }));
+
+        // 构建发布数据
+        const publishData = {
+            title: content.title,
+            content: content.content || '',
+            imageUrls: content.images || [],
+            hashtags: content.tags || [],
+            publishType: content.video ? 'video' : 'image',
+            videoUrl: content.video || null
+        };
+
+        console.log('[PlatformSelector] Sending publish task to extension:', publishData);
+
+        // 设置监听器等待插件响应
+        const publishPromise = new Promise<{ success: boolean; message: string }>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                window.removeEventListener('message', handleResponse);
+                reject(new Error('插件响应超时（5分钟），请确保插件已启用'));
+            }, 300000);
+
+            const handleResponse = (event: MessageEvent) => {
+                if (event.source !== window) return;
+
+                if (event.data.type === 'PROME_PUBLISH_ACKNOWLEDGED') {
+                    console.log('[PlatformSelector] Extension acknowledged:', event.data);
+                }
+
+                if (event.data.type === 'PROME_PUBLISH_RESULT') {
+                    console.log('[PlatformSelector] Received publish result:', event.data);
+                    clearTimeout(timeout);
+                    window.removeEventListener('message', handleResponse);
+                    resolve(event.data);
+                }
+            };
+
+            window.addEventListener('message', handleResponse);
+        });
+
+        // 发送发布任务到插件
+        window.postMessage({
+            type: 'PROME_PUBLISH_TASK',
+            data: publishData
+        }, '*');
+
+        alert(
+            `📝 发布任务已发送到插件！\n\n` +
+            `插件将自动：\n` +
+            `1. 打开小红书发布页面\n` +
+            `2. 填写内容并发布\n\n` +
+            `请保持浏览器窗口打开。`
+        );
+
+        try {
+            const result = await publishPromise;
+            if (result.success) {
+                setPublishStatus(prev => ({ ...prev, xiaohongshu: 'completed' }));
+                onPublishComplete?.('xiaohongshu', result);
+                alert('✅ 发布成功！');
+                return true;
+            } else {
+                setPublishStatus(prev => ({ ...prev, xiaohongshu: 'failed' }));
+                alert(`❌ 发布失败：${result.message || '未知错误'}`);
+                return false;
+            }
+        } catch (error: any) {
+            console.error('[PlatformSelector] Publish error:', error);
+            setPublishStatus(prev => ({ ...prev, xiaohongshu: 'failed' }));
+            alert(`❌ 发布失败：${error.message}`);
+            return false;
+        }
     };
 
     const handlePublish = async () => {
@@ -112,39 +181,15 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
             const platform = PLATFORMS.find(p => p.id === platformId);
             if (!platform) continue;
 
-            setPublishStatus(prev => ({ ...prev, [platformId]: 'publishing' }));
-
             if (platformId === 'xiaohongshu') {
-                // 检查插件
-                if (!hasExtension) {
-                    const install = window.confirm(
-                        '未检测到 Prome 助手插件。\n\n需要安装插件才能自动发布内容。\n\n点击「确定」下载插件。'
-                    );
-                    if (install) {
-                        downloadExtension();
-                    }
-                    setPublishStatus(prev => ({ ...prev, xiaohongshu: 'failed' }));
-                    continue;
-                }
-
-                // 打开发布页面
-                openPublishPage(content.video ? 'video' : 'image');
-
-                // 发布
-                await publishToXiaohongshu({
-                    title: content.title,
-                    content: content.content,
-                    images: content.images,
-                    video: content.video,
-                    tags: content.tags
-                });
+                await publishToXiaohongshu();
             } else {
                 // Skyvern 发布
                 try {
                     console.log(`[Skyvern] Publishing to ${platformId}`);
+                    setPublishStatus(prev => ({ ...prev, [platformId]: 'publishing' }));
                     const result = await publishApi.publishViaSkyvern(platformId);
                     if (result.success) {
-                        setPublishStatus(prev => ({ ...prev, [platformId]: 'publishing' }));
                         // 轮询状态
                         const checkStatus = async () => {
                             const status = await publishApi.checkSkyvernStatus(platformId);
