@@ -2,10 +2,14 @@
  * PlatformSelector - 多平台发布选择组件
  * 
  * 在内容入库后显示，允许用户选择目标发布平台
+ * 包含 Chrome 浏览器检测和插件安装引导流程
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { publishApi } from '../../lib/publishApi';
+
+// 插件下载地址
+const EXTENSION_DOWNLOAD_URL = '/prome-extension.zip';
 
 // 海外平台配置
 export interface Platform {
@@ -71,6 +75,37 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
     const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['xiaohongshu']);
     const [publishStatus, setPublishStatus] = useState<Record<string, Platform['status']>>({});
     const [isPublishing, setIsPublishing] = useState(false);
+
+    // 🔥 Chrome 和插件检测状态
+    const [isChrome, setIsChrome] = useState(false);
+    const [hasExtension, setHasExtension] = useState(false);
+    const [checkingExtension, setCheckingExtension] = useState(true);
+
+    // 检测 Chrome 浏览器和插件
+    useEffect(() => {
+        // 检测是否是 Chrome
+        const isChromeBrowser = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+        setIsChrome(isChromeBrowser);
+
+        // 检测插件是否安装（插件会在页面注入标记元素）
+        const checkExtension = () => {
+            const marker = document.getElementById('prome-extension-installed');
+            setHasExtension(!!marker);
+            setCheckingExtension(false);
+        };
+
+        // 初始检测
+        setTimeout(checkExtension, 500);
+
+        // 持续检测（用户可能安装后刷新）
+        const interval = setInterval(checkExtension, 2000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // 下载插件
+    const downloadExtension = () => {
+        window.open(EXTENSION_DOWNLOAD_URL, '_blank');
+    };
 
     const togglePlatform = (platformId: string) => {
         const platform = PLATFORMS.find(p => p.id === platformId);
@@ -242,6 +277,147 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
             }}>
                 🚀 发布到平台
             </h4>
+
+            {/* 🔥 Chrome/插件安装引导 */}
+            {checkingExtension ? (
+                <div style={{
+                    padding: '1rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.5rem',
+                    textAlign: 'center',
+                    marginBottom: '1rem'
+                }}>
+                    <span style={{ color: '#6b7280' }}>⏳ 正在检测插件...</span>
+                </div>
+            ) : !isChrome ? (
+                /* 不是 Chrome 浏览器 - 显示下载 Chrome 提示 */
+                <div style={{
+                    padding: '1rem',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '0.5rem',
+                    marginBottom: '1rem'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                        <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                        <div style={{ flex: 1 }}>
+                            <h5 style={{ fontWeight: '600', color: '#991b1b', marginBottom: '0.5rem' }}>
+                                请使用 Chrome 浏览器
+                            </h5>
+                            <p style={{ fontSize: '0.875rem', color: '#7f1d1d', marginBottom: '0.75rem' }}>
+                                小红书发布功能需要使用 Chrome 浏览器配合 Prome 助手插件。
+                            </p>
+                            <button
+                                onClick={() => window.open('https://www.google.com/chrome/', '_blank')}
+                                style={{
+                                    padding: '0.5rem 1rem',
+                                    backgroundColor: '#4285f4',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '0.375rem',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}
+                            >
+                                🌐 下载 Chrome 浏览器
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : !hasExtension ? (
+                /* Chrome 浏览器但未安装插件 - 显示安装插件提示 */
+                <div style={{
+                    padding: '1rem',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '0.5rem',
+                    marginBottom: '1rem'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                        <span style={{ fontSize: '1.5rem' }}>🔌</span>
+                        <div style={{ flex: 1 }}>
+                            <h5 style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.5rem' }}>
+                                安装 Prome 助手插件
+                            </h5>
+                            <p style={{ fontSize: '0.875rem', color: '#78350f', marginBottom: '0.75rem' }}>
+                                点击下载插件，然后在 Chrome 扩展管理页面加载解压后的文件夹。
+                            </p>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={downloadExtension}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        backgroundColor: '#10b981',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '0.375rem',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
+                                    }}
+                                >
+                                    📥 一键下载插件
+                                </button>
+                                <button
+                                    onClick={() => window.open('chrome://extensions/', '_blank')}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        backgroundColor: 'white',
+                                        color: '#374151',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '0.375rem',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem'
+                                    }}
+                                >
+                                    ⚙️ 打开扩展管理
+                                </button>
+                            </div>
+                            <div style={{
+                                marginTop: '0.75rem',
+                                fontSize: '0.75rem',
+                                color: '#92400e',
+                                backgroundColor: '#fef3c7',
+                                padding: '0.5rem',
+                                borderRadius: '0.25rem'
+                            }}>
+                                <strong>安装步骤：</strong>
+                                <ol style={{ margin: '0.25rem 0 0 1rem', paddingLeft: '0' }}>
+                                    <li>下载并解压插件文件</li>
+                                    <li>打开 Chrome 扩展管理页面</li>
+                                    <li>开启"开发者模式"</li>
+                                    <li>点击"加载已解压的扩展程序"</li>
+                                    <li>选择解压后的插件文件夹</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* ✅ Chrome 和插件都已安装 - 显示就绪状态 */
+                <div style={{
+                    padding: '0.5rem 0.75rem',
+                    backgroundColor: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    borderRadius: '0.375rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#047857'
+                }}>
+                    ✅ Prome 助手插件已就绪
+                </div>
+            )}
 
             {/* 平台选择 */}
             <div style={{
