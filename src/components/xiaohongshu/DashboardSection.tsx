@@ -11,6 +11,7 @@ import { WeeklyPlanCard } from './WeeklyPlanCard';
 import { ContentPreviewCard } from './ContentPreviewCard';
 import { ReadyQueueCard } from './ReadyQueueCard';
 import { PerformanceCard } from './PerformanceCard';
+import { ContentLibrary } from './ContentLibrary';
 import { AccountBadge } from './AccountBadge';
 import { ContentCreationForm } from './ContentCreationForm';
 import { ContentModeConfig } from './ContentModeConfig';
@@ -607,6 +608,26 @@ export function DashboardSection({
           {/* 策略演化历史 */}
           <div className="mt-6">
             <StrategyHistoryCard userId={xhsUserId} />
+          </div>
+
+          {/* 📚 内容库 - 显示所有生成的内容 */}
+          <div className="mt-6">
+            <ContentLibrary
+              items={plan?.tasks || []}
+              onPublish={handleApprovePost}
+              onEdit={handleEditPost}
+              onDelete={async (id) => {
+                if (!confirm('确认删除此内容？此操作不可恢复。')) return;
+                try {
+                  await xiaohongshuAPI.deletePost(xhsUserId, id);
+                  await fetchData();
+                  alert('✅ 内容已删除');
+                } catch (error: any) {
+                  alert('删除失败: ' + error.message);
+                }
+              }}
+              onRegenerate={handleRegeneratePost}
+            />
           </div>
         </CardContent>
       </Card>
