@@ -135,48 +135,132 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                         if (typeof output !== 'object' || output === null) return output;
 
                                         // 1. 详细发布计划 (detail-plan)
-                                        if (node.id === 'detail-plan' && (output.today_target || output.target || output.taskCount)) {
+                                        if (node.id === 'detail-plan' && (output.today_target || output.target || output.taskCount || output.tasks)) {
                                             const targetText = output.today_target || output.target || '内容创作任务';
+                                            // 优先使用完整 tasks 数组，其次使用 taskSummaries
+                                            const tasksToShow = output.tasks || output.taskSummaries || [];
+
                                             return (
                                                 <div className="space-y-6">
                                                     <div className="p-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] text-white shadow-xl">
                                                         <div className="text-[10px] uppercase font-black opacity-60 tracking-[0.2em] mb-2">📝 详细计划</div>
                                                         <div className="text-xl font-black mb-2">{targetText}</div>
                                                         <div className="flex items-center gap-4 text-sm opacity-80">
-                                                            <span>📋 任务数: {output.taskCount || output.tasksCount || 1}</span>
+                                                            <span>📋 任务数: {output.taskCount || output.tasksCount || tasksToShow.length || 1}</span>
                                                         </div>
                                                     </div>
 
-                                                    {/* 如果存在任务汇总，显示清单 */}
-                                                    {Array.isArray(output.taskSummaries) && (
-                                                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                                            <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block mb-3">策划任务清单</label>
-                                                            {output.taskSummaries.map((task: any, i: number) => (
-                                                                <div key={i} className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-blue-200 transition-all group">
-                                                                    <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                                                                        {i + 1}
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="text-sm font-extrabold text-slate-700 truncate">{task.title}</div>
-                                                                        <div className="flex items-center gap-3 mt-1">
-                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-bold">{task.type || '视频'}</span>
-                                                                            {task.scheduledTime && (
-                                                                                <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-                                                                                    <Clock size={10} />
-                                                                                    {new Date(task.scheduledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                                                                                </span>
-                                                                            )}
+                                                    {/* 完整任务详情卡片 */}
+                                                    {Array.isArray(tasksToShow) && tasksToShow.length > 0 && (
+                                                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                                                            <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block mb-3">📋 任务详情</label>
+                                                            {tasksToShow.map((task: any, i: number) => (
+                                                                <details key={i} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                                                    <summary className="flex items-center gap-4 p-4 cursor-pointer list-none hover:bg-slate-50 transition-colors">
+                                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-sm font-black text-white shadow-lg">
+                                                                            {i + 1}
                                                                         </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="text-base font-extrabold text-slate-800 truncate">{task.title}</div>
+                                                                            <div className="flex items-center gap-3 mt-1">
+                                                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">{task.type || '视频'}</span>
+                                                                                {task.scheduledTime && (
+                                                                                    <span className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                                                                                        <Clock size={10} />
+                                                                                        {new Date(task.scheduledTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                                                                                    </span>
+                                                                                )}
+                                                                                {task.content && <span className="text-[10px] text-emerald-600 font-bold">✓ 已生成内容</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-slate-400 group-open:rotate-180 transition-transform">
+                                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                            </svg>
+                                                                        </div>
+                                                                    </summary>
+
+                                                                    <div className="p-4 pt-0 space-y-4 border-t border-slate-100">
+                                                                        {/* 正文内容 */}
+                                                                        {task.content && (
+                                                                            <div className="mt-4">
+                                                                                <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-2">📄 正文内容</label>
+                                                                                <div className="p-4 bg-slate-50 rounded-xl text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto">
+                                                                                    {typeof task.content === 'string' ? task.content : JSON.stringify(task.content, null, 2)}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* 话题标签 */}
+                                                                        {task.hashtags && task.hashtags.length > 0 && (
+                                                                            <div>
+                                                                                <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-2"># 话题标签</label>
+                                                                                <div className="flex flex-wrap gap-2">
+                                                                                    {(Array.isArray(task.hashtags) ? task.hashtags : [task.hashtags]).map((tag: string, ti: number) => (
+                                                                                        <span key={ti} className="px-3 py-1 bg-pink-100 text-pink-700 text-xs font-bold rounded-full">
+                                                                                            #{tag.replace(/^#/, '')}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* 变体文案 */}
+                                                                        {task.variants && task.variants.length > 0 && (
+                                                                            <div>
+                                                                                <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-2">✨ 变体文案 ({task.variants.length})</label>
+                                                                                <div className="space-y-2">
+                                                                                    {task.variants.map((variant: any, vi: number) => (
+                                                                                        <div key={vi} className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+                                                                                            <div className="flex items-center gap-2 mb-2">
+                                                                                                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full">
+                                                                                                    {variant.platform || `变体 ${vi + 1}`}
+                                                                                                </span>
+                                                                                                {variant.title && (
+                                                                                                    <span className="text-xs font-bold text-slate-700">{variant.title}</span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <div className="text-sm text-slate-600 line-clamp-3">
+                                                                                                {variant.text || variant.content || JSON.stringify(variant)}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* 配图 */}
+                                                                        {task.imageUrls && task.imageUrls.length > 0 && (
+                                                                            <div>
+                                                                                <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-2">🖼️ 配图 ({task.imageUrls.length})</label>
+                                                                                <div className="grid grid-cols-3 gap-2">
+                                                                                    {task.imageUrls.slice(0, 6).map((url: string, ii: number) => (
+                                                                                        <div key={ii} className="aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
+                                                                                            <img
+                                                                                                src={url}
+                                                                                                alt={`配图 ${ii + 1}`}
+                                                                                                className="w-full h-full object-cover"
+                                                                                                onError={(e) => {
+                                                                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23f1f5f9" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%2394a3b8" font-size="12">图片加载失败</text></svg>';
+                                                                                                }}
+                                                                                            />
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                                {task.imageUrls.length > 6 && (
+                                                                                    <div className="text-xs text-slate-400 mt-2">还有 {task.imageUrls.length - 6} 张图片...</div>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></div>
-                                                                </div>
+                                                                </details>
                                                             ))}
                                                         </div>
                                                     )}
 
-                                                    <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-center gap-3">
-                                                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
-                                                        <span className="text-sm font-bold text-slate-600">计划已生成，准备进入脚本创作阶段</span>
+                                                    <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 flex items-center gap-3">
+                                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                                        <span className="text-sm font-bold text-emerald-700">✅ 计划已生成，准备进入脚本创作阶段</span>
                                                     </div>
                                                 </div>
                                             );
