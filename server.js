@@ -43,8 +43,14 @@ const digitalHumansStorage = {};
 // Temporary storage for mapping training IDs to temp file names for cleanup
 const tempFileCleanupMap = {};
 
-// 初始化 Stripe，确保 Zeabur 或本地 .env 设置了 STRIPE_SECRET_KEY
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// 初始化 Stripe（可选 - 如果没有配置 STRIPE_SECRET_KEY 则跳过）
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  console.log('✅ [BOOT] Stripe initialized successfully');
+} else {
+  console.warn('⚠️ [BOOT] STRIPE_SECRET_KEY not set, payment features disabled');
+}
 
 app.use(express.json());
 
