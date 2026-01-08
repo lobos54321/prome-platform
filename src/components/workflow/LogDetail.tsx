@@ -150,10 +150,10 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                         </div>
                                                     </div>
 
-                                                    {/* 完整任务详情卡片 */}
+                                                    {/* 可展开任务卡片 */}
                                                     {Array.isArray(tasksToShow) && tasksToShow.length > 0 && (
-                                                        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                                                            <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block mb-3">📋 任务详情</label>
+                                                        <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                                                            <label className="text-[10px] uppercase font-black text-slate-400 tracking-widest block mb-3">📋 任务详情 (点击展开)</label>
                                                             {tasksToShow.map((task: any, i: number) => (
                                                                 <details key={i} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all">
                                                                     <summary className="flex items-center gap-4 p-4 cursor-pointer list-none hover:bg-slate-50 transition-colors">
@@ -162,7 +162,7 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
                                                                             <div className="text-base font-extrabold text-slate-800 truncate">{task.title}</div>
-                                                                            <div className="flex items-center gap-3 mt-1">
+                                                                            <div className="flex items-center gap-3 mt-1 flex-wrap">
                                                                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">{task.type || '视频'}</span>
                                                                                 {task.scheduledTime && (
                                                                                     <span className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
@@ -173,11 +173,7 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                                 {task.content && <span className="text-[10px] text-emerald-600 font-bold">✓ 已生成内容</span>}
                                                                             </div>
                                                                         </div>
-                                                                        <div className="text-slate-400 group-open:rotate-180 transition-transform">
-                                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                            </svg>
-                                                                        </div>
+                                                                        <div className="text-slate-400 group-open:rotate-180 transition-transform">▼</div>
                                                                     </summary>
 
                                                                     <div className="p-4 pt-0 space-y-4 border-t border-slate-100">
@@ -198,7 +194,7 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                                 <div className="flex flex-wrap gap-2">
                                                                                     {(Array.isArray(task.hashtags) ? task.hashtags : [task.hashtags]).map((tag: string, ti: number) => (
                                                                                         <span key={ti} className="px-3 py-1 bg-pink-100 text-pink-700 text-xs font-bold rounded-full">
-                                                                                            #{tag.replace(/^#/, '')}
+                                                                                            #{String(tag).replace(/^#/, '')}
                                                                                         </span>
                                                                                     ))}
                                                                                 </div>
@@ -214,7 +210,7 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                                         <div key={vi} className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
                                                                                             <div className="flex items-center gap-2 mb-2">
                                                                                                 <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full">
-                                                                                                    {variant.platform || `变体 ${vi + 1}`}
+                                                                                                    {variant.type || variant.platform || `变体 ${vi + 1}`}
                                                                                                 </span>
                                                                                                 {variant.title && (
                                                                                                     <span className="text-xs font-bold text-slate-700">{variant.title}</span>
@@ -241,15 +237,19 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                                                 alt={`配图 ${ii + 1}`}
                                                                                                 className="w-full h-full object-cover"
                                                                                                 onError={(e) => {
-                                                                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23f1f5f9" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%2394a3b8" font-size="12">图片加载失败</text></svg>';
+                                                                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23f1f5f9" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%2394a3b8" font-size="10">加载失败</text></svg>';
                                                                                                 }}
                                                                                             />
                                                                                         </div>
                                                                                     ))}
                                                                                 </div>
-                                                                                {task.imageUrls.length > 6 && (
-                                                                                    <div className="text-xs text-slate-400 mt-2">还有 {task.imageUrls.length - 6} 张图片...</div>
-                                                                                )}
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* 如果没有详细内容，显示提示 */}
+                                                                        {!task.content && !task.variants && !task.imageUrls && (
+                                                                            <div className="mt-4 p-3 bg-slate-50 rounded-xl text-sm text-slate-400 text-center">
+                                                                                暂无详细内容（任务正在生成中...）
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -354,42 +354,6 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                             状态: {output.status === 'success' ? '✅ 成功' : '处理中...'}
                                                         </div>
                                                     </div>
-                                                    {output.audioUrl && (
-                                                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                                                            <div className="text-[10px] uppercase font-black text-amber-600 tracking-wider mb-3">🔊 语音预览</div>
-                                                            <audio
-                                                                controls
-                                                                className="w-full h-10"
-                                                                src={output.audioUrl}
-                                                                crossOrigin="anonymous"
-                                                                onError={(e) => console.error('Audio load error:', e, 'URL:', output.audioUrl)}
-                                                            >
-                                                                您的浏览器不支持音频播放
-                                                            </audio>
-                                                            <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
-                                                                <div className="text-[10px] text-slate-400 break-all flex-1 mr-2 min-w-0">
-                                                                    {output.audioUrl.split('/').pop()}
-                                                                </div>
-                                                                <div className="flex gap-2 flex-shrink-0">
-                                                                    <a
-                                                                        href={output.audioUrl}
-                                                                        download
-                                                                        className="text-xs bg-purple-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-purple-600 transition whitespace-nowrap"
-                                                                    >
-                                                                        ⬇️ 下载音频
-                                                                    </a>
-                                                                    <a
-                                                                        href={output.audioUrl}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-amber-600 transition whitespace-nowrap"
-                                                                    >
-                                                                        🔗 新窗口打开
-                                                                    </a>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
                                                     <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 flex items-center gap-3">
                                                         <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
                                                         <span className="text-sm font-bold text-slate-600">语音已合成，准备进入视频渲染阶段</span>
@@ -412,37 +376,9 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                     </div>
                                                     {output.videoUrl && (
                                                         <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                                                            <div className="text-[10px] uppercase font-black text-emerald-600 tracking-wider mb-3">🎬 视频预览</div>
-                                                            <video
-                                                                controls
-                                                                className="w-full rounded-xl shadow-lg"
-                                                                src={output.videoUrl}
-                                                                crossOrigin="anonymous"
-                                                                onError={(e) => console.error('Video load error:', e, 'URL:', output.videoUrl)}
-                                                            >
-                                                                您的浏览器不支持视频播放
-                                                            </video>
-                                                            <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
-                                                                <div className="text-[10px] text-slate-400 break-all flex-1 mr-2 min-w-0">
-                                                                    {output.videoUrl.split('/').pop()}
-                                                                </div>
-                                                                <div className="flex gap-2 flex-shrink-0">
-                                                                    <a
-                                                                        href={output.videoUrl}
-                                                                        download
-                                                                        className="text-xs bg-purple-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-purple-600 transition whitespace-nowrap"
-                                                                    >
-                                                                        ⬇️ 下载视频
-                                                                    </a>
-                                                                    <a
-                                                                        href={output.videoUrl}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-xs bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold hover:bg-emerald-600 transition whitespace-nowrap"
-                                                                    >
-                                                                        🔗 新窗口播放
-                                                                    </a>
-                                                                </div>
+                                                            <div className="text-[10px] uppercase font-black text-emerald-600 tracking-wider mb-2">视频预览</div>
+                                                            <div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
+                                                                <span className="text-sm">🎥 视频预览区域（即将上线）</span>
                                                             </div>
                                                         </div>
                                                     )}
