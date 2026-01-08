@@ -211,8 +211,13 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
                                 </button>
                                 <PlatformSelector
                                     content={{
-                                        title: content.title,
-                                        content: content.text || '',
+                                        // 🔥 使用选中的变体文案，而非原始母文案
+                                        title: content.variants && content.variants.length > 0
+                                            ? content.variants[selectedVariantIndex]?.title || content.title
+                                            : content.title,
+                                        content: content.variants && content.variants.length > 0
+                                            ? content.variants[selectedVariantIndex]?.text || content.text || ''
+                                            : content.text || '',
                                         images: content.imageUrls || [],
                                         tags: content.hashtags || []
                                     }}

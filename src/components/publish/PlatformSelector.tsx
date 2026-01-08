@@ -133,13 +133,50 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
 
         setPublishStatus(prev => ({ ...prev, xiaohongshu: 'publishing' }));
 
+        // 🔥 解析内容 - 如果是 JSON 字符串，提取其中的 text 字段
+        let parsedTitle = content.title;
+        let parsedContent = content.content || '';
+        let parsedTags = content.tags || [];
+
+        // 检查 content.content 是否是 JSON 字符串
+        if (parsedContent.trim().startsWith('{') || parsedContent.trim().startsWith('```json')) {
+            try {
+                // 移除可能的 markdown 代码块
+                let jsonStr = parsedContent
+                    .replace(/^```json\s*/i, '')
+                    .replace(/```\s*$/i, '')
+                    .trim();
+
+                const jsonData = JSON.parse(jsonStr);
+                console.log('[PlatformSelector] Parsed JSON content:', jsonData);
+
+                // 提取字段
+                parsedTitle = jsonData.title || parsedTitle;
+                parsedContent = jsonData.text || jsonData.content || parsedContent;
+
+                // 提取 hashtags
+                if (jsonData.hashtags && Array.isArray(jsonData.hashtags)) {
+                    parsedTags = jsonData.hashtags;
+                }
+            } catch (e) {
+                console.log('[PlatformSelector] Content is not valid JSON, using as-is');
+            }
+        }
+
+        // 🔥 小红书字数限制：控制在 850 字以内（留一些余量给 hashtags）
+        const XHS_MAX_CHARS = 850;
+        if (parsedContent.length > XHS_MAX_CHARS) {
+            console.log(`[PlatformSelector] Truncating content from ${parsedContent.length} to ${XHS_MAX_CHARS} chars`);
+            parsedContent = parsedContent.substring(0, XHS_MAX_CHARS) + '...';
+        }
+
         // 构建发布数据 - 🔥 字段名必须与 content.js executePublish 期望的一致
         const publishData = {
             taskId: Date.now().toString(),  // content.js 需要 taskId
-            title: content.title,
-            content: content.content || '',
+            title: parsedTitle,
+            content: parsedContent,
             images: content.images || [],   // content.js 期望 images 而非 imageUrls
-            tags: content.tags || [],       // content.js 期望 tags 而非 hashtags
+            tags: parsedTags,               // content.js 期望 tags 而非 hashtags
             video: content.video || null,   // content.js 期望 video 而非 videoUrl
         };
 
