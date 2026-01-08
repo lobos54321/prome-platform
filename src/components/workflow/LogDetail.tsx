@@ -11,6 +11,36 @@ interface LogDetailProps {
     node: WorkflowNode;
 }
 
+// 🔥 内容清理函数：移除 <think> 标签和 JSON 包装
+function cleanContent(raw: string): string {
+    if (!raw || typeof raw !== 'string') return '';
+
+    // 1. 移除 <think>...</think> 标签及内容
+    let cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+    // 2. 尝试解析 JSON 提取 text 字段
+    try {
+        const trimmed = cleaned.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('```json')) {
+            // 移除 markdown 代码块标记
+            const jsonStr = trimmed.replace(/```json\s*|\s*```/g, '').trim();
+            const json = JSON.parse(jsonStr);
+            cleaned = json.text || json.content || json.title || cleaned;
+        }
+    } catch {
+        // 解析失败就用原文
+    }
+
+    return cleaned.trim();
+}
+
+// 🔥 变体标签清理：移除 【爆款钩子】【情感共鸣】 等前缀
+function cleanVariantLabel(text: string): string {
+    if (!text || typeof text !== 'string') return '';
+    // 移除开头的 【...】 标签
+    return text.replace(/^【[^】]*】\s*/g, '').trim();
+}
+
 export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
     // 动态获取图标组件
     const NodeIcon = node.icon || FileText;
@@ -182,7 +212,7 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                             <div className="mt-4">
                                                                                 <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-2">📄 正文内容</label>
                                                                                 <div className="p-4 bg-slate-50 rounded-xl text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto">
-                                                                                    {typeof task.content === 'string' ? task.content : JSON.stringify(task.content, null, 2)}
+                                                                                    {cleanContent(typeof task.content === 'string' ? task.content : JSON.stringify(task.content, null, 2))}
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -217,7 +247,7 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                                                 )}
                                                                                             </div>
                                                                                             <div className="text-sm text-slate-600 line-clamp-3">
-                                                                                                {variant.text || variant.content || JSON.stringify(variant)}
+                                                                                                {cleanVariantLabel(variant.text || variant.content || JSON.stringify(variant))}
                                                                                             </div>
                                                                                         </div>
                                                                                     ))}
@@ -252,6 +282,45 @@ export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
                                                                                 暂无详细内容（任务正在生成中...）
                                                                             </div>
                                                                         )}
+                                                                        
+                                                                        {/* 🔥 操作按钮 */}
+                                                                        <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
+                                                                            <button 
+                                                                                className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-600 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    // TODO: 打开编辑模态框
+                                                                                    console.log('Edit task:', task.title);
+                                                                                    alert(`编辑功能开发中：${task.title}`);
+                                                                                }}
+                                                                            >
+                                                                                ✏️ 编辑
+                                                                            </button>
+                                                                            <button 
+                                                                                className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-red-100 transition-colors"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    // TODO: 删除任务
+                                                                                    if (confirm(`确定删除任务「${task.title}」吗？`)) {
+                                                                                        console.log('Delete task:', task.title);
+                                                                                        alert('删除功能开发中');
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                🗑️ 删除
+                                                                            </button>
+                                                                            <button 
+                                                                                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-3 py-2.5 rounded-xl text-sm font-bold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    // TODO: 调用 Chrome 扩展发布
+                                                                                    console.log('Publish task:', task.title);
+                                                                                    alert(`一键发布功能开发中：${task.title}`);
+                                                                                }}
+                                                                            >
+                                                                                🚀 一键发布
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                 </details>
                                                             ))}

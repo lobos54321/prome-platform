@@ -144,6 +144,7 @@ export default function AutoMarketing() {
                     region: config.region,
                     marketing_goal: config.marketingGoal,
                     brand_style: config.brandStyle,
+                    posts_per_day: config.postsPerDay,  // 🔥 新增：每日发布篇数
                     material_images: config.materialImages,
                     material_documents: config.materialDocuments,
                     material_analysis: config.materialAnalysis,
