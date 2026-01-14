@@ -41,19 +41,17 @@ export function ContentModeStep({
     });
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // 🔥 目标发布平台选择
-    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
-        userProfile?.target_platforms || ['xiaohongshu']
-    );
+    // 🔥 目标发布平台 - 从 userProfile 读取（在 /auto 页面已选择）
+    const selectedPlatforms = userProfile?.target_platforms || ['xiaohongshu'];
 
-    // 可选平台列表
-    const availablePlatforms = [
-        { id: 'xiaohongshu', name: '小红书', icon: '📕', enabled: true },
-        { id: 'x', name: 'X (Twitter)', icon: '𝕏', enabled: true },
-        { id: 'tiktok', name: 'TikTok', icon: '🎵', enabled: true },
-        { id: 'instagram', name: 'Instagram', icon: '📷', enabled: true },
-        { id: 'youtube', name: 'YouTube', icon: '▶️', enabled: true },
-    ];
+    // 平台显示名称映射
+    const platformDisplayNames: Record<string, { name: string; icon: string }> = {
+        xiaohongshu: { name: '小红书', icon: '📕' },
+        x: { name: 'X (Twitter)', icon: '𝕏' },
+        tiktok: { name: 'TikTok', icon: '🎵' },
+        instagram: { name: 'Instagram', icon: '📷' },
+        youtube: { name: 'YouTube', icon: '▶️' },
+    };
 
     // 同步配置变化
     useEffect(() => {
@@ -221,48 +219,28 @@ export function ContentModeStep({
                 </CardContent>
             </Card>
 
-            {/* 🔥 目标发布平台选择 */}
+            {/* 🔥 目标发布平台展示 (只读，在 /auto 页面已选择) */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-lg">目标发布平台</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-gray-500 mb-4">
-                        选择您希望发布内容的平台，系统将为每个平台生成符合其特性的变体文案
+                        系统将为以下平台生成符合其特性的变体文案（可在「自动化配置」页面修改）
                     </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                        {availablePlatforms.map((platform) => {
-                            const isSelected = selectedPlatforms.includes(platform.id);
+                    <div className="flex flex-wrap gap-3">
+                        {selectedPlatforms.map((platformId) => {
+                            const platform = platformDisplayNames[platformId];
+                            if (!platform) return null;
                             return (
-                                <button
-                                    key={platform.id}
-                                    type="button"
-                                    onClick={() => {
-                                        if (isSelected) {
-                                            // 至少保留一个平台
-                                            if (selectedPlatforms.length > 1) {
-                                                setSelectedPlatforms(selectedPlatforms.filter(p => p !== platform.id));
-                                            }
-                                        } else {
-                                            setSelectedPlatforms([...selectedPlatforms, platform.id]);
-                                        }
-                                    }}
-                                    className={`
-                                        flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all
-                                        ${isSelected
-                                            ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                                        }
-                                        ${!platform.enabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                                    `}
-                                    disabled={!platform.enabled}
+                                <div
+                                    key={platformId}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-purple-500 bg-purple-50 text-purple-700"
                                 >
-                                    <span className="text-2xl mb-2">{platform.icon}</span>
-                                    <span className="text-sm font-medium">{platform.name}</span>
-                                    {isSelected && (
-                                        <span className="text-xs text-purple-500 mt-1">✓ 已选择</span>
-                                    )}
-                                </button>
+                                    <span className="text-xl">{platform.icon}</span>
+                                    <span className="font-medium">{platform.name}</span>
+                                    <span className="text-xs text-purple-500">✓</span>
+                                </div>
                             );
                         })}
                     </div>

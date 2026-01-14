@@ -182,10 +182,26 @@ export default function AutoMarketing() {
     };
 
     // 进入平台运营
-    const handleStartPlatform = () => {
+    const handleStartPlatform = async () => {
         if (selectedPlatforms.length === 0) {
             setError('请选择至少一个平台');
             return;
+        }
+
+        try {
+            // 🔥 保存选择的平台到数据库，供后续变体生成使用
+            await supabase
+                .from('xhs_user_profiles')
+                .update({
+                    target_platforms: selectedPlatforms,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('supabase_uuid', currentUser.id);
+
+            console.log('✅ 目标平台已保存:', selectedPlatforms);
+        } catch (err) {
+            console.error('保存平台选择失败:', err);
+            // 继续执行，不阻断流程
         }
 
         // 目前只支持小红书，直接跳转
