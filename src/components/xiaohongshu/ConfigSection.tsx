@@ -336,6 +336,8 @@ export function ConfigSection({
         <AgentProgressPanel
           taskId={currentTaskId || undefined}
           mode={getWorkflowMode()}
+          // 🔥 传递目标平台列表
+          targetPlatforms={initialConfig?.target_platforms || ['xiaohongshu']}
           onClose={() => {
             setShowProgressPanel(false);
             // 关闭时也切换到 dashboard

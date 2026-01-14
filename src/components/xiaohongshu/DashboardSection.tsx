@@ -818,6 +818,8 @@ export function DashboardSection({
           <AgentProgressPanel
             taskId={currentTaskId || undefined}
             mode={selectedWorkflowMode}
+            // 🔥 传递目标平台列表
+            targetPlatforms={userProfile?.target_platforms || ['xiaohongshu']}
             onClose={() => {
               setShowProgressPanel(false);
               setCurrentTaskId(null);

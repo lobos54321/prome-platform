@@ -147,6 +147,8 @@ export function ContentModeStep({
                     productName={userProfile?.product_name}
                     marketingGoal={userProfile?.marketing_goal as 'brand' | 'sales' | 'traffic' | 'community' | undefined}
                     postFrequency={userProfile?.post_frequency as 'daily' | 'weekly' | 'biweekly' | 'monthly' | undefined}
+                    // 🔥 传递目标平台列表
+                    targetPlatforms={selectedPlatforms}
                     onClose={() => {
                         setShowProgressPanel(false);
                         setCurrentTaskId(null);
