@@ -1,8 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileText, Image as ImageIcon, Send, Clock, Eye, Edit2, RefreshCw, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Image as ImageIcon, Send, Clock, Eye, Edit2, RefreshCw, CheckCircle, ChevronDown, ChevronUp, Settings2, Sparkles } from 'lucide-react';
 import { PlatformSelector } from '../publish/PlatformSelector';
+import { PlatformVariantEditor, PLATFORM_RULES } from '../xiaohongshu/PlatformVariantEditor';
+
+// 🔥 平台变体类型
+interface PlatformVariant {
+    platform: string;
+    platformName: string;
+    title: string;
+    text: string;
+    hashtags?: string[];
+}
 
 interface TodayContentPreviewProps {
     content?: {
@@ -11,14 +21,21 @@ interface TodayContentPreviewProps {
         imageUrls?: string[];
         hashtags?: string[];
         scheduledTime?: string;
-        engine?: string; // 🔥 新增：生成引擎名称
+        engine?: string;
         status?: 'draft' | 'approved' | 'publishing' | 'published' | 'failed';
         variants?: Array<{
             type: string;
+            platform?: string;       // 🔥 平台ID
+            platformName?: string;   // 🔥 平台显示名称
             title: string;
             text: string;
+            hashtags?: string[];
         }>;
     } | null;
+    // 🔥 目标平台列表
+    targetPlatforms?: string[];
+    // 🔥 重新生成平台变体的回调
+    onRegeneratePlatformVariant?: (platform: string, prompt: string) => Promise<PlatformVariant | null>;
     onPublish?: () => Promise<void>;
     onEdit?: () => void;
     onRegenerate?: () => void;
@@ -28,6 +45,8 @@ interface TodayContentPreviewProps {
 
 export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
     content,
+    targetPlatforms = ['xiaohongshu'],
+    onRegeneratePlatformVariant,
     onPublish,
     onEdit,
     onRegenerate,
@@ -37,6 +56,8 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
     const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
     const [showPreview, setShowPreview] = useState(false);
     const [showPlatformSelector, setShowPlatformSelector] = useState(false);
+    const [showPlatformVariantEditor, setShowPlatformVariantEditor] = useState(false);
+    const [isRegenerating, setIsRegenerating] = useState(false);
 
     if (!content) {
         return (
@@ -51,6 +72,31 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
     }
 
     const activeContent = content.variants?.[selectedVariantIndex] || content;
+
+    // 🔥 检测是否有平台变体（包含 platform 字段的变体）
+    const platformVariants: PlatformVariant[] = (content.variants || [])
+        .filter(v => v.platform)
+        .map(v => ({
+            platform: v.platform!,
+            platformName: v.platformName || PLATFORM_RULES[v.platform!]?.displayName || v.platform!,
+            title: v.title,
+            text: v.text,
+            hashtags: v.hashtags,
+        }));
+
+    const hasPlatformVariants = platformVariants.length > 0;
+
+    // 🔥 处理平台变体重新生成
+    const handleRegeneratePlatformVariant = async (platform: string, prompt: string): Promise<PlatformVariant | null> => {
+        if (!onRegeneratePlatformVariant) return null;
+
+        setIsRegenerating(true);
+        try {
+            return await onRegeneratePlatformVariant(platform, prompt);
+        } finally {
+            setIsRegenerating(false);
+        }
+    };
 
     const getStatusBadge = () => {
         switch (content.status) {
@@ -69,6 +115,40 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
         }
     };
 
+    // 🔥 平台变体编辑器视图
+    if (showPlatformVariantEditor) {
+        return (
+            <div className="h-full flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 text-white">
+                            <Settings2 size={14} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700">平台变体 Prompt 编辑</h3>
+                    </div>
+                    <button
+                        onClick={() => setShowPlatformVariantEditor(false)}
+                        className="text-sm text-slate-500 hover:text-slate-700"
+                    >
+                        返回内容预览
+                    </button>
+                </div>
+
+                {/* Platform Variant Editor */}
+                <div className="flex-1 overflow-y-auto p-4">
+                    <PlatformVariantEditor
+                        motherCopy={{ title: content.title, text: content.text }}
+                        variants={platformVariants}
+                        targetPlatforms={targetPlatforms}
+                        onRegenerate={handleRegeneratePlatformVariant}
+                        isGenerating={isRegenerating}
+                    />
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="h-full flex flex-col">
             {/* Header */}
@@ -85,19 +165,62 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
                     </div>
                     {getStatusBadge()}
                 </div>
-                {content.scheduledTime && (
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <Clock size={12} />
-                        <span>{new Date(content.scheduledTime).toLocaleTimeString('zh-CN', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        })}</span>
-                    </div>
-                )}
+                <div className="flex items-center gap-2">
+                    {/* 🔥 平台变体编辑入口 */}
+                    {(hasPlatformVariants || targetPlatforms.length > 0) && (
+                        <button
+                            onClick={() => setShowPlatformVariantEditor(true)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors"
+                        >
+                            <Sparkles size={12} />
+                            编辑 Prompt
+                        </button>
+                    )}
+                    {content.scheduledTime && (
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                            <Clock size={12} />
+                            <span>{new Date(content.scheduledTime).toLocaleTimeString('zh-CN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            })}</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
+            {/* 🔥 平台变体快捷预览（如果有） */}
+            {hasPlatformVariants && (
+                <div className="p-3 border-b border-slate-50 bg-gradient-to-r from-purple-50 to-pink-50">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-slate-600">
+                            🌐 已生成 {platformVariants.length} 个平台变体
+                        </span>
+                        <button
+                            onClick={() => setShowPlatformVariantEditor(true)}
+                            className="text-xs text-purple-600 hover:text-purple-700"
+                        >
+                            查看详情 →
+                        </button>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto">
+                        {platformVariants.map((variant, index) => {
+                            const rules = PLATFORM_RULES[variant.platform];
+                            return (
+                                <div
+                                    key={index}
+                                    className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs"
+                                >
+                                    <span className="mr-1">{rules?.icon || '📄'}</span>
+                                    {variant.platformName}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* 变体选择器 */}
-            {content.variants && content.variants.length > 1 && (
+            {content.variants && content.variants.length > 1 && !hasPlatformVariants && (
                 <div className="p-3 border-b border-slate-50">
                     <div className="flex gap-2 overflow-x-auto">
                         {content.variants.map((variant, index) => (

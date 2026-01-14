@@ -78,6 +78,8 @@ interface AgentProgressPanelProps {
     productName?: string;
     marketingGoal?: 'brand' | 'sales' | 'traffic' | 'community';
     postFrequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+    // 🔥 目标平台列表
+    targetPlatforms?: string[];
     contentStrategy?: ContentStrategy | null;
     weeklyPlan?: WeeklyPlan | null;
     todayContent?: {
@@ -87,11 +89,13 @@ interface AgentProgressPanelProps {
         hashtags?: string[];
         scheduledTime?: string;
         status?: 'draft' | 'approved' | 'publishing' | 'published' | 'failed';
-        variants?: Array<{ type: string; title: string; text: string }>;
+        variants?: Array<{ type: string; platform?: string; platformName?: string; title: string; text: string; hashtags?: string[] }>;
     } | null;
     onPublish?: () => Promise<void>;
     onEditContent?: () => void;
     onRegenerateContent?: () => void;
+    // 🔥 重新生成平台变体的回调
+    onRegeneratePlatformVariant?: (platform: string, prompt: string) => Promise<{ platform: string; platformName: string; title: string; text: string; hashtags?: string[] } | null>;
 }
 
 export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
@@ -105,12 +109,16 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     productName,
     marketingGoal,
     postFrequency,
+    // 🔥 目标平台
+    targetPlatforms,
     contentStrategy,
     weeklyPlan,
     todayContent,
     onPublish,
     onEditContent,
     onRegenerateContent,
+    // 🔥 平台变体重新生成
+    onRegeneratePlatformVariant,
 }) => {
     const [activeMode, setActiveMode] = useState<WorkflowMode>(initialMode);
     const [nodes, setNodes] = useState<WorkflowNode[]>(DEFAULT_NODES[initialMode]);
@@ -621,6 +629,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                             ) : (
                                 <TodayContentPreview
                                     content={localResult || todayContent}
+                                    targetPlatforms={targetPlatforms}
+                                    onRegeneratePlatformVariant={onRegeneratePlatformVariant}
                                     onPublish={async () => {
                                         if (onPublish) {
                                             setIsPublishing(true);
