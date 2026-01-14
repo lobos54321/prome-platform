@@ -41,6 +41,19 @@ export function ContentModeStep({
     });
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // 🔥 目标发布平台选择
+    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
+        userProfile?.target_platforms || ['xiaohongshu']
+    );
+
+    // 可选平台列表
+    const availablePlatforms = [
+        { id: 'xiaohongshu', name: '小红书', icon: '📕', enabled: true },
+        { id: 'x', name: 'X (Twitter)', icon: '𝕏', enabled: true },
+        { id: 'tiktok', name: 'TikTok', icon: '🎵', enabled: true },
+        { id: 'instagram', name: 'Instagram', icon: '📷', enabled: true },
+        { id: 'youtube', name: 'YouTube', icon: '▶️', enabled: true },
+    ];
 
     // 同步配置变化
     useEffect(() => {
@@ -77,6 +90,7 @@ export function ContentModeStep({
                 reviewMode: (userProfile.review_mode as any) || 'manual',
                 taskId, // 传递任务ID
                 contentModePreference: selectedWorkflowMode, // 🔥 使用当前选择的模式而非 userProfile 中的旧值
+                targetPlatforms: selectedPlatforms, // 🔥 传递选择的目标平台
             });
 
             if (!response.success) {
@@ -204,6 +218,57 @@ export function ContentModeStep({
                             }
                         }}
                     />
+                </CardContent>
+            </Card>
+
+            {/* 🔥 目标发布平台选择 */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">目标发布平台</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-gray-500 mb-4">
+                        选择您希望发布内容的平台，系统将为每个平台生成符合其特性的变体文案
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        {availablePlatforms.map((platform) => {
+                            const isSelected = selectedPlatforms.includes(platform.id);
+                            return (
+                                <button
+                                    key={platform.id}
+                                    type="button"
+                                    onClick={() => {
+                                        if (isSelected) {
+                                            // 至少保留一个平台
+                                            if (selectedPlatforms.length > 1) {
+                                                setSelectedPlatforms(selectedPlatforms.filter(p => p !== platform.id));
+                                            }
+                                        } else {
+                                            setSelectedPlatforms([...selectedPlatforms, platform.id]);
+                                        }
+                                    }}
+                                    className={`
+                                        flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all
+                                        ${isSelected
+                                            ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                                        }
+                                        ${!platform.enabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                                    `}
+                                    disabled={!platform.enabled}
+                                >
+                                    <span className="text-2xl mb-2">{platform.icon}</span>
+                                    <span className="text-sm font-medium">{platform.name}</span>
+                                    {isSelected && (
+                                        <span className="text-xs text-purple-500 mt-1">✓ 已选择</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3">
+                        已选择 {selectedPlatforms.length} 个平台
+                    </p>
                 </CardContent>
             </Card>
 

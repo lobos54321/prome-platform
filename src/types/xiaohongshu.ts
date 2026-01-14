@@ -42,6 +42,8 @@ export interface UserProfile {
   ugc_age_range?: 'young' | 'middle' | 'senior';
   ugc_language?: string;          // "zh-CN", "en-US" 等
   ugc_duration?: number;          // 视频时长秒数，默认 60
+  // 🔥 目标发布平台
+  target_platforms?: string[];    // 目标发布平台：xiaohongshu, x, tiktok, instagram, youtube
   created_at: string;
   updated_at: string;
 }
@@ -222,4 +224,5 @@ export interface ProductConfig {
   reviewMode: 'auto' | 'manual';
   taskId?: string;
   contentModePreference?: string;
+  targetPlatforms?: string[]; // 🔥 目标发布平台：xiaohongshu, x, tiktok, instagram, youtube
 }
