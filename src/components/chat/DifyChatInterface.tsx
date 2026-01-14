@@ -90,6 +90,81 @@ const getNodeIcon = (nodeType?: string) => {
   return Clock; // 默认图标
 };
 
+/**
+ * 清理Dify响应内容 - 移除<think>标签，提取并格式化JSON内容
+ * 用于前端显示，同时提取结构化数据供后续使用
+ * @param rawContent 原始响应内容
+ * @returns { displayContent: 格式化的显示内容, structuredData: 解析的JSON数据 }
+ */
+const cleanDifyResponse = (rawContent: string): { displayContent: string; structuredData: Record<string, unknown> | null } => {
+  if (!rawContent || typeof rawContent !== 'string') {
+    return { displayContent: rawContent || '', structuredData: null };
+  }
+
+  let content = rawContent;
+
+  // 1. 移除 <think>...</think> 标签及其内容
+  content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  // 2. 尝试提取并解析JSON内容
+  let structuredData: Record<string, unknown> | null = null;
+
+  // 匹配 ```json ... ``` 代码块
+  const jsonCodeBlockMatch = content.match(/```json\s*([\s\S]*?)```/);
+  // 匹配独立的 JSON 对象 (包含title和text)
+  const jsonObjectMatch = content.match(/\{[\s\S]*?"title"[\s\S]*?"text"[\s\S]*?\}(?=\s*$|\s*\n|\s*,\s*"hashtags"[\s\S]*?\][\s\S]*?\})/);
+  // 更宽松的JSON匹配
+  const looseJsonMatch = content.match(/\{\s*"title"\s*:\s*"[^"]*"[\s\S]*?"text"\s*:\s*"[\s\S]*?"\s*[\s\S]*?\}/);
+
+  const jsonString = jsonCodeBlockMatch?.[1]?.trim() || jsonObjectMatch?.[0] || looseJsonMatch?.[0];
+
+  if (jsonString) {
+    try {
+      structuredData = JSON.parse(jsonString);
+      console.log('[cleanDifyResponse] Successfully parsed JSON:', Object.keys(structuredData || {}));
+    } catch (e) {
+      console.log('[cleanDifyResponse] Failed to parse JSON, trying to fix common issues');
+      // 尝试修复常见的JSON问题（换行符等）
+      try {
+        const fixedJson = jsonString.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        structuredData = JSON.parse(fixedJson);
+      } catch (e2) {
+        console.log('[cleanDifyResponse] JSON parse failed after fix attempt');
+      }
+    }
+  }
+
+  // 3. 如果成功解析JSON且包含title/text，格式化输出
+  if (structuredData && (structuredData.title || structuredData.text)) {
+    const parts: string[] = [];
+
+    if (structuredData.title) {
+      parts.push(`## ${structuredData.title}`);
+    }
+
+    if (structuredData.text) {
+      parts.push(String(structuredData.text));
+    }
+
+    if (structuredData.emotion) {
+      parts.push(`\n**情感基调**: ${structuredData.emotion}`);
+    }
+
+    if (structuredData.hashtags && Array.isArray(structuredData.hashtags) && structuredData.hashtags.length > 0) {
+      parts.push(`\n**标签**: ${structuredData.hashtags.join(' ')}`);
+    }
+
+    console.log('[cleanDifyResponse] Formatted content from JSON');
+    return { displayContent: parts.join('\n\n'), structuredData };
+  }
+
+  // 4. 如果没有JSON，返回清理后的内容（已移除<think>标签）
+  // 同时移除残留的 ```json 标记
+  content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+
+  return { displayContent: content, structuredData };
+};
+
 export function DifyChatInterface({
   className,
   placeholder = "Type your message...",
@@ -1886,11 +1961,18 @@ export function DifyChatInterface({
                 clearTimeout(streamTimeoutId);
                 // 流结束，添加最终消息 - 确保会话ID连续性
                 if (finalResponse.trim()) {
+                  // 🔧 清理Dify响应：移除<think>标签，格式化JSON内容
+                  const { displayContent: cleanedContent, structuredData } = cleanDifyResponse(finalResponse.trim());
+
                   const assistantMessage: Message = {
                     id: `assistant_${Date.now()}`,
-                    content: finalResponse.trim(),
+                    content: cleanedContent,
                     role: 'assistant',
                     timestamp: new Date(),
+                    metadata: {
+                      structuredContent: structuredData,
+                      rawContent: finalResponse.trim()
+                    },
                   };
                   setMessages(prev => [...prev, assistantMessage]);
                   console.log('[Chat Debug] Added assistant message from stream with conversation ID:', detectedConversationId);
@@ -2343,11 +2425,18 @@ export function DifyChatInterface({
       // 如果循环正常结束但没有收到 [DONE] 信号，处理已收集的数据
       if (finalResponse.trim()) {
         console.log('[Chat Debug] Stream ended without [DONE], using accumulated response');
+        // 🔧 清理Dify响应：移除<think>标签，格式化JSON内容
+        const { displayContent: cleanedContent, structuredData } = cleanDifyResponse(finalResponse.trim());
+
         const assistantMessage: Message = {
           id: `assistant_${Date.now()}`,
-          content: finalResponse.trim(),
+          content: cleanedContent,
           role: 'assistant',
           timestamp: new Date(),
+          metadata: {
+            structuredContent: structuredData,
+            rawContent: finalResponse.trim()
+          },
         };
         setMessages(prev => [...prev, assistantMessage]);
         console.log('[Chat Debug] Added assistant message from incomplete stream');
@@ -2423,7 +2512,7 @@ export function DifyChatInterface({
     }
 
     // Fix 5: Better content extraction with multiple fallbacks
-    const responseContent = (
+    const rawResponseContent = (
       (typeof data.answer === 'string' ? data.answer : '') ||
       (typeof data.content === 'string' ? data.content : '') ||
       (typeof data.message === 'string' ? data.message : '') ||
@@ -2431,8 +2520,14 @@ export function DifyChatInterface({
       '抱歉，我无法处理您的请求。'
     );
 
+    // 🔧 清理Dify响应：移除<think>标签，格式化JSON内容
+    const { displayContent: responseContent, structuredData } = cleanDifyResponse(rawResponseContent);
+
     console.log('[Chat Debug] Extracted response content:', {
-      length: responseContent.length,
+      rawLength: rawResponseContent.length,
+      cleanedLength: responseContent.length,
+      hasStructuredData: !!structuredData,
+      structuredDataKeys: structuredData ? Object.keys(structuredData) : [],
       preview: responseContent.substring(0, 100) + (responseContent.length > 100 ? '...' : '')
     });
 
@@ -2442,7 +2537,12 @@ export function DifyChatInterface({
       content: responseContent,
       role: 'assistant',
       timestamp: new Date(),
-      metadata: data.metadata,
+      metadata: {
+        ...data.metadata,
+        // 保存结构化数据供后续使用（如发布到小红书）
+        structuredContent: structuredData,
+        rawContent: rawResponseContent // 保留原始内容以备需要
+      },
     };
 
     setMessages(prev => [...prev, assistantMessage]);
