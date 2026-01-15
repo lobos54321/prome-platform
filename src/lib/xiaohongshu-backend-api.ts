@@ -316,6 +316,27 @@ export class XiaohongshuBackendAPI {
     );
   }
 
+  /**
+   * 获取每日任务列表
+   */
+  async getDailyTasks(userId: string, date?: string): Promise<APIResponse<any[]>> {
+    const query = date ? `?date=${date}` : '';
+    return await this.request(
+      `/agent/auto/tasks/${encodeURIComponent(userId)}${query}`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * 生成今日任务 (手动触发)
+   */
+  async generateDailyTasks(userId: string): Promise<APIResponse<any>> {
+    return await this.request(
+      `/agent/auto/tasks/generate/${encodeURIComponent(userId)}`,
+      { method: 'POST' }
+    );
+  }
+
   // ============================================
   // 系统管理 API
   // ============================================
