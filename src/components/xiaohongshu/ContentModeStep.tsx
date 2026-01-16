@@ -84,6 +84,7 @@ export function ContentModeStep({
                 targetAudience: userProfile.target_audience || '',
                 marketingGoal: userProfile.marketing_goal as any,
                 postFrequency: userProfile.post_frequency as any,
+                postsPerDay: userProfile.posts_per_day || 1, // 🔥 每日发布篇数，用于周计划详细内容生成
                 brandStyle: userProfile.brand_style || 'warm',
                 reviewMode: (userProfile.review_mode as any) || 'manual',
                 taskId, // 传递任务ID

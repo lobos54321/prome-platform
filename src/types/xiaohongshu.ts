@@ -220,6 +220,7 @@ export interface ProductConfig {
   targetAudience: string;
   marketingGoal: 'brand' | 'sales' | 'traffic' | 'community';
   postFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  postsPerDay?: number; // 🔥 每日发布篇数 (1-10)，用于周计划详细内容生成
   brandStyle: 'professional' | 'warm' | 'humorous' | 'minimalist';
   reviewMode: 'auto' | 'manual';
   taskId?: string;
