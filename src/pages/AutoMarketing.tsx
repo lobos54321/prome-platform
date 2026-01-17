@@ -13,9 +13,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, ArrowLeft, CheckCircle2, Loader2, Package, Target, Globe2, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowLeft, CheckCircle2, Loader2, Package, Target, Globe2, Sparkles, Play } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { MaterialUpload } from '@/components/xiaohongshu/MaterialUpload';
+import { ContentModeStep } from '@/components/xiaohongshu/ContentModeStep';
+import { userMappingService } from '@/lib/xiaohongshu-user-mapping';
 
 // 平台列表
 const PLATFORMS = [
@@ -26,7 +28,7 @@ const PLATFORMS = [
     { id: 'youtube', name: 'YouTube', icon: '▶️', status: 'coming_soon', description: '全球最大视频平台' },
 ];
 
-type Step = 'config' | 'platforms' | 'redirect';
+type Step = 'config' | 'platforms' | 'content-mode' | 'redirect';
 
 interface ProductConfig {
     productName: string;
@@ -66,10 +68,25 @@ export default function AutoMarketing() {
     // 选中的平台
     const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
 
+    // 🔥 用于 ContentModeStep 的 xhsUserId
+    const [xhsUserId, setXhsUserId] = useState<string>('');
+
+    // 🔥 用户配置（从数据库加载，传给 ContentModeStep）
+    const [userProfile, setUserProfile] = useState<any>(null);
+
     // 获取当前用户
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
             setCurrentUser(session?.user || null);
+            if (session?.user) {
+                // 获取或创建 xhsUserId
+                try {
+                    const userId = await userMappingService.getOrCreateMapping(session.user.id);
+                    setXhsUserId(userId);
+                } catch (err) {
+                    console.error('Failed to get xhsUserId:', err);
+                }
+            }
             setLoading(false);
         });
     }, []);
@@ -199,14 +216,26 @@ export default function AutoMarketing() {
                 .eq('supabase_uuid', currentUser.id);
 
             console.log('✅ 目标平台已保存:', selectedPlatforms);
+
+            // 🔥 加载用户配置传给 ContentModeStep
+            const { data: profile } = await supabase
+                .from('xhs_user_profiles')
+                .select('*')
+                .eq('supabase_uuid', currentUser.id)
+                .single();
+
+            if (profile) {
+                setUserProfile(profile);
+            }
+
         } catch (err) {
             console.error('保存平台选择失败:', err);
             // 继续执行，不阻断流程
         }
 
-        // 目前只支持小红书，直接跳转
+        // 🔥 进入内容形式选择步骤，不再跳转到 /xiaohongshu
         if (selectedPlatforms.includes('xiaohongshu')) {
-            navigate('/xiaohongshu');
+            setCurrentStep('content-mode');
         }
     };
 
@@ -221,35 +250,42 @@ export default function AutoMarketing() {
     };
 
     // 步骤指示器
-    const StepIndicator = () => (
-        <div className="flex items-center justify-center gap-4 mb-8">
-            {[
-                { key: 'config', label: '产品配置', icon: Package },
-                { key: 'platforms', label: '选择平台', icon: Globe2 },
-            ].map((step, index) => {
-                const isActive = currentStep === step.key;
-                const isPast = (currentStep === 'platforms' && step.key === 'config');
-                const Icon = step.icon;
+    const StepIndicator = () => {
+        const steps = [
+            { key: 'config', label: '产品配置', icon: Package },
+            { key: 'platforms', label: '选择平台', icon: Globe2 },
+            { key: 'content-mode', label: '开始运营', icon: Play },
+        ];
 
-                return (
-                    <div key={step.key} className="flex items-center gap-2">
-                        {index > 0 && (
-                            <div className={`w-12 h-0.5 ${isPast ? 'bg-green-500' : 'bg-gray-200'}`} />
-                        )}
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${isActive
-                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                            : isPast
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-gray-100 text-gray-500'
-                            }`}>
-                            {isPast ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
-                            <span className="font-medium">{step.label}</span>
+        const currentIndex = steps.findIndex(s => s.key === currentStep);
+
+        return (
+            <div className="flex items-center justify-center gap-4 mb-8">
+                {steps.map((step, index) => {
+                    const isActive = currentStep === step.key;
+                    const isPast = index < currentIndex;
+                    const Icon = step.icon;
+
+                    return (
+                        <div key={step.key} className="flex items-center gap-2">
+                            {index > 0 && (
+                                <div className={`w-12 h-0.5 ${isPast ? 'bg-green-500' : 'bg-gray-200'}`} />
+                            )}
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${isActive
+                                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                                : isPast
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                {isPast ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                                <span className="font-medium">{step.label}</span>
+                            </div>
                         </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
+                    );
+                })}
+            </div>
+        );
+    };
 
     if (loading) {
         return (
@@ -526,12 +562,28 @@ export default function AutoMarketing() {
                                     disabled={selectedPlatforms.length === 0}
                                     className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
                                 >
-                                    开始运营
+                                    下一步
                                     <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
                             </div>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* Step 3: 内容形式偏好 + 启动运营 */}
+                {currentStep === 'content-mode' && currentUser && xhsUserId && (
+                    <ContentModeStep
+                        supabaseUuid={currentUser.id}
+                        xhsUserId={xhsUserId}
+                        userProfile={userProfile}
+                        onComplete={() => {
+                            // 运营完成后可以跳转到 dashboard 或其他页面
+                            navigate('/xiaohongshu-manager');
+                        }}
+                        onViewDashboard={() => {
+                            navigate('/xiaohongshu-manager');
+                        }}
+                    />
                 )}
             </div>
         </div>
