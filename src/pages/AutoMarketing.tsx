@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { MaterialUpload } from '@/components/xiaohongshu/MaterialUpload';
 import { ContentModeStep } from '@/components/xiaohongshu/ContentModeStep';
 import { userMappingService } from '@/lib/xiaohongshu-user-mapping';
+import { PlatformSwitcher } from '@/components/ui/PlatformSwitcher';
 
 // 平台列表
 const PLATFORMS = [
@@ -67,6 +68,9 @@ export default function AutoMarketing() {
 
     // 选中的平台
     const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+
+    // 🔥 当前激活的平台（多平台切换时使用）
+    const [activePlatform, setActivePlatform] = useState<string>('');
 
     // 🔥 用于 ContentModeStep 的 xhsUserId
     const [xhsUserId, setXhsUserId] = useState<string>('');
@@ -228,15 +232,17 @@ export default function AutoMarketing() {
                 setUserProfile(profile);
             }
 
+            // 🔥 设置初始激活平台（默认第一个）
+            setActivePlatform(selectedPlatforms[0]);
+
         } catch (err) {
             console.error('保存平台选择失败:', err);
             // 继续执行，不阻断流程
         }
 
-        // 🔥 进入内容形式选择步骤，不再跳转到 /xiaohongshu
-        if (selectedPlatforms.includes('xiaohongshu')) {
-            setCurrentStep('content-mode');
-        }
+        // 🔥 进入内容形式选择步骤
+        // 多平台时使用 PlatformSwitcher 切换，单平台时直接显示该平台
+        setCurrentStep('content-mode');
     };
 
     // 素材更新处理
@@ -572,18 +578,31 @@ export default function AutoMarketing() {
 
                 {/* Step 3: 内容形式偏好 + 启动运营 */}
                 {currentStep === 'content-mode' && currentUser && xhsUserId && (
-                    <ContentModeStep
-                        supabaseUuid={currentUser.id}
-                        xhsUserId={xhsUserId}
-                        userProfile={userProfile}
-                        onComplete={() => {
-                            // 运营完成后可以跳转到 dashboard 或其他页面
-                            navigate('/xiaohongshu-manager');
-                        }}
-                        onViewDashboard={() => {
-                            navigate('/xiaohongshu-manager');
-                        }}
-                    />
+                    <div className="space-y-4">
+                        {/* 🔥 多平台切换器 - 当选择多个平台时显示 */}
+                        {selectedPlatforms.length > 1 && (
+                            <PlatformSwitcher
+                                platforms={selectedPlatforms}
+                                activePlatform={activePlatform}
+                                onPlatformChange={setActivePlatform}
+                                className="sticky top-4 z-10"
+                            />
+                        )}
+
+                        <ContentModeStep
+                            supabaseUuid={currentUser.id}
+                            xhsUserId={xhsUserId}
+                            userProfile={userProfile}
+                            activePlatform={activePlatform || selectedPlatforms[0]}
+                            onComplete={() => {
+                                // 运营完成后可以跳转到 dashboard 或其他页面
+                                navigate('/xiaohongshu-manager');
+                            }}
+                            onViewDashboard={() => {
+                                navigate('/xiaohongshu-manager');
+                            }}
+                        />
+                    </div>
                 )}
             </div>
         </div>

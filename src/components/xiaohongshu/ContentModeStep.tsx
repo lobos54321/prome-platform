@@ -20,6 +20,8 @@ interface ContentModeStepProps {
     supabaseUuid: string;
     xhsUserId: string;
     userProfile?: UserProfile | null;
+    /** 🔥 当前激活的平台（多平台切换时由父组件传入） */
+    activePlatform?: string;
     onComplete: () => void;
     onViewDashboard: () => void;
 }
@@ -28,6 +30,7 @@ export function ContentModeStep({
     supabaseUuid,
     xhsUserId,
     userProfile,
+    activePlatform,
     onComplete,
     onViewDashboard,
 }: ContentModeStepProps) {
