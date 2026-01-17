@@ -30,6 +30,7 @@ import {
     X,
     LayoutDashboard
 } from 'lucide-react';
+import { PlatformSwitcher, PLATFORM_CONFIGS } from '@/components/ui/PlatformSwitcher';
 
 // 默认节点配置（使用自有品牌名）
 const DEFAULT_NODES: Record<WorkflowMode, WorkflowNode[]> = {
@@ -131,6 +132,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     const [localContentStrategy, setLocalContentStrategy] = useState<ContentStrategy | null>(contentStrategy || null);
     const [localWeeklyPlan, setLocalWeeklyPlan] = useState<WeeklyPlan | null>(weeklyPlan || null);
     const [isWorkflowCompleted, setIsWorkflowCompleted] = useState(false);
+    // 🔥 多平台切换 - 默认选中第一个平台
+    const [activePlatform, setActivePlatform] = useState<string>(targetPlatforms?.[0] || 'xiaohongshu');
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -566,6 +569,16 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
 
             {/* 3. 右侧：内容产出 / 日志切换 */}
             <main className="flex-1 flex flex-col bg-slate-50/30">
+                {/* 🔥 多平台切换器 - 当有多个目标平台时显示 */}
+                {targetPlatforms && targetPlatforms.length > 1 && (
+                    <div className="px-6 pt-4 pb-2 bg-white border-b border-slate-100">
+                        <PlatformSwitcher
+                            platforms={targetPlatforms}
+                            activePlatform={activePlatform}
+                            onPlatformChange={setActivePlatform}
+                        />
+                    </div>
+                )}
                 <header className="h-14 px-6 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md">
                     <div className="flex items-center gap-2">
                         {/* Tab 切换 */}
@@ -630,6 +643,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                 <TodayContentPreview
                                     content={localResult || todayContent}
                                     targetPlatforms={targetPlatforms}
+                                    activePlatform={activePlatform}
                                     onRegeneratePlatformVariant={onRegeneratePlatformVariant}
                                     onPublish={async () => {
                                         if (onPublish) {

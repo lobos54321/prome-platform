@@ -34,6 +34,8 @@ interface TodayContentPreviewProps {
     } | null;
     // 🔥 目标平台列表
     targetPlatforms?: string[];
+    // 🔥 当前激活的平台（用于过滤显示）
+    activePlatform?: string;
     // 🔥 重新生成平台变体的回调
     onRegeneratePlatformVariant?: (platform: string, prompt: string) => Promise<PlatformVariant | null>;
     onPublish?: () => Promise<void>;
@@ -46,6 +48,7 @@ interface TodayContentPreviewProps {
 export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
     content,
     targetPlatforms = ['xiaohongshu'],
+    activePlatform,
     onRegeneratePlatformVariant,
     onPublish,
     onEdit,
@@ -74,7 +77,7 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
     const activeContent = content.variants?.[selectedVariantIndex] || content;
 
     // 🔥 检测是否有平台变体（包含 platform 字段的变体）
-    const platformVariants: PlatformVariant[] = (content.variants || [])
+    const allPlatformVariants: PlatformVariant[] = (content.variants || [])
         .filter(v => v.platform)
         .map(v => ({
             platform: v.platform!,
@@ -83,6 +86,11 @@ export const TodayContentPreview: React.FC<TodayContentPreviewProps> = ({
             text: v.text,
             hashtags: v.hashtags,
         }));
+
+    // 🔥 根据 activePlatform 过滤变体（如果指定了激活平台）
+    const platformVariants: PlatformVariant[] = activePlatform
+        ? allPlatformVariants.filter(v => v.platform === activePlatform)
+        : allPlatformVariants;
 
     const hasPlatformVariants = platformVariants.length > 0;
 
