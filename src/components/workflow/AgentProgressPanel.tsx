@@ -628,14 +628,56 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                         <LogDetail node={activeNode as WorkflowNode} />
                                     </div>
                                 </div>
-                            ) : ['weekly-plan', 'detail-plan'].includes(activeNodeId) ? (
+                            ) : activeNodeId === 'weekly-plan' ? (
                                 <div className="p-8 h-full overflow-y-auto">
                                     <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                        <Calendar className="text-blue-500" /> 详细发布计划策划
+                                        <Calendar className="text-blue-500" /> 每周内容计划
                                     </h2>
                                     <WeeklyPlanTimeline weeklyPlan={localWeeklyPlan} />
                                     <div className="mt-8 border-t border-slate-100 pt-8">
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">编排详情</h3>
+                                        <LogDetail node={activeNode as WorkflowNode} />
+                                    </div>
+                                </div>
+                            ) : activeNodeId === 'detail-plan' ? (
+                                <div className="p-8 h-full overflow-y-auto">
+                                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                        <Calendar className="text-emerald-500" /> 今日执行计划
+                                    </h2>
+                                    {/* 显示今日任务确认信息 */}
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                                                <Zap className="text-emerald-600" size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-emerald-800">今日任务确认</h3>
+                                                <p className="text-sm text-emerald-600">基于周计划快速确认今日执行目标</p>
+                                            </div>
+                                        </div>
+                                        {(activeNode?.details?.output as any)?.today_theme && (
+                                            <div className="space-y-3 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span className="text-emerald-700">今日主题:</span>
+                                                    <span className="font-medium text-emerald-900">{(activeNode?.details?.output as any)?.today_theme}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-emerald-700">计划篇数:</span>
+                                                    <span className="font-medium text-emerald-900">{(activeNode?.details?.output as any)?.posts_count || 1} 篇</span>
+                                                </div>
+                                                {(activeNode?.details?.output as any)?.message && (
+                                                    <div className="pt-3 border-t border-emerald-200">
+                                                        <p className="text-emerald-800">{(activeNode?.details?.output as any)?.message}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {!(activeNode?.details?.output as any)?.today_theme && (
+                                            <p className="text-emerald-600 text-sm">等待任务确认中...</p>
+                                        )}
+                                    </div>
+                                    <div className="mt-6 border-t border-slate-100 pt-6">
+                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">执行详情</h3>
                                         <LogDetail node={activeNode as WorkflowNode} />
                                     </div>
                                 </div>
