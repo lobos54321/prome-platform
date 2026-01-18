@@ -23,8 +23,8 @@ import { PlatformSwitcher } from '@/components/ui/PlatformSwitcher';
 // 平台列表
 const PLATFORMS = [
     { id: 'xiaohongshu', name: '小红书', icon: '📕', status: 'ready', description: '中国领先的生活方式社区' },
-    { id: 'x', name: 'X (Twitter)', icon: '𝕏', status: 'coming_soon', description: '全球实时社交媒体' },
-    { id: 'tiktok', name: 'TikTok', icon: '🎵', status: 'coming_soon', description: '短视频娱乐平台' },
+    { id: 'x', name: 'X (Twitter)', icon: '𝕏', status: 'ready', description: '全球实时社交媒体' },
+    { id: 'tiktok', name: 'TikTok', icon: '🎵', status: 'ready', description: '短视频娱乐平台' },
     { id: 'threads', name: 'Threads', icon: '📱', status: 'coming_soon', description: 'Meta 文字社交应用' },
     { id: 'youtube', name: 'YouTube', icon: '▶️', status: 'coming_soon', description: '全球最大视频平台' },
 ];
