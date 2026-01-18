@@ -42,6 +42,8 @@ interface ProductConfig {
     materialImages: string[];
     materialDocuments: string[];
     materialAnalysis: string;
+    // 🔥 新增：舆情开关
+    enableSentiment: boolean;
 }
 
 export default function AutoMarketing() {
@@ -64,6 +66,8 @@ export default function AutoMarketing() {
         materialImages: [],
         materialDocuments: [],
         materialAnalysis: '',
+        // 🔥 默认启用舆情分析
+        enableSentiment: true,
     });
 
     // 选中的平台
@@ -78,7 +82,7 @@ export default function AutoMarketing() {
     // 🔥 用户配置（从数据库加载，传给 ContentModeStep）
     const [userProfile, setUserProfile] = useState<any>(null);
 
-    // 获取当前用户
+    // 获取当前用户 + 加载已保存的配置
     useEffect(() => {
         supabase.auth.getSession().then(async ({ data: { session } }) => {
             setCurrentUser(session?.user || null);
@@ -89,6 +93,56 @@ export default function AutoMarketing() {
                     setXhsUserId(userId);
                 } catch (err) {
                     console.error('Failed to get xhsUserId:', err);
+                }
+
+                // 🔥 加载已保存的用户配置
+                try {
+                    const { data: profile } = await supabase
+                        .from('xhs_user_profiles')
+                        .select('*')
+                        .eq('supabase_uuid', session.user.id)
+                        .single();
+
+                    if (profile) {
+                        console.log('✅ 已加载用户配置:', profile.product_name);
+                        setUserProfile(profile);
+
+                        // 恢复配置状态
+                        setConfig({
+                            productName: profile.product_name || '',
+                            targetAudience: profile.target_audience || '',
+                            region: profile.region || '',
+                            marketingGoal: profile.marketing_goal || 'brand',
+                            postsPerDay: profile.posts_per_day || 1,
+                            brandStyle: profile.brand_style || 'warm',
+                            reviewMode: profile.review_mode || 'manual',
+                            materialImages: profile.material_images || [],
+                            materialDocuments: profile.material_documents || [],
+                            materialAnalysis: profile.material_analysis || '',
+                            enableSentiment: true, // 默认启用
+                        });
+
+                        // 恢复已选平台
+                        if (profile.target_platforms && profile.target_platforms.length > 0) {
+                            setSelectedPlatforms(profile.target_platforms);
+                            setActivePlatform(profile.target_platforms[0]);
+                        }
+
+                        // 🔥 根据已保存的数据决定初始步骤
+                        if (profile.product_name && profile.target_audience) {
+                            // 有产品配置
+                            if (profile.target_platforms && profile.target_platforms.length > 0) {
+                                // 有平台选择 -> 直接进入 content-mode
+                                setCurrentStep('content-mode');
+                            } else {
+                                // 没有平台选择 -> 进入平台选择
+                                setCurrentStep('platforms');
+                            }
+                        }
+                        // 否则保持在 config 步骤
+                    }
+                } catch (err) {
+                    console.log('首次使用，无已保存配置');
                 }
             }
             setLoading(false);
@@ -442,6 +496,40 @@ export default function AutoMarketing() {
                                         </SelectContent>
                                     </Select>
                                 </div>
+
+                                {/* 🔥 舆情分析开关 */}
+                                <div className="space-y-2">
+                                    <Label>舆情热点分析</Label>
+                                    <div
+                                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                                            config.enableSentiment
+                                                ? 'bg-orange-50 border-orange-200'
+                                                : 'bg-gray-50 border-gray-200'
+                                        }`}
+                                        onClick={() => setConfig(prev => ({ ...prev, enableSentiment: !prev.enableSentiment }))}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xl">{config.enableSentiment ? '🔥' : '⏸️'}</span>
+                                            <div>
+                                                <p className="font-medium text-sm">
+                                                    {config.enableSentiment ? '已启用舆情分析' : '舆情分析已关闭'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {config.enableSentiment
+                                                        ? '自动获取热门话题和关键词（每天缓存）'
+                                                        : '使用 AI 智能创作，不分析市场热点'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors ${
+                                            config.enableSentiment ? 'bg-orange-500' : 'bg-gray-300'
+                                        }`}>
+                                            <div className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                                                config.enableSentiment ? 'translate-x-6' : 'translate-x-0'
+                                            }`} />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* 产品素材：文档+图片+视频 */}
@@ -594,6 +682,7 @@ export default function AutoMarketing() {
                             xhsUserId={xhsUserId}
                             userProfile={userProfile}
                             activePlatform={activePlatform || selectedPlatforms[0]}
+                            enableSentiment={config.enableSentiment}
                             onComplete={() => {
                                 // 运营完成后可以跳转到 dashboard 或其他页面
                                 navigate('/xiaohongshu-manager');

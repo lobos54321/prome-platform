@@ -22,6 +22,8 @@ interface ContentModeStepProps {
     userProfile?: UserProfile | null;
     /** 🔥 当前激活的平台（多平台切换时由父组件传入） */
     activePlatform?: string;
+    /** 🔥 是否启用舆情分析（默认 true） */
+    enableSentiment?: boolean;
     onComplete: () => void;
     onViewDashboard: () => void;
 }
@@ -31,6 +33,7 @@ export function ContentModeStep({
     xhsUserId,
     userProfile,
     activePlatform,
+    enableSentiment = true,
     onComplete,
     onViewDashboard,
 }: ContentModeStepProps) {
@@ -93,6 +96,7 @@ export function ContentModeStep({
                 taskId, // 传递任务ID
                 contentModePreference: selectedWorkflowMode, // 🔥 使用当前选择的模式而非 userProfile 中的旧值
                 targetPlatforms: selectedPlatforms, // 🔥 传递选择的目标平台
+                enableSentiment, // 🔥 舆情开关
             });
 
             if (!response.success) {

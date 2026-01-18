@@ -32,36 +32,34 @@ import {
 } from 'lucide-react';
 import { PlatformSwitcher, PLATFORM_CONFIGS } from '@/components/ui/PlatformSwitcher';
 
-// 默认节点配置（使用自有品牌名）
+// 🔥 已优化节点配置（v2.0）
+// 1. 新增 sentiment 舆情热点节点（真实 BettaFish 数据）
+// 2. 删除假节点: copy-analyze, detail-plan, image-adapt
 const DEFAULT_NODES: Record<WorkflowMode, WorkflowNode[]> = {
     [WorkflowMode.IMAGE_TEXT]: [
+        { id: 'sentiment', title: '舆情热点分析', agent: 'Prome BettaFish', desc: '获取实时市场舆情和热门话题趋势', status: NodeStatus.PENDING, details: {} },
         { id: 'market-strategy', title: '内容营销策略', agent: 'Prome Strategy Master', desc: '根据品牌定位生成长期内容营销策略', status: NodeStatus.PENDING, details: {} },
         { id: 'weekly-plan', title: '每周计划生成', agent: 'Prome Planner', desc: '基于营销策略制定 7 天发布规律与节奏', status: NodeStatus.PENDING, details: {} },
-        { id: 'detail-plan', title: '详细发布计划', agent: 'Prome Orchestrator', desc: '基于周计划拆解今日的具体执行目标', status: NodeStatus.PENDING, details: {} },
-        { id: 'copy-analyze', title: '文案策略分析', agent: 'Prome Content Analyzer', desc: '提取热点金句，计算权重，决定分发策略', status: NodeStatus.PENDING, details: {} },
         { id: 'copy-gen', title: '智能文案生成', agent: 'Prome Marketing Engine', desc: '基于 Dify 工作流生成核心母文案', status: NodeStatus.PENDING, details: {} },
         { id: 'variant-gen', title: '变体文案生成', agent: 'Prome Copywriter', desc: '生成变体文案以适配图文内容形态', status: NodeStatus.PENDING, details: {} },
-        { id: 'image-adapt', title: '图片智能适配', agent: 'Prome Vision AI', desc: '分析素材与文案匹配度，规划补充图片', status: NodeStatus.PENDING, details: {} },
         { id: 'image-gen', title: '图片生成编排', agent: 'Prome Image Studio', desc: '根据需求生成高精图片并合成任务', status: NodeStatus.PENDING, details: {} },
         { id: 'task-save', title: '内容入库', agent: 'Prome Executor', desc: '完成生成并同步至待审任务列表', status: NodeStatus.PENDING, details: {} },
     ],
     [WorkflowMode.AVATAR_VIDEO]: [
+        { id: 'sentiment', title: '舆情热点分析', agent: 'Prome BettaFish', desc: '获取实时市场舆情和热门话题趋势', status: NodeStatus.PENDING, details: {} },
         { id: 'market-strategy', title: '内容营销策略', agent: 'Prome Strategy Master', desc: '确定内容垂类与数字人营销策略', status: NodeStatus.PENDING, details: {} },
         { id: 'weekly-plan', title: '每周计划生成', agent: 'Prome Planner', desc: '生成本周视频发布频率与主题规划', status: NodeStatus.PENDING, details: {} },
-        { id: 'detail-plan', title: '详细发布计划', agent: 'Prome Orchestrator', desc: '锁定今日视频脚本目标与分镜大纲', status: NodeStatus.PENDING, details: {} },
         { id: 'script-gen', title: '口播脚本生成', agent: 'Prome Script Writer', desc: '生成高转化率的数字人口播文案脚本', status: NodeStatus.PENDING, details: {} },
         { id: 'voice-clone', title: '语音克隆合成', agent: 'Prome Voice Engine', desc: '合成带情感的真人克隆音轨', status: NodeStatus.PENDING, details: {} },
         { id: 'avatar-render', title: '数字人渲染', agent: 'Prome Avatar Renderer', desc: '唇形同步与身体姿态融合渲染', status: NodeStatus.PENDING, details: {} },
         { id: 'task-save', title: '内容入库', agent: 'Prome Executor', desc: '同步至待审视频任务列表', status: NodeStatus.PENDING, details: {} },
     ],
     [WorkflowMode.UGC_VIDEO]: [
+        { id: 'sentiment', title: '舆情热点分析', agent: 'Prome BettaFish', desc: '获取实时市场舆情和热门话题趋势', status: NodeStatus.PENDING, details: {} },
         { id: 'market-strategy', title: '内容营销策略', agent: 'Prome Strategy Master', desc: '确定 UGC 真实感营销路径与主题', status: NodeStatus.PENDING, details: {} },
         { id: 'weekly-plan', title: '每周计划生成', agent: 'Prome Planner', desc: '规划本周 UGC 视频的发布节奏', status: NodeStatus.PENDING, details: {} },
-        { id: 'detail-plan', title: '详细发布计划', agent: 'Prome Orchestrator', desc: '确定今日 UGC 视频的拍摄场景与目标', status: NodeStatus.PENDING, details: {} },
-        { id: 'copy-analyze', title: '文案策略分析', agent: 'Prome Content Analyzer', desc: '提取 UGC 低成本高转化文案逻辑', status: NodeStatus.PENDING, details: {} },
         { id: 'copy-gen', title: '智能文案生成', agent: 'Prome Marketing Engine', desc: '基于 Dify 生成原生感母文案', status: NodeStatus.PENDING, details: {} },
         { id: 'variant-gen', title: '变体文案生成', agent: 'Prome Copywriter', desc: '适配手持拍摄感的文案变体', status: NodeStatus.PENDING, details: {} },
-        { id: 'vision-analyze', title: '视觉特征分析', agent: 'Prome Visual AI', desc: '深度分析产品图：色彩、材质、光影', status: NodeStatus.PENDING, details: {} },
         { id: 'scene-gen', title: '场景图生成', agent: 'Prome Scene Studio', desc: '生成高度拟真的 UGC 拍摄背景图', status: NodeStatus.PENDING, details: {} },
         { id: 'video-gen', title: '动态视频生成', agent: 'Prome Video Engine', desc: '基于场景图与文案生成关键镜头', status: NodeStatus.PENDING, details: {} },
         { id: 'task-save', title: '内容入库', agent: 'Prome Executor', desc: '同步至待审 UGC 任务列表', status: NodeStatus.PENDING, details: {} },
@@ -209,20 +207,16 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         }
                     }
 
-                    // 提取详细计划结果 (显示今日目标标题)
-                    if (updatedNode.id === 'detail-plan' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
+                    // 🔥 提取舆情分析结果 (sentiment node)
+                    if (updatedNode.id === 'sentiment' && updatedNode.status === NodeStatus.COMPLETED && updatedNode.details.output) {
                         try {
                             const output = typeof updatedNode.details.output === 'string'
                                 ? JSON.parse(updatedNode.details.output)
                                 : updatedNode.details.output;
-                            if (output.today_target) {
-                                setLocalResult((prev: any) => ({
-                                    ...prev,
-                                    title: output.today_target
-                                }));
-                            }
+                            console.log('[AgentProgressPanel] Extracted sentiment data:', output);
+                            // 舆情数据会被 market-strategy 使用，这里只做日志记录
                         } catch (e) {
-                            console.warn('Failed to parse detail-plan result:', e);
+                            console.warn('Failed to parse sentiment result:', e);
                         }
                     }
 
@@ -611,7 +605,54 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                 <div className="flex-1 overflow-hidden p-4">
                     <div className="h-full bg-white rounded-2xl border border-slate-100 shadow-lg overflow-hidden flex flex-col">
                         {rightPanelView === 'content' ? (
-                            ['market-strategy', 'copy-analyze'].includes(activeNodeId) ? (
+                            activeNodeId === 'sentiment' ? (
+                                <div className="p-8 h-full overflow-y-auto">
+                                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                        🔥 舆情热点分析
+                                    </h2>
+                                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6 mb-6">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                                                <Activity className="text-orange-600" size={20} />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-orange-800">BettaFish 实时舆情</h3>
+                                                <p className="text-sm text-orange-600">获取市场热点与话题趋势</p>
+                                            </div>
+                                        </div>
+                                        {(activeNode?.details?.output as any)?.topics ? (
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-orange-700 mb-2">热门话题</h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {((activeNode?.details?.output as any)?.topics || []).slice(0, 5).map((topic: string, i: number) => (
+                                                            <span key={i} className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
+                                                                {topic}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-orange-700 mb-2">关键词</h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {((activeNode?.details?.output as any)?.keywords || []).slice(0, 10).map((kw: string, i: number) => (
+                                                            <span key={i} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                                                #{kw}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-orange-600 text-sm">正在获取舆情数据...</p>
+                                        )}
+                                    </div>
+                                    <div className="mt-6 border-t border-slate-100 pt-6">
+                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">执行详情</h3>
+                                        <LogDetail node={activeNode as WorkflowNode} />
+                                    </div>
+                                </div>
+                            ) : activeNodeId === 'market-strategy' ? (
                                 <div className="p-8 h-full overflow-y-auto">
                                     <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
                                         <Zap className="text-amber-500" /> 内容营销策略分析
@@ -636,48 +677,6 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                     <WeeklyPlanTimeline weeklyPlan={localWeeklyPlan} />
                                     <div className="mt-8 border-t border-slate-100 pt-8">
                                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">编排详情</h3>
-                                        <LogDetail node={activeNode as WorkflowNode} />
-                                    </div>
-                                </div>
-                            ) : activeNodeId === 'detail-plan' ? (
-                                <div className="p-8 h-full overflow-y-auto">
-                                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                        <Calendar className="text-emerald-500" /> 今日执行计划
-                                    </h2>
-                                    {/* 显示今日任务确认信息 */}
-                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 mb-6">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                                                <Zap className="text-emerald-600" size={20} />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-emerald-800">今日任务确认</h3>
-                                                <p className="text-sm text-emerald-600">基于周计划快速确认今日执行目标</p>
-                                            </div>
-                                        </div>
-                                        {(activeNode?.details?.output as any)?.today_theme && (
-                                            <div className="space-y-3 text-sm">
-                                                <div className="flex justify-between">
-                                                    <span className="text-emerald-700">今日主题:</span>
-                                                    <span className="font-medium text-emerald-900">{(activeNode?.details?.output as any)?.today_theme}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-emerald-700">计划篇数:</span>
-                                                    <span className="font-medium text-emerald-900">{(activeNode?.details?.output as any)?.posts_count || 1} 篇</span>
-                                                </div>
-                                                {(activeNode?.details?.output as any)?.message && (
-                                                    <div className="pt-3 border-t border-emerald-200">
-                                                        <p className="text-emerald-800">{(activeNode?.details?.output as any)?.message}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        {!(activeNode?.details?.output as any)?.today_theme && (
-                                            <p className="text-emerald-600 text-sm">等待任务确认中...</p>
-                                        )}
-                                    </div>
-                                    <div className="mt-6 border-t border-slate-100 pt-6">
-                                        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">执行详情</h3>
                                         <LogDetail node={activeNode as WorkflowNode} />
                                     </div>
                                 </div>
