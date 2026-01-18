@@ -392,16 +392,34 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     }, [connectWebSocket]);
 
     // 🔥 切换模式时保存当前节点状态并恢复目标模式的缓存
+    // 共用节点（相同ID）的状态会同步到目标模式
     const handleModeSwitch = useCallback((newMode: WorkflowMode) => {
         if (newMode === activeMode) return;
 
         // 保存当前模式的节点状态到缓存
         nodesCacheRef.current[activeMode] = nodes;
 
-        // 恢复目标模式的缓存节点状态
+        // 获取目标模式的缓存节点
         const cachedNodes = nodesCacheRef.current[newMode];
-        setNodes(cachedNodes);
-        setActiveNodeId(cachedNodes[0]?.id || '');
+
+        // 🔥 同步共用节点的状态（按ID匹配）
+        const syncedNodes = cachedNodes.map(targetNode => {
+            // 在当前模式中查找相同ID的节点
+            const sourceNode = nodes.find(n => n.id === targetNode.id);
+            if (sourceNode) {
+                // 共用节点：保持状态同步
+                return {
+                    ...targetNode,
+                    status: sourceNode.status,
+                    details: sourceNode.details,
+                };
+            }
+            // 非共用节点：保持原状态
+            return targetNode;
+        });
+
+        setNodes(syncedNodes);
+        setActiveNodeId(syncedNodes[0]?.id || '');
         setActiveMode(newMode);
     }, [activeMode, nodes]);
 
