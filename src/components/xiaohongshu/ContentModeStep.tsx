@@ -138,6 +138,17 @@ export function ContentModeStep({
             console.log('🏁 [ContentModeStep] Step 4: Activating Progress Panel...');
             setCurrentTaskId(taskId);
             setShowProgressPanel(true);
+
+            // 🔥 更新 URL 到对应平台（不触发路由跳转，只更新显示）
+            const platform = activePlatform || selectedPlatforms[0] || 'xiaohongshu';
+            const platformUrls: Record<string, string> = {
+                xiaohongshu: '/xiaohongshu',
+                x: '/x',
+                tiktok: '/tiktok',
+                instagram: '/instagram',
+                youtube: '/youtube',
+            };
+            window.history.replaceState(null, '', platformUrls[platform] || '/xiaohongshu');
         } catch (err) {
             console.error('❌ [ContentModeStep] Operation failed:', err);
             setError(err instanceof Error ? err.message : '启动失败，请稍后重试');
