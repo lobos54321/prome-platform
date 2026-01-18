@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ interface DashboardData {
 }
 
 export default function XiaohongshuAutoManager() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -811,7 +813,7 @@ export default function XiaohongshuAutoManager() {
   };
 
   const handleReconfigure = async () => {
-    if (!confirm('确定要重新配置吗？这将停止当前的自动运营并清除所有数据。')) {
+    if (!confirm('确定要重新配置吗？这将跳转到配置向导页面。')) {
       return;
     }
 
@@ -819,24 +821,8 @@ export default function XiaohongshuAutoManager() {
       stopPolling();
       setAutoModeEnabled(false);
 
-      if (currentUser) {
-        localStorage.removeItem(`userConfig_${currentUser}`);
-        await fetch(`${CLAUDE_API}/agent/auto/reset/${currentUser}`, {
-          method: 'POST'
-        }).catch(console.error);
-      }
-
-      setConfig({
-        productName: '',
-        targetAudience: '',
-        marketingGoal: 'brand-awareness',
-        postFrequency: 'daily-2',
-        brandStyle: 'professional',
-        reviewMode: 'auto-publish'
-      });
-
-      setDashboardData({});
-      setShowSetup(true);
+      // 🔥 直接跳转到配置页面，让用户重新配置
+      navigate('/auto');
     } catch (error) {
       console.error('重新配置失败:', error);
     }
@@ -1048,12 +1034,11 @@ export default function XiaohongshuAutoManager() {
           <p className="text-muted-foreground">一次设置，终身自动 - 让Claude为你打理一切</p>
         </div>
         <div className="flex gap-2">
-          {!showSetup && (
-            <Button variant="outline" onClick={handleReconfigure}>
-              <Settings className="w-4 h-4 mr-2" />
-              重新配置
-            </Button>
-          )}
+          {/* 🔥 重新配置按钮始终显示 */}
+          <Button variant="outline" onClick={handleReconfigure}>
+            <Settings className="w-4 h-4 mr-2" />
+            重新配置
+          </Button>
           {isLoggedIn && (
             <Button variant="destructive" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
