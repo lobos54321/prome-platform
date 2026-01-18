@@ -27,7 +27,6 @@ import {
     Terminal,
     Activity,
     Zap,
-    X,
     LayoutDashboard,
     Settings2
 } from 'lucide-react';
@@ -478,10 +477,6 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         <Settings2 size={20} className="group-hover:text-blue-500 transition-colors" />
                     </button>
                 )}
-
-                <button onClick={onClose} className="p-3 rounded-xl text-slate-400 hover:bg-slate-50 transition-colors">
-                    <X size={20} />
-                </button>
             </aside>
 
             {/* 2. 中间：策略+计划+编排 */}

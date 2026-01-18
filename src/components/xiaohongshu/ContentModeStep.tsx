@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Eye, Loader2, AlertCircle } from 'lucide-react';
+import { Play, Loader2, AlertCircle } from 'lucide-react';
 import { ContentModeConfig } from './ContentModeConfig';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
@@ -293,14 +293,7 @@ export function ContentModeStep({
             {/* 操作按钮 */}
             <Card>
                 <CardContent className="p-6">
-                    <div className="flex justify-between items-center">
-                        <Button
-                            variant="outline"
-                            onClick={onViewDashboard}
-                        >
-                            <Eye className="h-4 w-4 mr-2" />
-                            查看运营仪表盘
-                        </Button>
+                    <div className="flex justify-end items-center">
                         <Button
                             onClick={handleStartOperation}
                             disabled={starting}
