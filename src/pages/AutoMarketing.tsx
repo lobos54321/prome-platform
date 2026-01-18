@@ -684,11 +684,28 @@ export default function AutoMarketing() {
                             activePlatform={activePlatform || selectedPlatforms[0]}
                             enableSentiment={config.enableSentiment}
                             onComplete={() => {
-                                // 运营完成后可以跳转到 dashboard 或其他页面
-                                navigate('/xiaohongshu-manager');
+                                // 🔥 运营完成后跳转到对应平台的管理页面
+                                const platform = activePlatform || selectedPlatforms[0] || 'xiaohongshu';
+                                const platformRoutes: Record<string, string> = {
+                                    xiaohongshu: '/xiaohongshu-manager',
+                                    x: '/x',
+                                    tiktok: '/tiktok',
+                                    threads: '/threads',
+                                    youtube: '/youtube',
+                                };
+                                navigate(platformRoutes[platform] || '/xiaohongshu-manager');
                             }}
                             onViewDashboard={() => {
-                                navigate('/xiaohongshu-manager');
+                                // 🔥 查看仪表盘也跳转到对应平台
+                                const platform = activePlatform || selectedPlatforms[0] || 'xiaohongshu';
+                                const platformRoutes: Record<string, string> = {
+                                    xiaohongshu: '/xiaohongshu-manager',
+                                    x: '/x',
+                                    tiktok: '/tiktok',
+                                    threads: '/threads',
+                                    youtube: '/youtube',
+                                };
+                                navigate(platformRoutes[platform] || '/xiaohongshu-manager');
                             }}
                         />
                     </div>
