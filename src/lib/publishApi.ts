@@ -6,7 +6,7 @@
 
 const API_BASE = import.meta.env.VITE_XHS_API_URL || 'http://localhost:8080';
 
-export type Platform = 'xiaohongshu' | 'tiktok' | 'instagram' | 'youtube' | 'pinterest';
+export type Platform = 'xiaohongshu' | 'tiktok' | 'instagram' | 'youtube' | 'pinterest' | 'x';
 export type PublishStatus = 'pending' | 'queued' | 'publishing' | 'completed' | 'failed';
 export type ContentType = 'image_text' | 'video';
 
@@ -130,7 +130,8 @@ export function getPlatformConfig(platform: Platform): {
         tiktok: { name: 'TikTok', icon: '🎵', method: 'skyvern', enabled: true },
         instagram: { name: 'Instagram', icon: '📷', method: 'skyvern', enabled: true },
         youtube: { name: 'YouTube', icon: '▶️', method: 'skyvern', enabled: false },
-        pinterest: { name: 'Pinterest', icon: '📌', method: 'skyvern', enabled: false }
+        pinterest: { name: 'Pinterest', icon: '📌', method: 'skyvern', enabled: false },
+        x: { name: 'X (Twitter)', icon: '𝕏', method: 'skyvern', enabled: true }
     };
 
     return configs[platform];

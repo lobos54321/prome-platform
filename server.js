@@ -8772,6 +8772,289 @@ app.post('/api/debug/dify-test', async (req, res) => {
   res.json(results);
 });
 
+// ==================== Publish API Routes ====================
+// 多平台发布 API - 支持 Skyvern 自动发布
+
+/**
+ * 创建发布任务
+ * POST /api/publish/create
+ */
+app.post('/api/publish/create', async (req, res) => {
+  try {
+    const { userId, contentId, contentType, title, content, images, videoUrl, tags, platforms, scheduledAt } = req.body;
+
+    if (!userId || !title || !platforms || platforms.length === 0) {
+      return res.status(400).json({ message: 'Missing required fields: userId, title, platforms' });
+    }
+
+    // 平台配置
+    const PLATFORM_CONFIG = {
+      xiaohongshu: { method: 'chrome_extension', enabled: true },
+      tiktok: { method: 'skyvern', enabled: true },
+      instagram: { method: 'skyvern', enabled: true },
+      youtube: { method: 'skyvern', enabled: false },
+      pinterest: { method: 'skyvern', enabled: false },
+      x: { method: 'skyvern', enabled: true }
+    };
+
+    const tasks = [];
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    for (const platform of platforms) {
+      const config = PLATFORM_CONFIG[platform];
+      if (!config || !config.enabled) {
+        console.warn(`[PublishAPI] Platform ${platform} is not enabled, skipping`);
+        continue;
+      }
+
+      const task = {
+        user_id: userId,
+        content_id: contentId,
+        content_type: contentType || 'image_text',
+        title,
+        content: content || '',
+        images: images || [],
+        video_url: videoUrl,
+        tags: tags || [],
+        platform,
+        method: config.method,
+        status: 'pending',
+        scheduled_at: scheduledAt
+      };
+
+      const { data, error } = await supabase
+        .from('publish_tasks')
+        .insert(task)
+        .select()
+        .single();
+
+      if (error) {
+        console.error(`[PublishAPI] Failed to create task for ${platform}:`, error);
+        continue;
+      }
+
+      tasks.push(data);
+    }
+
+    console.log(`[PublishAPI] Created ${tasks.length} publish tasks`);
+    res.json(tasks);
+
+  } catch (error) {
+    console.error('[PublishAPI] Create tasks error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/**
+ * 获取发布任务列表
+ * GET /api/publish/tasks
+ */
+app.get('/api/publish/tasks', async (req, res) => {
+  try {
+    const { userId, platform, status, limit } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'Missing required field: userId' });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    let query = supabase
+      .from('publish_tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (platform) {
+      query = query.eq('platform', platform);
+    }
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (limit) {
+      query = query.limit(parseInt(limit));
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    res.json(data || []);
+
+  } catch (error) {
+    console.error('[PublishAPI] Get tasks error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/**
+ * 通过 Skyvern 发布
+ * POST /api/publish/skyvern/:taskId
+ */
+app.post('/api/publish/skyvern/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // 获取任务
+    const { data: task, error: fetchError } = await supabase
+      .from('publish_tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single();
+
+    if (fetchError || !task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    // Skyvern 配置
+    const SKYVERN_API_URL = process.env.SKYVERN_API_URL || 'http://localhost:8000/api/v1';
+    const SKYVERN_API_KEY = process.env.SKYVERN_API_KEY || '';
+
+    // 获取工作流 ID
+    const workflows = {
+      tiktok: process.env.SKYVERN_WORKFLOW_TIKTOK || '',
+      instagram: process.env.SKYVERN_WORKFLOW_INSTAGRAM || '',
+      youtube: process.env.SKYVERN_WORKFLOW_YOUTUBE || '',
+      pinterest: process.env.SKYVERN_WORKFLOW_PINTEREST || '',
+      x: process.env.SKYVERN_WORKFLOW_X || ''
+    };
+
+    const workflowId = workflows[task.platform];
+    if (!workflowId) {
+      return res.status(400).json({
+        success: false,
+        message: `No Skyvern workflow configured for platform: ${task.platform}`
+      });
+    }
+
+    // 调用 Skyvern API
+    const skyvernPayload = {
+      workflow_id: workflowId,
+      data: {
+        title: task.title,
+        content: task.content || '',
+        images: task.images || [],
+        video_url: task.video_url,
+        tags: task.tags || []
+      }
+    };
+
+    const skyvernResponse = await fetch(`${SKYVERN_API_URL}/workflows/${workflowId}/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': SKYVERN_API_KEY
+      },
+      body: JSON.stringify(skyvernPayload)
+    });
+
+    if (!skyvernResponse.ok) {
+      const errorText = await skyvernResponse.text();
+      throw new Error(`Skyvern API error: ${skyvernResponse.status} - ${errorText}`);
+    }
+
+    const skyvernResult = await skyvernResponse.json();
+
+    // 更新任务状态
+    await supabase
+      .from('publish_tasks')
+      .update({
+        status: 'publishing',
+        skyvern_task_id: workflowId,
+        skyvern_run_id: skyvernResult.workflow_run_id
+      })
+      .eq('id', taskId);
+
+    console.log(`[PublishAPI] Started Skyvern job for task ${taskId}, runId: ${skyvernResult.workflow_run_id}`);
+    res.json({ success: true, runId: skyvernResult.workflow_run_id });
+
+  } catch (error) {
+    console.error('[PublishAPI] Skyvern publish error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * 检查 Skyvern 任务状态
+ * GET /api/publish/skyvern/:taskId/status
+ */
+app.get('/api/publish/skyvern/:taskId/status', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // 获取任务
+    const { data: task, error: fetchError } = await supabase
+      .from('publish_tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single();
+
+    if (fetchError || !task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    if (!task.skyvern_run_id) {
+      return res.json({ status: task.status, message: 'No Skyvern run associated' });
+    }
+
+    // 查询 Skyvern 状态
+    const SKYVERN_API_URL = process.env.SKYVERN_API_URL || 'http://localhost:8000/api/v1';
+    const SKYVERN_API_KEY = process.env.SKYVERN_API_KEY || '';
+
+    const skyvernResponse = await fetch(
+      `${SKYVERN_API_URL}/workflows/runs/${task.skyvern_run_id}`,
+      {
+        headers: { 'x-api-key': SKYVERN_API_KEY }
+      }
+    );
+
+    if (!skyvernResponse.ok) {
+      throw new Error(`Failed to check Skyvern status: ${skyvernResponse.status}`);
+    }
+
+    const skyvernResult = await skyvernResponse.json();
+
+    // 映射状态
+    let status = task.status;
+    if (skyvernResult.status === 'completed') {
+      status = 'completed';
+      // 更新任务
+      await supabase
+        .from('publish_tasks')
+        .update({
+          status: 'completed',
+          platform_post_id: skyvernResult.outputs?.post_id,
+          published_url: skyvernResult.outputs?.post_url,
+          published_at: new Date().toISOString()
+        })
+        .eq('id', taskId);
+    } else if (skyvernResult.status === 'failed' || skyvernResult.status === 'terminated') {
+      status = 'failed';
+      await supabase
+        .from('publish_tasks')
+        .update({
+          status: 'failed',
+          error_message: skyvernResult.failure_reason
+        })
+        .eq('id', taskId);
+    }
+
+    res.json({
+      status,
+      postUrl: skyvernResult.outputs?.post_url,
+      error: skyvernResult.failure_reason
+    });
+
+  } catch (error) {
+    console.error('[PublishAPI] Check status error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 console.log('🚀 [BOOT 2] About to start server listening...');
 
 app.listen(port, async () => {

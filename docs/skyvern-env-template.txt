@@ -1,0 +1,19 @@
+# ==================== Skyvern X Platform Integration ====================
+# 将以下环境变量添加到您的 .env 文件中
+
+# Skyvern API 配置
+SKYVERN_API_URL=http://localhost:8000/api/v1
+SKYVERN_API_KEY=your_skyvern_api_key_here
+
+# 各平台工作流 ID (在 Skyvern 中创建工作流后获取)
+SKYVERN_WORKFLOW_X=your_x_workflow_id_here
+SKYVERN_WORKFLOW_TIKTOK=your_tiktok_workflow_id_here
+SKYVERN_WORKFLOW_INSTAGRAM=your_instagram_workflow_id_here
+SKYVERN_WORKFLOW_YOUTUBE=your_youtube_workflow_id_here
+SKYVERN_WORKFLOW_PINTEREST=your_pinterest_workflow_id_here
+
+# Browser Profile ID (用于保持登录状态)
+# 在 Skyvern 中创建持久化 Browser Session 后获取
+SKYVERN_X_BROWSER_PROFILE=your_x_browser_profile_id_here
+SKYVERN_TIKTOK_BROWSER_PROFILE=your_tiktok_browser_profile_id_here
+SKYVERN_INSTAGRAM_BROWSER_PROFILE=your_instagram_browser_profile_id_here
