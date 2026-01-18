@@ -149,6 +149,16 @@ export function ContentModeStep({
                 youtube: '/youtube',
             };
             window.history.replaceState(null, '', platformUrls[platform] || '/xiaohongshu');
+
+            // 🔥 保存任务状态到 localStorage，刷新页面后可恢复
+            localStorage.setItem('prome_active_task', JSON.stringify({
+                taskId,
+                platform,
+                mode: selectedWorkflowMode,
+                supabaseUuid,
+                xhsUserId,
+                startedAt: new Date().toISOString(),
+            }));
         } catch (err) {
             console.error('❌ [ContentModeStep] Operation failed:', err);
             setError(err instanceof Error ? err.message : '启动失败，请稍后重试');
@@ -176,12 +186,16 @@ export function ContentModeStep({
                     onClose={() => {
                         setShowProgressPanel(false);
                         setCurrentTaskId(null);
+                        // 🔥 清除任务状态
+                        localStorage.removeItem('prome_active_task');
                         onComplete();
                     }}
                     onComplete={(result) => {
                         console.log('Workflow completed:', result);
                         setShowProgressPanel(false);
                         setCurrentTaskId(null);
+                        // 🔥 清除任务状态
+                        localStorage.removeItem('prome_active_task');
                         onComplete();
                     }}
                 />
