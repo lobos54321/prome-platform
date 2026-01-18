@@ -78,7 +78,9 @@ export function ContentModeStep({
             return;
         }
 
-        const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        // 🔥 使用 UUID 格式的 taskId，以便后端可以持久化工作流状态到数据库
+        // 后端 WorkflowProgressService 只对 UUID 格式的 taskId 进行数据库持久化
+        const taskId = crypto.randomUUID();
 
         try {
             console.log('🚀 [ContentModeStep] Starting operation sequence...', { xhsUserId, taskId });
