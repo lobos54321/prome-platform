@@ -26,6 +26,8 @@ interface ContentModeStepProps {
     enableSentiment?: boolean;
     onComplete: () => void;
     onViewDashboard: () => void;
+    /** 🔥 重新配置回调 - 跳转到配置页面 */
+    onReconfigure?: () => void;
 }
 
 export function ContentModeStep({
@@ -36,6 +38,7 @@ export function ContentModeStep({
     enableSentiment = true,
     onComplete,
     onViewDashboard,
+    onReconfigure,
 }: ContentModeStepProps) {
     const [showProgressPanel, setShowProgressPanel] = useState(false);
     const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -157,6 +160,8 @@ export function ContentModeStep({
                     postFrequency={userProfile?.post_frequency as 'daily' | 'weekly' | 'biweekly' | 'monthly' | undefined}
                     // 🔥 传递目标平台列表
                     targetPlatforms={selectedPlatforms}
+                    // 🔥 重新配置回调
+                    onReconfigure={onReconfigure}
                     onClose={() => {
                         setShowProgressPanel(false);
                         setCurrentTaskId(null);

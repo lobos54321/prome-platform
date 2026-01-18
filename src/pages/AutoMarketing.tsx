@@ -707,6 +707,12 @@ export default function AutoMarketing() {
                                 };
                                 navigate(platformRoutes[platform] || '/xiaohongshu-manager');
                             }}
+                            // 🔥 重新配置 - 返回产品配置步骤
+                            onReconfigure={() => {
+                                if (confirm('确定要重新配置吗？这将返回产品配置页面。')) {
+                                    setCurrentStep('product');
+                                }
+                            }}
                         />
                     </div>
                 )}

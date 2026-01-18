@@ -28,7 +28,8 @@ import {
     Activity,
     Zap,
     X,
-    LayoutDashboard
+    LayoutDashboard,
+    Settings2
 } from 'lucide-react';
 import { PlatformSwitcher, PLATFORM_CONFIGS } from '@/components/ui/PlatformSwitcher';
 
@@ -72,6 +73,8 @@ interface AgentProgressPanelProps {
     wsUrl?: string;
     onClose?: () => void;
     onComplete?: (result: WorkflowStatusResponse) => void;
+    // 🔥 重新配置回调
+    onReconfigure?: () => void;
     // 新增 Props
     supabaseUuid?: string;
     productName?: string;
@@ -103,6 +106,8 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     wsUrl,
     onClose,
     onComplete,
+    // 🔥 重新配置
+    onReconfigure,
     // 新增 Props
     supabaseUuid,
     productName,
@@ -135,6 +140,12 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // 🔥 节点状态缓存 - 切换模式时保存当前节点状态
+    const nodesCacheRef = useRef<Record<WorkflowMode, WorkflowNode[]>>({
+        [WorkflowMode.IMAGE_TEXT]: DEFAULT_NODES[WorkflowMode.IMAGE_TEXT],
+        [WorkflowMode.AVATAR_VIDEO]: DEFAULT_NODES[WorkflowMode.AVATAR_VIDEO],
+        [WorkflowMode.UGC_VIDEO]: DEFAULT_NODES[WorkflowMode.UGC_VIDEO],
+    });
 
     // 当 mode 发生变化时更新 nodes
     useEffect(() => {
@@ -380,12 +391,19 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
         };
     }, [connectWebSocket]);
 
-    // 切换模式时更新节点
-    useEffect(() => {
-        const defaultNodes = DEFAULT_NODES[activeMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
-        setNodes(defaultNodes);
-        setActiveNodeId(defaultNodes[0]?.id || '');
-    }, [activeMode]);
+    // 🔥 切换模式时保存当前节点状态并恢复目标模式的缓存
+    const handleModeSwitch = useCallback((newMode: WorkflowMode) => {
+        if (newMode === activeMode) return;
+
+        // 保存当前模式的节点状态到缓存
+        nodesCacheRef.current[activeMode] = nodes;
+
+        // 恢复目标模式的缓存节点状态
+        const cachedNodes = nodesCacheRef.current[newMode];
+        setNodes(cachedNodes);
+        setActiveNodeId(cachedNodes[0]?.id || '');
+        setActiveMode(newMode);
+    }, [activeMode, nodes]);
 
     const activeNode = nodes.find(n => n.id === activeNodeId) || nodes[0];
     const modeTheme = MODE_THEMES[activeMode] || MODE_THEMES[WorkflowMode.IMAGE_TEXT];
@@ -410,7 +428,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         return (
                             <div key={mode} className="relative group flex flex-col items-center">
                                 <button
-                                    onClick={() => setActiveMode(mode)}
+                                    onClick={() => handleModeSwitch(mode as WorkflowMode)}
                                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${isActive
                                         ? 'border-blue-200 shadow-md scale-110 bg-white'
                                         : 'border-transparent bg-slate-50 hover:bg-slate-100'
@@ -431,6 +449,17 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         );
                     })}
                 </div>
+
+                {/* 🔥 重新配置按钮 */}
+                {onReconfigure && (
+                    <button
+                        onClick={onReconfigure}
+                        className="p-3 rounded-xl text-slate-400 hover:bg-slate-50 transition-colors group"
+                        title="重新配置"
+                    >
+                        <Settings2 size={20} className="group-hover:text-blue-500 transition-colors" />
+                    </button>
+                )}
 
                 <button onClick={onClose} className="p-3 rounded-xl text-slate-400 hover:bg-slate-50 transition-colors">
                     <X size={20} />
