@@ -1,12 +1,12 @@
 /**
  * publishApi - 前端发布 API 客户端
- * 
+ *
  * 调用后端 PublishService 管理多平台发布任务
  */
 
 const API_BASE = import.meta.env.VITE_XHS_API_URL || 'http://localhost:8080';
 
-export type Platform = 'xiaohongshu' | 'tiktok' | 'instagram' | 'youtube' | 'pinterest' | 'x';
+export type Platform = 'xiaohongshu' | 'x' | 'tiktok' | 'instagram' | 'youtube' | 'pinterest';
 export type PublishStatus = 'pending' | 'queued' | 'publishing' | 'completed' | 'failed';
 export type ContentType = 'image_text' | 'video';
 
@@ -127,11 +127,11 @@ export function getPlatformConfig(platform: Platform): {
 } {
     const configs: Record<Platform, ReturnType<typeof getPlatformConfig>> = {
         xiaohongshu: { name: '小红书', icon: '📕', method: 'chrome_extension', enabled: true },
+        x: { name: 'X (Twitter)', icon: '𝕏', method: 'chrome_extension', enabled: true },
         tiktok: { name: 'TikTok', icon: '🎵', method: 'skyvern', enabled: true },
         instagram: { name: 'Instagram', icon: '📷', method: 'skyvern', enabled: true },
         youtube: { name: 'YouTube', icon: '▶️', method: 'skyvern', enabled: false },
-        pinterest: { name: 'Pinterest', icon: '📌', method: 'skyvern', enabled: false },
-        x: { name: 'X (Twitter)', icon: '𝕏', method: 'skyvern', enabled: true }
+        pinterest: { name: 'Pinterest', icon: '📌', method: 'skyvern', enabled: false }
     };
 
     return configs[platform];
