@@ -37,9 +37,9 @@ export class TwitterWorkerClient {
 
     constructor() {
         // Use XHS Worker URL since Twitter API is now integrated into xhs-worker
-        const url = import.meta.env.VITE_XHS_API_URL || import.meta.env.VITE_TWITTER_WORKER_URL || "";
+        const url = import.meta.env.VITE_XHS_API_URL || import.meta.env.VITE_XHS_WORKER_URL || "";
         this.baseUrl = url.replace(/\/$/, ""); // Remove trailing slash
-        this.secret = import.meta.env.VITE_WORKER_SECRET || import.meta.env.VITE_TWITTER_WORKER_SECRET || "";
+        this.secret = import.meta.env.VITE_XHS_WORKER_SECRET || "";
 
         if (!this.baseUrl) console.warn("⚠️ XHS_API_URL not set!");
     }
