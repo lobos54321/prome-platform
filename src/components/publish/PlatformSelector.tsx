@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { publishApi } from '../../lib/publishApi';
+import { twitterClient } from '../../lib/twitter-worker';
 
 // 插件下载地址
 const EXTENSION_DOWNLOAD_URL = '/prome-extension.zip';
@@ -28,6 +29,13 @@ export const PLATFORMS: Platform[] = [
         name: '小红书',
         icon: '📕',
         enabled: true,
+        method: 'chrome_extension'
+    },
+    {
+        id: 'x',
+        name: 'X (Twitter)',
+        icon: '𝕏',
+        enabled: true, // ✅ Twitter Worker 集成
         method: 'chrome_extension'
     },
     {
@@ -241,6 +249,110 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
         }
     };
 
+    // 🔥 X/Twitter 发布 - 通过 Twitter Worker 服务
+    const publishToX = async () => {
+        // 检查登录状态
+        const userId = localStorage.getItem('userId') || 'anonymous';
+
+        try {
+            const loginStatus = await twitterClient.checkWebLogin(userId);
+            if (!loginStatus.logged_in) {
+                alert('❌ 未登录 X/Twitter！\n\n请先在设置中登录 Twitter 账号。');
+                return false;
+            }
+
+            if (!window.confirm('确认发布此内容到 X/Twitter？')) {
+                return false;
+            }
+
+            setPublishStatus(prev => ({ ...prev, x: 'publishing' }));
+
+            // 解析内容
+            let parsedContent = content.content || '';
+            let parsedTags = content.tags || [];
+
+            // 检查是否是 JSON 字符串
+            if (parsedContent.trim().startsWith('{') || parsedContent.trim().startsWith('```json')) {
+                try {
+                    let jsonStr = parsedContent
+                        .replace(/^```json\s*/i, '')
+                        .replace(/```\s*$/i, '')
+                        .trim();
+
+                    const jsonData = JSON.parse(jsonStr);
+                    parsedContent = jsonData.text || jsonData.content || parsedContent;
+                    if (jsonData.hashtags && Array.isArray(jsonData.hashtags)) {
+                        parsedTags = jsonData.hashtags;
+                    }
+                } catch (e) {
+                    console.log('[PlatformSelector] Content is not valid JSON, using as-is');
+                }
+            }
+
+            // Twitter 字数限制：280 字符
+            const TWITTER_MAX_CHARS = 280;
+            let tweetText = parsedContent;
+
+            // 添加 hashtags
+            if (parsedTags.length > 0) {
+                const hashtagStr = parsedTags.map(t => t.startsWith('#') ? t : `#${t}`).join(' ');
+                if (tweetText.length + hashtagStr.length + 1 <= TWITTER_MAX_CHARS) {
+                    tweetText = `${tweetText}\n${hashtagStr}`;
+                }
+            }
+
+            // 截断到 280 字符
+            if (tweetText.length > TWITTER_MAX_CHARS) {
+                tweetText = tweetText.substring(0, TWITTER_MAX_CHARS - 3) + '...';
+            }
+
+            // 发布推文
+            const result = await twitterClient.publish({
+                userId,
+                cookies: loginStatus.cookies || '',
+                text: tweetText,
+                mediaUrls: content.images,
+            });
+
+            if (result.status === 'started' || result.task_id) {
+                // 轮询状态
+                const taskId = result.task_id;
+                const pollStatus = async (retries = 30) => {
+                    if (retries <= 0) {
+                        setPublishStatus(prev => ({ ...prev, x: 'failed' }));
+                        return;
+                    }
+                    try {
+                        const status = await twitterClient.getPublishStatus(taskId);
+                        if (status.status === 'completed') {
+                            setPublishStatus(prev => ({ ...prev, x: 'completed' }));
+                            onPublishComplete?.('x', { taskId });
+                            alert('✅ 推文发布成功！');
+                        } else if (status.status === 'failed') {
+                            setPublishStatus(prev => ({ ...prev, x: 'failed' }));
+                            alert(`❌ 推文发布失败：${status.error || '未知错误'}`);
+                        } else {
+                            setTimeout(() => pollStatus(retries - 1), 3000);
+                        }
+                    } catch {
+                        setTimeout(() => pollStatus(retries - 1), 3000);
+                    }
+                };
+
+                alert('📝 推文正在发布中...\n\n请稍候，发布完成后会通知您。');
+                pollStatus();
+                return true;
+            } else {
+                throw new Error(result.msg || '发布失败');
+            }
+        } catch (error: any) {
+            console.error('[PlatformSelector] X publish error:', error);
+            setPublishStatus(prev => ({ ...prev, x: 'failed' }));
+            alert(`❌ X 发布失败：${error.message}`);
+            return false;
+        }
+    };
+
     const handlePublish = async () => {
         if (selectedPlatforms.length === 0) {
             alert('请至少选择一个发布平台');
@@ -255,6 +367,8 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
 
             if (platformId === 'xiaohongshu') {
                 await publishToXiaohongshu();
+            } else if (platformId === 'x') {
+                await publishToX();
             } else {
                 // Skyvern 发布
                 try {

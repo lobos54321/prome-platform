@@ -36,11 +36,12 @@ export class TwitterWorkerClient {
     private secret: string;
 
     constructor() {
-        const url = import.meta.env.VITE_TWITTER_WORKER_URL || "";
+        // Use XHS Worker URL since Twitter API is now integrated into xhs-worker
+        const url = import.meta.env.VITE_XHS_API_URL || import.meta.env.VITE_TWITTER_WORKER_URL || "";
         this.baseUrl = url.replace(/\/$/, ""); // Remove trailing slash
-        this.secret = import.meta.env.VITE_TWITTER_WORKER_SECRET || "";
+        this.secret = import.meta.env.VITE_WORKER_SECRET || import.meta.env.VITE_TWITTER_WORKER_SECRET || "";
 
-        if (!this.baseUrl) console.warn("⚠️ TWITTER_WORKER_URL not set!");
+        if (!this.baseUrl) console.warn("⚠️ XHS_API_URL not set!");
     }
 
     private get headers() {
@@ -55,7 +56,7 @@ export class TwitterWorkerClient {
      */
     async publish(payload: PublishPayload) {
         try {
-            const res = await fetch(`${this.baseUrl}/api/v1/publish`, {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/publish`, {
                 method: "POST",
                 headers: this.headers,
                 body: JSON.stringify({
@@ -85,7 +86,7 @@ export class TwitterWorkerClient {
      */
     async publishThread(payload: ThreadPayload) {
         try {
-            const res = await fetch(`${this.baseUrl}/api/v1/publish/thread`, {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/publish/thread`, {
                 method: "POST",
                 headers: this.headers,
                 body: JSON.stringify({
@@ -117,7 +118,7 @@ export class TwitterWorkerClient {
      */
     async login(payload: LoginPayload) {
         try {
-            const res = await fetch(`${this.baseUrl}/api/v1/login`, {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/login`, {
                 method: "POST",
                 headers: this.headers,
                 body: JSON.stringify({
@@ -146,7 +147,7 @@ export class TwitterWorkerClient {
      */
     async syncCookies(payload: CookieSyncPayload) {
         try {
-            const res = await fetch(`${this.baseUrl}/api/v1/login/sync`, {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/login/sync`, {
                 method: "POST",
                 headers: this.headers,
                 body: JSON.stringify({
@@ -173,7 +174,7 @@ export class TwitterWorkerClient {
      */
     async checkLoginStatus(userId: string) {
         try {
-            const res = await fetch(`${this.baseUrl}/api/v1/login/status/${userId}`, {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/login/status/${userId}`, {
                 method: "GET",
                 headers: this.headers,
             });
@@ -203,7 +204,7 @@ export class TwitterWorkerClient {
      */
     async checkWebLogin(userId: string) {
         try {
-            const res = await fetch(`${this.baseUrl}/api/v1/login/check-web/${userId}`, {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/login/check-web/${userId}`, {
                 method: "GET",
                 headers: this.headers,
             });
@@ -225,7 +226,7 @@ export class TwitterWorkerClient {
      */
     async getPublishStatus(taskId: string) {
         try {
-            const res = await fetch(`${this.baseUrl}/api/v1/publish/status/${taskId}`, {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/publish/status/${taskId}`, {
                 method: "GET",
                 headers: this.headers,
             });
