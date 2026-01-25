@@ -36,12 +36,12 @@ export class TwitterWorkerClient {
     private secret: string;
 
     constructor() {
-        // Use XHS Worker URL since Twitter API is now integrated into xhs-worker
-        const url = import.meta.env.VITE_XHS_API_URL || import.meta.env.VITE_XHS_WORKER_URL || "";
+        // Twitter API is in xhs-worker, use VITE_XHS_WORKER_URL (not VITE_XHS_API_URL which is AI service)
+        const url = import.meta.env.VITE_XHS_WORKER_URL || "";
         this.baseUrl = url.replace(/\/$/, ""); // Remove trailing slash
         this.secret = import.meta.env.VITE_XHS_WORKER_SECRET || "";
 
-        if (!this.baseUrl) console.warn("⚠️ XHS_API_URL not set!");
+        if (!this.baseUrl) console.warn("⚠️ VITE_XHS_WORKER_URL not set!");
     }
 
     private get headers() {
