@@ -41,6 +41,9 @@ export class TwitterWorkerClient {
         this.baseUrl = url.replace(/\/$/, ""); // Remove trailing slash
         this.secret = import.meta.env.VITE_XHS_WORKER_SECRET || "";
 
+        console.log("[TwitterWorkerClient] baseUrl:", this.baseUrl);
+        console.log("[TwitterWorkerClient] secret set:", !!this.secret);
+
         if (!this.baseUrl) console.warn("⚠️ VITE_XHS_WORKER_URL not set!");
     }
 
