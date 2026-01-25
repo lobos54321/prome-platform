@@ -130,12 +130,60 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     const [overallProgress, setOverallProgress] = useState(0);
     const [isPublishing, setIsPublishing] = useState(false);
     const [rightPanelView, setRightPanelView] = useState<'logs' | 'content'>('content');
-    const [localResult, setLocalResult] = useState<any>(null);
+    // 🔥 从 localStorage 恢复结果
+    const [localResult, setLocalResultState] = useState<any>(() => {
+        try {
+            const saved = localStorage.getItem(`prome_workflow_result_${taskId}`);
+            if (saved) {
+                console.log('[AgentProgressPanel] Restored result from localStorage');
+                return JSON.parse(saved);
+            }
+        } catch (e) {
+            console.warn('Failed to restore result from localStorage:', e);
+        }
+        return null;
+    });
     const [localContentStrategy, setLocalContentStrategy] = useState<ContentStrategy | null>(contentStrategy || null);
     const [localWeeklyPlan, setLocalWeeklyPlan] = useState<WeeklyPlan | null>(weeklyPlan || null);
-    const [isWorkflowCompleted, setIsWorkflowCompleted] = useState(false);
+    // 🔥 从 localStorage 恢复完成状态
+    const [isWorkflowCompleted, setIsWorkflowCompleted] = useState(() => {
+        try {
+            return localStorage.getItem(`prome_workflow_completed_${taskId}`) === 'true';
+        } catch {
+            return false;
+        }
+    });
     // 🔥 多平台切换 - 默认选中第一个平台
     const [activePlatform, setActivePlatform] = useState<string>(targetPlatforms?.[0] || 'xiaohongshu');
+
+    // 🔥 包装 setLocalResult 以同步保存到 localStorage
+    const setLocalResult = useCallback((value: any) => {
+        setLocalResultState((prev: any) => {
+            const newValue = typeof value === 'function' ? value(prev) : value;
+            // 保存到 localStorage
+            if (newValue && taskId) {
+                try {
+                    localStorage.setItem(`prome_workflow_result_${taskId}`, JSON.stringify(newValue));
+                    console.log('[AgentProgressPanel] Saved result to localStorage');
+                } catch (e) {
+                    console.warn('Failed to save result to localStorage:', e);
+                }
+            }
+            return newValue;
+        });
+    }, [taskId]);
+
+    // 🔥 包装 setIsWorkflowCompleted 以同步保存
+    const markWorkflowCompleted = useCallback((completed: boolean) => {
+        setIsWorkflowCompleted(completed);
+        if (taskId) {
+            try {
+                localStorage.setItem(`prome_workflow_completed_${taskId}`, String(completed));
+            } catch (e) {
+                console.warn('Failed to save completion status:', e);
+            }
+        }
+    }, [taskId]);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -145,6 +193,38 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
         [WorkflowMode.AVATAR_VIDEO]: DEFAULT_NODES[WorkflowMode.AVATAR_VIDEO],
         [WorkflowMode.UGC_VIDEO]: DEFAULT_NODES[WorkflowMode.UGC_VIDEO],
     });
+
+    // 🔥 从 localStorage 恢复节点状态（在组件挂载时）
+    useEffect(() => {
+        if (taskId) {
+            try {
+                const savedNodes = localStorage.getItem(`prome_workflow_nodes_${taskId}`);
+                const savedProgress = localStorage.getItem(`prome_workflow_progress_${taskId}`);
+                if (savedNodes) {
+                    const parsedNodes = JSON.parse(savedNodes);
+                    setNodes(parsedNodes);
+                    console.log('[AgentProgressPanel] Restored nodes from localStorage');
+                }
+                if (savedProgress) {
+                    setOverallProgress(parseInt(savedProgress, 10));
+                }
+            } catch (e) {
+                console.warn('Failed to restore nodes from localStorage:', e);
+            }
+        }
+    }, [taskId]);
+
+    // 🔥 保存节点状态到 localStorage
+    useEffect(() => {
+        if (taskId && nodes.length > 0) {
+            try {
+                localStorage.setItem(`prome_workflow_nodes_${taskId}`, JSON.stringify(nodes));
+                localStorage.setItem(`prome_workflow_progress_${taskId}`, String(overallProgress));
+            } catch (e) {
+                console.warn('Failed to save nodes to localStorage:', e);
+            }
+        }
+    }, [taskId, nodes, overallProgress]);
 
     // 当 mode 发生变化时更新 nodes
     useEffect(() => {
@@ -332,7 +412,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         console.log('[AgentProgressPanel] Got final result from completed message:', data.result);
                         setLocalResult(data.result);
                     }
-                    setIsWorkflowCompleted(true);
+                    markWorkflowCompleted(true);
 
                     // 🔔 发送浏览器通知
                     if ('Notification' in window) {
