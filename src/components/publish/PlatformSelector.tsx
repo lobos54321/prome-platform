@@ -5,9 +5,10 @@
  * 包含 Chrome 浏览器检测和插件安装引导流程
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { publishApi } from '../../lib/publishApi';
 import { twitterClient } from '../../lib/twitter-worker';
+import { TwitterLoginSection } from '../twitter/TwitterLoginSection';
 
 // 插件下载地址
 const EXTENSION_DOWNLOAD_URL = '/prome-extension.zip';
@@ -88,6 +89,32 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
     const [isChrome, setIsChrome] = useState(false);
     const [hasExtension, setHasExtension] = useState(false);
     const [checkingExtension, setCheckingExtension] = useState(true);
+
+    // 🔥 X/Twitter 登录状态
+    const [xLoggedIn, setXLoggedIn] = useState(false);
+    const [checkingXLogin, setCheckingXLogin] = useState(false);
+    const [showXLogin, setShowXLogin] = useState(false);
+    const userId = localStorage.getItem('userId') || 'anonymous';
+    const supabaseUuid = localStorage.getItem('supabaseUuid') || userId;
+
+    // 检查 X 登录状态
+    const checkXLoginStatus = useCallback(async () => {
+        try {
+            setCheckingXLogin(true);
+            const result = await twitterClient.checkWebLogin(userId);
+            setXLoggedIn(result.logged_in);
+        } catch (err) {
+            console.error('Failed to check X login:', err);
+            setXLoggedIn(false);
+        } finally {
+            setCheckingXLogin(false);
+        }
+    }, [userId]);
+
+    // 初始检查 X 登录状态
+    useEffect(() => {
+        checkXLoginStatus();
+    }, [checkXLoginStatus]);
 
     // 检测 Chrome 浏览器和插件
     useEffect(() => {
@@ -252,12 +279,11 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
     // 🔥 X/Twitter 发布 - 通过 Twitter Worker 服务
     const publishToX = async () => {
         // 检查登录状态
-        const userId = localStorage.getItem('userId') || 'anonymous';
-
         try {
             const loginStatus = await twitterClient.checkWebLogin(userId);
             if (!loginStatus.logged_in) {
-                alert('❌ 未登录 X/Twitter！\n\n请先在设置中登录 Twitter 账号。');
+                // 显示登录界面而不是仅弹出提示
+                setShowXLogin(true);
                 return false;
             }
 
@@ -602,6 +628,16 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                         <span>{platform.icon}</span>
                         <span>{platform.name}</span>
                         <span>{getStatusIcon(publishStatus[platform.id])}</span>
+                        {/* X 平台登录状态指示 */}
+                        {platform.id === 'x' && (
+                            <span style={{
+                                fontSize: '0.75rem',
+                                color: xLoggedIn ? '#10b981' : '#f59e0b',
+                                marginLeft: '0.25rem'
+                            }}>
+                                {checkingXLogin ? '⏳' : xLoggedIn ? '✓' : '⚠'}
+                            </span>
+                        )}
                         {!platform.enabled && (
                             <span style={{
                                 fontSize: '0.75rem',
@@ -614,6 +650,52 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                     </button>
                 ))}
             </div>
+
+            {/* 🔥 X/Twitter 登录面板 - 当选中X但未登录时显示 */}
+            {(showXLogin || (selectedPlatforms.includes('x') && !xLoggedIn && !checkingXLogin)) && (
+                <div style={{
+                    marginBottom: '1rem',
+                    border: '2px solid #1d9bf0',
+                    borderRadius: '0.5rem',
+                    overflow: 'hidden'
+                }}>
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.5rem 1rem',
+                        backgroundColor: '#1d9bf0',
+                        color: 'white'
+                    }}>
+                        <span style={{ fontWeight: '600' }}>𝕏 请先登录 X/Twitter</span>
+                        <button
+                            onClick={() => setShowXLogin(false)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                fontSize: '1.25rem',
+                                padding: '0.25rem'
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <div style={{ padding: '1rem' }}>
+                        <TwitterLoginSection
+                            userId={userId}
+                            supabaseUuid={supabaseUuid}
+                            onLoginStatusChange={(isLoggedIn) => {
+                                setXLoggedIn(isLoggedIn);
+                                if (isLoggedIn) {
+                                    setShowXLogin(false);
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* 发布按钮 */}
             <button

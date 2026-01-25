@@ -203,6 +203,32 @@ export class TwitterWorkerClient {
     }
 
     /**
+     * Check login task status (for username/password login)
+     */
+    async checkLoginTaskStatus(taskId: string) {
+        try {
+            const res = await fetch(`${this.baseUrl}/api/v1/twitter/login/task/${taskId}`, {
+                method: "GET",
+                headers: this.headers,
+            });
+
+            if (res.status === 404) {
+                return { status: "not_found" };
+            }
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(`Worker Error (${res.status}): ${err}`);
+            }
+
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to check login task status:", error);
+            throw error;
+        }
+    }
+
+    /**
      * Check login status from web frontend
      */
     async checkWebLogin(userId: string) {

@@ -124,19 +124,57 @@ export function TwitterLoginSection({
                 password,
             });
 
-            if (result.status === 'success') {
+            // 后端返回 task_id 表示异步任务已启动
+            if (result.status === 'started' && result.task_id) {
+                // 轮询任务状态
+                const pollTaskStatus = async (retries = 60) => {
+                    if (retries <= 0) {
+                        setError('登录超时，请重试');
+                        setLoggingIn(false);
+                        return;
+                    }
+
+                    try {
+                        const taskStatus = await twitterClient.checkLoginTaskStatus(result.task_id);
+
+                        if (taskStatus.status === 'completed' && taskStatus.logged_in) {
+                            setIsLoggedIn(true);
+                            setShowCredentials(false);
+                            setLoggingIn(false);
+                            onLoginStatusChange?.(true);
+                        } else if (taskStatus.status === 'failed') {
+                            setError(taskStatus.error || '登录失败');
+                            setLoggingIn(false);
+                        } else if (taskStatus.status === 'pending' || taskStatus.status === 'processing') {
+                            // 继续轮询
+                            setTimeout(() => pollTaskStatus(retries - 1), 3000);
+                        } else {
+                            setTimeout(() => pollTaskStatus(retries - 1), 3000);
+                        }
+                    } catch (err) {
+                        console.error('Failed to check task status:', err);
+                        setTimeout(() => pollTaskStatus(retries - 1), 3000);
+                    }
+                };
+
+                // 开始轮询（每3秒一次，最多3分钟）
+                pollTaskStatus();
+            } else if (result.status === 'success') {
+                // 直接成功（如果后端改为同步模式）
                 setIsLoggedIn(true);
                 setShowCredentials(false);
+                setLoggingIn(false);
                 onLoginStatusChange?.(true);
             } else if (result.status === '2fa_required') {
                 setError('需要两步验证，请使用 Chrome 扩展方式登录');
+                setLoggingIn(false);
             } else {
                 setError(result.msg || '登录失败');
+                setLoggingIn(false);
             }
         } catch (err) {
             console.error('Twitter login failed:', err);
             setError('登录请求失败');
-        } finally {
             setLoggingIn(false);
         }
     };

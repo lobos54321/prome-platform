@@ -281,6 +281,7 @@ const App = () => {
               <Route path="/xiaohongshu-api" element={<XiaohongshuMarketing />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/auto" element={<AutoMarketing />} />
+              <Route path="/x" element={<AutoMarketing />} />
               <Route path="/video-history" element={<VideoHistory />} />
               <Route path="/admin" element={<Admin />} />
 
