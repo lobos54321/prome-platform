@@ -1,6 +1,6 @@
 /**
  * PlatformSelector - 多平台发布选择组件
- * 
+ *
  * 在内容入库后显示，允许用户选择目标发布平台
  * 包含 Chrome 浏览器检测和插件安装引导流程
  */
@@ -8,10 +8,220 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { publishApi } from '../../lib/publishApi';
 import { twitterClient } from '../../lib/twitter-worker';
-import { TwitterLoginSection } from '../twitter/TwitterLoginSection';
 
 // 插件下载地址
 const EXTENSION_DOWNLOAD_URL = '/prome-extension.zip';
+
+// 🔥 内联 X 登录表单组件
+function XLoginForm({ userId, onLoginSuccess }: { userId: string; onLoginSuccess: () => void }) {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+    const handleLogin = async () => {
+        if (!username.trim() || !password.trim()) {
+            setError('请输入用户名和密码');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError(null);
+            setStatusMessage('正在启动登录...');
+
+            const result = await twitterClient.login({
+                userId,
+                username: username.trim(),
+                password,
+            });
+
+            if (result.status === 'started' && result.task_id) {
+                setStatusMessage('浏览器正在登录 Twitter，请稍候...');
+
+                // 轮询任务状态
+                const pollTaskStatus = async (retries = 60) => {
+                    if (retries <= 0) {
+                        setError('登录超时，请重试');
+                        setLoading(false);
+                        setStatusMessage(null);
+                        return;
+                    }
+
+                    try {
+                        const taskStatus = await twitterClient.checkLoginTaskStatus(result.task_id);
+
+                        if (taskStatus.status === 'completed' && taskStatus.logged_in) {
+                            setStatusMessage('登录成功！');
+                            setLoading(false);
+                            onLoginSuccess();
+                        } else if (taskStatus.status === 'failed') {
+                            setError(taskStatus.error || '登录失败');
+                            setLoading(false);
+                            setStatusMessage(null);
+                        } else {
+                            setTimeout(() => pollTaskStatus(retries - 1), 3000);
+                        }
+                    } catch (err) {
+                        setTimeout(() => pollTaskStatus(retries - 1), 3000);
+                    }
+                };
+
+                pollTaskStatus();
+            } else if (result.status === 'success') {
+                setStatusMessage('登录成功！');
+                setLoading(false);
+                onLoginSuccess();
+            } else {
+                setError(result.msg || '登录失败');
+                setLoading(false);
+                setStatusMessage(null);
+            }
+        } catch (err: any) {
+            console.error('Twitter login failed:', err);
+            setError(err.message || '登录请求失败');
+            setLoading(false);
+            setStatusMessage(null);
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* 错误提示 */}
+            {error && (
+                <div style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '0.375rem',
+                    color: '#dc2626',
+                    fontSize: '0.875rem'
+                }}>
+                    ❌ {error}
+                </div>
+            )}
+
+            {/* 状态提示 */}
+            {statusMessage && (
+                <div style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '0.375rem',
+                    color: '#2563eb',
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                }}>
+                    {loading && <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span>}
+                    {statusMessage}
+                </div>
+            )}
+
+            {/* 用户名输入 */}
+            <div>
+                <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    marginBottom: '0.25rem',
+                    color: '#374151'
+                }}>
+                    用户名 / 邮箱 / 手机号
+                </label>
+                <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="@username 或 email@example.com"
+                    disabled={loading}
+                    style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                    }}
+                />
+            </div>
+
+            {/* 密码输入 */}
+            <div>
+                <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    marginBottom: '0.25rem',
+                    color: '#374151'
+                }}>
+                    密码
+                </label>
+                <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    disabled={loading}
+                    style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                    }}
+                />
+            </div>
+
+            {/* 登录按钮 */}
+            <button
+                onClick={handleLogin}
+                disabled={loading}
+                style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    backgroundColor: loading ? '#9ca3af' : '#1d9bf0',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                }}
+            >
+                {loading ? (
+                    <>
+                        <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span>
+                        登录中...
+                    </>
+                ) : (
+                    <>𝕏 登录 Twitter</>
+                )}
+            </button>
+
+            {/* 提示信息 */}
+            <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                margin: 0,
+                lineHeight: '1.5'
+            }}>
+                ⚠️ 如果您启用了两步验证(2FA)，此方式可能无法使用。
+                <br />
+                登录后，系统将通过浏览器自动化完成 Twitter 发布。
+            </p>
+        </div>
+    );
+}
 
 // 海外平台配置
 export interface Platform {
@@ -95,7 +305,6 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
     const [checkingXLogin, setCheckingXLogin] = useState(false);
     const [showXLogin, setShowXLogin] = useState(false);
     const userId = localStorage.getItem('userId') || 'anonymous';
-    const supabaseUuid = localStorage.getItem('supabaseUuid') || userId;
 
     // 检查 X 登录状态
     const checkXLoginStatus = useCallback(async () => {
@@ -657,7 +866,9 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                     marginBottom: '1rem',
                     border: '2px solid #1d9bf0',
                     borderRadius: '0.5rem',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    maxHeight: '400px',
+                    overflowY: 'auto'
                 }}>
                     <div style={{
                         display: 'flex',
@@ -665,11 +876,18 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                         alignItems: 'center',
                         padding: '0.5rem 1rem',
                         backgroundColor: '#1d9bf0',
-                        color: 'white'
+                        color: 'white',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10
                     }}>
                         <span style={{ fontWeight: '600' }}>𝕏 请先登录 X/Twitter</span>
                         <button
-                            onClick={() => setShowXLogin(false)}
+                            onClick={() => {
+                                setShowXLogin(false);
+                                // 同时取消选中 X 平台
+                                setSelectedPlatforms(prev => prev.filter(p => p !== 'x'));
+                            }}
                             style={{
                                 background: 'none',
                                 border: 'none',
@@ -682,15 +900,12 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                             ×
                         </button>
                     </div>
-                    <div style={{ padding: '1rem' }}>
-                        <TwitterLoginSection
+                    <div style={{ padding: '1rem', backgroundColor: 'white' }}>
+                        <XLoginForm
                             userId={userId}
-                            supabaseUuid={supabaseUuid}
-                            onLoginStatusChange={(isLoggedIn) => {
-                                setXLoggedIn(isLoggedIn);
-                                if (isLoggedIn) {
-                                    setShowXLogin(false);
-                                }
+                            onLoginSuccess={() => {
+                                setXLoggedIn(true);
+                                setShowXLogin(false);
                             }}
                         />
                     </div>
