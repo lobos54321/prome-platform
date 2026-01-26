@@ -46,9 +46,28 @@ interface ProductConfig {
     enableSentiment: boolean;
 }
 
+// 🔥 持久化工作流步骤的 key
+const WORKFLOW_STEP_KEY = 'prome_auto_marketing_step';
+const WORKFLOW_PLATFORMS_KEY = 'prome_auto_marketing_platforms';
+const WORKFLOW_ACTIVE_PLATFORM_KEY = 'prome_auto_marketing_active_platform';
+
 export default function AutoMarketing() {
     const navigate = useNavigate();
-    const [currentStep, setCurrentStep] = useState<Step>('config');
+
+    // 🔥 从 localStorage 恢复初始步骤
+    const getInitialStep = (): Step => {
+        try {
+            const savedStep = localStorage.getItem(WORKFLOW_STEP_KEY);
+            if (savedStep && ['config', 'platforms', 'content-mode', 'redirect'].includes(savedStep)) {
+                return savedStep as Step;
+            }
+        } catch (e) {
+            console.warn('Failed to restore step from localStorage:', e);
+        }
+        return 'config';
+    };
+
+    const [currentStep, setCurrentStep] = useState<Step>(getInitialStep);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -70,17 +89,75 @@ export default function AutoMarketing() {
         enableSentiment: true,
     });
 
+    // 🔥 从 localStorage 恢复选中的平台
+    const getInitialPlatforms = (): string[] => {
+        try {
+            const saved = localStorage.getItem(WORKFLOW_PLATFORMS_KEY);
+            if (saved) {
+                return JSON.parse(saved);
+            }
+        } catch (e) {
+            console.warn('Failed to restore platforms from localStorage:', e);
+        }
+        return [];
+    };
+
+    // 🔥 从 localStorage 恢复激活的平台
+    const getInitialActivePlatform = (): string => {
+        try {
+            const saved = localStorage.getItem(WORKFLOW_ACTIVE_PLATFORM_KEY);
+            if (saved) {
+                return saved;
+            }
+        } catch (e) {
+            console.warn('Failed to restore active platform from localStorage:', e);
+        }
+        return '';
+    };
+
     // 选中的平台
-    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(getInitialPlatforms);
 
     // 🔥 当前激活的平台（多平台切换时使用）
-    const [activePlatform, setActivePlatform] = useState<string>('');
+    const [activePlatform, setActivePlatform] = useState<string>(getInitialActivePlatform);
 
     // 🔥 用于 ContentModeStep 的 xhsUserId
     const [xhsUserId, setXhsUserId] = useState<string>('');
 
     // 🔥 用户配置（从数据库加载，传给 ContentModeStep）
     const [userProfile, setUserProfile] = useState<any>(null);
+
+    // 🔥 保存步骤状态到 localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem(WORKFLOW_STEP_KEY, currentStep);
+            console.log('✅ 已保存工作流步骤:', currentStep);
+        } catch (e) {
+            console.warn('Failed to save step to localStorage:', e);
+        }
+    }, [currentStep]);
+
+    // 🔥 保存选中平台到 localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem(WORKFLOW_PLATFORMS_KEY, JSON.stringify(selectedPlatforms));
+            console.log('✅ 已保存选中平台:', selectedPlatforms);
+        } catch (e) {
+            console.warn('Failed to save platforms to localStorage:', e);
+        }
+    }, [selectedPlatforms]);
+
+    // 🔥 保存激活平台到 localStorage
+    useEffect(() => {
+        try {
+            if (activePlatform) {
+                localStorage.setItem(WORKFLOW_ACTIVE_PLATFORM_KEY, activePlatform);
+                console.log('✅ 已保存激活平台:', activePlatform);
+            }
+        } catch (e) {
+            console.warn('Failed to save active platform to localStorage:', e);
+        }
+    }, [activePlatform]);
 
     // 获取当前用户 + 加载已保存的配置
     useEffect(() => {
@@ -122,24 +199,31 @@ export default function AutoMarketing() {
                             enableSentiment: true, // 默认启用
                         });
 
-                        // 恢复已选平台
-                        if (profile.target_platforms && profile.target_platforms.length > 0) {
-                            setSelectedPlatforms(profile.target_platforms);
-                            setActivePlatform(profile.target_platforms[0]);
-                        }
-
-                        // 🔥 根据已保存的数据决定初始步骤
-                        if (profile.product_name && profile.target_audience) {
-                            // 有产品配置
+                        // 🔥 恢复已选平台（仅在 localStorage 没有保存时才从数据库恢复）
+                        const savedPlatforms = localStorage.getItem(WORKFLOW_PLATFORMS_KEY);
+                        if (!savedPlatforms || JSON.parse(savedPlatforms).length === 0) {
                             if (profile.target_platforms && profile.target_platforms.length > 0) {
-                                // 有平台选择 -> 直接进入 content-mode
-                                setCurrentStep('content-mode');
-                            } else {
-                                // 没有平台选择 -> 进入平台选择
-                                setCurrentStep('platforms');
+                                setSelectedPlatforms(profile.target_platforms);
+                                setActivePlatform(profile.target_platforms[0]);
                             }
                         }
-                        // 否则保持在 config 步骤
+
+                        // 🔥 仅在 localStorage 没有保存步骤时，才根据数据库数据推断步骤
+                        const savedStep = localStorage.getItem(WORKFLOW_STEP_KEY);
+                        if (!savedStep) {
+                            if (profile.product_name && profile.target_audience) {
+                                // 有产品配置
+                                if (profile.target_platforms && profile.target_platforms.length > 0) {
+                                    // 有平台选择 -> 直接进入 content-mode
+                                    setCurrentStep('content-mode');
+                                } else {
+                                    // 没有平台选择 -> 进入平台选择
+                                    setCurrentStep('platforms');
+                                }
+                            }
+                            // 否则保持在 config 步骤
+                        }
+                        // 如果 localStorage 有保存步骤，则已经通过 getInitialStep 恢复了，不需要覆盖
                     }
                 } catch (err) {
                     console.log('首次使用，无已保存配置');

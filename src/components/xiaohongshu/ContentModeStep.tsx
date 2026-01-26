@@ -62,6 +62,28 @@ export function ContentModeStep({
         youtube: { name: 'YouTube', icon: '▶️' },
     };
 
+    // 🔥 在组件加载时检查是否有正在进行的任务，并恢复进度面板
+    useEffect(() => {
+        try {
+            const savedTask = localStorage.getItem('prome_active_task');
+            if (savedTask) {
+                const task = JSON.parse(savedTask);
+                // 检查任务是否属于当前用户
+                if (task.supabaseUuid === supabaseUuid && task.taskId) {
+                    console.log('🔄 恢复进行中的任务:', task);
+                    setCurrentTaskId(task.taskId);
+                    // 恢复工作流模式
+                    if (task.mode) {
+                        setSelectedWorkflowMode(task.mode);
+                    }
+                    setShowProgressPanel(true);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to restore active task:', e);
+        }
+    }, [supabaseUuid]);
+
     // 同步配置变化
     useEffect(() => {
         if (userProfile?.content_mode_preference) {
