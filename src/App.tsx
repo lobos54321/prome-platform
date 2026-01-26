@@ -61,6 +61,7 @@ import Analytics from './pages/Analytics';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import AutoMarketing from './pages/AutoMarketing';
 import VideoHistory from './pages/VideoHistory';
+import XManager from './pages/XManager';
 
 const queryClient = new QueryClient();
 
@@ -281,7 +282,7 @@ const App = () => {
               <Route path="/xiaohongshu-api" element={<XiaohongshuMarketing />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/auto" element={<AutoMarketing />} />
-              <Route path="/x" element={<AutoMarketing />} />
+              <Route path="/x" element={<XManager />} />
               <Route path="/video-history" element={<VideoHistory />} />
               <Route path="/admin" element={<Admin />} />
 
