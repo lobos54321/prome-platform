@@ -14,6 +14,7 @@ import { LogDetail } from './LogDetail';
 import { StrategyOverview } from './StrategyOverview';
 import { WeeklyPlanTimeline } from './WeeklyPlanTimeline';
 import { TodayContentPreview } from './TodayContentPreview';
+import { workflowResultsService } from '@/lib/workflowResultsService';
 import {
     ChevronRight,
     Cpu,
@@ -194,9 +195,41 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
         [WorkflowMode.UGC_VIDEO]: DEFAULT_NODES[WorkflowMode.UGC_VIDEO],
     });
 
-    // 🔥 从 localStorage 恢复节点状态（在组件挂载时）
+    // 🔥 从 Supabase 或 localStorage 恢复数据（在组件挂载时）
     useEffect(() => {
-        if (taskId) {
+        if (!taskId) return;
+
+        const restoreData = async () => {
+            const authUserId = localStorage.getItem('supabaseUserId') || localStorage.getItem('userId');
+
+            if (authUserId) {
+                // 首先尝试从 Supabase 恢复
+                const savedResult = await workflowResultsService.getResult(authUserId, taskId);
+                if (savedResult) {
+                    console.log('[AgentProgressPanel] ✅ Restored from Supabase');
+                    if (savedResult.result && Object.keys(savedResult.result).length > 0) {
+                        setLocalResultState(savedResult.result);
+                    }
+                    if (savedResult.nodes && savedResult.nodes.length > 0) {
+                        setNodes(savedResult.nodes);
+                    }
+                    if (savedResult.overall_progress) {
+                        setOverallProgress(savedResult.overall_progress);
+                    }
+                    if (savedResult.status === 'completed') {
+                        setIsWorkflowCompleted(true);
+                    }
+                    if (savedResult.content_strategy) {
+                        setLocalContentStrategy(savedResult.content_strategy);
+                    }
+                    if (savedResult.weekly_plan) {
+                        setLocalWeeklyPlan(savedResult.weekly_plan);
+                    }
+                    return; // 从 Supabase 恢复成功，不需要 localStorage
+                }
+            }
+
+            // 降级：从 localStorage 恢复
             try {
                 const savedNodes = localStorage.getItem(`prome_workflow_nodes_${taskId}`);
                 const savedProgress = localStorage.getItem(`prome_workflow_progress_${taskId}`);
@@ -209,9 +242,11 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                     setOverallProgress(parseInt(savedProgress, 10));
                 }
             } catch (e) {
-                console.warn('Failed to restore nodes from localStorage:', e);
+                console.warn('Failed to restore from localStorage:', e);
             }
-        }
+        };
+
+        restoreData();
     }, [taskId]);
 
     // 🔥 保存节点状态到 localStorage
@@ -413,6 +448,28 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         setLocalResult(data.result);
                     }
                     markWorkflowCompleted(true);
+
+                    // 🔥 保存到 Supabase
+                    const authUserId = localStorage.getItem('supabaseUserId') || localStorage.getItem('userId');
+                    if (authUserId && taskId) {
+                        workflowResultsService.saveResult({
+                            user_id: authUserId,
+                            task_id: taskId,
+                            workflow_mode: activeMode === WorkflowMode.IMAGE_TEXT ? 'image_text' :
+                                           activeMode === WorkflowMode.AVATAR_VIDEO ? 'avatar_video' : 'ugc_video',
+                            status: 'completed',
+                            overall_progress: 100,
+                            result: data.result || {},
+                            nodes: data.nodes || nodes,
+                            content_strategy: localContentStrategy,
+                            weekly_plan: localWeeklyPlan,
+                            target_platforms: targetPlatforms || ['xiaohongshu'],
+                        }).then(() => {
+                            console.log('[AgentProgressPanel] ✅ Saved to Supabase');
+                        }).catch(err => {
+                            console.error('[AgentProgressPanel] Failed to save to Supabase:', err);
+                        });
+                    }
 
                     // 🔔 发送浏览器通知
                     if ('Notification' in window) {
