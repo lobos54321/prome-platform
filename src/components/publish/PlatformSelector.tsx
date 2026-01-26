@@ -860,54 +860,67 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                 ))}
             </div>
 
-            {/* 🔥 X/Twitter 登录面板 - 当选中X但未登录时显示 */}
+            {/* 🔥 X/Twitter 登录模态框 - 使用固定定位确保可见和可滚动 */}
             {(showXLogin || (selectedPlatforms.includes('x') && !xLoggedIn && !checkingXLogin)) && (
                 <div style={{
-                    marginBottom: '1rem',
-                    border: '2px solid #1d9bf0',
-                    borderRadius: '0.5rem',
-                    overflow: 'hidden',
-                    maxHeight: '400px',
-                    overflowY: 'auto'
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    padding: '1rem'
                 }}>
                     <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '0.5rem 1rem',
-                        backgroundColor: '#1d9bf0',
-                        color: 'white',
-                        position: 'sticky',
-                        top: 0,
-                        zIndex: 10
+                        backgroundColor: 'white',
+                        borderRadius: '0.75rem',
+                        width: '100%',
+                        maxWidth: '420px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
                     }}>
-                        <span style={{ fontWeight: '600' }}>𝕏 请先登录 X/Twitter</span>
-                        <button
-                            onClick={() => {
-                                setShowXLogin(false);
-                                // 同时取消选中 X 平台
-                                setSelectedPlatforms(prev => prev.filter(p => p !== 'x'));
-                            }}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontSize: '1.25rem',
-                                padding: '0.25rem'
-                            }}
-                        >
-                            ×
-                        </button>
-                    </div>
-                    <div style={{ padding: '1rem', backgroundColor: 'white' }}>
-                        <XLoginForm
-                            userId={userId}
-                            onLoginSuccess={() => {
-                                setXLoggedIn(true);
-                                setShowXLogin(false);
-                            }}
-                        />
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '1rem 1.25rem',
+                            backgroundColor: '#1d9bf0',
+                            color: 'white',
+                            borderRadius: '0.75rem 0.75rem 0 0'
+                        }}>
+                            <span style={{ fontWeight: '600', fontSize: '1.1rem' }}>𝕏 登录 X/Twitter</span>
+                            <button
+                                onClick={() => {
+                                    setShowXLogin(false);
+                                    setSelectedPlatforms(prev => prev.filter(p => p !== 'x'));
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '1.5rem',
+                                    padding: '0.25rem',
+                                    lineHeight: 1
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div style={{ padding: '1.5rem' }}>
+                            <XLoginForm
+                                userId={userId}
+                                onLoginSuccess={() => {
+                                    setXLoggedIn(true);
+                                    setShowXLogin(false);
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
