@@ -125,8 +125,13 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     onRegeneratePlatformVariant,
 }) => {
     const [activeMode, setActiveMode] = useState<WorkflowMode>(initialMode);
-    const [nodes, setNodes] = useState<WorkflowNode[]>(DEFAULT_NODES[initialMode]);
-    const [activeNodeId, setActiveNodeId] = useState<string>(DEFAULT_NODES[initialMode][0].id);
+    const [nodes, setNodes] = useState<WorkflowNode[]>(() => {
+        return DEFAULT_NODES[initialMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
+    });
+    const [activeNodeId, setActiveNodeId] = useState<string>(() => {
+        const initialNodes = DEFAULT_NODES[initialMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
+        return initialNodes[0]?.id || '';
+    });
     const [isConnected, setIsConnected] = useState(false);
     const [overallProgress, setOverallProgress] = useState(0);
     const [isPublishing, setIsPublishing] = useState(false);
@@ -210,7 +215,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                     if (savedResult.result && Object.keys(savedResult.result).length > 0) {
                         setLocalResultState(savedResult.result);
                     }
-                    if (savedResult.nodes && savedResult.nodes.length > 0) {
+                    if (savedResult.nodes && Array.isArray(savedResult.nodes) && savedResult.nodes.length > 0) {
                         setNodes(savedResult.nodes);
                     }
                     if (savedResult.overall_progress) {
@@ -235,8 +240,10 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                 const savedProgress = localStorage.getItem(`prome_workflow_progress_${taskId}`);
                 if (savedNodes) {
                     const parsedNodes = JSON.parse(savedNodes);
-                    setNodes(parsedNodes);
-                    console.log('[AgentProgressPanel] Restored nodes from localStorage');
+                    if (Array.isArray(parsedNodes) && parsedNodes.length > 0) {
+                        setNodes(parsedNodes);
+                        console.log('[AgentProgressPanel] Restored nodes from localStorage');
+                    }
                 }
                 if (savedProgress) {
                     setOverallProgress(parseInt(savedProgress, 10));
@@ -264,9 +271,13 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
     // 当 mode 发生变化时更新 nodes
     useEffect(() => {
         if (initialMode && initialMode !== activeMode) {
+            console.log(`[AgentProgressPanel] Mode change detected: ${activeMode} -> ${initialMode}`);
             setActiveMode(initialMode);
-            setNodes(DEFAULT_NODES[initialMode]);
-            setActiveNodeId(DEFAULT_NODES[initialMode][0].id);
+            const defaultNodes = DEFAULT_NODES[initialMode];
+            if (defaultNodes && defaultNodes.length > 0) {
+                setNodes(defaultNodes);
+                setActiveNodeId(defaultNodes[0].id);
+            }
         }
     }, [initialMode]);
 
@@ -300,7 +311,9 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
 
                 if (message.type === 'status_update') {
                     const data = message.data as WorkflowStatusResponse;
-                    setNodes(data.nodes);
+                    if (data.nodes && data.nodes.length > 0) {
+                        setNodes(data.nodes);
+                    }
                     setOverallProgress(data.overallProgress);
                     setActiveMode(data.mode);
 
@@ -311,7 +324,14 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                     }
                 } else if (message.type === 'node_update') {
                     const updatedNode = message.data as WorkflowNode;
-                    setNodes(prev => prev.map(n => n.id === updatedNode.id ? updatedNode : n));
+                    setNodes(prev => {
+                        if (prev.length === 0) {
+                            console.warn('[AgentProgressPanel] Received node_update but current nodes list is empty. Re-initializing from default.');
+                            const defaultNodes = DEFAULT_NODES[activeMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
+                            return defaultNodes.map(n => n.id === updatedNode.id ? updatedNode : n);
+                        }
+                        return prev.map(n => n.id === updatedNode.id ? updatedNode : n);
+                    });
 
                     if (updatedNode.status === NodeStatus.PROCESSING) {
                         setActiveNodeId(updatedNode.id);
@@ -425,7 +445,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                 } else if (message.type === 'completed') {
                     const data = message.data as any;
                     setOverallProgress(100);
-                    if (data.nodes) {
+                    if (data.nodes && data.nodes.length > 0) {
                         setNodes(data.nodes);
                         // 尝试从完成消息中同步所有状态
                         data.nodes.forEach((n: any) => {
@@ -536,7 +556,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
         nodesCacheRef.current[activeMode] = nodes;
 
         // 获取目标模式的缓存节点
-        const cachedNodes = nodesCacheRef.current[newMode];
+        const cachedNodes = nodesCacheRef.current[newMode] || DEFAULT_NODES[newMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
 
         // 🔥 同步共用节点的状态（按ID匹配）
         const syncedNodes = cachedNodes.map(targetNode => {
@@ -554,9 +574,17 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
             return targetNode;
         });
 
-        setNodes(syncedNodes);
-        setActiveNodeId(syncedNodes[0]?.id || '');
-        setActiveMode(newMode);
+        if (syncedNodes.length > 0) {
+            setNodes(syncedNodes);
+            setActiveNodeId(syncedNodes[0]?.id || '');
+            setActiveMode(newMode);
+        } else {
+            console.warn('[AgentProgressPanel] Prevented setting empty nodes during mode switch, falling back to default nodes');
+            const fallbackNodes = DEFAULT_NODES[newMode] || DEFAULT_NODES[WorkflowMode.IMAGE_TEXT];
+            setNodes(fallbackNodes);
+            setActiveNodeId(fallbackNodes[0]?.id || '');
+            setActiveMode(newMode);
+        }
     }, [activeMode, nodes]);
 
     const activeNode = nodes.find(n => n.id === activeNodeId) || nodes[0];
