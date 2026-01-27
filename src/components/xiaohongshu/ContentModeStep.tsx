@@ -60,6 +60,7 @@ export function ContentModeStep({
         tiktok: { name: 'TikTok', icon: '🎵' },
         instagram: { name: 'Instagram', icon: '📷' },
         youtube: { name: 'YouTube', icon: '▶️' },
+        threads: { name: 'Threads', icon: '📱' },
     };
 
     // 🔥 在组件加载时检查是否有正在进行的任务，并恢复进度面板

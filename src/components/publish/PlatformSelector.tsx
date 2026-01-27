@@ -271,6 +271,13 @@ export const PLATFORMS: Platform[] = [
         method: 'skyvern'
     },
     {
+        id: 'threads',
+        name: 'Threads',
+        icon: '📱',
+        enabled: false, // 待实现
+        method: 'skyvern'
+    },
+    {
         id: 'pinterest',
         name: 'Pinterest',
         icon: '📌',

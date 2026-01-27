@@ -74,6 +74,15 @@ export const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
     color: 'text-red-500',
     bgColor: 'bg-red-50',
     borderColor: 'border-red-300'
+  },
+  threads: {
+    id: 'threads',
+    name: 'threads',
+    displayName: 'Threads',
+    icon: '📱',
+    color: 'text-slate-800',
+    bgColor: 'bg-slate-50',
+    borderColor: 'border-slate-300'
   }
 };
 

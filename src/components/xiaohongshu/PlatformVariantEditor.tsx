@@ -124,6 +124,23 @@ export const PLATFORM_RULES: Record<string, PlatformCopyRules> = {
             '使用关键词但避免堆砌',
         ],
     },
+    threads: {
+        id: 'threads',
+        name: 'threads',
+        displayName: 'Threads',
+        icon: '📱',
+        maxLength: 500,
+        style: '随性真实、对话感强、碎片化',
+        tone: '轻松、平视、像在发短信',
+        hashtagStyle: '少量标签或无标签，1-3个',
+        specialRules: [
+            '像在和朋友发短信',
+            '鼓励回复和引用',
+            '可以使用连载形式',
+            '适合碎片化思考分享',
+            '图片配文要简洁',
+        ],
+    },
 };
 
 // ============ 默认 Prompt 模板生成 ============

@@ -75,7 +75,7 @@ export function WeeklyPlanCard({ weeklyPlan, className = '' }: WeeklyPlanCardPro
               );
             }
 
-            const statusConfig = STATUS_CONFIG[dayPlan.status];
+            const statusConfig = STATUS_CONFIG[dayPlan.status] || STATUS_CONFIG.planned;
             const StatusIcon = statusConfig.icon;
 
             return (
