@@ -62,6 +62,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import AutoMarketing from './pages/AutoMarketing';
 import VideoHistory from './pages/VideoHistory';
 import XManager from './pages/XManager';
+import PlatformManager from './pages/PlatformManager';
 
 const queryClient = new QueryClient();
 
@@ -283,6 +284,10 @@ const App = () => {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/auto" element={<AutoMarketing />} />
               <Route path="/x" element={<XManager />} />
+              <Route path="/tiktok" element={<PlatformManager platformId="tiktok" />} />
+              <Route path="/youtube" element={<PlatformManager platformId="youtube" />} />
+              <Route path="/threads" element={<PlatformManager platformId="threads" />} />
+              <Route path="/instagram" element={<PlatformManager platformId="instagram" />} />
               <Route path="/video-history" element={<VideoHistory />} />
               <Route path="/admin" element={<Admin />} />
 
