@@ -88,6 +88,11 @@ const videoUpload = multer({
 // General upload configuration (for backward compatibility)
 const upload = imageUpload;
 
+// 🔥 健康检查端点 - Zeabur readiness probe
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // 🔍 DEBUG: Log all incoming requests to identify routing
 app.use((req, res, next) => {
   if (req.path.includes('/api/dify') || req.path.includes('/api/video-result')) {
