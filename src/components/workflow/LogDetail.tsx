@@ -42,6 +42,15 @@ function cleanVariantLabel(text: string): string {
 }
 
 export const LogDetail: React.FC<LogDetailProps> = ({ node }) => {
+    // 🔥 防御性检查：如果 node 为 undefined，返回空状态
+    if (!node) {
+        return (
+            <div className="flex items-center justify-center h-full text-slate-400">
+                <p className="text-sm">节点数据加载中...</p>
+            </div>
+        );
+    }
+
     // 动态获取图标组件
     const NodeIcon = node.icon || FileText;
 
