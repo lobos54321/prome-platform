@@ -22,6 +22,7 @@ export interface Platform {
     postUrl?: string;
 }
 
+// 平台配置 - 只保留小红书和 X
 export const PLATFORMS: Platform[] = [
     {
         id: 'xiaohongshu',
@@ -34,44 +35,9 @@ export const PLATFORMS: Platform[] = [
         id: 'x',
         name: 'X (Twitter)',
         icon: '𝕏',
-        enabled: true, // ✅ Twitter Worker 集成
+        enabled: true,
         method: 'chrome_extension'
     },
-    {
-        id: 'tiktok',
-        name: 'TikTok',
-        icon: '🎵',
-        enabled: true, // ✅ Skyvern 集成
-        method: 'skyvern'
-    },
-    {
-        id: 'instagram',
-        name: 'Instagram',
-        icon: '📷',
-        enabled: true, // ✅ Skyvern 集成
-        method: 'skyvern'
-    },
-    {
-        id: 'youtube',
-        name: 'YouTube Shorts',
-        icon: '▶️',
-        enabled: false, // 待实现
-        method: 'skyvern'
-    },
-    {
-        id: 'threads',
-        name: 'Threads',
-        icon: '📱',
-        enabled: false, // 待实现
-        method: 'skyvern'
-    },
-    {
-        id: 'pinterest',
-        name: 'Pinterest',
-        icon: '📌',
-        enabled: false, // 待实现
-        method: 'skyvern'
-    }
 ];
 
 interface PlatformSelectorProps {

@@ -53,14 +53,10 @@ export function ContentModeStep({
     // 🔥 目标发布平台 - 从 userProfile 读取（在 /auto 页面已选择）
     const selectedPlatforms = userProfile?.target_platforms || ['xiaohongshu'];
 
-    // 平台显示名称映射
+    // 平台显示名称映射 - 只保留小红书和 X
     const platformDisplayNames: Record<string, { name: string; icon: string }> = {
         xiaohongshu: { name: '小红书', icon: '📕' },
         x: { name: 'X (Twitter)', icon: '𝕏' },
-        tiktok: { name: 'TikTok', icon: '🎵' },
-        instagram: { name: 'Instagram', icon: '📷' },
-        youtube: { name: 'YouTube', icon: '▶️' },
-        threads: { name: 'Threads', icon: '📱' },
     };
 
     // 🔥 在组件加载时检查是否有正在进行的任务，并恢复进度面板
