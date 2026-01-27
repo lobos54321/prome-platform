@@ -5,223 +5,11 @@
  * 包含 Chrome 浏览器检测和插件安装引导流程
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { publishApi } from '../../lib/publishApi';
-import { twitterClient } from '../../lib/twitter-worker';
 
 // 插件下载地址
 const EXTENSION_DOWNLOAD_URL = '/prome-extension.zip';
-
-// 🔥 内联 X 登录表单组件
-function XLoginForm({ userId, onLoginSuccess }: { userId: string; onLoginSuccess: () => void }) {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [statusMessage, setStatusMessage] = useState<string | null>(null);
-
-    const handleLogin = async () => {
-        if (!username.trim() || !password.trim()) {
-            setError('请输入用户名和密码');
-            return;
-        }
-
-        try {
-            setLoading(true);
-            setError(null);
-            setStatusMessage('正在启动登录...');
-
-            const result = await twitterClient.login({
-                userId,
-                username: username.trim(),
-                password,
-            });
-
-            if (result.status === 'started' && result.task_id) {
-                setStatusMessage('浏览器正在登录 Twitter，请稍候...');
-
-                // 轮询任务状态
-                const pollTaskStatus = async (retries = 60) => {
-                    if (retries <= 0) {
-                        setError('登录超时，请重试');
-                        setLoading(false);
-                        setStatusMessage(null);
-                        return;
-                    }
-
-                    try {
-                        const taskStatus = await twitterClient.checkLoginTaskStatus(result.task_id);
-
-                        if (taskStatus.status === 'completed' && taskStatus.logged_in) {
-                            setStatusMessage('登录成功！');
-                            setLoading(false);
-                            onLoginSuccess();
-                        } else if (taskStatus.status === 'failed') {
-                            setError(taskStatus.error || '登录失败');
-                            setLoading(false);
-                            setStatusMessage(null);
-                        } else {
-                            setTimeout(() => pollTaskStatus(retries - 1), 3000);
-                        }
-                    } catch (err) {
-                        setTimeout(() => pollTaskStatus(retries - 1), 3000);
-                    }
-                };
-
-                pollTaskStatus();
-            } else if (result.status === 'success') {
-                setStatusMessage('登录成功！');
-                setLoading(false);
-                onLoginSuccess();
-            } else {
-                setError(result.msg || '登录失败');
-                setLoading(false);
-                setStatusMessage(null);
-            }
-        } catch (err: any) {
-            console.error('Twitter login failed:', err);
-            setError(err.message || '登录请求失败');
-            setLoading(false);
-            setStatusMessage(null);
-        }
-    };
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* 错误提示 */}
-            {error && (
-                <div style={{
-                    padding: '0.75rem',
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '0.375rem',
-                    color: '#dc2626',
-                    fontSize: '0.875rem'
-                }}>
-                    ❌ {error}
-                </div>
-            )}
-
-            {/* 状态提示 */}
-            {statusMessage && (
-                <div style={{
-                    padding: '0.75rem',
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '0.375rem',
-                    color: '#2563eb',
-                    fontSize: '0.875rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                }}>
-                    {loading && <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span>}
-                    {statusMessage}
-                </div>
-            )}
-
-            {/* 用户名输入 */}
-            <div>
-                <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    marginBottom: '0.25rem',
-                    color: '#374151'
-                }}>
-                    用户名 / 邮箱 / 手机号
-                </label>
-                <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="@username 或 email@example.com"
-                    disabled={loading}
-                    style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.875rem',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                    }}
-                />
-            </div>
-
-            {/* 密码输入 */}
-            <div>
-                <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    marginBottom: '0.25rem',
-                    color: '#374151'
-                }}>
-                    密码
-                </label>
-                <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    disabled={loading}
-                    style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.875rem',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                    }}
-                />
-            </div>
-
-            {/* 登录按钮 */}
-            <button
-                onClick={handleLogin}
-                disabled={loading}
-                style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    backgroundColor: loading ? '#9ca3af' : '#1d9bf0',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem'
-                }}
-            >
-                {loading ? (
-                    <>
-                        <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span>
-                        登录中...
-                    </>
-                ) : (
-                    <>𝕏 登录 Twitter</>
-                )}
-            </button>
-
-            {/* 提示信息 */}
-            <p style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                margin: 0,
-                lineHeight: '1.5'
-            }}>
-                ⚠️ 如果您启用了两步验证(2FA)，此方式可能无法使用。
-                <br />
-                登录后，系统将通过浏览器自动化完成 Twitter 发布。
-            </p>
-        </div>
-    );
-}
 
 // 海外平台配置
 export interface Platform {
@@ -306,31 +94,6 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
     const [isChrome, setIsChrome] = useState(false);
     const [hasExtension, setHasExtension] = useState(false);
     const [checkingExtension, setCheckingExtension] = useState(true);
-
-    // 🔥 X/Twitter 登录状态
-    const [xLoggedIn, setXLoggedIn] = useState(false);
-    const [checkingXLogin, setCheckingXLogin] = useState(false);
-    const [showXLogin, setShowXLogin] = useState(false);
-    const userId = localStorage.getItem('userId') || 'anonymous';
-
-    // 检查 X 登录状态
-    const checkXLoginStatus = useCallback(async () => {
-        try {
-            setCheckingXLogin(true);
-            const result = await twitterClient.checkWebLogin(userId);
-            setXLoggedIn(result.logged_in);
-        } catch (err) {
-            console.error('Failed to check X login:', err);
-            setXLoggedIn(false);
-        } finally {
-            setCheckingXLogin(false);
-        }
-    }, [userId]);
-
-    // 初始检查 X 登录状态
-    useEffect(() => {
-        checkXLoginStatus();
-    }, [checkXLoginStatus]);
 
     // 检测 Chrome 浏览器和插件
     useEffect(() => {
@@ -492,103 +255,122 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
         }
     };
 
-    // 🔥 X/Twitter 发布 - 通过 Twitter Worker 服务
+    // 🔥 X/Twitter 发布 - 通过 Chrome 插件
     const publishToX = async () => {
-        // 检查登录状态
+        // 检查插件是否安装
+        const extensionMarker = document.getElementById('prome-extension-installed');
+        if (!extensionMarker) {
+            alert('❌ 未检测到 Prome 助手插件！\n\n请确保已安装插件并刷新页面。\n\n如需安装，请在 Chrome 扩展商店搜索 "Prome 助手"。');
+            return false;
+        }
+
+        if (!window.confirm('确认发布此内容到 X/Twitter？\n\n将通过浏览器插件自动发布。')) {
+            return false;
+        }
+
+        setPublishStatus(prev => ({ ...prev, x: 'publishing' }));
+
+        // 解析内容
+        let parsedContent = content.content || '';
+        let parsedTags = content.tags || [];
+
+        // 检查是否是 JSON 字符串
+        if (parsedContent.trim().startsWith('{') || parsedContent.trim().startsWith('```json')) {
+            try {
+                let jsonStr = parsedContent
+                    .replace(/^```json\s*/i, '')
+                    .replace(/```\s*$/i, '')
+                    .trim();
+
+                const jsonData = JSON.parse(jsonStr);
+                parsedContent = jsonData.text || jsonData.content || parsedContent;
+                if (jsonData.hashtags && Array.isArray(jsonData.hashtags)) {
+                    parsedTags = jsonData.hashtags;
+                }
+            } catch (e) {
+                console.log('[PlatformSelector] Content is not valid JSON, using as-is');
+            }
+        }
+
+        // Twitter 字数限制：280 字符
+        const TWITTER_MAX_CHARS = 280;
+        let tweetText = parsedContent;
+
+        // 添加 hashtags
+        if (parsedTags.length > 0) {
+            const hashtagStr = parsedTags.map(t => t.startsWith('#') ? t : `#${t}`).join(' ');
+            if (tweetText.length + hashtagStr.length + 1 <= TWITTER_MAX_CHARS) {
+                tweetText = `${tweetText}\n${hashtagStr}`;
+            }
+        }
+
+        // 截断到 280 字符
+        if (tweetText.length > TWITTER_MAX_CHARS) {
+            tweetText = tweetText.substring(0, TWITTER_MAX_CHARS - 3) + '...';
+        }
+
+        // 构建发布数据
+        const publishData = {
+            taskId: Date.now().toString(),
+            text: tweetText,
+            images: content.images || [],
+        };
+
+        console.log('[PlatformSelector] Sending Twitter publish task to extension:', publishData);
+
+        // 设置监听器等待插件响应
+        const publishPromise = new Promise<{ success: boolean; message: string }>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                window.removeEventListener('message', handleResponse);
+                reject(new Error('插件响应超时（5分钟），请确保插件已启用'));
+            }, 300000);
+
+            const handleResponse = (event: MessageEvent) => {
+                if (event.source !== window) return;
+
+                if (event.data.type === 'PROME_TWITTER_PUBLISH_ACKNOWLEDGED') {
+                    console.log('[PlatformSelector] Extension acknowledged Twitter task:', event.data);
+                }
+
+                if (event.data.type === 'PROME_TWITTER_PUBLISH_RESULT') {
+                    console.log('[PlatformSelector] Received Twitter publish result:', event.data);
+                    clearTimeout(timeout);
+                    window.removeEventListener('message', handleResponse);
+                    resolve(event.data);
+                }
+            };
+
+            window.addEventListener('message', handleResponse);
+        });
+
+        // 发送发布任务到插件
+        window.postMessage({
+            type: 'PROME_TWITTER_PUBLISH_TASK',
+            data: publishData
+        }, '*');
+
+        alert(
+            `📝 发布任务已发送到插件！\n\n` +
+            `插件将自动：\n` +
+            `1. 打开 X/Twitter 发布页面\n` +
+            `2. 填写内容并发布\n\n` +
+            `请保持浏览器窗口打开。`
+        );
+
         try {
-            const loginStatus = await twitterClient.checkWebLogin(userId);
-            if (!loginStatus.logged_in) {
-                // 显示登录界面而不是仅弹出提示
-                setShowXLogin(true);
-                return false;
-            }
-
-            if (!window.confirm('确认发布此内容到 X/Twitter？')) {
-                return false;
-            }
-
-            setPublishStatus(prev => ({ ...prev, x: 'publishing' }));
-
-            // 解析内容
-            let parsedContent = content.content || '';
-            let parsedTags = content.tags || [];
-
-            // 检查是否是 JSON 字符串
-            if (parsedContent.trim().startsWith('{') || parsedContent.trim().startsWith('```json')) {
-                try {
-                    let jsonStr = parsedContent
-                        .replace(/^```json\s*/i, '')
-                        .replace(/```\s*$/i, '')
-                        .trim();
-
-                    const jsonData = JSON.parse(jsonStr);
-                    parsedContent = jsonData.text || jsonData.content || parsedContent;
-                    if (jsonData.hashtags && Array.isArray(jsonData.hashtags)) {
-                        parsedTags = jsonData.hashtags;
-                    }
-                } catch (e) {
-                    console.log('[PlatformSelector] Content is not valid JSON, using as-is');
-                }
-            }
-
-            // Twitter 字数限制：280 字符
-            const TWITTER_MAX_CHARS = 280;
-            let tweetText = parsedContent;
-
-            // 添加 hashtags
-            if (parsedTags.length > 0) {
-                const hashtagStr = parsedTags.map(t => t.startsWith('#') ? t : `#${t}`).join(' ');
-                if (tweetText.length + hashtagStr.length + 1 <= TWITTER_MAX_CHARS) {
-                    tweetText = `${tweetText}\n${hashtagStr}`;
-                }
-            }
-
-            // 截断到 280 字符
-            if (tweetText.length > TWITTER_MAX_CHARS) {
-                tweetText = tweetText.substring(0, TWITTER_MAX_CHARS - 3) + '...';
-            }
-
-            // 发布推文
-            const result = await twitterClient.publish({
-                userId,
-                cookies: loginStatus.cookies || '',
-                text: tweetText,
-                mediaUrls: content.images,
-            });
-
-            if (result.status === 'started' || result.task_id) {
-                // 轮询状态
-                const taskId = result.task_id;
-                const pollStatus = async (retries = 30) => {
-                    if (retries <= 0) {
-                        setPublishStatus(prev => ({ ...prev, x: 'failed' }));
-                        return;
-                    }
-                    try {
-                        const status = await twitterClient.getPublishStatus(taskId);
-                        if (status.status === 'completed') {
-                            setPublishStatus(prev => ({ ...prev, x: 'completed' }));
-                            onPublishComplete?.('x', { taskId });
-                            alert('✅ 推文发布成功！');
-                        } else if (status.status === 'failed') {
-                            setPublishStatus(prev => ({ ...prev, x: 'failed' }));
-                            alert(`❌ 推文发布失败：${status.error || '未知错误'}`);
-                        } else {
-                            setTimeout(() => pollStatus(retries - 1), 3000);
-                        }
-                    } catch {
-                        setTimeout(() => pollStatus(retries - 1), 3000);
-                    }
-                };
-
-                alert('📝 推文正在发布中...\n\n请稍候，发布完成后会通知您。');
-                pollStatus();
+            const result = await publishPromise;
+            if (result.success) {
+                setPublishStatus(prev => ({ ...prev, x: 'completed' }));
+                onPublishComplete?.('x', result);
+                alert('✅ 推文发布成功！');
                 return true;
             } else {
-                throw new Error(result.msg || '发布失败');
+                setPublishStatus(prev => ({ ...prev, x: 'failed' }));
+                alert(`❌ 推文发布失败：${result.message || '未知错误'}`);
+                return false;
             }
         } catch (error: any) {
-            console.error('[PlatformSelector] X publish error:', error);
+            console.error('[PlatformSelector] Twitter publish error:', error);
             setPublishStatus(prev => ({ ...prev, x: 'failed' }));
             alert(`❌ X 发布失败：${error.message}`);
             return false;
@@ -844,16 +626,6 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                         <span>{platform.icon}</span>
                         <span>{platform.name}</span>
                         <span>{getStatusIcon(publishStatus[platform.id])}</span>
-                        {/* X 平台登录状态指示 */}
-                        {platform.id === 'x' && (
-                            <span style={{
-                                fontSize: '0.75rem',
-                                color: xLoggedIn ? '#10b981' : '#f59e0b',
-                                marginLeft: '0.25rem'
-                            }}>
-                                {checkingXLogin ? '⏳' : xLoggedIn ? '✓' : '⚠'}
-                            </span>
-                        )}
                         {!platform.enabled && (
                             <span style={{
                                 fontSize: '0.75rem',
@@ -866,71 +638,6 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
                     </button>
                 ))}
             </div>
-
-            {/* 🔥 X/Twitter 登录模态框 - 使用固定定位确保可见和可滚动 */}
-            {(showXLogin || (selectedPlatforms.includes('x') && !xLoggedIn && !checkingXLogin)) && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999,
-                    padding: '1rem'
-                }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        borderRadius: '0.75rem',
-                        width: '100%',
-                        maxWidth: '420px',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-                    }}>
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '1rem 1.25rem',
-                            backgroundColor: '#1d9bf0',
-                            color: 'white',
-                            borderRadius: '0.75rem 0.75rem 0 0'
-                        }}>
-                            <span style={{ fontWeight: '600', fontSize: '1.1rem' }}>𝕏 登录 X/Twitter</span>
-                            <button
-                                onClick={() => {
-                                    setShowXLogin(false);
-                                    setSelectedPlatforms(prev => prev.filter(p => p !== 'x'));
-                                }}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontSize: '1.5rem',
-                                    padding: '0.25rem',
-                                    lineHeight: 1
-                                }}
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div style={{ padding: '1.5rem' }}>
-                            <XLoginForm
-                                userId={userId}
-                                onLoginSuccess={() => {
-                                    setXLoggedIn(true);
-                                    setShowXLogin(false);
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* 发布按钮 */}
             <button
