@@ -24,6 +24,8 @@ interface ContentModeStepProps {
     activePlatform?: string;
     /** 🔥 是否启用舆情分析（默认 true） */
     enableSentiment?: boolean;
+    /** 🔥 目标平台列表（由父组件直接传入，优先于 userProfile） */
+    targetPlatforms?: string[];
     onComplete: () => void;
     onViewDashboard: () => void;
     /** 🔥 重新配置回调 - 跳转到配置页面 */
@@ -36,6 +38,7 @@ export function ContentModeStep({
     userProfile,
     activePlatform,
     enableSentiment = true,
+    targetPlatforms: propTargetPlatforms,
     onComplete,
     onViewDashboard,
     onReconfigure,
@@ -50,8 +53,8 @@ export function ContentModeStep({
     });
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // 🔥 目标发布平台 - 从 userProfile 读取（在 /auto 页面已选择）
-    const selectedPlatforms = userProfile?.target_platforms || ['xiaohongshu'];
+    // 🔥 目标发布平台 - 优先使用 prop 传入的值，其次是 userProfile，最后是默认值
+    const selectedPlatforms = propTargetPlatforms || userProfile?.target_platforms || ['xiaohongshu'];
 
     // 平台显示名称映射 - 只保留小红书和 X
     const platformDisplayNames: Record<string, { name: string; icon: string }> = {
