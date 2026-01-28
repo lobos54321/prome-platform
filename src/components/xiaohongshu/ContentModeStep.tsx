@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Loader2, AlertCircle } from 'lucide-react';
+import { Play, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { ContentModeConfig } from './ContentModeConfig';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
@@ -26,6 +26,8 @@ interface ContentModeStepProps {
     enableSentiment?: boolean;
     /** 🔥 目标平台列表（由父组件直接传入，优先于 userProfile） */
     targetPlatforms?: string[];
+    /** 🔥 返回上一步回调 */
+    onBack?: () => void;
     onComplete: () => void;
     onViewDashboard: () => void;
     /** 🔥 重新配置回调 - 跳转到配置页面 */
@@ -39,6 +41,7 @@ export function ContentModeStep({
     activePlatform,
     enableSentiment = true,
     targetPlatforms: propTargetPlatforms,
+    onBack,
     onComplete,
     onViewDashboard,
     onReconfigure,
@@ -317,7 +320,22 @@ export function ContentModeStep({
             {/* 操作按钮 */}
             <Card>
                 <CardContent className="p-6">
-                    <div className="flex justify-end items-center">
+                    <div className="flex justify-between items-center">
+                        {/* 返回上一步按钮 */}
+                        {onBack && (
+                            <Button
+                                variant="outline"
+                                onClick={onBack}
+                                disabled={starting}
+                                className="px-6"
+                            >
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                返回上一步
+                            </Button>
+                        )}
+                        {!onBack && <div />}
+
+                        {/* 启动运营按钮 */}
                         <Button
                             onClick={handleStartOperation}
                             disabled={starting}

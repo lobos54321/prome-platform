@@ -765,6 +765,7 @@ export default function AutoMarketing() {
                             activePlatform={activePlatform || selectedPlatforms[0]}
                             enableSentiment={config.enableSentiment}
                             targetPlatforms={selectedPlatforms}
+                            onBack={() => setCurrentStep('platforms')}
                             onComplete={() => {
                                 // 🔥 运营完成后跳转到对应平台的管理页面
                                 const platform = activePlatform || selectedPlatforms[0] || 'xiaohongshu';
