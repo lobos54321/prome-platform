@@ -345,19 +345,19 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
             `请保持浏览器窗口打开。`
         );
 
-        try {
-            const result = await publishPromise;
-            if (result.success) {
-                setPublishStatus(prev => ({ ...prev, x: 'completed' }));
-                onPublishComplete?.('x', result);
-                alert('✅ 推文发布成功！');
-                return true;
-            } else {
-                setPublishStatus(prev => ({ ...prev, x: 'failed' }));
-                alert(`❌ 推文发布失败：${result.message || '未知错误'}`);
-                return false;
-            }
-        } catch (error: any) {
+            try {
+                const result = await publishPromise;
+                if (result.success) {
+                    setPublishStatus(prev => ({ ...prev, x: 'completed' }));
+                    onPublishComplete?.('x', result);
+                    alert('✅ 推文发布成功！');
+                    return true;
+                } else {
+                    setPublishStatus(prev => ({ ...prev, x: 'failed' }));
+                    alert(`❌ 推文发布失败：${result.message || '未知错误'}`);
+                    return false;
+                }
+            } catch (error: any) {
             console.error('[PlatformSelector] Twitter publish error:', error);
             setPublishStatus(prev => ({ ...prev, x: 'failed' }));
             alert(`❌ X 发布失败：${error.message}`);
