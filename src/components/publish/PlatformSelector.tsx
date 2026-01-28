@@ -260,25 +260,47 @@ export function PlatformSelector({ content, onPublishComplete }: PlatformSelecto
 
         // Twitter 字数限制：280 字符
         const TWITTER_MAX_CHARS = 280;
-        let tweetText = parsedContent;
 
-        // 添加 hashtags
-        if (parsedTags.length > 0) {
-            const hashtagStr = parsedTags.map(t => t.startsWith('#') ? t : `#${t}`).join(' ');
-            if (tweetText.length + hashtagStr.length + 1 <= TWITTER_MAX_CHARS) {
-                tweetText = `${tweetText}\n${hashtagStr}`;
-            }
+        // 1. 限制 hashtags 数量（最多5个）
+        const MAX_HASHTAGS = 5;
+        const limitedTags = parsedTags.slice(0, MAX_HASHTAGS);
+
+        // 2. 构建 hashtag 字符串
+        let hashtagStr = '';
+        if (limitedTags.length > 0) {
+            // 确保都有 # 前缀，并且用空格连接
+            hashtagStr = limitedTags
+                .map(t => t.trim())
+                .map(t => t.startsWith('#') ? t : `#${t}`)
+                .join(' ');
         }
 
-        // 截断到 280 字符
-        if (tweetText.length > TWITTER_MAX_CHARS) {
-            tweetText = tweetText.substring(0, TWITTER_MAX_CHARS - 3) + '...';
+        // 3. 构建完整文案：文案在前，Hashtag 在后
+        let finalContent = parsedContent;
+        if (hashtagStr) {
+            finalContent = `${parsedContent}\n\n${hashtagStr}`;
+        }
+
+        // 4. 智能截断
+        // 如果总长度超过限制
+        if (finalContent.length > TWITTER_MAX_CHARS) {
+            // 计算文案允许的最大长度 = 总限制 - hashtag长度 - 换行符(2) - 省略号(3)
+            const allowedContentLength = TWITTER_MAX_CHARS - hashtagStr.length - 5;
+
+            if (allowedContentLength > 10) {
+                // 如果还有足够空间放文案，就截断文案，保留完整 hashtag
+                finalContent = `${parsedContent.substring(0, allowedContentLength)}...\n\n${hashtagStr}`;
+            } else {
+                // 如果空间实在不够（hashtag太长），就只能丢弃部分 hashtag
+                // 简单粗暴截断整个字符串
+                finalContent = finalContent.substring(0, TWITTER_MAX_CHARS - 3) + '...';
+            }
         }
 
         // 构建发布数据
         const publishData = {
             taskId: Date.now().toString(),
-            text: tweetText,
+            text: finalContent,
             images: content.images || [],
         };
 
