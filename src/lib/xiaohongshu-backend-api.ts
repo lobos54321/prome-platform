@@ -685,8 +685,8 @@ export class XiaohongshuBackendAPI {
     try {
       console.log(`🔄 [BackendAPI] 重新生成 ${platform} 平台变体...`);
 
-      // 调用后端 Dify 简单聊天接口
-      const response = await fetch(`${this.baseURL.replace('/agent', '')}/api/dify/chat/simple`, {
+      // 🔥 使用前端后端的 Dify 接口（相对路径，由 Vite 代理转发）
+      const response = await fetch(`/api/dify/chat/simple`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
