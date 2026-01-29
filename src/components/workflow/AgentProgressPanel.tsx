@@ -746,7 +746,7 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                         {/* Completion Message */}
                         {isWorkflowCompleted && (
                             <div className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xl animate-in zoom-in-95 duration-500">
-                                <div className="flex items-center gap-4 mb-4">
+                                <div className="flex items-center gap-4">
                                     <div className="p-2 bg-white/20 rounded-full">
                                         <Zap size={24} className="text-white fill-white" />
                                     </div>
@@ -755,13 +755,6 @@ export const AgentProgressPanel: React.FC<AgentProgressPanelProps> = ({
                                         <p className="text-emerald-50 opacity-90 text-xs">内容已成功同步至待审任务列表</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => onComplete?.({ nodes, result: localResult })}
-                                    className="w-full py-3 bg-white text-emerald-600 font-black rounded-xl shadow-lg hover:bg-emerald-50 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <LayoutDashboard size={18} />
-                                    进入运营仪表盘
-                                </button>
                             </div>
                         )}
                     </div>
