@@ -338,6 +338,15 @@ export function ConfigSection({
           mode={getWorkflowMode()}
           // 🔥 传递目标平台列表
           targetPlatforms={initialConfig?.target_platforms || ['xiaohongshu']}
+          onRegeneratePlatformVariant={async (platform, prompt) => {
+            console.log(`🔄 重新生成 ${platform} 平台变体...`);
+            const result = await xiaohongshuAPI.regeneratePlatformVariant(platform, prompt);
+            if (result.success && result.data) {
+              return result.data;
+            }
+            console.error('重新生成变体失败:', result.error);
+            return null;
+          }}
           onClose={() => {
             setShowProgressPanel(false);
             // 关闭时也切换到 dashboard

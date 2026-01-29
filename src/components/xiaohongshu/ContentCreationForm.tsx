@@ -36,6 +36,7 @@ import type {
 } from '@/types/content';
 import { VIDEO_TYPE_CONFIG, UGC_CREDITS } from '@/types/content';
 import type { UserProfile } from '@/types/xiaohongshu';
+import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { MaterialUpload } from './MaterialUpload';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
@@ -547,6 +548,15 @@ export function ContentCreationForm({
                 <AgentProgressPanel
                     taskId={currentTaskId || undefined}
                     mode={getWorkflowMode()}
+                    onRegeneratePlatformVariant={async (platform, prompt) => {
+                        console.log(`🔄 重新生成 ${platform} 平台变体...`);
+                        const result = await xiaohongshuAPI.regeneratePlatformVariant(platform, prompt);
+                        if (result.success && result.data) {
+                            return result.data;
+                        }
+                        console.error('重新生成变体失败:', result.error);
+                        return null;
+                    }}
                     onClose={() => {
                         setShowProgressPanel(false);
                         setGenerating(false);

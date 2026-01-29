@@ -255,6 +255,15 @@ export function PreferencesSection({ onPrev, onComplete }: PreferencesSectionPro
           marketingGoal={marketingGoal}
           postFrequency={postFrequency}
           targetPlatforms={data.profile?.target_platforms || ['xiaohongshu']}
+          onRegeneratePlatformVariant={async (platform, prompt) => {
+            console.log(`🔄 重新生成 ${platform} 平台变体...`);
+            const result = await xiaohongshuAPI.regeneratePlatformVariant(platform, prompt);
+            if (result.success && result.data) {
+              return result.data;
+            }
+            console.error('重新生成变体失败:', result.error);
+            return null;
+          }}
           onClose={() => {
             setShowProgressPanel(false);
             setCurrentTaskId(null);

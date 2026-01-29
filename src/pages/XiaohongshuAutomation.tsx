@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { Loader2 } from 'lucide-react';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
@@ -119,6 +120,15 @@ export default function XiaohongshuAutomation() {
               localStorage.removeItem('prome_active_task');
               navigate('/auto');
             }
+          }}
+          onRegeneratePlatformVariant={async (platform, prompt) => {
+            console.log(`🔄 重新生成 ${platform} 平台变体...`);
+            const result = await xiaohongshuAPI.regeneratePlatformVariant(platform, prompt);
+            if (result.success && result.data) {
+              return result.data;
+            }
+            console.error('重新生成变体失败:', result.error);
+            return null;
           }}
           onClose={() => {
             localStorage.removeItem('prome_active_task');

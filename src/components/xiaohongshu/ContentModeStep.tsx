@@ -196,6 +196,15 @@ export function ContentModeStep({
                     targetPlatforms={selectedPlatforms}
                     // 🔥 重新配置回调
                     onReconfigure={onReconfigure}
+                    onRegeneratePlatformVariant={async (platform, prompt) => {
+                        console.log(`🔄 重新生成 ${platform} 平台变体...`);
+                        const result = await xiaohongshuAPI.regeneratePlatformVariant(platform, prompt);
+                        if (result.success && result.data) {
+                            return result.data;
+                        }
+                        console.error('重新生成变体失败:', result.error);
+                        return null;
+                    }}
                     onClose={() => {
                         setShowProgressPanel(false);
                         setCurrentTaskId(null);

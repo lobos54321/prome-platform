@@ -833,6 +833,15 @@ export function DashboardSection({
               // 刷新数据
               fetchData();
             }}
+            onRegeneratePlatformVariant={async (platform, prompt) => {
+              console.log(`🔄 重新生成 ${platform} 平台变体...`);
+              const result = await xiaohongshuAPI.regeneratePlatformVariant(platform, prompt);
+              if (result.success && result.data) {
+                return result.data;
+              }
+              console.error('重新生成变体失败:', result.error);
+              return null;
+            }}
             onPublish={async () => {
               // 🚀 发布到小红书 - 使用 Chrome 插件
               console.log('[AgentProgressPanel] onPublish triggered');

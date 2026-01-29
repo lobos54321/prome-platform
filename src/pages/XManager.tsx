@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Twitter, Construction, Rocket, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { xiaohongshuAPI } from '@/lib/xiaohongshu-backend-api';
 import { AgentProgressPanel } from '@/components/workflow';
 import { WorkflowMode } from '@/types/workflow';
 
@@ -99,6 +100,15 @@ export default function XManager() {
               localStorage.removeItem('prome_active_task');
               navigate('/auto');
             }
+          }}
+          onRegeneratePlatformVariant={async (platform, prompt) => {
+            console.log(`🔄 重新生成 ${platform} 平台变体...`);
+            const result = await xiaohongshuAPI.regeneratePlatformVariant(platform, prompt);
+            if (result.success && result.data) {
+              return result.data;
+            }
+            console.error('重新生成变体失败:', result.error);
+            return null;
           }}
           onClose={() => {
             localStorage.removeItem('prome_active_task');

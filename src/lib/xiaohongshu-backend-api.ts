@@ -673,6 +673,74 @@ export class XiaohongshuBackendAPI {
       return this.handleError(error);
     }
   }
+
+  /**
+   * 重新生成平台变体文案
+   * 使用 Dify API 根据 prompt 重新生成指定平台的变体文案
+   */
+  async regeneratePlatformVariant(
+    platform: string,
+    prompt: string
+  ): Promise<ApiResponse<{ platform: string; platformName: string; title: string; text: string; hashtags?: string[] }>> {
+    try {
+      console.log(`🔄 [BackendAPI] 重新生成 ${platform} 平台变体...`);
+
+      // 调用后端 Dify 简单聊天接口
+      const response = await fetch(`${this.baseURL.replace('/agent', '')}/api/dify/chat/simple`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: prompt,
+          user: `prome_variant_${Date.now()}`,
+        }),
+        signal: AbortSignal.timeout(60000), // 60秒超时
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ [BackendAPI] Dify 调用失败:`, errorText);
+        throw new Error(`Dify API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ [BackendAPI] Dify 响应:`, data);
+
+      // 解析 AI 返回的内容
+      const aiResponse = data.answer || data.data?.outputs?.text || '';
+
+      // 解析变体文案（期望格式：【标题】...【正文】...【标签】...）
+      const titleMatch = aiResponse.match(/【标题】\s*([\s\S]*?)(?=【正文】|$)/);
+      const textMatch = aiResponse.match(/【正文】\s*([\s\S]*?)(?=【标签】|$)/);
+      const hashtagMatch = aiResponse.match(/【标签】\s*([\s\S]*?)$/);
+
+      const platformNames: Record<string, string> = {
+        xiaohongshu: '小红书',
+        x: 'X (Twitter)',
+        tiktok: 'TikTok',
+        instagram: 'Instagram',
+        youtube: 'YouTube',
+        threads: 'Threads',
+      };
+
+      const result = {
+        platform,
+        platformName: platformNames[platform] || platform,
+        title: titleMatch ? titleMatch[1].trim() : '',
+        text: textMatch ? textMatch[1].trim() : aiResponse.trim(),
+        hashtags: hashtagMatch
+          ? hashtagMatch[1].trim().split(/\s+/).filter((tag: string) => tag.startsWith('#'))
+          : [],
+      };
+
+      console.log(`✅ [BackendAPI] 解析后的变体:`, result);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error(`❌ [BackendAPI] 重新生成变体失败:`, error);
+      return this.handleError(error);
+    }
+  }
 }
 
 // 导出单例
