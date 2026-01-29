@@ -67,27 +67,9 @@ export function ContentModeStep({
         x: { name: 'X (Twitter)', icon: '𝕏' },
     };
 
-    // 🔥 在组件加载时检查是否有正在进行的任务，并恢复进度面板
-    useEffect(() => {
-        try {
-            const savedTask = localStorage.getItem('prome_active_task');
-            if (savedTask) {
-                const task = JSON.parse(savedTask);
-                // 检查任务是否属于当前用户
-                if (task.supabaseUuid === supabaseUuid && task.taskId) {
-                    console.log('🔄 恢复进行中的任务:', task);
-                    setCurrentTaskId(task.taskId);
-                    // 恢复工作流模式
-                    if (task.mode) {
-                        setSelectedWorkflowMode(task.mode);
-                    }
-                    setShowProgressPanel(true);
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to restore active task:', e);
-        }
-    }, [supabaseUuid]);
+    // 🔥 注意：任务恢复逻辑已移至平台页面（XiaohongshuAutomation, XManager）
+    // ContentModeStep 不再自动恢复任务，避免在 /auto 页面时意外跳转
+    // 用户需要通过 /xiaohongshu 或 /x 页面刷新来恢复进行中的任务
 
     // 同步配置变化
     useEffect(() => {
