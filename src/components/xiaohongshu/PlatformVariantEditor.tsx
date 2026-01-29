@@ -225,6 +225,13 @@ export function PlatformVariantEditor({
     const [prompts, setPrompts] = useState<Record<string, string>>({});
     const [regenerating, setRegenerating] = useState<string | null>(null);
     const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
+    // 🔥 本地变体状态，用于存储重新生成的变体
+    const [localVariants, setLocalVariants] = useState<PlatformVariant[]>(variants);
+
+    // 🔥 当外部 variants 变化时同步到本地
+    useEffect(() => {
+        setLocalVariants(variants);
+    }, [variants]);
 
     // 初始化每个平台的默认 prompt
     useEffect(() => {
@@ -238,9 +245,9 @@ export function PlatformVariantEditor({
         setPrompts(initialPrompts);
     }, [targetPlatforms, motherCopy]);
 
-    // 获取当前平台的变体
+    // 获取当前平台的变体 - 🔥 使用本地状态
     const getCurrentVariant = (platformId: string): PlatformVariant | undefined => {
-        return variants.find(v => v.platform === platformId);
+        return localVariants.find(v => v.platform === platformId);
     };
 
     // 复制文案到剪贴板
@@ -253,12 +260,30 @@ export function PlatformVariantEditor({
 
     // 重新生成变体
     const handleRegenerate = async (platformId: string) => {
-        if (!onRegenerate) return;
+        if (!onRegenerate) {
+            console.warn('onRegenerate callback not provided');
+            return;
+        }
 
         setRegenerating(platformId);
         try {
             const prompt = prompts[platformId];
-            await onRegenerate(platformId, prompt);
+            console.log(`🔄 Regenerating variant for ${platformId}...`);
+            const newVariant = await onRegenerate(platformId, prompt);
+
+            // 🔥 更新本地变体状态
+            if (newVariant) {
+                console.log(`✅ Received new variant for ${platformId}:`, newVariant);
+                setLocalVariants(prev => {
+                    // 移除旧的同平台变体，添加新的
+                    const filtered = prev.filter(v => v.platform !== platformId);
+                    return [...filtered, newVariant];
+                });
+            } else {
+                console.warn(`❌ Failed to regenerate variant for ${platformId}`);
+            }
+        } catch (error) {
+            console.error(`Error regenerating variant for ${platformId}:`, error);
         } finally {
             setRegenerating(null);
         }
