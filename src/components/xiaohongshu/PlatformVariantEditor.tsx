@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     Settings2,
     RefreshCw,
@@ -20,7 +21,8 @@ import {
     Check,
     ChevronRight,
     Sparkles,
-    FileText
+    FileText,
+    AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -227,6 +229,10 @@ export function PlatformVariantEditor({
     const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
     // 🔥 本地变体状态，用于存储重新生成的变体
     const [localVariants, setLocalVariants] = useState<PlatformVariant[]>(variants);
+    // 🔥 错误状态
+    const [error, setError] = useState<string | null>(null);
+    // 🔥 成功提示
+    const [success, setSuccess] = useState<string | null>(null);
 
     // 🔥 当外部 variants 变化时同步到本地
     useEffect(() => {
@@ -262,13 +268,19 @@ export function PlatformVariantEditor({
     const handleRegenerate = async (platformId: string) => {
         if (!onRegenerate) {
             console.warn('onRegenerate callback not provided');
+            setError('重新生成功能未配置');
             return;
         }
 
         setRegenerating(platformId);
+        setError(null);
+        setSuccess(null);
+
         try {
             const prompt = prompts[platformId];
             console.log(`🔄 Regenerating variant for ${platformId}...`);
+            console.log(`📝 Prompt length: ${prompt?.length || 0} chars`);
+
             const newVariant = await onRegenerate(platformId, prompt);
 
             // 🔥 更新本地变体状态
@@ -279,11 +291,16 @@ export function PlatformVariantEditor({
                     const filtered = prev.filter(v => v.platform !== platformId);
                     return [...filtered, newVariant];
                 });
+                setSuccess(`${PLATFORM_RULES[platformId]?.displayName || platformId} 变体已重新生成！`);
+                // 3秒后清除成功提示
+                setTimeout(() => setSuccess(null), 3000);
             } else {
                 console.warn(`❌ Failed to regenerate variant for ${platformId}`);
+                setError('生成失败，请稍后重试。检查浏览器控制台获取详细信息。');
             }
         } catch (error) {
             console.error(`Error regenerating variant for ${platformId}:`, error);
+            setError(`生成出错: ${error instanceof Error ? error.message : '未知错误'}`);
         } finally {
             setRegenerating(null);
         }
@@ -328,6 +345,22 @@ export function PlatformVariantEditor({
                 </div>
             </CardHeader>
             <CardContent>
+                {/* 🔥 错误提示 */}
+                {error && (
+                    <Alert variant="destructive" className="mb-4">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                )}
+
+                {/* 🔥 成功提示 */}
+                {success && (
+                    <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+                        <Check className="h-4 w-4" />
+                        <AlertDescription>{success}</AlertDescription>
+                    </Alert>
+                )}
+
                 {/* 母文案展示 */}
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
                     <div className="flex items-center gap-2 mb-2">
