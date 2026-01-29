@@ -1,10 +1,11 @@
 /**
  * ContentModeStep - 内容形式偏好设置步骤
- * 
+ *
  * 用户设置内容形式偏好后，点击启动运营
  * 显示 AgentProgressPanel，完成后进入 Dashboard
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
@@ -46,6 +47,7 @@ export function ContentModeStep({
     onViewDashboard,
     onReconfigure,
 }: ContentModeStepProps) {
+    const navigate = useNavigate();
     const [showProgressPanel, setShowProgressPanel] = useState(false);
     const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
     const [selectedWorkflowMode, setSelectedWorkflowMode] = useState<WorkflowMode>(() => {
@@ -164,9 +166,8 @@ export function ContentModeStep({
             // 4. 显示进度面板
             console.log('🏁 [ContentModeStep] Step 4: Activating Progress Panel...');
             setCurrentTaskId(taskId);
-            setShowProgressPanel(true);
 
-            // 🔥 更新 URL 到对应平台（不触发路由跳转，只更新显示）
+            // 🔥 确定目标平台
             const platform = activePlatform || selectedPlatforms[0] || 'xiaohongshu';
             const platformUrls: Record<string, string> = {
                 xiaohongshu: '/xiaohongshu',
@@ -175,7 +176,6 @@ export function ContentModeStep({
                 instagram: '/instagram',
                 youtube: '/youtube',
             };
-            window.history.replaceState(null, '', platformUrls[platform] || '/xiaohongshu');
 
             // 🔥 保存任务状态到 localStorage，刷新页面后可恢复
             localStorage.setItem('prome_active_task', JSON.stringify({
@@ -186,6 +186,10 @@ export function ContentModeStep({
                 xhsUserId,
                 startedAt: new Date().toISOString(),
             }));
+
+            // 🔥 使用真正的路由跳转到对应平台页面
+            // 平台页面会检测 localStorage 中的任务并显示进度面板
+            navigate(platformUrls[platform] || '/xiaohongshu', { replace: true });
         } catch (err) {
             console.error('❌ [ContentModeStep] Operation failed:', err);
             setError(err instanceof Error ? err.message : '启动失败，请稍后重试');

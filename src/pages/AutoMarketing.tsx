@@ -51,20 +51,9 @@ const WORKFLOW_ACTIVE_PLATFORM_KEY = 'prome_auto_marketing_active_platform';
 export default function AutoMarketing() {
     const navigate = useNavigate();
 
-    // 🔥 从 localStorage 恢复初始步骤
-    const getInitialStep = (): Step => {
-        try {
-            const savedStep = localStorage.getItem(WORKFLOW_STEP_KEY);
-            if (savedStep && ['config', 'platforms', 'content-mode', 'redirect'].includes(savedStep)) {
-                return savedStep as Step;
-            }
-        } catch (e) {
-            console.warn('Failed to restore step from localStorage:', e);
-        }
-        return 'config';
-    };
-
-    const [currentStep, setCurrentStep] = useState<Step>(getInitialStep);
+    // 🔥 /auto 页面总是从 config 步骤开始
+    // 任务恢复的逻辑交给 /xiaohongshu 和 /x 等平台页面处理
+    const [currentStep, setCurrentStep] = useState<Step>('config');
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
