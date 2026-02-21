@@ -34,7 +34,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/use-auth';
 import { xiangongAPI } from '@/lib/xiangongyun-api';
-import { VideoEditor } from '@/components/video-editor';
 
 interface CopywritingResult {
   id: string;
@@ -113,8 +112,6 @@ const DigitalHumanVideoForm = forwardRef<DigitalHumanVideoFormRef, DigitalHumanV
       temporarySolution?: any;
     } | null>(null);
     const [userBalance, setUserBalance] = useState(user?.balance || 0);
-    const [showVideoEditor, setShowVideoEditor] = useState(false);
-    const [editedVideoUrl, setEditedVideoUrl] = useState<string | null>(null);
 
     // Voice model options
     const voiceModels = [
@@ -940,64 +937,32 @@ const DigitalHumanVideoForm = forwardRef<DigitalHumanVideoFormRef, DigitalHumanV
           <Card>
             <CardContent className="p-4">
               {videoResult.videoUrl ? (
-                showVideoEditor ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">视频剪辑</h3>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowVideoEditor(false)}
-                      >
-                        返回
-                      </Button>
-                    </div>
-                    <VideoEditor
-                      videoUrl={editedVideoUrl || videoResult.videoUrl}
-                      onExportComplete={(url) => {
-                        setEditedVideoUrl(url);
-                        setShowVideoEditor(false);
+                <div className="text-center">
+                  <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">视频生成完成!</h3>
+                  <div className="space-y-3">
+                    <a
+                      href={videoResult.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      查看视频
+                    </a>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setVideoResult(null);
+                        setTrainingStatus({ status: 'idle' });
                       }}
-                      onClose={() => setShowVideoEditor(false)}
-                    />
+                      className="ml-2"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      创建新数字人
+                    </Button>
                   </div>
-                ) : (
-                  <div className="text-center">
-                    <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">视频生成完成!</h3>
-                    <div className="space-y-3">
-                      <div className="flex gap-2 justify-center">
-                        <a
-                          href={editedVideoUrl || videoResult.videoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          查看视频
-                        </a>
-                        <Button
-                          onClick={() => setShowVideoEditor(true)}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Video className="h-4 w-4 mr-2" />
-                          剪辑视频
-                        </Button>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setVideoResult(null);
-                          setTrainingStatus({ status: 'idle' });
-                          setShowVideoEditor(false);
-                          setEditedVideoUrl(null);
-                        }}
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        创建新数字人
-                      </Button>
-                    </div>
-                  </div>
-                )
+                </div>
               ) : videoResult.status === 'manual_required' ? (
                 <div className="text-center space-y-4">
                   <AlertTriangle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />

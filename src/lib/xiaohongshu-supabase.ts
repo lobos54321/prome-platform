@@ -26,10 +26,9 @@ export class XiaohongshuSupabaseService {
   async getUserMapping(supabaseUuid: string): Promise<UserMapping | null> {
     console.log('🔍 [Supabase] 查询用户映射, UUID:', supabaseUuid);
 
-    // 使用 xhs_user_profiles 表，因为它已经包含了映射关系
     const { data, error } = await supabase
-      .from('xhs_user_profiles')
-      .select('supabase_uuid, xhs_user_id')
+      .from('xhs_user_mapping')
+      .select('*')
       .eq('supabase_uuid', supabaseUuid)
       .single();
 
@@ -50,17 +49,9 @@ export class XiaohongshuSupabaseService {
   async createUserMapping(mapping: Omit<UserMapping, 'created_at' | 'updated_at'>): Promise<void> {
     console.log('💾 [Supabase] 准备插入用户映射:', mapping);
 
-    // 使用 xhs_user_profiles 表来存储映射
-    // 如果记录已存在，则更新 xhs_user_id
     const { data, error } = await supabase
-      .from('xhs_user_profiles')
-      .upsert({
-        supabase_uuid: mapping.supabase_uuid,
-        xhs_user_id: mapping.xhs_user_id,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'supabase_uuid'
-      })
+      .from('xhs_user_mapping')
+      .insert(mapping)
       .select();
 
     if (error) {
@@ -427,9 +418,11 @@ export class XiaohongshuSupabaseService {
         .eq('supabase_uuid', supabaseUuid);
 
       // 清除用户映射（完全退出时）
-      // 注意：xhs_user_profiles 表包含映射关系，已在上面删除
       if (clearMapping) {
-        console.log('✅ 用户映射已随 xhs_user_profiles 一起删除');
+        await supabase
+          .from('xhs_user_mapping')
+          .delete()
+          .eq('supabase_uuid', supabaseUuid);
       }
 
       // 清除保存的 cookies（如果有这个表）

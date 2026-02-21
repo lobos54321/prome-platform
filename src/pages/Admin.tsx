@@ -9,7 +9,6 @@ import ModelManagement from './Admin/ModelManagement';
 import TokenConsumptionMonitor from './Admin/TokenConsumptionMonitor';
 import RechargePackageManagement from './Admin/RechargePackageManagement';
 import AdminDebugTools from './Admin/AdminDebugTools';
-import SystemConfig from './Admin/SystemConfig';
 import { WorkflowDiagnostics } from '@/components/WorkflowDiagnostics';
 
 export default function Admin() {
@@ -110,7 +109,6 @@ export default function Admin() {
           <TabsTrigger value="services">服务管理</TabsTrigger>
           <TabsTrigger value="stats">平台统计</TabsTrigger>
           <TabsTrigger value="debug">调试工具</TabsTrigger>
-          <TabsTrigger value="system-config">系统配置</TabsTrigger>
         </TabsList>
 
         <TabsContent value="models">
@@ -153,10 +151,6 @@ export default function Admin() {
 
         <TabsContent value="debug">
           <AdminDebugTools />
-        </TabsContent>
-
-        <TabsContent value="system-config">
-          <SystemConfig />
         </TabsContent>
       </Tabs>
     </div>

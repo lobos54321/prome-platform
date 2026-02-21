@@ -224,6 +224,6 @@ export interface ProductConfig {
   brandStyle: 'professional' | 'warm' | 'humorous' | 'minimalist';
   reviewMode: 'auto' | 'manual';
   taskId?: string;
-  contentModePreference?: string | string[];
+  contentModePreference?: string;
   targetPlatforms?: string[]; // 🔥 目标发布平台：xiaohongshu, x, tiktok, instagram, youtube
 }

@@ -58,11 +58,6 @@ export function ContentModeStep({
     });
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // 🔥 多模式支持：存储所有选中的内容模式
-    const [selectedContentModes, setSelectedContentModes] = useState<string[]>(() => {
-        const pref = userProfile?.content_mode_preference;
-        return pref ? [pref] : ['IMAGE_TEXT'];
-    });
     // 🔥 目标发布平台 - 优先使用 prop 传入的值，其次是 userProfile，最后是默认值
     const selectedPlatforms = propTargetPlatforms || userProfile?.target_platforms || ['xiaohongshu'];
 
@@ -113,7 +108,7 @@ export function ContentModeStep({
                 brandStyle: userProfile.brand_style || 'warm',
                 reviewMode: (userProfile.review_mode as any) || 'manual',
                 taskId, // 传递任务ID
-                contentModePreference: selectedContentModes.length > 1 ? selectedContentModes : selectedWorkflowMode, // 🔥 多模式传数组，单模式传字符串
+                contentModePreference: selectedWorkflowMode, // 🔥 使用当前选择的模式而非 userProfile 中的旧值
                 targetPlatforms: selectedPlatforms, // 🔥 传递选择的目标平台
                 enableSentiment, // 🔥 舆情开关
             });
@@ -267,9 +262,7 @@ export function ContentModeStep({
                         initialUgcDuration={userProfile?.ugc_duration}
                         onConfigChange={(config) => {
                             console.log('内容形式偏好已更新:', config);
-                            // 🔥 保存多选模式
-                            setSelectedContentModes(config.selectedModes);
-                            // 更新 selectedWorkflowMode 用于 AgentProgressPanel（取第一个）
+                            // 更新 selectedWorkflowMode 用于 AgentProgressPanel
                             if (config.selectedModes.length > 0) {
                                 const mode = config.selectedModes[0];
                                 switch (mode) {
